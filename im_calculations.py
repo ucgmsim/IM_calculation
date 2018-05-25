@@ -9,12 +9,13 @@ def get_max(data):
 
 def get_spectral_acceleration(acceleration, period, constants, NT, DT):
     # pSA
-
-    deltat = constants["deltat"]
-    c = constants["c"]
-    M = constants["M"]
-    beta = constants["beta"]
-    gamma = constants["gamma"]
+    deltat = 0.005
+    c = 0.05
+    M = 1.0
+    beta = 0.25
+    gamma = 0.5
+    extended_period = np.logspace(start=np.log10(0.01), stop=np.log10(10.), num=100, base=10)
+    basic_period = [0.02, 0.05, 0.1, 0.2, 0.3, 0.4, 0.5, 0.75, 1.0, 2.0, 3.0, 4.0, 5.0, 7.5, 10.0]
 
     acc_step = np.zeros(NT + 1)
     acc_step[1:] = acceleration

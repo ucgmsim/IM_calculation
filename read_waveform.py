@@ -1,10 +1,11 @@
+#TODO ADD velocities attribute calculation for standard file waveform obj
 import sys
 import os
 import numpy as np
 import im_calculations
 
 sys.path.append('../qcore/qcore/')
-from timeseries import BBSeis
+import timeseries
 
 G = 981.0
 MEASURES  = ['AI', 'CAV', 'Ds575', 'Ds595', 'PGA', 'PGV', 'pSA', 'MMI']
@@ -16,19 +17,20 @@ PSA_PARAMS = {
     "c": 0.05,
     "deltat": 0.005,
     "extented_period": np.logspace(start=np.log10(0.01), stop=np.log10(10.), num=100, base=10),
-    "karim20_period":[0.02,0.05,0.1,0.2,0.3,0.4,0.5,0.75,1.0,2.0,3.0,4.0,5.0,7.5,10.0]
+    "basic_period": [0.02, 0.05, 0.1, 0.2, 0.3, 0.4, 0.5, 0.75, 1.0, 2.0, 3.0, 4.0, 5.0, 7.5, 10.0]
 }
 
 
 class Waveform:
-    def __init__(self, NT=None, DT=None, time_offset=None, values=None, wave_type=None, file_type=None, times=None,
+    def __init__(self, NT=None, DT=None, time_offset=None, values=None, velocities=None, wave_type=None, file_type=None, times=None,
                  station_name=None):
-        self.NT = NT
-        self.DT = DT
-        self.times = times
+        self.NT = NT  # number of entries  how many data points on the plot
+        self.DT = DT  # time step
+        self.times = times  # array of x values
         self.values = values
+        self.velocities = velocities
         self.time_offset = time_offset
-        self.wave_type = wave_type
+        self.wave_type = wave_type  # v or a
         self.file_type = file_type
         self.station_name = station_name
 
@@ -87,7 +89,7 @@ def create_waveform_from_data(data, wave_type=None, base_waveform=None, NT=None,
     return waveform
 
 
-def read_file(filename, wave_type=None, file_type=None):
+def read_file(filename, station_name=None, comp=Ellipsis, wave_type=None, file_type=None):
     try:
         fid = open(filename)
     except IOError:
@@ -97,45 +99,52 @@ def read_file(filename, wave_type=None, file_type=None):
     extension = os.path.splitext(filename)[-1]
     if file_type == 'standard' or extension in ['.000', '.090', '.ver']:
         return read_standard_file(fid, wave_type, 'standard')
+    elif file_type == 'binary':
+        return read_binary_file(filename, station_name, comp, wave_type=wave_type, file_type='binary')
     else:
         print "Could not determine filetype %s Ignoring this station" % filename
         return None
 
 
+def read_one_station_from_bbseries(bbseries, station_name, comp, wave_type=None, file_type=None):
+    waveform = Waveform()  # instance of Waveform
+    waveform.wave_type = wave_type
+    waveform.file_type = file_type
+    waveform.station_name = station_name
+    waveform.NT = bbseries.nt   # number of timesteps
+    waveform.DT = bbseries.dt   # time step
+    waveform.time_offset = bbseries.start_sec   # time offset
+    waveform.times = calculate_timesteps(waveform.NT, waveform.DT)  # array of time values
 
-def read_station_from_binary(input_path,station_name=None):
-    bbseries = BBSeis(input_path)
+    # print("nunber of timesteps",waveform.NT)
+    # print("time step", waveform.DT)
+    # print("duration", bbseries.duration)
+    # print("stations", bbseries.stations)
 
-    if not station_name:
-        return bbseries.stations
+    try:
+        waveform.values = bbseries.acc(station=station_name, comp=comp)  # get timeseries/acc for a station
+        waveform.velocities = timeseries.acc2vel(waveform.values, waveform.DT)
+    except KeyError:
+        sys.exit("staiton name {} does not exist".format(station_name))
+    return waveform
+
+
+def read_binary_file(input_path, comp, station_name=None, wave_type=None, file_type=None):
+    bbseries = timeseries.BBSeis(input_path)
+
+    if station_name:
+        waveform = read_one_station_from_bbseries(bbseries, comp, station_name, wave_type=wave_type, file_type=file_type)
+        return waveform
     else:
-        try:
-            station_index = bbseries.stat_idx[station_name]
-        except KeyError:
-            sys.exit("staiton name {} does not exist".format(station_name))
-        return bbseries.stations[station_index]
-
-
-# def compute_measures(input_path, station_name=None, ims=MEASURES, component=Ellipsis, period=20, extended_period=False,meta_data=None, output='.'):
-#     if isinstance(ims, str):
-#         ims = ims.split()   # if only one measure is provided, make it into a list
-#
-#     for im in ims:
-
-
-
-
-
-
-
-
-
-
-
-
+        waveforms = []
+        station_names = bbseries.stations.name
+        for station_name in station_names:
+            waveform = read_one_station_from_bbseries(bbseries, comp, station_name, wave_type=wave_type, file_type=file_type)
+            waveforms.append(waveform)
+        return waveforms
 
 
 if __name__ == '__main__':
-    print(read_station_from_binary('../BB.bin',station_name='112A'))
+    print(read_file('../BB.bin', station_name='112A', file_type='binary'))
 
 
