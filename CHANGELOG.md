@@ -11,4 +11,7 @@ Added
 
 [18.5.1] - 2017-05-24 -- Initial Version
 Added
-    Rudimentary rrup calculation script
+    rrup calculation script
+    R_x template code
+Changed
+    modified rrup.csv output to conform to the template on wiki	

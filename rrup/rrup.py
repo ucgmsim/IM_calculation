@@ -65,8 +65,10 @@ def computeSourcetoSiteDistance(finite_fault, Site):
     Based on ComputeSourceToSiteDistance.m """
 
     # start values, no distance should be longer than this
-    rjb = sys.maxsize
-    rrup = sys.maxsize
+    r_jb = sys.maxsize
+    r_rup = sys.maxsize
+    r_x = sys.maxsize
+    min_depth = sys.maxsize
 
     # for subfaults, calculate distance, update if shortest
     for fault_i in finite_fault:
@@ -74,14 +76,18 @@ def computeSourcetoSiteDistance(finite_fault, Site):
         h = horizdist(Site, fault_i['lat'], fault_i['lon'])
         v = Site.Depth - fault_i['depth']
 
-        if abs(h) < rjb:
-            rjb = h
+        if v < min_depth:
+            min_depth = v
+            r_x = h
+
+        if abs(h) < r_jb:
+            r_jb = h
 
         d = sqrt(h ** 2 + v ** 2)
-        if d < rrup:
-            rrup = d
+        if d < r_rup:
+            r_rup = d
 
-    return rrup, rjb
+    return r_rup, r_jb, r_x
 
 
 def source_to_distance(packaged_data):
@@ -89,7 +95,7 @@ def source_to_distance(packaged_data):
     return station_name, station.Lat, station.Lon, computeSourcetoSiteDistance(finite_fault, station)
 
 
-def computeRrup(db, station_file, srf_file, match_stations, n_processes):
+def computeRrup(station_file, srf_file, match_stations, n_processes):
     """Wrapper function to calculate the rupture distance from the station and srf files"""
 
     # read in list of stations
@@ -111,9 +117,4 @@ def computeRrup(db, station_file, srf_file, match_stations, n_processes):
     for station_name, station in stations.iteritems():
         packaged_data_list.append((finite_fault, station, station_name))
 
-    results = p.map(source_to_distance, packaged_data_list)
-
-    for values in results:
-        name, lat, lon, (r_rups, r_jbs) = values
-        db.add_rrups_to_station(name, lat, lon, r_rups, r_jbs)
-        db.save()
+    return p.map(source_to_distance, packaged_data_list)
