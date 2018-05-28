@@ -90,6 +90,30 @@ def getDs_nd(dt, fx, percLow=5, percHigh=75):
     return results
 
 
+def get_arias_intensity_nd(acceleration, g, times):
+    results, cols = get_cols(acceleration)
+    print(results, cols)
+    for col in range(cols):
+        print(col)
+        acc_col = acceleration[:, col]
+        acc_in_cms = acc_col * g
+        integrand = acc_in_cms ** 2
+        ai = np.pi / (2 * g) * np.trapz(integrand, times)
+        results = get_result(results, ai)
+    return results
+
+
+def get_cumulative_abs_velocity_nd(acceleration, times):
+    results, cols = get_cols(acceleration)
+    print(results, cols)
+    for col in range(cols):
+        print(col)
+        acc_col = acceleration[:, col]
+        cav = np.trapz(np.abs(acc_col), times)
+        results = get_result(results, cav)
+    return results
+
+
 def get_cols(fx):
     print(fx.shape)
     try:

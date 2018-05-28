@@ -27,7 +27,7 @@ class Waveform:
         self.NT = NT  # number of entries  how many data points on the plot
         self.DT = DT  # time step
         self.times = times  # array of x values
-        self.values = values
+        self.values = values  # v
         self.time_offset = time_offset
         self.wave_type = wave_type  # v or a
         self.file_type = file_type
@@ -121,7 +121,7 @@ def read_one_station_from_bbseries(bbseries, station_name, comp, wave_type=None,
     # print("stations", bbseries.stations)
 
     try:
-        waveform.values = bbseries.acc(station=station_name, comp=comp)  # get timeseries/acc for a station
+        waveform.values = bbseries.vel(station=station_name, comp=comp)  # get timeseries/vel for a station
     except KeyError:
         sys.exit("staiton name {} does not exist".format(station_name))
     return waveform

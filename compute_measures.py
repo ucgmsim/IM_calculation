@@ -9,7 +9,6 @@ import read_waveform
 sys.path.append('../qcore/qcore/')
 import timeseries
 
-
 G = 981.0
 OUTPUT = 'computed_measures'
 IMS = 'PGV PGA CAV AI Ds575 Ds595 pSA'
@@ -30,10 +29,21 @@ def calc_nd_array(comp, oned_calc_func, extra_args):
     return value
 
 
+def get_acc(velocities, DT):
+    try:
+        accelerations = timeseries.vel2acc(velocities,DT)
+    except ValueError:
+        print("value error")
+        accelerations = timeseries.vel2acc3d(velocities, DT)
+    return accelerations
+
+
 def compute_measures(input_path, file_type, wave_type, station_name=None, ims=IMS, comp=None, period=None, extended_period=False, meta_data=None, output=OUTPUT):
     waveform = read_waveform.read_file(input_path, station_name, comp, wave_type=wave_type, file_type=file_type)
-    accelerations = waveform.values
+    velocities = waveform.values
     DT = waveform.DT
+    print(velocities.shape)
+    print(velocities)
     times = waveform.times
 
     ims = ims.strip().split()
@@ -42,73 +52,36 @@ def compute_measures(input_path, file_type, wave_type, station_name=None, ims=IM
     result = {}
 
     for im in ims:
-        # if im == 'PGV':
-        #     velocities = timeseries.acc2vel(waveform.values, waveform.DT)
-        #     print("vel pgv",velocities)
-        #     print(np.max(np.abs(velocities)))
-        #     value = im_calculations.get_max(velocities)
-        #
-        # if im == "PGA":
-        #     value = im_calculations.get_max(accelerations)
+        if im == 'PGV':
+            print("vel pgv",velocities)
+            print(np.max(np.abs(velocities)))
+            value = im_calculations.get_max(velocities)
+
+        if im == "PGA":
+            accelerations = get_acc(velocities, DT)
+            value = im_calculations.get_max(accelerations)
         # # if im == "pSA":
         #     value = im_calculations.get_spectral_acceleration(accelerations, period, self.constants,
         #                                                       acceleration.NT, acceleration.DT)
         if im == "Ds595":
+            accelerations = get_acc(velocities, DT)
             value = im_calculations.getDs_nd(DT, accelerations, 5, 95)
-            # if comp and comp != Ellipsis:
-            #     try:
-            #         value = im_calculations.getDs(DT, accelerations, 5, 95)
-            #     except ValueError:
-            #         sys.exit("Please check if you've entered a correct single ground motion component")
-            # else:
-            #     values = []
-            #     for i in range(3):
-            #         single_comp = im_calculations.getDs(DT, accelerations[:, i], 5, 95)
-            #         values.append(single_comp)
-            #     value = values
+            print(value)
 
-        # if im == "Ds575":
-        #     if comp and comp != Ellipsis:
-        #         try:
-        #             value = im_calculations.getDs(DT, accelerations, 5, 75)
-        #         except ValueError:
-        #             sys.exit("Please check if you've entered a correct single ground motion component")
-        #     else:
-        #         values = []
-        #         for i in range(3):
-        #             single_comp = im_calculations.getDs(DT, accelerations, 5, 75)
-        #             values.append(single_comp)
-        #         value = values
-        #
-        # if im == "AI":
-        #     if comp and comp != Ellipsis:
-        #         try:
-        #             value = im_calculations.get_arias_intensity(accelerations, G, times)
-        #         except ValueError:
-        #             sys.exit("Please check if you've entered a correct single ground motion component")
-        #     else:
-        #         values = []
-        #         for i in range(3):
-        #             single_comp = im_calculations.get_arias_intensity(accelerations[:, i], G, times)
-        #             values.append(single_comp)
-        #         value = values
-        #
-        # if im == "CAV":
-        #     if comp and comp != Ellipsis:
-        #         try:
-        #             value = im_calculations.get_cumulative_abs_velocity(accelerations, times)
-        #         except ValueError:
-        #             sys.exit("Please check if you've entered a correct single ground motion component")
-        #     else:
-        #         values = []
-        #         for i in range(3):
-        #             single_comp = im_calculations.get_cumulative_abs_velocity(accelerations[:, i], times)
-        #             values.append(single_comp)
-        #         value = values
-        #
-        # if im == "MMI":
-        #     velocities = timeseries.acc2vel(waveform.values, waveform.DT)
-        #     value = im_calculations.calculate_MMI(velocities)
+        if im == "Ds575":
+            accelerations = get_acc(velocities, DT)
+            value = im_calculations.getDs_nd(DT, accelerations, 5, 75)
+
+        if im == "AI":
+            accelerations = get_acc(velocities, DT)
+            value = im_calculations.get_arias_intensity_nd(accelerations, G, times)
+
+        if im == "CAV":
+            accelerations = get_acc(velocities, DT)
+            value = im_calculations.get_cumulative_abs_velocity_nd(accelerations, times)
+
+        if im == "MMI":
+            value = im_calculations.calculate_MMI(velocities)
 
         if value:
             if im == "pSA":
@@ -148,3 +121,17 @@ if __name__ == '__main__':
 
     compute_measures(args.input_path, file_type, wave_type=None, station_name='112A', ims=IMS, comp=Ellipsis, period=None,
                      extended_period=False, meta_data=None, output=OUTPUT)
+
+
+
+ # if comp and comp != Ellipsis:
+            #     try:
+            #         value = im_calculations.getDs(DT, accelerations, 5, 95)
+            #     except ValueError:
+            #         sys.exit("Please check if you've entered a correct single ground motion component")
+            # else:
+            #     values = []
+            #     for i in range(3):
+            #         single_comp = im_calculations.getDs(DT, accelerations[:, i], 5, 95)
+            #         values.append(single_comp)
+            #     value = values
