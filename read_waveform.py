@@ -22,13 +22,12 @@ PSA_PARAMS = {
 
 
 class Waveform:
-    def __init__(self, NT=None, DT=None, time_offset=None, values=None, velocities=None, wave_type=None, file_type=None, times=None,
+    def __init__(self, NT=None, DT=None, time_offset=None, values=None, wave_type=None, file_type=None, times=None,
                  station_name=None):
         self.NT = NT  # number of entries  how many data points on the plot
         self.DT = DT  # time step
         self.times = times  # array of x values
         self.values = values
-        self.velocities = velocities
         self.time_offset = time_offset
         self.wave_type = wave_type  # v or a
         self.file_type = file_type
@@ -123,7 +122,6 @@ def read_one_station_from_bbseries(bbseries, station_name, comp, wave_type=None,
 
     try:
         waveform.values = bbseries.acc(station=station_name, comp=comp)  # get timeseries/acc for a station
-        waveform.velocities = timeseries.acc2vel(waveform.values, waveform.DT)
     except KeyError:
         sys.exit("staiton name {} does not exist".format(station_name))
     return waveform

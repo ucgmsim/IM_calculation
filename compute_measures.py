@@ -6,14 +6,32 @@ import numpy as np
 import im_calculations
 import read_waveform
 
+sys.path.append('../qcore/qcore/')
+import timeseries
+
+
 G = 981.0
 OUTPUT = 'computed_measures'
 IMS = 'PGV PGA CAV AI Ds575 Ds595 pSA'
 
 
-def compute_measures(input_path, file_type, wave_type, station_name=None, ims=IMS, comp=Ellipsis, period=None, extended_period=False, meta_data=None, output=OUTPUT):
+def calc_nd_array(comp, oned_calc_func, extra_args):
+    if comp and comp != Ellipsis:
+        try:
+            value = oned_calc_func(*extra_args)
+        except ValueError:
+            sys.exit("Please check if you've entered a correct single ground motion component")
+    else:
+        values = []
+        for i in range(3):
+            single_comp = oned_calc_func(extra_args)
+            values.append(single_comp)
+        value = values
+    return value
+
+
+def compute_measures(input_path, file_type, wave_type, station_name=None, ims=IMS, comp=None, period=None, extended_period=False, meta_data=None, output=OUTPUT):
     waveform = read_waveform.read_file(input_path, station_name, comp, wave_type=wave_type, file_type=file_type)
-    velocities = waveform.velocities
     accelerations = waveform.values
     DT = waveform.DT
     times = waveform.times
@@ -24,31 +42,84 @@ def compute_measures(input_path, file_type, wave_type, station_name=None, ims=IM
     result = {}
 
     for im in ims:
-        if im == 'PGV':
-            value = im_calculations.get_max(velocities)
-        if im == "PGA":
-            value = im_calculations.get_max(accelerations)
-        # if im == "pSA":
+        # if im == 'PGV':
+        #     velocities = timeseries.acc2vel(waveform.values, waveform.DT)
+        #     print("vel pgv",velocities)
+        #     print(np.max(np.abs(velocities)))
+        #     value = im_calculations.get_max(velocities)
+        #
+        # if im == "PGA":
+        #     value = im_calculations.get_max(accelerations)
+        # # if im == "pSA":
         #     value = im_calculations.get_spectral_acceleration(accelerations, period, self.constants,
         #                                                       acceleration.NT, acceleration.DT)
-        # if im == "Ds595":
-        #     value = im_calculations.getDs(DT, accelerations, 5, 95)
+        if im == "Ds595":
+            value = im_calculations.getDs_nd(DT, accelerations, 5, 95)
+            # if comp and comp != Ellipsis:
+            #     try:
+            #         value = im_calculations.getDs(DT, accelerations, 5, 95)
+            #     except ValueError:
+            #         sys.exit("Please check if you've entered a correct single ground motion component")
+            # else:
+            #     values = []
+            #     for i in range(3):
+            #         single_comp = im_calculations.getDs(DT, accelerations[:, i], 5, 95)
+            #         values.append(single_comp)
+            #     value = values
+
         # if im == "Ds575":
-        #     value = im_calculations.getDs(DT, accelerations, 5, 75)
+        #     if comp and comp != Ellipsis:
+        #         try:
+        #             value = im_calculations.getDs(DT, accelerations, 5, 75)
+        #         except ValueError:
+        #             sys.exit("Please check if you've entered a correct single ground motion component")
+        #     else:
+        #         values = []
+        #         for i in range(3):
+        #             single_comp = im_calculations.getDs(DT, accelerations, 5, 75)
+        #             values.append(single_comp)
+        #         value = values
+        #
         # if im == "AI":
-        #     value = im_calculations.get_arias_intensity(accelerations, G, times)
+        #     if comp and comp != Ellipsis:
+        #         try:
+        #             value = im_calculations.get_arias_intensity(accelerations, G, times)
+        #         except ValueError:
+        #             sys.exit("Please check if you've entered a correct single ground motion component")
+        #     else:
+        #         values = []
+        #         for i in range(3):
+        #             single_comp = im_calculations.get_arias_intensity(accelerations[:, i], G, times)
+        #             values.append(single_comp)
+        #         value = values
+        #
         # if im == "CAV":
-        #     value = im_calculations.get_cumulative_abs_velocity(accelerations, times)
+        #     if comp and comp != Ellipsis:
+        #         try:
+        #             value = im_calculations.get_cumulative_abs_velocity(accelerations, times)
+        #         except ValueError:
+        #             sys.exit("Please check if you've entered a correct single ground motion component")
+        #     else:
+        #         values = []
+        #         for i in range(3):
+        #             single_comp = im_calculations.get_cumulative_abs_velocity(accelerations[:, i], times)
+        #             values.append(single_comp)
+        #         value = values
+        #
         # if im == "MMI":
+        #     velocities = timeseries.acc2vel(waveform.values, waveform.DT)
         #     value = im_calculations.calculate_MMI(velocities)
 
-    #     if value:
-    #         if im == "pSA":
-    #             result["pSA"] = (period, value)
-    #         else:
-    #             result[im] = value
-    # print(result)
-    # return result
+        if value:
+            if im == "pSA":
+                result["pSA"] = (period, value)
+            else:
+                result[im] = value
+    print(result)
+    return result
+
+
+
 
 
 if __name__ == '__main__':
