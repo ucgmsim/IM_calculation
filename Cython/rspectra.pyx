@@ -30,7 +30,7 @@ def Response_Spectra(np.ndarray[np.float64_t, ndim=1] acc, double dt, double xi,
     cdef np.ndarray[np.float64_t, ndim=1] du2 = np.zeros(Np-1, dtype=float)
     cdef np.ndarray[np.float64_t, ndim=1] u1 = np.zeros(Np, dtype=float)
     cdef np.ndarray[np.float64_t, ndim=1] u2 = np.zeros(Np, dtype=float)
- 
+
     p=-m*acc        #always same so move outside loop
 
     for i_T in range(Nt):

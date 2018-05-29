@@ -10,15 +10,6 @@ import timeseries
 G = 981.0
 MEASURES  = ['AI', 'CAV', 'Ds575', 'Ds595', 'PGA', 'PGV', 'pSA', 'MMI']
 EXTENSIONS = ["000", "090", "ver"]
-PSA_PARAMS = {
-    "M": 1.0,
-    "beta": 0.25,
-    "gamma": 0.5,
-    "c": 0.05,
-    "deltat": 0.005,
-    "extented_period": np.logspace(start=np.log10(0.01), stop=np.log10(10.), num=100, base=10),
-    "basic_period": [0.02, 0.05, 0.1, 0.2, 0.3, 0.4, 0.5, 0.75, 1.0, 2.0, 3.0, 4.0, 5.0, 7.5, 10.0]
-}
 
 
 class Waveform:
@@ -99,7 +90,7 @@ def read_file(filename, station_name=None, comp=Ellipsis, wave_type=None, file_t
     if file_type == 'standard' or extension in ['.000', '.090', '.ver']:
         return read_standard_file(fid, wave_type, 'standard')
     elif file_type == 'binary':
-        return read_binary_file(filename, station_name, comp, wave_type=wave_type, file_type='binary')
+        return read_binary_file(filename, comp, station_name, wave_type=wave_type, file_type='binary')
     else:
         print "Could not determine filetype %s Ignoring this station" % filename
         return None
@@ -121,7 +112,9 @@ def read_one_station_from_bbseries(bbseries, station_name, comp, wave_type=None,
     # print("stations", bbseries.stations)
 
     try:
-        waveform.values = bbseries.vel(station=station_name, comp=comp)  # get timeseries/vel for a station
+        print("start values",station_name,comp)
+        waveform.values = bbseries.acc(station=station_name, comp=comp)  # get timeseries/acc for a station
+        print(waveform.values)
     except KeyError:
         sys.exit("staiton name {} does not exist".format(station_name))
     return waveform
@@ -131,13 +124,13 @@ def read_binary_file(input_path, comp, station_name=None, wave_type=None, file_t
     bbseries = timeseries.BBSeis(input_path)
 
     if station_name:
-        waveform = read_one_station_from_bbseries(bbseries, comp, station_name, wave_type=wave_type, file_type=file_type)
+        waveform = read_one_station_from_bbseries(bbseries, station_name, comp, wave_type=wave_type, file_type=file_type)
         return waveform
     else:
         waveforms = []
         station_names = bbseries.stations.name
         for station_name in station_names:
-            waveform = read_one_station_from_bbseries(bbseries, comp, station_name, wave_type=wave_type, file_type=file_type)
+            waveform = read_one_station_from_bbseries(bbseries, station_name, comp, wave_type=wave_type, file_type=file_type)
             waveforms.append(waveform)
         return waveforms
 

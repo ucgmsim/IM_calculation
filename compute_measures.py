@@ -1,3 +1,4 @@
+#TODO check correctness of nd calc
 import sys
 import os
 import argparse
@@ -11,7 +12,7 @@ import timeseries
 
 G = 981.0
 OUTPUT = 'computed_measures'
-IMS = 'PGV PGA CAV AI Ds575 Ds595 pSA'
+IMS = 'PGV PGA CAV AI Ds575 Ds595 pSA MMI'
 
 
 def calc_nd_array(comp, oned_calc_func, extra_args):
@@ -38,12 +39,12 @@ def get_acc(velocities, DT):
     return accelerations
 
 
-def compute_measures(input_path, file_type, wave_type, station_name=None, ims=IMS, comp=None, period=None, extended_period=False, meta_data=None, output=OUTPUT):
+def compute_measures(input_path, file_type, wave_type, station_name=None, ims=IMS, comp=None, period=im_calculations.BSC_PERIOD, extended_period=False, meta_data=None, output=OUTPUT):
     waveform = read_waveform.read_file(input_path, station_name, comp, wave_type=wave_type, file_type=file_type)
-    velocities = waveform.values
+    accelerations = waveform.values
+    print(accelerations.shape)
     DT = waveform.DT
-    print(velocities.shape)
-    print(velocities)
+    print("pppp",period)
     times = waveform.times
 
     ims = ims.strip().split()
@@ -53,37 +54,40 @@ def compute_measures(input_path, file_type, wave_type, station_name=None, ims=IM
 
     for im in ims:
         if im == 'PGV':
-            print("vel pgv",velocities)
-            print(np.max(np.abs(velocities)))
-            value = im_calculations.get_max(velocities)
+            velocities = timeseries.acc2vel(accelerations, DT)
+            value = im_calculations.get_max_nd(velocities)
+            print("pgv", value)
 
         if im == "PGA":
-            accelerations = get_acc(velocities, DT)
-            value = im_calculations.get_max(accelerations)
-        # # if im == "pSA":
-        #     value = im_calculations.get_spectral_acceleration(accelerations, period, self.constants,
-        #                                                       acceleration.NT, acceleration.DT)
+            value = im_calculations.get_max_nd(accelerations)
+            print("pga",value)
+
+        if im == "pSA":
+            value = im_calculations.get_spectral_acceleration_nd(accelerations, period, waveform.NT, DT, extended_period)
+            print("psa",value)
+
         if im == "Ds595":
-            accelerations = get_acc(velocities, DT)
             value = im_calculations.getDs_nd(DT, accelerations, 5, 95)
-            print(value)
+            print("ds595",value)
 
         if im == "Ds575":
-            accelerations = get_acc(velocities, DT)
             value = im_calculations.getDs_nd(DT, accelerations, 5, 75)
+            print("ds575",value)
 
         if im == "AI":
-            accelerations = get_acc(velocities, DT)
             value = im_calculations.get_arias_intensity_nd(accelerations, G, times)
+            print("ai", value)
 
         if im == "CAV":
-            accelerations = get_acc(velocities, DT)
             value = im_calculations.get_cumulative_abs_velocity_nd(accelerations, times)
-
+            print("cav", value)
+        #
         if im == "MMI":
+            velocities = timeseries.acc2vel(accelerations, DT)
             value = im_calculations.calculate_MMI(velocities)
+            print("mmi",value)
 
-        if value:
+        if value.any() or value:
             if im == "pSA":
                 result["pSA"] = (period, value)
             else:
@@ -119,7 +123,7 @@ if __name__ == '__main__':
     elif args.binary:
         file_type = 'binary'
 
-    compute_measures(args.input_path, file_type, wave_type=None, station_name='112A', ims=IMS, comp=Ellipsis, period=None,
+    compute_measures(args.input_path, file_type, wave_type=None, station_name='112A', ims=IMS, comp=Ellipsis, period=im_calculations.BSC_PERIOD,
                      extended_period=False, meta_data=None, output=OUTPUT)
 
 

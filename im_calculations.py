@@ -1,13 +1,31 @@
-#from Cython import rspectra as rspectra
+from Cython import rspectra as rspectra
 import numpy as np
 from qcore import timeseries
+
+# pSA
+DELTA = 0.005
+C = 0.05
+M = 1.0
+BETA = 0.25
+GAMMA = 0.5
+EXT_PERIOD = np.logspace(start=np.log10(0.01), stop=np.log10(10.), num=100, base=10)
+BSC_PERIOD = np.array([0.02, 0.05, 0.1, 0.2, 0.3, 0.4, 0.5, 0.75, 1.0, 2.0, 3.0, 4.0, 5.0, 7.5, 10.0])
+
 
 def get_max(data):
     # PGV / PGA
     return np.max(np.abs(data))
 
 
-def get_spectral_acceleration(acceleration, period, constants, NT, DT):
+def get_max_nd(data):
+    if data.ndim == 1
+        axis = 0
+    else:
+        axis = 1
+    return np.max(np.abs(data), axis=axis)
+
+
+def get_spectral_acceleration(acceleration, period, NT, DT):
     # pSA
     deltat = 0.005
     c = 0.05
@@ -29,9 +47,31 @@ def get_spectral_acceleration(acceleration, period, constants, NT, DT):
     return rspectra.Response_Spectra(acc_step, deltat, c, period, M, gamma, beta)
 
 
+def get_spectral_acceleration_nd(acceleration, period, NT, DT, extended):
+    # pSA
+    values = []
+
+    if extended:
+        period = EXT_PERIOD
+
+    if acceleration.ndim != 1:
+        for i in range(3):
+            value = get_spectral_acceleration(acceleration[:, i], period, NT, DT)
+            values.append(value)
+        value = np,arrayvalues
+    else:
+        value = get_spectral_acceleration(acceleration, period, NT, DT)
+    print("respectra values",value)
+    return values
+
+
 def get_cumulative_abs_velocity(acceleration, times):
     # CAV
     return np.trapz(np.abs(acceleration), times)
+
+
+def get_cumulative_abs_velocity_nd(acceleration, times):
+    return np.trapz(np.abs(acceleration), times, axis=0)
 
 
 def get_arias_intensity(acceleration, g, times):
@@ -43,9 +83,20 @@ def get_arias_intensity(acceleration, g, times):
     return np.pi / (2 * g) * np.trapz(integrand, times)
 
 
+def get_arias_intensity_nd(acceleration, g, times):
+    acc_in_cms = acceleration * g
+    integrand = acc_in_cms ** 2
+    return np.pi / (2 * g) * np.trapz(integrand, times, axis=0)
+
+
 def calculate_MMI(velocities):
     # MMI
     pgv = get_max(velocities)
+    return np.float(timeseries.pgv2MMI(pgv))
+
+
+def calculate_MMI_nd(velocities):
+    pgv = get_max_nd(velocities)
     return np.float(timeseries.pgv2MMI(pgv))
 
 
@@ -70,65 +121,58 @@ def getDs(dt, fx, percLow=5, percHigh=75):
 
 
 def getDs_nd(dt, fx, percLow=5, percHigh=75):
-    results, cols = get_cols(fx)
-    print(results, cols)
-
-    for col in range(cols):
-        print(col)
-        fx_col = fx[:, col]
-        nsteps = np.size(fx_col)
-        print(nsteps)
-        husid = np.zeros(nsteps)
-        husid[0] = 0  # initialize first to 0
-        for i in xrange(1, nsteps):
-            husid[i] = husid[i - 1] + dt * (fx_col[i] ** 2)  # note that pi/(2g) is not used as doesnt affect the result
-        AI = husid[-1]
-        Ds = dt * (np.sum(husid / AI <= percHigh / 100.) - np.sum(husid / AI <= percLow / 100.))
-
-        results = get_result(results, Ds)
-
-    return results
+    """Computes the percLow-percHigh% sign duration for a single ground motion component
+    Based on getDs575.m
+    Inputs:
+        dt - the time step (s)
+        fx - a vector (of acceleration)
+        percLow - The lower percentage bound (default 5%)
+        percHigh - The higher percentage bound (default 75%)
+    Outputs:
+        Ds - The duration (s)    """
+    husid = np.zeros(fx.shape)
+    husid[1:] = husid[:-1] + dt * (fx[1:] ** 2)
+    AI = husid[-1]
+    Ds = dt * (np.sum(husid / AI <= percHigh / 100., axis=0) - np.sum(husid / AI <= percLow / 100.,axis=0))
+    return Ds
 
 
-def get_arias_intensity_nd(acceleration, g, times):
-    results, cols = get_cols(acceleration)
-    print(results, cols)
-    for col in range(cols):
-        print(col)
-        acc_col = acceleration[:, col]
-        acc_in_cms = acc_col * g
-        integrand = acc_in_cms ** 2
-        ai = np.pi / (2 * g) * np.trapz(integrand, times)
-        results = get_result(results, ai)
-    return results
-
-
-def get_cumulative_abs_velocity_nd(acceleration, times):
-    results, cols = get_cols(acceleration)
-    print(results, cols)
-    for col in range(cols):
-        print(col)
-        acc_col = acceleration[:, col]
-        cav = np.trapz(np.abs(acc_col), times)
-        results = get_result(results, cav)
-    return results
-
-
-def get_cols(fx):
-    print(fx.shape)
-    try:
-        cols = fx.shape[1]
-        results = []
-    except IndexError:
-        cols = 1
-        results = None
-    return results, cols
-
-
-def get_result(results, result):
-    try:
-        results.append(result)
-    except AttributeError:
-        print("only one col in fx")
-        return result
-    return results
+# def getDs(dt, fx, percLow=5, percHigh=75):
+#     results, cols = get_cols(fx)
+#     print(results, cols)
+#
+#     for col in range(cols):
+#         print(col)
+#         fx_col = fx[:, col]
+#         nsteps = np.size(fx_col)
+#         print(nsteps)
+#         husid = np.zeros(nsteps)
+#         husid[0] = 0  # initialize first to 0
+#         for i in xrange(1, nsteps):
+#             husid[i] = husid[i - 1] + dt * (fx_col[i] ** 2)  # note that pi/(2g) is not used as doesnt affect the result
+#         AI = husid[-1]
+#         Ds = dt * (np.sum(husid / AI <= percHigh / 100.) - np.sum(husid / AI <= percLow / 100.))
+#
+#         results = get_result(results, Ds)
+#
+#     return results
+#
+#
+# def get_cols(fx):
+#     print(fx.shape)
+#     try:
+#         cols = fx.shape[1]
+#         results = []
+#     except IndexError:
+#         cols = 1
+#         results = None
+#     return results, cols
+#
+#
+# def get_result(results, result):
+#     try:
+#         results.append(result)
+#     except AttributeError:
+#         print("only one col in fx")
+#         return result
+#     return results
