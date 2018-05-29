@@ -10,6 +10,7 @@ BETA = 0.25
 GAMMA = 0.5
 EXT_PERIOD = np.logspace(start=np.log10(0.01), stop=np.log10(10.), num=100, base=10)
 BSC_PERIOD = np.array([0.02, 0.05, 0.1, 0.2, 0.3, 0.4, 0.5, 0.75, 1.0, 2.0, 3.0, 4.0, 5.0, 7.5, 10.0])
+DIMS_AXIS = {1:0, 2:0}
 
 
 def get_max(data):
@@ -18,11 +19,7 @@ def get_max(data):
 
 
 def get_max_nd(data):
-    if data.ndim == 1
-        axis = 0
-    else:
-        axis = 1
-    return np.max(np.abs(data), axis=axis)
+    return np.max(np.abs(data), axis=DIMS_AXIS[data.ndim])
 
 
 def get_spectral_acceleration(acceleration, period, NT, DT):
@@ -58,7 +55,7 @@ def get_spectral_acceleration_nd(acceleration, period, NT, DT, extended):
         for i in range(3):
             value = get_spectral_acceleration(acceleration[:, i], period, NT, DT)
             values.append(value)
-        value = np,arrayvalues
+        value = values
     else:
         value = get_spectral_acceleration(acceleration, period, NT, DT)
     print("respectra values",value)

@@ -3,3 +3,4 @@ Cython/Cython/
 Cython/rspectra.c
 Cython/rspectra.so
 Cython/build
+computed_measures/
