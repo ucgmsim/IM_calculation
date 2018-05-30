@@ -7,9 +7,7 @@ import argparse
 import numpy as np
 import im_calculations
 import read_waveform
-
-sys.path.append('../qcore/qcore/')
-import timeseries
+from qcore import timeseries
 
 G = 981.0
 OUTPUT_FOLDER = 'computed_measures'

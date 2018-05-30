@@ -4,8 +4,7 @@ import os
 import numpy as np
 import im_calculations
 
-sys.path.append('../qcore/qcore/')
-import timeseries
+from qcore import timeseries
 
 G = 981.0
 MEASURES  = ['AI', 'CAV', 'Ds575', 'Ds595', 'PGA', 'PGV', 'pSA', 'MMI']
