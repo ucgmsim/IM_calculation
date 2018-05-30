@@ -136,6 +136,12 @@ def getDs_nd(dt, accelerations, percLow=5, percHigh=75):
     return ds_values
 
 
+def getDs_ugly(comp, dt, fx, percLow, percHigh):
+    if comp != Ellipsis:
+        return getDs(dt, fx, percLow=percLow, percHigh=percHigh)
+    else:
+        return getDs_nd(dt, fx, percLow=percLow, percHigh=percHigh)
+
 # def getDs(dt, fx, percLow=5, percHigh=75):
 #     results, cols = get_cols(fx)
 #     print(results, cols)
