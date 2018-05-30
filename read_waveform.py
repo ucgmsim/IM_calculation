@@ -78,7 +78,7 @@ def create_waveform_from_data(data, wave_type=None, base_waveform=None, NT=None,
     return waveform
 
 
-def read_file(filename, station_name=None, comp=Ellipsis, wave_type=None, file_type=None):
+def read_file(filename, station_names=None, comp=Ellipsis, wave_type=None, file_type=None):
     try:
         fid = open(filename)
     except IOError:
@@ -89,7 +89,8 @@ def read_file(filename, station_name=None, comp=Ellipsis, wave_type=None, file_t
     if file_type == 'standard' or extension in ['.000', '.090', '.ver']:
         return read_standard_file(fid, wave_type, 'standard')
     elif file_type == 'binary':
-        return read_binary_file(filename, comp, station_name, wave_type=wave_type, file_type='binary')
+        print("read_file",station_names)
+        return read_binary_file(filename, comp, station_names, wave_type=wave_type, file_type='binary')
     else:
         print "Could not determine filetype %s Ignoring this station" % filename
         return None
@@ -105,36 +106,34 @@ def read_one_station_from_bbseries(bbseries, station_name, comp, wave_type=None,
     waveform.time_offset = bbseries.start_sec   # time offset
     waveform.times = calculate_timesteps(waveform.NT, waveform.DT)  # array of time values
 
-    # print("nunber of timesteps",waveform.NT)
-    # print("time step", waveform.DT)
-    # print("duration", bbseries.duration)
-    # print("stations", bbseries.stations)
-
     try:
         print("start values",station_name,comp)
-        waveform.values = bbseries.acc(station=station_name, comp=comp)  # get timeseries/acc for a station
-        print(waveform.values)
+        if wave_type == 'a':
+            waveform.values = bbseries.acc(station=station_name, comp=comp)  # get timeseries/acc for a station
+        elif wave_type == 'v':
+            waveform.values = bbseries.vel(station=station_name, comp=comp)
+            print("v",waveform.values)
     except KeyError:
-        sys.exit("staiton name {} does not exist".format(station_name))
+        print("staiton name {} does not exist".format(station_name))
+        return None
     return waveform
 
 
-def read_binary_file(input_path, comp, station_name=None, wave_type=None, file_type=None):
+def read_binary_file(input_path, comp, station_names=None, wave_type=None, file_type=None):
     bbseries = timeseries.BBSeis(input_path)
-
-    if station_name:
-        waveform = read_one_station_from_bbseries(bbseries, station_name, comp, wave_type=wave_type, file_type=file_type)
-        return waveform
-    else:
-        waveforms = []
+    waveforms = []
+    if not station_names:
+        print("ss")
         station_names = bbseries.stations.name
-        for station_name in station_names:
-            waveform = read_one_station_from_bbseries(bbseries, station_name, comp, wave_type=wave_type, file_type=file_type)
-            waveforms.append(waveform)
-        return waveforms
+    print("read_b_file", station_names)
+    for station_name in station_names:
+        print("read b single station name",station_name)
+        waveform_acc = read_one_station_from_bbseries(bbseries, station_name, comp, wave_type='a', file_type=file_type)
+        waveform_vel= read_one_station_from_bbseries(bbseries, station_name, comp, wave_type='v', file_type=file_type)
+        waveforms.append((waveform_acc,waveform_vel))
+    return waveforms
 
 
-if __name__ == '__main__':
-    print(read_file('../BB.bin', station_name='112A', file_type='binary'))
+
 
 

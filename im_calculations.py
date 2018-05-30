@@ -19,7 +19,7 @@ def get_max(data):
 
 
 def get_max_nd(data):
-    return np.max(np.abs(data), axis=DIMS_AXIS[data.ndim])
+    return np.max(np.abs(data), axis=0)
 
 
 def get_spectral_acceleration(acceleration, period, NT, DT):
@@ -29,8 +29,8 @@ def get_spectral_acceleration(acceleration, period, NT, DT):
     M = 1.0
     beta = 0.25
     gamma = 0.5
-    extended_period = np.logspace(start=np.log10(0.01), stop=np.log10(10.), num=100, base=10)
-    basic_period = [0.02, 0.05, 0.1, 0.2, 0.3, 0.4, 0.5, 0.75, 1.0, 2.0, 3.0, 4.0, 5.0, 7.5, 10.0]
+    # extended_period = np.logspace(start=np.log10(0.01), stop=np.log10(10.), num=100, base=10)
+    # basic_period = [0.02, 0.05, 0.1, 0.2, 0.3, 0.4, 0.5, 0.75, 1.0, 2.0, 3.0, 4.0, 5.0, 7.5, 10.0]
 
     acc_step = np.zeros(NT + 1)
     acc_step[1:] = acceleration
@@ -44,12 +44,9 @@ def get_spectral_acceleration(acceleration, period, NT, DT):
     return rspectra.Response_Spectra(acc_step, deltat, c, period, M, gamma, beta)
 
 
-def get_spectral_acceleration_nd(acceleration, period, NT, DT, extended):
+def get_spectral_acceleration_nd(acceleration, period, NT, DT):
     # pSA
     values = []
-
-    if extended:
-        period = EXT_PERIOD
 
     if acceleration.ndim != 1:
         for i in range(3):
@@ -59,7 +56,7 @@ def get_spectral_acceleration_nd(acceleration, period, NT, DT, extended):
     else:
         value = get_spectral_acceleration(acceleration, period, NT, DT)
     print("respectra values",value)
-    return values
+    return value
 
 
 def get_cumulative_abs_velocity(acceleration, times):
@@ -94,7 +91,7 @@ def calculate_MMI(velocities):
 
 def calculate_MMI_nd(velocities):
     pgv = get_max_nd(velocities)
-    return np.float(timeseries.pgv2MMI(pgv))
+    return timeseries.pgv2MMI(pgv)
 
 
 def getDs(dt, fx, percLow=5, percHigh=75):
