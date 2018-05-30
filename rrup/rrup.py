@@ -67,7 +67,7 @@ def computeSourcetoSiteDistance(finite_fault, Site):
     # start values, no distance should be longer than this
     r_jb = sys.maxsize
     r_rup = sys.maxsize
-    r_x = sys.maxsize
+    r_x = 'X'
     min_depth = sys.maxsize
 
     # for subfaults, calculate distance, update if shortest
@@ -75,10 +75,6 @@ def computeSourcetoSiteDistance(finite_fault, Site):
 
         h = horizdist(Site, fault_i['lat'], fault_i['lon'])
         v = Site.Depth - fault_i['depth']
-
-        if v < min_depth:
-            min_depth = v
-            r_x = h
 
         if abs(h) < r_jb:
             r_jb = h
