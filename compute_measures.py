@@ -20,8 +20,8 @@ G = 981.0
 OUTPUT_FOLDER = 'computed_measures_f64'
 OUTPUT_SUBFOLDER = 'stations_f64'
 IMS = ['PGV', 'PGA', 'CAV', 'AI', 'Ds575','Ds595','MMI', 'pSA']
-EXT_DICT = {'090':0, '000':1, 'ver':2}
-EXT_DICT2 = {0:'090', 1: '000', 2:'ver'}
+EXT_DICT = {'090':0, '000':1, 'ver':2, 'geom':3}
+EXT_DICT2 = {0:'090', 1: '000', 2:'ver', 3:'geom'}
 
 
 def mkdir(directory):
@@ -66,45 +66,43 @@ def compute_measures(input_path, file_type, wave_type, station_names, ims=IMS, c
 
         for im in ims:
             if im == 'PGV':
-                print("Afdsafsa",waveform_vel)
                 value = im_calculations.get_max_nd(waveform_vel.values)
-                print("pgv", value)
-                result[station_name][im] = value
 
             if im == "PGA":
                 value = im_calculations.get_max_nd(accelerations)
-                print("pga",value)
-                result[station_name][im] = value
 
             if im == "pSA":
                 value = im_calculations.get_spectral_acceleration_nd(accelerations, period, waveform_acc.NT, DT)
-                print("psa",value)
-                result[station_name]["pSA"] = (period, value)
 
             if im == "Ds595":
                 value = im_calculations.getDs_ugly(comp, DT, accelerations, 5, 95)
-                print("ds595",value)
-                result[station_name][im] = value
 
             if im == "Ds575":
                 value = im_calculations.getDs_ugly(comp,DT, accelerations, 5, 75)
-                print("ds575",value)
-                result[station_name][im] = value
 
             if im == "AI":
                 value = im_calculations.get_arias_intensity_nd(accelerations, G, times)
-                print("ai", value)
-                result[station_name][im] = value
 
             if im == "CAV":
                 value = im_calculations.get_cumulative_abs_velocity_nd(accelerations, times)
-                print("cav", value)
-                result[station_name][im] = value
-            #
+
             if im == "MMI":
                 value = im_calculations.calculate_MMI_nd(waveform_vel.values)
-                print("mmi",value)
+
+            if comp is Ellipsis:
+                d1 = value[0]
+                d2 = value[1]
+                geom_value = im_calculations.get_geom(d1, d2)
+                if im is not 'pSA':
+                    value = np.append(value, geom_value)
+                else:
+                    value.append(geom_value)
+
+            print(im, value)
+            if im is not 'pSA':
                 result[station_name][im] = value
+            else:
+                result[station_name]["pSA"] = (period, value)
 
             # if value.any() or value:
             #     if im == "pSA":
@@ -169,7 +167,7 @@ def write_result(result_dict, outputfolder, comp, ims, period):
                 with open(station_csv, 'wb') as sub_csv_file:
                     sub_csv_writer = csv.writer(sub_csv_file, delimiter=',', quotechar='|')
                     sub_csv_writer.writerow(row1)
-                    for i in range(3):
+                    for i in range(4):
                         result_row = [station, EXT_DICT2[i]]
                         for im in ims:
                             if im != 'pSA':

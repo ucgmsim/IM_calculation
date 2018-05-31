@@ -181,3 +181,7 @@ def getDs_ugly(comp, dt, fx, percLow, percHigh):
 #         print("only one col in fx")
 #         return result
 #     return results
+
+
+def get_geom(d1, d2):
+    return np.sqrt(d1 * d2)
