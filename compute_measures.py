@@ -5,7 +5,7 @@
    python compute_measures.py /home/vap30/scratch/2/BB.bin b -p 0.02 -e -n 112A -c 090
 """
 
-import sys
+
 import os
 import errno
 import csv
@@ -14,7 +14,6 @@ import argparse
 import numpy as np
 import im_calculations
 import read_waveform
-from qcore import timeseries
 from multiprocessing import Pool
 
 
@@ -22,8 +21,8 @@ G = 981.0
 OUTPUT_FOLDER = 'computed_measures_3'
 OUTPUT_SUBFOLDER = 'stations_3'
 IMS = ['PGV', 'PGA', 'CAV', 'AI', 'Ds575', 'Ds595', 'MMI', 'pSA']
-EXT_DICT = {'090': 0, '000': 1, 'ver': 2}
-EXT_DICT2 = {0: '090', 1: '000', 2: 'ver'}
+EXT_DICT = {'090': 0, '000': 1, 'ver': 2, 'geom': 3}
+EXT_DICT2 = {0: '090', 1: '000', 2: 'ver', 3: 'geom'}
 
 
 def mkdir(directory):
@@ -35,7 +34,7 @@ def mkdir(directory):
 
 
 def compute_measures_multiprocess(input_path, file_type, wave_type, station_names, ims=IMS, comp=None, period=None, meta_data=None,
-                     output=OUTPUT_FOLDER, process=2):
+                     output=OUTPUT_FOLDER, process=1):
     """
     using multiprocesses to computer measures.
     Calls compute_measure_single() to compute measures for a single station
@@ -52,23 +51,26 @@ def compute_measures_multiprocess(input_path, file_type, wave_type, station_name
     :param process:
     :return: writes
     """
-    all_result_dict = {}
     comp_obj = comp
     if comp == 'ellipsis':
         comp_obj = Ellipsis
+
     waveforms = read_waveform.read_file(input_path, station_names, comp_obj, wave_type=wave_type, file_type=file_type)
     array_params = []
+    all_result_dict = {}
+
     for waveform in waveforms:
         print("waveforms are",waveforms)
         array_params.append((waveform, ims, comp, period))
     print("arry params",array_params)
+
     p = Pool(process)
 
     result_list = p.map(compute_measure_single, array_params)
     print("result list",result_list)
 
-    for result_dict in result_list:
-        all_result_dict.update(result_dict)
+    for result in result_list:
+        all_result_dict.update(result)
 
     write_result(all_result_dict, output, comp, ims, period)
 
@@ -79,68 +81,82 @@ def compute_measure_single((waveform, ims, comp, period)):
     Compute measures for a single station
     :return: {result[station_name]: {[im]: value or (period,value}}
     """
+    if comp == 'ellipsis':
+        comp = Ellipsis
+
     result = {}
     waveform_acc, waveform_vel = waveform
     accelerations = waveform_acc.values
-    # print(accelerations.shape)
+    #print(accelerations.shape)
     DT = waveform_acc.DT
-    # print("pppp",period)
+    #print("pppp",period)
     times = waveform_acc.times
     station_name = waveform_acc.station_name
     result[station_name] = {}
 
-    if comp == 'ellipsis':
-        comp = Ellipsis
-
     for im in ims:
         if im == 'PGV':
-            print("Afdsafsa", waveform_vel)
             value = im_calculations.get_max_nd(waveform_vel.values)
-            print("pgv", value)
-            result[station_name][im] = value
 
         if im == "PGA":
             value = im_calculations.get_max_nd(accelerations)
-            print("pga", value)
-            result[station_name][im] = value
 
         if im == "pSA":
             value = im_calculations.get_spectral_acceleration_nd(accelerations, period, waveform_acc.NT, DT)
-            print("psa", value)
-            result[station_name]["pSA"] = (period, value)
 
         if im == "Ds595":
             value = im_calculations.getDs_ugly(comp, DT, accelerations, 5, 95)
-            print("ds595", value)
-            result[station_name][im] = value
 
         if im == "Ds575":
+            print("DS7 adfsafdsfdsfdsaf")
+            print(value, comp, DT, accelerations)
             value = im_calculations.getDs_ugly(comp, DT, accelerations, 5, 75)
-            print("ds575", value)
-            result[station_name][im] = value
+            print("finidhes ds7")
 
         if im == "AI":
             value = im_calculations.get_arias_intensity_nd(accelerations, G, times)
-            print("ai", value)
-            result[station_name][im] = value
 
         if im == "CAV":
             value = im_calculations.get_cumulative_abs_velocity_nd(accelerations, times)
-            print("cav", value)
-            result[station_name][im] = value
-        #
+
         if im == "MMI":
             value = im_calculations.calculate_MMI_nd(waveform_vel.values)
-            print("mmi", value)
+
+        if comp is Ellipsis:
+            print("ell",im)
+            d1 = value[0]
+            d2 = value[1]
+            print("getting geom",im)
+            geom_value = im_calculations.get_geom(d1, d2)
+            if im != 'pSA':
+                print("setting",im)
+                print("value before",value)
+                value = np.append(value, geom_value)
+            else:
+                print("value after", value)
+                value.append(geom_value)
+
+        #print(im, value)
+        print("stearererearaesrarear",im,type(im))
+        if im == 'pSA':
+            print("1222222222222222222222222 psa")
+            result[station_name][im] = (period, value)
+            #print("result is",result)
+        else:
+            print("not psa")
             result[station_name][im] = value
+
+        # if value.any() or value:
+        #     if im == "pSA":
+        #         result["pSA"] = (period, value)
+        #     else:
+        #         result[im] = value
     return result
 
 
-def compute_measures(input_path, file_type, wave_type, station_names, ims=IMS, comp=None, period=None, meta_data=None,
-                     output=OUTPUT_FOLDER):
+def compute_measures(input_path, file_type, wave_type, station_names, ims=IMS, comp=None, period=None, meta_data=None, output=OUTPUT_FOLDER):
     # TODO tear down the big func, make it more modular
     """
-
     :param input_path:
     :param file_type:
     :param wave_type:
@@ -152,7 +168,7 @@ def compute_measures(input_path, file_type, wave_type, station_names, ims=IMS, c
     :param output:
     :return: {result[station_name]: {[im]: value or (period,value}}
     """
-    if comp=='ellipsis':
+    if comp == 'ellipsis':
         comp = Ellipsis
 
     waveforms = read_waveform.read_file(input_path, station_names, comp, wave_type=wave_type, file_type=file_type)
@@ -160,68 +176,59 @@ def compute_measures(input_path, file_type, wave_type, station_names, ims=IMS, c
 
     for waveform_acc, waveform_vel in waveforms:
         accelerations = waveform_acc.values
-        # print(accelerations.shape)
+        #print(accelerations.shape)
         DT = waveform_acc.DT
-        # print("pppp",period)
+        #print("pppp",period)
         times = waveform_acc.times
         station_name = waveform_acc.station_name
         result[station_name] = {}
 
         for im in ims:
             if im == 'PGV':
-                print("Afdsafsa", waveform_vel)
                 value = im_calculations.get_max_nd(waveform_vel.values)
-                print("pgv", value)
-                result[station_name][im] = value
 
             if im == "PGA":
                 value = im_calculations.get_max_nd(accelerations)
-                print("pga", value)
-                result[station_name][im] = value
 
             if im == "pSA":
                 value = im_calculations.get_spectral_acceleration_nd(accelerations, period, waveform_acc.NT, DT)
-                print("psa", value)
-                result[station_name]["pSA"] = (period, value)
 
             if im == "Ds595":
                 value = im_calculations.getDs_ugly(comp, DT, accelerations, 5, 95)
-                print("ds595", value)
-                result[station_name][im] = value
 
             if im == "Ds575":
-                value = im_calculations.getDs_ugly(comp, DT, accelerations, 5, 75)
-                print("ds575", value)
-                result[station_name][im] = value
+                value = im_calculations.getDs_ugly(comp,DT, accelerations, 5, 75)
 
             if im == "AI":
                 value = im_calculations.get_arias_intensity_nd(accelerations, G, times)
-                print("ai", value)
-                result[station_name][im] = value
 
             if im == "CAV":
                 value = im_calculations.get_cumulative_abs_velocity_nd(accelerations, times)
-                print("cav", value)
-                result[station_name][im] = value
-            #
+
             if im == "MMI":
                 value = im_calculations.calculate_MMI_nd(waveform_vel.values)
-                print("mmi", value)
+
+            if comp is Ellipsis:
+                d1 = value[0]
+                d2 = value[1]
+                geom_value = im_calculations.get_geom(d1, d2)
+                if im != 'pSA':
+                    value = np.append(value, geom_value)
+                else:
+                    value.append(geom_value)
+
+            #print(im, value)
+            if im != 'pSA':
                 result[station_name][im] = value
+            else:
+                result[station_name]["pSA"] = (period, value)
 
-                # if value.any() or value:
-                #     if im == "pSA":
-                #         result["pSA"] = (period, value)
-                #     else:
-                #         result[im] = value
-    # print(result)
+            # if value.any() or value:
+            #     if im == "pSA":
+            #         result["pSA"] = (period, value)
+            #     else:
+            #         result[im] = value
     return result
-
-
-def compute_measures_on_array((input_path, file_type, wave_type, station_names, ims, comp, period, meta_data,
-                     output)):
-    return compute_measures(input_path, file_type, wave_type, station_names, ims, comp, period, meta_data, output)
-
 
 
 def write_result(result_dict, outputfolder, comp, ims, period):
@@ -266,7 +273,6 @@ def write_result(result_dict, outputfolder, comp, ims, period):
                             result_row.append(result_dict[station][im])
                             # print("result row is ", result_row)
                         else:
-                            # print(result_dict[station][im][1][0])
                             result_row += result_dict[station][im][1].tolist()
                             # print("result row is ",result_row)
                     sub_csv_writer.writerow(result_row)
@@ -277,12 +283,13 @@ def write_result(result_dict, outputfolder, comp, ims, period):
                 with open(station_csv, 'wb') as sub_csv_file:
                     sub_csv_writer = csv.writer(sub_csv_file, delimiter=',', quotechar='|')
                     sub_csv_writer.writerow(row1)
-                    for i in range(3):
+                    for i in range(4):
                         result_row = [station, EXT_DICT2[i]]
                         for im in ims:
                             if im != 'pSA':
                                 result_row.append(result_dict[station][im][i])
                             else:
+                                print("result row psa", result_dict[station][im][1])
                                 result_row += result_dict[station][im][1][i].tolist()
                         sub_csv_writer.writerow(result_row)
                         csv_writer.writerow(result_row)
@@ -347,14 +354,13 @@ if __name__ == '__main__':
 
     mkdir(os.path.join(args.output, OUTPUT_SUBFOLDER))
 
-    # result_dict = compute_measures(args.input_path, file_type, wave_type=None, station_names=station_names, ims=im,comp=comp, period=period, meta_data=None, output=OUTPUT_FOLDER)
-    #
-    #
-    #
-    # print("ccccc",comp)
-    # write_result(result_dict, args.output, comp, im, period)
+    #SINGLE PROCESSOR
+    result_dict = compute_measures(args.input_path, file_type, wave_type=None, station_names=station_names, ims=im,comp=comp, period=period, meta_data=None, output=OUTPUT_FOLDER)
+    print("ccccc",comp)
+    write_result(result_dict, args.output, comp, im, period)
 
-    compute_measures_multiprocess(args.input_path, file_type, wave_type=None, station_names=station_names, ims=im, comp=comp, period=period, meta_data=None, output=OUTPUT_FOLDER, process=args.process)
+    #multiprocessor
+    #compute_measures_multiprocess(args.input_path, file_type, wave_type=None, station_names=station_names, ims=im, comp=comp, period=period, meta_data=None, output=OUTPUT_FOLDER, process=args.process)
 
 
 # if comp and comp != Ellipsis:
@@ -383,6 +389,3 @@ if __name__ == '__main__':
 #             values.append(single_comp)
 #         value = values
 #     return value
-# ('arry params', [((<read_waveform.Waveform instance at 0x7f1a919a6908>, <read_waveform.Waveform instance at 0x7f1a919a6d40>), ['PGV', 'PGA', 'CAV', 'AI', 'Ds575', 'Ds595', 'MMI', 'pSA'], 'ellipsis', array([  0.02,   0.05,   0.1 ,   0.2 ,   0.3 ,   0.4 ,   0.5 ,   0.75,
-#          1.  ,   2.  ,   3.  ,   4.  ,   5.  ,   7.5 ,  10.  ])), ((<read_waveform.Waveform instance at 0x7f1a919a6f80>, <read_waveform.Waveform instance at 0x7f1a919a6fc8>), ['PGV', 'PGA', 'CAV', 'AI', 'Ds575', 'Ds595', 'MMI', 'pSA'], 'ellipsis', array([  0.02,   0.05,   0.1 ,   0.2 ,   0.3 ,   0.4 ,   0.5 ,   0.75,
-#          1.  ,   2.  ,   3.  ,   4.  ,   5.  ,   7.5 ,  10.  ]))])
