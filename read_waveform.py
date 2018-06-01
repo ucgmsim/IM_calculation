@@ -1,8 +1,6 @@
 #TODO ADD velocities attribute calculation for standard file waveform obj
-import sys
 import os
 import numpy as np
-import im_calculations
 
 from qcore import timeseries
 
@@ -98,7 +96,6 @@ def read_file(filename, station_names=None, comp=Ellipsis, wave_type=None, file_
     if file_type == 'standard' or extension in ['.000', '.090', '.ver']:
         return read_standard_file(fid, wave_type, 'standard')
     elif file_type == 'binary':
-        #print("read_file",station_names)
         return read_binary_file(filename, comp, station_names, wave_type=wave_type, file_type='binary')
     else:
         print "Could not determine filetype %s Ignoring this station" % filename
@@ -125,12 +122,10 @@ def read_one_station_from_bbseries(bbseries, station_name, comp, wave_type=None,
     waveform.times = calculate_timesteps(waveform.NT, waveform.DT)  # array of time values
 
     try:
-        print("start values",station_name,comp)
         if wave_type == 'a':
             waveform.values = bbseries.acc(station=station_name, comp=comp)  # get timeseries/acc for a station
         elif wave_type == 'v':
             waveform.values = bbseries.vel(station=station_name, comp=comp)
-            #print("v",waveform.values)
     except KeyError:
         print("staiton name {} does not exist".format(station_name))
         return None
@@ -150,12 +145,9 @@ def read_binary_file(input_path, comp, station_names=None, wave_type=None, file_
     bbseries = timeseries.BBSeis(input_path)
     waveforms = []
     if not station_names:
-        #print("ss")
         station_names = bbseries.stations.name
-    print("read_b_file", station_names)
     for station_name in station_names:
-        print("read binary single station name",station_name)
-        waveform_acc = read_one_station_from_bbseries(bbseries, station_name, comp, wave_type='a', file_type=file_type)  # TODO should create either a or v not bothm tidy later
+        waveform_acc = read_one_station_from_bbseries(bbseries, station_name, comp, wave_type='a', file_type=file_type) # TODO should create either a or v not bothm tidy later
         waveform_vel= read_one_station_from_bbseries(bbseries, station_name, comp, wave_type='v', file_type=file_type)
         waveforms.append((waveform_acc,waveform_vel))
     return waveforms

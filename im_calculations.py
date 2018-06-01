@@ -142,46 +142,6 @@ def getDs_ugly(comp, dt, fx, percLow, percHigh):
     else:
         return getDs_nd(dt, fx, percLow=percLow, percHigh=percHigh)
 
-# def getDs(dt, fx, percLow=5, percHigh=75):
-#     results, cols = get_cols(fx)
-#     print(results, cols)
-#
-#     for col in range(cols):
-#         print(col)
-#         fx_col = fx[:, col]
-#         nsteps = np.size(fx_col)
-#         print(nsteps)
-#         husid = np.zeros(nsteps)
-#         husid[0] = 0  # initialize first to 0
-#         for i in xrange(1, nsteps):
-#             husid[i] = husid[i - 1] + dt * (fx_col[i] ** 2)  # note that pi/(2g) is not used as doesnt affect the result
-#         AI = husid[-1]
-#         Ds = dt * (np.sum(husid / AI <= percHigh / 100.) - np.sum(husid / AI <= percLow / 100.))
-#
-#         results = get_result(results, Ds)
-#
-#     return results
-#
-#
-# def get_cols(fx):
-#     print(fx.shape)
-#     try:
-#         cols = fx.shape[1]
-#         results = []
-#     except IndexError:
-#         cols = 1
-#         results = None
-#     return results, cols
-#
-#
-# def get_result(results, result):
-#     try:
-#         results.append(result)
-#     except AttributeError:
-#         print("only one col in fx")
-#         return result
-#     return results
-
 
 def get_geom(d1, d2):
     return np.sqrt(d1 * d2)

@@ -5,7 +5,6 @@
    python compute_measures.py /home/vap30/scratch/2/BB.bin b -p 0.02 -e -n 112A -c 090
 """
 
-
 import os
 import errno
 import csv
@@ -16,9 +15,8 @@ import im_calculations
 import read_waveform
 from multiprocessing import Pool
 
-
 G = 981.0
-OUTPUT_FOLDER = 'computed_measures_3'
+OUTPUT_FOLDER = 'computed_measures3'
 OUTPUT_SUBFOLDER = 'stations_3'
 IMS = ['PGV', 'PGA', 'CAV', 'AI', 'Ds575', 'Ds595', 'MMI', 'pSA']
 EXT_DICT = {'090': 0, '000': 1, 'ver': 2, 'geom': 3}
@@ -33,8 +31,9 @@ def mkdir(directory):
             raise
 
 
-def compute_measures_multiprocess(input_path, file_type, wave_type, station_names, ims=IMS, comp=None, period=None, meta_data=None,
-                     output=OUTPUT_FOLDER, process=1):
+def compute_measures_multiprocess(input_path, file_type, wave_type, station_names, ims=IMS, comp=None, period=None,
+                                  meta_data=None,
+                                  output=OUTPUT_FOLDER, process=1):
     """
     using multiprocesses to computer measures.
     Calls compute_measure_single() to compute measures for a single station
@@ -60,14 +59,11 @@ def compute_measures_multiprocess(input_path, file_type, wave_type, station_name
     all_result_dict = {}
 
     for waveform in waveforms:
-        print("waveforms are",waveforms)
         array_params.append((waveform, ims, comp, period))
-    print("arry params",array_params)
 
     p = Pool(process)
 
     result_list = p.map(compute_measure_single, array_params)
-    print("result list",result_list)
 
     for result in result_list:
         all_result_dict.update(result)
@@ -87,9 +83,7 @@ def compute_measure_single((waveform, ims, comp, period)):
     result = {}
     waveform_acc, waveform_vel = waveform
     accelerations = waveform_acc.values
-    #print(accelerations.shape)
     DT = waveform_acc.DT
-    #print("pppp",period)
     times = waveform_acc.times
     station_name = waveform_acc.station_name
     result[station_name] = {}
@@ -108,10 +102,7 @@ def compute_measure_single((waveform, ims, comp, period)):
             value = im_calculations.getDs_ugly(comp, DT, accelerations, 5, 95)
 
         if im == "Ds575":
-            print("DS7 adfsafdsfdsfdsaf")
-            print(value, comp, DT, accelerations)
             value = im_calculations.getDs_ugly(comp, DT, accelerations, 5, 75)
-            print("finidhes ds7")
 
         if im == "AI":
             value = im_calculations.get_arias_intensity_nd(accelerations, G, times)
@@ -123,38 +114,25 @@ def compute_measure_single((waveform, ims, comp, period)):
             value = im_calculations.calculate_MMI_nd(waveform_vel.values)
 
         if comp is Ellipsis:
-            print("ell",im)
             d1 = value[0]
             d2 = value[1]
-            print("getting geom",im)
             geom_value = im_calculations.get_geom(d1, d2)
             if im != 'pSA':
-                print("setting",im)
-                print("value before",value)
                 value = np.append(value, geom_value)
             else:
-                print("value after", value)
                 value.append(geom_value)
 
-        #print(im, value)
-        print("stearererearaesrarear",im,type(im))
         if im == 'pSA':
-            print("1222222222222222222222222 psa")
             result[station_name][im] = (period, value)
-            #print("result is",result)
+            # print("result is",result)
         else:
-            print("not psa")
             result[station_name][im] = value
 
-        # if value.any() or value:
-        #     if im == "pSA":
-        #         result["pSA"] = (period, value)
-        #     else:
-        #         result[im] = value
     return result
 
 
-def compute_measures(input_path, file_type, wave_type, station_names, ims=IMS, comp=None, period=None, meta_data=None, output=OUTPUT_FOLDER):
+def compute_measures(input_path, file_type, wave_type, station_names, ims=IMS, comp=None, period=None, meta_data=None,
+                     output=OUTPUT_FOLDER):
     # TODO tear down the big func, make it more modular
     """
     :param input_path:
@@ -176,9 +154,7 @@ def compute_measures(input_path, file_type, wave_type, station_names, ims=IMS, c
 
     for waveform_acc, waveform_vel in waveforms:
         accelerations = waveform_acc.values
-        #print(accelerations.shape)
         DT = waveform_acc.DT
-        #print("pppp",period)
         times = waveform_acc.times
         station_name = waveform_acc.station_name
         result[station_name] = {}
@@ -197,7 +173,7 @@ def compute_measures(input_path, file_type, wave_type, station_names, ims=IMS, c
                 value = im_calculations.getDs_ugly(comp, DT, accelerations, 5, 95)
 
             if im == "Ds575":
-                value = im_calculations.getDs_ugly(comp,DT, accelerations, 5, 75)
+                value = im_calculations.getDs_ugly(comp, DT, accelerations, 5, 75)
 
             if im == "AI":
                 value = im_calculations.get_arias_intensity_nd(accelerations, G, times)
@@ -217,17 +193,10 @@ def compute_measures(input_path, file_type, wave_type, station_names, ims=IMS, c
                 else:
                     value.append(geom_value)
 
-            #print(im, value)
             if im != 'pSA':
                 result[station_name][im] = value
             else:
                 result[station_name]["pSA"] = (period, value)
-
-            # if value.any() or value:
-            #     if im == "pSA":
-            #         result["pSA"] = (period, value)
-            #     else:
-            #         result[im] = value
     return result
 
 
@@ -258,7 +227,6 @@ def write_result(result_dict, outputfolder, comp, ims, period):
         csv_writer = csv.writer(csv_file, delimiter=',', quotechar='|')
         csv_writer.writerow(row1)
         stations = result_dict.keys()
-        # print("ssss",stations)
         if comp != Ellipsis and comp != 'ellipsis':
             for station in stations:
                 station_csv = os.path.join(outputfolder, OUTPUT_SUBFOLDER, '{}_{}.csv'.format(station, EXT_DICT2[comp]))
@@ -267,14 +235,11 @@ def write_result(result_dict, outputfolder, comp, ims, period):
                     sub_csv_writer = csv.writer(sub_csv_file, delimiter=',', quotechar='|')
                     sub_csv_writer.writerow(row1)
                     result_row = [station, EXT_DICT2[comp]]
-                    # print("start result")
                     for im in ims:
                         if im != 'pSA':
                             result_row.append(result_dict[station][im])
-                            # print("result row is ", result_row)
                         else:
                             result_row += result_dict[station][im][1].tolist()
-                            # print("result row is ",result_row)
                     sub_csv_writer.writerow(result_row)
                     csv_writer.writerow(result_row)
         else:
@@ -314,7 +279,6 @@ if __name__ == '__main__':
                         help="Please type 'a'(ascii) or 'b'(binary) to indicate the type of input file")
     parser.add_argument('-np', '--process', default=2, type=int, help='Please provide the number of processers')
 
-    # parser.add_argument('-b', '--binary', action='store_true', help="Please add '-b' to indicate the type of input file is binary")
     args = parser.parse_args()
 
     if args.file_type == 'a':
@@ -326,26 +290,19 @@ if __name__ == '__main__':
     if isinstance(period[0], str):
         period = np.array(args.period, dtype='float64')
 
-    print("period", period)
-
     comp = args.component
     if comp != 'ellipsis' and comp not in EXT_DICT.values():
         comp = EXT_DICT[args.component.lower()]
 
     im = args.im
-    # print("input im")
     if isinstance(im, str):
         im = args.im.strip().split()
-        print("input ims are:", im)
 
     station_names = args.station_names
-    print("args station name", station_names)
 
     extended_period = args.extended_period
     if extended_period:
-        print("flag set")
         period = np.append(period, im_calculations.EXT_PERIOD)
-        print("perioddddd", period)
 
     if (args.extended_period or period.any()) and 'pSA' not in args.im:
         parser.error("period or extended period must be used with pSA, but pSA is not in the IM mesaures entered")
@@ -354,38 +311,10 @@ if __name__ == '__main__':
 
     mkdir(os.path.join(args.output, OUTPUT_SUBFOLDER))
 
-    #SINGLE PROCESSOR
-    result_dict = compute_measures(args.input_path, file_type, wave_type=None, station_names=station_names, ims=im,comp=comp, period=period, meta_data=None, output=OUTPUT_FOLDER)
-    print("ccccc",comp)
-    write_result(result_dict, args.output, comp, im, period)
+    # multiprocessor
+    compute_measures_multiprocess(args.input_path, file_type, wave_type=None, station_names=station_names, ims=im, comp=comp, period=period, meta_data=None, output=OUTPUT_FOLDER, process=args.process)
 
-    #multiprocessor
-    #compute_measures_multiprocess(args.input_path, file_type, wave_type=None, station_names=station_names, ims=im, comp=comp, period=period, meta_data=None, output=OUTPUT_FOLDER, process=args.process)
-
-
-# if comp and comp != Ellipsis:
-#     try:
-#         value = im_calculations.getDs(DT, accelerations, 5, 95)
-#     except ValueError:
-#         sys.exit("Please check if you've entered a correct single ground motion component")
-# else:
-#     values = []
-#     for i in range(3):
-#         single_comp = im_calculations.getDs(DT, accelerations[:, i], 5, 95)
-#         values.append(single_comp)
-#     value = values
-
-
-# def calc_nd_array(comp, oned_calc_func, extra_args):
-#     if comp and comp != Ellipsis:
-#         try:
-#             value = oned_calc_func(*extra_args)
-#         except ValueError:
-#             sys.exit("Please check if you've entered a correct single ground motion component")
-#     else:
-#         values = []
-#         for i in range(3):
-#             single_comp = oned_calc_func(extra_args)
-#             values.append(single_comp)
-#         value = values
-#     return value
+    # # SINGLE PROCESSOR
+    # result_dict = compute_measures(args.input_path, file_type, wave_type=None, station_names=station_names, ims=im,
+    #                                comp=comp, period=period, meta_data=None, output=OUTPUT_FOLDER)
+    # write_result(result_dict, args.output, comp, im, period)
