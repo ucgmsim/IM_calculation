@@ -52,7 +52,7 @@ def compute_measures(input_path, file_type, wave_type, station_names, ims=IMS, c
     :param output:
     :return: {result[station_name]: {[im]: value or (period,value}}
     """
-    waveforms = read_waveform.read_file(input_path, station_names, comp, wave_type=wave_type, file_type=file_type)
+    waveforms = read_waveform.read_waveforms(input_path, station_names, comp, wave_type=wave_type, file_type=file_type)
     result = {}
 
     for waveform_acc, waveform_vel in waveforms:
@@ -65,7 +65,8 @@ def compute_measures(input_path, file_type, wave_type, station_names, ims=IMS, c
         result[station_name] = {}
 
         for im in ims:
-            if im == 'PGV':
+            value = [None, None, None]
+            if im == 'PGV' and waveform_vel is not None:
                 value = im_calculations.get_max_nd(waveform_vel.values)
 
             if im == "PGA":
@@ -86,13 +87,16 @@ def compute_measures(input_path, file_type, wave_type, station_names, ims=IMS, c
             if im == "CAV":
                 value = im_calculations.get_cumulative_abs_velocity_nd(accelerations, times)
 
-            if im == "MMI":
+            if im == "MMI" and waveform_vel is not None:
                 value = im_calculations.calculate_MMI_nd(waveform_vel.values)
 
             if comp is Ellipsis:
-                d1 = value[0]
-                d2 = value[1]
-                geom_value = im_calculations.get_geom(d1, d2)
+                if None not in value:
+                    d1 = value[0]
+                    d2 = value[1]
+                    geom_value = im_calculations.get_geom(d1, d2)
+                else:
+                    geom_value = None
                 if im is not 'pSA':
                     value = np.append(value, geom_value)
                 else:
