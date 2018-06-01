@@ -2,12 +2,15 @@
 
 To calculate rrups:
 
+```
 python usage: calculate_rrups.py [-h] [-np PROCESSES] [-s STATIONS [STATIONS ...]]
                                  [-o OUTPUT]
                                  station_file srf_file
-                                 
+```
+
 To calculate IMs:
 
+```
 usage: compute_measures.py [-h] [-o OUTPUT] [-m IM [IM ...]]
                            [-p PERIOD [PERIOD ...]] [-e]
                            [-n STATION_NAMES [STATION_NAMES ...]]
@@ -42,3 +45,4 @@ optional arguments:
   -c COMPONENT, --component COMPONENT
                         Please provide the velocity/acc component(s) you want
                         to calculate eperated by a spave. eg.000 090 ver
+```
