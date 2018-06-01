@@ -106,6 +106,7 @@ def read_waveforms(path, station_names=None, comp=Ellipsis, wave_type=None, file
     if file_type == 'standard':
         return read_ascii_folder(path, station_names)
     elif file_type == 'binary':
+
         return read_binary_file(path, comp, station_names, wave_type=wave_type, file_type='binary')
     else:
         print "Could not determine filetype %s Ignoring this station" % path
@@ -168,12 +169,10 @@ def read_one_station_from_bbseries(bbseries, station_name, comp, wave_type=None,
     waveform.times = calculate_timesteps(waveform.NT, waveform.DT)  # array of time values
 
     try:
-        print("start values", station_name, comp)
         if wave_type == 'a':
             waveform.values = bbseries.acc(station=station_name, comp=comp)  # get timeseries/acc for a station
         elif wave_type == 'v':
             waveform.values = bbseries.vel(station=station_name, comp=comp)
-            # print("v",waveform.values)
     except KeyError:
         print("staiton name {} does not exist".format(station_name))
         return None
@@ -193,9 +192,7 @@ def read_binary_file(input_path, comp, station_names=None, wave_type=None, file_
     bbseries = timeseries.BBSeis(input_path)
     waveforms = []
     if not station_names:
-        # print("ss")
         station_names = bbseries.stations.name
-    print("read_b_file", station_names)
     for station_name in station_names:
         print("read binary single station name", station_name)
         waveform_acc = read_one_station_from_bbseries(bbseries, station_name, comp, wave_type='a',
