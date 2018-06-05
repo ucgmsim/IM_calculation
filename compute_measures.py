@@ -54,7 +54,7 @@ def compute_measures_multiprocess(input_path, file_type, wave_type, station_name
     if comp == 'ellipsis':
         comp_obj = Ellipsis
 
-    waveforms = read_waveform.read_file(input_path, station_names, comp_obj, wave_type=wave_type, file_type=file_type)
+    waveforms = read_waveform.read_waveforms(input_path, station_names, comp_obj, wave_type=wave_type, file_type=file_type)
     array_params = []
     all_result_dict = {}
 
@@ -89,7 +89,8 @@ def compute_measure_single((waveform, ims, comp, period)):
     result[station_name] = {}
 
     for im in ims:
-        if im == 'PGV':
+        value = [None, None, None]
+        if im == 'PGV' and waveform_vel is not None:
             value = im_calculations.get_max_nd(waveform_vel.values)
 
         if im == "PGA":
@@ -110,13 +111,16 @@ def compute_measure_single((waveform, ims, comp, period)):
         if im == "CAV":
             value = im_calculations.get_cumulative_abs_velocity_nd(accelerations, times)
 
-        if im == "MMI":
+        if im == "MMI" and waveform_vel is not None:
             value = im_calculations.calculate_MMI_nd(waveform_vel.values)
 
         if comp is Ellipsis:
-            d1 = value[0]
-            d2 = value[1]
-            geom_value = im_calculations.get_geom(d1, d2)
+            if None not in value:
+                d1 = value[0]
+                d2 = value[1]
+                geom_value = im_calculations.get_geom(d1, d2)
+            else:
+                geom_value = None
             if im != 'pSA':
                 value = np.append(value, geom_value)
             else:
