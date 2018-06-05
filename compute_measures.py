@@ -60,10 +60,15 @@ def compute_measures_multiprocess(input_path, file_type, wave_type, station_name
 
     for waveform in waveforms:
         array_params.append((waveform, ims, comp, period))
+    # TODO: use pool wrapper here to avoid this
+    if process == 1:
+        result_list = []
+        for params in array_params:
+            result_list.append(compute_measure_single(params))
+    else:
+        p = Pool(process)
 
-    p = Pool(process)
-
-    result_list = p.map(compute_measure_single, array_params)
+        result_list = p.map(compute_measure_single, array_params)
 
     for result in result_list:
         all_result_dict.update(result)
@@ -115,7 +120,9 @@ def compute_measure_single((waveform, ims, comp, period)):
             value = im_calculations.calculate_MMI_nd(waveform_vel.values)
 
         if comp is Ellipsis:
-            if None not in value:
+            print value
+            print type(value)
+            if im =='pSA' or (None not in value):
                 d1 = value[0]
                 d2 = value[1]
                 geom_value = im_calculations.get_geom(d1, d2)
@@ -321,7 +328,4 @@ if __name__ == '__main__':
     # multiprocessor
     compute_measures_multiprocess(args.input_path, file_type, wave_type=None, station_names=station_names, ims=im, comp=comp, period=period, meta_data=None, output=args.output, process=args.process)
 
-    # # SINGLE PROCESSOR
-    # result_dict = compute_measures(args.input_path, file_type, wave_type=None, station_names=station_names, ims=im,
-    #                                comp=comp, period=period, meta_data=None, output=OUTPUT_FOLDER)
-    # write_result(result_dict, args.output, comp, im, period)
+
