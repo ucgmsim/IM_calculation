@@ -319,7 +319,7 @@ if __name__ == '__main__':
     mkdir(os.path.join(args.output, OUTPUT_SUBFOLDER))
 
     # multiprocessor
-    compute_measures_multiprocess(args.input_path, file_type, wave_type=None, station_names=station_names, ims=im, comp=comp, period=period, meta_data=None, output=OUTPUT_FOLDER, process=args.process)
+    compute_measures_multiprocess(args.input_path, file_type, wave_type=None, station_names=station_names, ims=im, comp=comp, period=period, meta_data=None, output=args.output, process=args.process)
 
     # # SINGLE PROCESSOR
     # result_dict = compute_measures(args.input_path, file_type, wave_type=None, station_names=station_names, ims=im,
