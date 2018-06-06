@@ -14,6 +14,7 @@ import numpy as np
 import im_calculations
 import read_waveform
 from multiprocessing import Pool
+from qcore import timeseries
 
 G = 981.0
 OUTPUT_FOLDER = 'computed_measures3'
@@ -87,47 +88,52 @@ def compute_measure_single((waveform, ims, comp, period)):
 
     result = {}
     waveform_acc, waveform_vel = waveform
-    accelerations = waveform_acc.values
+
     DT = waveform_acc.DT
     times = waveform_acc.times
+
+    accelerations = waveform_acc.values
+
+    if waveform_vel is None:
+        # integrating g to cm/s
+        velocities = timeseries.acc2vel(accelerations, DT) * G
+    else:
+        velocities = waveform_vel.values
+
     station_name = waveform_acc.station_name
     result[station_name] = {}
 
     for im in ims:
-        value = [None, None, None]
-        if im == 'PGV' and waveform_vel is not None:
-            value = im_calculations.get_max_nd(waveform_vel.values)
+        if im == 'PGV':
+            value = im_calculations.get_max_nd(velocities)
 
-        if im == "PGA":
+        elif im == "PGA":
             value = im_calculations.get_max_nd(accelerations)
 
-        if im == "pSA":
+        elif im == "pSA":
             value = im_calculations.get_spectral_acceleration_nd(accelerations, period, waveform_acc.NT, DT)
 
-        if im == "Ds595":
+        elif im == "Ds595":
             value = im_calculations.getDs_ugly(comp, DT, accelerations, 5, 95)
 
-        if im == "Ds575":
+        elif im == "Ds575":
             value = im_calculations.getDs_ugly(comp, DT, accelerations, 5, 75)
 
-        if im == "AI":
+        elif im == "AI":
             value = im_calculations.get_arias_intensity_nd(accelerations, G, times)
 
-        if im == "CAV":
+        elif im == "CAV":
             value = im_calculations.get_cumulative_abs_velocity_nd(accelerations, times)
 
-        if im == "MMI" and waveform_vel is not None:
-            value = im_calculations.calculate_MMI_nd(waveform_vel.values)
+        elif im == "MMI":
+            value = im_calculations.calculate_MMI_nd(velocities)
+        else:
+            print "{} has no method to be calculated".format(im)
 
         if comp is Ellipsis:
-            print value
-            print type(value)
-            if im =='pSA' or (None not in value):
-                d1 = value[0]
-                d2 = value[1]
-                geom_value = im_calculations.get_geom(d1, d2)
-            else:
-                geom_value = None
+            d1 = value[0]
+            d2 = value[1]
+            geom_value = im_calculations.get_geom(d1, d2)
             if im != 'pSA':
                 value = np.append(value, geom_value)
             else:
