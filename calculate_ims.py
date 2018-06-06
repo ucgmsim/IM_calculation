@@ -11,7 +11,7 @@ import csv
 import datetime
 import argparse
 import numpy as np
-import im_calculations
+import intensity_measures
 import read_waveform
 from multiprocessing import Pool
 
@@ -21,6 +21,9 @@ OUTPUT_SUBFOLDER = 'stations_3'
 IMS = ['PGV', 'PGA', 'CAV', 'AI', 'Ds575', 'Ds595', 'MMI', 'pSA']
 EXT_DICT = {'090': 0, '000': 1, 'ver': 2, 'geom': 3}
 EXT_DICT2 = {0: '090', 1: '000', 2: 'ver', 3: 'geom'}
+EXT_PERIOD = np.logspace(start=np.log10(0.01), stop=np.log10(10.), num=100, base=10)
+BSC_PERIOD = np.array([0.02, 0.05, 0.1, 0.2, 0.3, 0.4, 0.5, 0.75, 1.0, 2.0, 3.0, 4.0, 5.0, 7.5, 10.0])
+
 
 
 def mkdir(directory):
@@ -96,36 +99,36 @@ def compute_measure_single((waveform, ims, comp, period)):
     for im in ims:
         value = [None, None, None]
         if im == 'PGV' and waveform_vel is not None:
-            value = im_calculations.get_max_nd(waveform_vel.values)
+            value = intensity_measures.get_max_nd(waveform_vel.values)
 
         if im == "PGA":
-            value = im_calculations.get_max_nd(accelerations)
+            value = intensity_measures.get_max_nd(accelerations)
 
         if im == "pSA":
-            value = im_calculations.get_spectral_acceleration_nd(accelerations, period, waveform_acc.NT, DT)
+            value = intensity_measures.get_spectral_acceleration_nd(accelerations, period, waveform_acc.NT, DT)
 
         if im == "Ds595":
-            value = im_calculations.getDs_ugly(comp, DT, accelerations, 5, 95)
+            value = intensity_measures.getDs_nd(DT, accelerations, 5, 95)
 
         if im == "Ds575":
-            value = im_calculations.getDs_ugly(comp, DT, accelerations, 5, 75)
+            value = intensity_measures.getDs_nd(DT, accelerations, 5, 75)
 
         if im == "AI":
-            value = im_calculations.get_arias_intensity_nd(accelerations, G, times)
+            value = intensity_measures.get_arias_intensity_nd(accelerations, G, times)
 
         if im == "CAV":
-            value = im_calculations.get_cumulative_abs_velocity_nd(accelerations, times)
+            value = intensity_measures.get_cumulative_abs_velocity_nd(accelerations, times)
 
         if im == "MMI" and waveform_vel is not None:
-            value = im_calculations.calculate_MMI_nd(waveform_vel.values)
+            value = intensity_measures.calculate_MMI_nd(waveform_vel.values)
 
         if comp is Ellipsis:
-            print value
+            print im, value
             print type(value)
             if im =='pSA' or (None not in value):
                 d1 = value[0]
                 d2 = value[1]
-                geom_value = im_calculations.get_geom(d1, d2)
+                geom_value = intensity_measures.get_geom(d1, d2)
             else:
                 geom_value = None
             if im != 'pSA':
@@ -161,56 +164,10 @@ def compute_measures(input_path, file_type, wave_type, station_names, ims=IMS, c
         comp = Ellipsis
 
     result = {}
+    waveforms = read_waveform.read_file(input_path, station_names, comp, wave_type=wave_type, file_type=file_type)
 
-    for waveform_acc, waveform_vel in waveforms:
-        accelerations = waveform_acc.values
-        DT = waveform_acc.DT
-        times = waveform_acc.times
-        station_name = waveform_acc.station_name
-        result[station_name] = {}
-
-        for im in ims:
-            value = [None, None, None]
-            if im == 'PGV' and waveform_vel is not None:
-                value = im_calculations.get_max_nd(waveform_vel.values)
-
-            if im == "PGA":
-                value = im_calculations.get_max_nd(accelerations)
-
-            if im == "pSA":
-                value = im_calculations.get_spectral_acceleration_nd(accelerations, period, waveform_acc.NT, DT)
-
-            if im == "Ds595":
-                value = im_calculations.getDs_ugly(comp, DT, accelerations, 5, 95)
-
-            if im == "Ds575":
-                value = im_calculations.getDs_ugly(comp, DT, accelerations, 5, 75)
-
-            if im == "AI":
-                value = im_calculations.get_arias_intensity_nd(accelerations, G, times)
-
-            if im == "CAV":
-                value = im_calculations.get_cumulative_abs_velocity_nd(accelerations, times)
-
-            if im == "MMI" and waveform_vel is not None:
-                value = im_calculations.calculate_MMI_nd(waveform_vel.values)
-
-            if comp is Ellipsis:
-                if None not in value:
-                    d1 = value[0]
-                    d2 = value[1]
-                    geom_value = im_calculations.get_geom(d1, d2)
-                else:
-                    geom_value = None
-                if im != 'pSA':
-                    value = np.append(value, geom_value)
-                else:
-                    value.append(geom_value)
-
-            if im != 'pSA':
-                result[station_name][im] = value
-            else:
-                result[station_name]["pSA"] = (period, value)
+    for waveform in waveforms:
+        result.update(compute_measure_single((waveform, ims, comp, period)))
     return result
 
 
@@ -281,7 +238,7 @@ if __name__ == '__main__':
                         help='path to output folder that stores the computed measures. Default to /computed_measures/')
     parser.add_argument('-m', '--im', nargs='+', default=IMS,
                         help='Please specify im measure(s) seperated by a space(if more than one). eg: PGV PGA CAV. Available and default measures are: PGV, PGA, CAV, AI, Ds575, Ds595, pSA')
-    parser.add_argument('-p', '--period', nargs='+', default=im_calculations.BSC_PERIOD,
+    parser.add_argument('-p', '--period', nargs='+', default=BSC_PERIOD,
                         help='Please provide pSA period(s) separated by a space. eg: 0.02 0.05 0.1. Available and default periods are:0.02 0.05 0.1 0.2 0.3 0.4 0.5 0.75 1.0 2.0 3.0 4.0 5.0 7.5 10.0')
     parser.add_argument('-e', '--extended_period', action='store_true',
                         help="Please add '-e' to indicate the use of extended(100) pSA periods. Default not using")
@@ -316,7 +273,7 @@ if __name__ == '__main__':
 
     extended_period = args.extended_period
     if extended_period:
-        period = np.append(period, im_calculations.EXT_PERIOD)
+        period = np.append(period, EXT_PERIOD)
 
     if (args.extended_period or period.any()) and 'pSA' not in args.im:
         parser.error("period or extended period must be used with pSA, but pSA is not in the IM mesaures entered")

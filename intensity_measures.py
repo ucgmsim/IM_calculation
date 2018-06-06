@@ -1,21 +1,6 @@
-from Cython import rspectra as rspectra
+from rspectra_calculations import rspectra as rspectra
 import numpy as np
 from qcore import timeseries
-
-# pSA
-DELTA = 0.005
-C = 0.05
-M = 1.0
-BETA = 0.25
-GAMMA = 0.5
-EXT_PERIOD = np.logspace(start=np.log10(0.01), stop=np.log10(10.), num=100, base=10)
-BSC_PERIOD = np.array([0.02, 0.05, 0.1, 0.2, 0.3, 0.4, 0.5, 0.75, 1.0, 2.0, 3.0, 4.0, 5.0, 7.5, 10.0])
-DIMS_AXIS = {1:0, 2:0}
-
-
-def get_max(data):
-    # PGV / PGA
-    return np.max(np.abs(data))
 
 
 def get_max_nd(data):
@@ -29,8 +14,6 @@ def get_spectral_acceleration(acceleration, period, NT, DT):
     M = 1.0
     beta = 0.25
     gamma = 0.5
-    # extended_period = np.logspace(start=np.log10(0.01), stop=np.log10(10.), num=100, base=10)
-    # basic_period = [0.02, 0.05, 0.1, 0.2, 0.3, 0.4, 0.5, 0.75, 1.0, 2.0, 3.0, 4.0, 5.0, 7.5, 10.0]
 
     acc_step = np.zeros(NT + 1)
     acc_step[1:] = acceleration
@@ -85,7 +68,7 @@ def get_arias_intensity_nd(acceleration, g, times):
 
 def calculate_MMI(velocities):
     # MMI
-    pgv = get_max(velocities)
+    pgv = get_max_nd(velocities)
     return np.float(timeseries.pgv2MMI(pgv))
 
 
@@ -124,23 +107,14 @@ def getDs_nd(dt, accelerations, percLow=5, percHigh=75):
         percHigh - The higher percentage bound (default 75%)
     Outputs:
         Ds - The duration (s)    """
-    ds_values = []
-    for fx in accelerations.transpose():
-        nsteps = np.size(fx)
-        husid = np.zeros(fx.shape)
-        for i in xrange(1, nsteps):
-            husid[i] = husid[i - 1] + dt * (fx[i] ** 2)  # note that pi/(2g) is not used as doesnt affect the result
-        AI = husid[-1]
-        ds = dt * (np.sum(husid / AI <= percHigh / 100., axis=0) - np.sum(husid / AI <= percLow / 100.))
-        ds_values.append(ds)
-    return ds_values
-
-
-def getDs_ugly(comp, dt, fx, percLow, percHigh):
-    if comp != Ellipsis:
-        return getDs(dt, fx, percLow=percLow, percHigh=percHigh)
+    if accelerations.ndim == 1:
+        return getDs(dt, accelerations, percLow=percLow, percHigh=percHigh)
     else:
-        return getDs_nd(dt, fx, percLow=percLow, percHigh=percHigh)
+        ds_values = []
+        for fx in accelerations.transpose():
+            ds = getDs(dt, fx, percLow, percHigh)
+            ds_values.append(ds)
+        return ds_values
 
 
 def get_geom(d1, d2):
