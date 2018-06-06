@@ -1,4 +1,4 @@
-# TODO make getDs_nd work for 1d ;Modularize; Tidy up
+# TODO MMI calc returns an array of 1 item when only 1 comp is given
 
 """command:
    python compute_measures.py /home/vap30/scratch/2/BB.bin b
@@ -8,22 +8,25 @@
 import os
 import errno
 import csv
-import datetime
 import argparse
 import numpy as np
+from collections import OrderedDict
+from multiprocessing import Pool
 import intensity_measures
 import read_waveform
-from multiprocessing import Pool
+
 
 G = 981.0
-OUTPUT_FOLDER = 'computed_measures3'
-OUTPUT_SUBFOLDER = 'stations_3'
-IMS = ['PGV', 'PGA', 'CAV', 'AI', 'Ds575', 'Ds595', 'MMI', 'pSA']
-EXT_DICT = {'090': 0, '000': 1, 'ver': 2, 'geom': 3}
-EXT_DICT2 = {0: '090', 1: '000', 2: 'ver', 3: 'geom'}
+IMS = ['PGV', 'PGA', 'CAV', 'AI', 'Ds575', 'Ds595', 'pSA']
+
 EXT_PERIOD = np.logspace(start=np.log10(0.01), stop=np.log10(10.), num=100, base=10)
 BSC_PERIOD = np.array([0.02, 0.05, 0.1, 0.2, 0.3, 0.4, 0.5, 0.75, 1.0, 2.0, 3.0, 4.0, 5.0, 7.5, 10.0])
 
+IDX_EXT_DICT = OrderedDict([(0, '090'), (1, '000'), (2, 'ver'), (3, 'geom')])
+EXT_IDX_DICT = OrderedDict((v, k) for k, v in IDX_EXT_DICT.items())
+
+OUTPUT_FOLDER = 'computed_measures3'  # todo should be outside ims
+OUTPUT_SUBFOLDER = 'stations_3'
 
 
 def mkdir(directory):
@@ -32,6 +35,14 @@ def mkdir(directory):
     except OSError as e:
         if e.errno != errno.EEXIST:
             raise
+
+
+def convert_str_comp(comp):
+    if comp == 'ellipsis':
+        converted_comp = Ellipsis
+    else:
+        converted_comp = EXT_IDX_DICT[comp]
+    return converted_comp
 
 
 def compute_measures_multiprocess(input_path, file_type, wave_type, station_names, ims=IMS, comp=None, period=None,
@@ -53,11 +64,10 @@ def compute_measures_multiprocess(input_path, file_type, wave_type, station_name
     :param process:
     :return: writes
     """
-    comp_obj = comp
-    if comp == 'ellipsis':
-        comp_obj = Ellipsis
 
-    waveforms = read_waveform.read_waveforms(input_path, station_names, comp_obj, wave_type=wave_type, file_type=file_type)
+    converted_comp = convert_str_comp(comp)
+
+    waveforms = read_waveform.read_waveforms(input_path, station_names, converted_comp, wave_type=wave_type, file_type=file_type)
     array_params = []
     all_result_dict = {}
 
@@ -76,7 +86,7 @@ def compute_measures_multiprocess(input_path, file_type, wave_type, station_name
     for result in result_list:
         all_result_dict.update(result)
 
-    write_result(all_result_dict, output, comp, ims, period)
+    write_result2(all_result_dict, output, comp, ims, period)
 
 
 def compute_measure_single((waveform, ims, comp, period)):
@@ -85,9 +95,9 @@ def compute_measure_single((waveform, ims, comp, period)):
     Compute measures for a single station
     :return: {result[station_name]: {[im]: value or (period,value}}
     """
-    if comp == 'ellipsis':
-        comp = Ellipsis
+    converted_comp = convert_str_comp(comp)
 
+    print("afsfad", converted_comp)
     result = {}
     waveform_acc, waveform_vel = waveform
     accelerations = waveform_acc.values
@@ -97,7 +107,7 @@ def compute_measure_single((waveform, ims, comp, period)):
     result[station_name] = {}
 
     for im in ims:
-        value = [None, None, None]
+        # value = [None, None, None]
         if im == 'PGV' and waveform_vel is not None:
             value = intensity_measures.get_max_nd(waveform_vel.values)
 
@@ -122,32 +132,60 @@ def compute_measure_single((waveform, ims, comp, period)):
         if im == "MMI" and waveform_vel is not None:
             value = intensity_measures.calculate_MMI_nd(waveform_vel.values)
 
-        if comp is Ellipsis:
-            print im, value
-            print type(value)
-            if im =='pSA' or (None not in value):
-                d1 = value[0]
-                d2 = value[1]
+        value_dict = OrderedDict()  # {comp: np_array/single float}
+        if converted_comp == Ellipsis:
+            print(im,value)
+            comps = EXT_IDX_DICT.keys()
+            for c in comps[:-1]:  # excludes geom
+                column = EXT_IDX_DICT[c]
+                if im == 'pSA':  # pSA returns 2d array
+                    d1 = value[:, 0]
+                    d2 = value[:, 1]
+                    value_dict[c] = value[:, column]
+                else:
+                    d1 = value[0]
+                    d2 = value[1]
+                    value_dict[c] = value[column]
                 geom_value = intensity_measures.get_geom(d1, d2)
-            else:
-                geom_value = None
-            if im != 'pSA':
-                value = np.append(value, geom_value)
-            else:
-                value.append(geom_value)
+            print(geom_value)
+            value_dict[comps[-1]] = geom_value   # now set geom
+        else:
+            print(im, value)
+            print("afsfad",comp)
+            # only one comp
+            # geom_value = None
+            value_dict[comp] = value
 
         if im == 'pSA':
-            result[station_name][im] = (period, value)
-            # print("result is",result)
+            result[station_name][im] = (period, value_dict)
         else:
-            result[station_name][im] = value
-
+            result[station_name][im] = value_dict
+            #TODO DELETE below grey after testing
+        # if comp is Ellipsis:
+        #     print im, value
+        #     print type(value)
+        #     if im =='pSA' or (None not in value):
+        #         d1 = value[0]
+        #         d2 = value[1]
+        #         geom_value = intensity_measures.get_geom(d1, d2)
+        #     else:
+        #         geom_value = None
+        #     if im != 'pSA':
+        #         value = np.append(value, geom_value)
+        #     else:
+        #         value.append(geom_value)
+        #
+        # if im == 'pSA':
+        #     result[station_name][im] = (period, value)
+        #     # print("result is",result)
+        # else:
+        #     result[station_name][im] = value
+    print(result)
     return result
 
 
 def compute_measures(input_path, file_type, wave_type, station_names, ims=IMS, comp=None, period=None, meta_data=None,
                      output=OUTPUT_FOLDER):
-    # TODO tear down the big func, make it more modular
     """
     :param input_path:
     :param file_type:
@@ -160,19 +198,78 @@ def compute_measures(input_path, file_type, wave_type, station_names, ims=IMS, c
     :param output:
     :return: {result[station_name]: {[im]: value or (period,value}}
     """
-    if comp == 'ellipsis':
-        comp = Ellipsis
+    converted_comp = convert_str_comp(comp)
 
     result = {}
-    waveforms = read_waveform.read_file(input_path, station_names, comp, wave_type=wave_type, file_type=file_type)
+    waveforms = read_waveform.read_waveforms(input_path, station_names, converted_comp, wave_type=wave_type, file_type=file_type)
 
     for waveform in waveforms:
-        result.update(compute_measure_single((waveform, ims, comp, period)))
+        result.update(compute_measure_single((waveform, ims, converted_comp, period)))
     return result
 
 
+def get_header(ims, period):
+    """
+    write header colums for output im_calculations csv file
+    :param ims: a list of im measures
+    :param period: a list of pSA periods
+    :return:
+    """
+    header = ['station', 'component']
+    psa_names = []
+
+    for im in ims:
+        if im == 'pSA':  # only write period if im is pSA.
+            for p in period:
+                psa_names.append('pSA_{}'.format(p))
+            header += psa_names
+        else:
+            header.append(im)
+    return header
+
+
+def write_result2(result_dict, outputfolder, comp, ims, period):
+    # TODO  wrapper sub csv
+    """
+    :param result_dict:
+    :param outputfolder:
+    :param comp:
+    :param ims:
+    :param period:
+    :return:output result into csvs
+    """
+    output_path = os.path.join(outputfolder, 'all_station_ims.csv')
+
+    header = get_header(ims, period)
+
+    with open(output_path, 'w') as csv_file:
+        csv_writer = csv.writer(csv_file, delimiter=',', quotechar='|')
+        csv_writer.writerow(header)
+        stations = result_dict.keys()
+        for station in stations:
+            station_csv = os.path.join(outputfolder, OUTPUT_SUBFOLDER, '{}_{}.csv'.format(station, comp))
+            with open(station_csv, 'wb') as sub_csv_file:
+                sub_csv_writer = csv.writer(sub_csv_file, delimiter=',', quotechar='|')
+                sub_csv_writer.writerow(header)
+                if comp == 'ellipsis':
+                    comps = EXT_IDX_DICT.keys()
+                else:
+                    comps = [comp]
+                for c in comps:
+                    row = [station, c]
+                    for im in ims:
+                        if im != 'pSA':
+                            row.append(result_dict[station][im][c])
+                        else:
+                            print("is psa",result_dict[station][im])
+                            row += result_dict[station][im][1][c].tolist()
+                    sub_csv_writer.writerow(row)
+                    csv_writer.writerow(row)
+
+
+
 def write_result(result_dict, outputfolder, comp, ims, period):
-    # TODO  modularize repeated code
+    # TODO delete write_result after write_result2 is tested
     """
 
     :param result_dict:
@@ -182,30 +279,22 @@ def write_result(result_dict, outputfolder, comp, ims, period):
     :param period:
     :return:output result into csvs
     """
-    output_path = os.path.join(outputfolder, 'IM_sim_master_{}.csv'.format(str(datetime.datetime.now())))
+    output_path = os.path.join(outputfolder, 'all_station_ims.csv')
 
-    row1 = ['station', 'component']
-    psa_names = []
-    for im in ims:
-        if im == 'pSA':
-            for p in period:
-                psa_names.append('pSA_{}'.format(p))
-            row1 += psa_names
-        else:
-            row1.append(im)
+    header = get_header(ims, period)
 
     with open(output_path, 'a') as csv_file:
         csv_writer = csv.writer(csv_file, delimiter=',', quotechar='|')
-        csv_writer.writerow(row1)
+        csv_writer.writerow(header)
         stations = result_dict.keys()
         if comp != Ellipsis and comp != 'ellipsis':
             for station in stations:
-                station_csv = os.path.join(outputfolder, OUTPUT_SUBFOLDER, '{}_{}.csv'.format(station, EXT_DICT2[comp]))
+                station_csv = os.path.join(outputfolder, OUTPUT_SUBFOLDER, '{}_{}.csv'.format(station, EXT_IDX_DICT[comp]))
                 print("scsvs s ", station_csv)
                 with open(station_csv, 'wb') as sub_csv_file:
                     sub_csv_writer = csv.writer(sub_csv_file, delimiter=',', quotechar='|')
-                    sub_csv_writer.writerow(row1)
-                    result_row = [station, EXT_DICT2[comp]]
+                    sub_csv_writer.writerow(header)
+                    result_row = [station, EXT_IDX_DICT[comp]]
                     for im in ims:
                         if im != 'pSA':
                             result_row.append(result_dict[station][im])
@@ -215,12 +304,12 @@ def write_result(result_dict, outputfolder, comp, ims, period):
                     csv_writer.writerow(result_row)
         else:
             for station in stations:
-                station_csv = os.path.join(outputfolder, OUTPUT_SUBFOLDER, '{}_Ellipsis.csv'.format(station))
+                station_csv = os.path.join(outputfolder, OUTPUT_SUBFOLDER, '{}.csv'.format(station))
                 with open(station_csv, 'wb') as sub_csv_file:
                     sub_csv_writer = csv.writer(sub_csv_file, delimiter=',', quotechar='|')
-                    sub_csv_writer.writerow(row1)
+                    sub_csv_writer.writerow(header)
                     for i in range(4):
-                        result_row = [station, EXT_DICT2[i]]
+                        result_row = [station, IDX_EXT_DICT[i]]
                         for im in ims:
                             if im != 'pSA':
                                 result_row.append(result_dict[station][im][i])
@@ -231,7 +320,7 @@ def write_result(result_dict, outputfolder, comp, ims, period):
                         csv_writer.writerow(result_row)
 
 
-if __name__ == '__main__':
+def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('input_path', help='path to input bb binary file eg./home/melody/BB.bin')
     parser.add_argument('-o', '--output', default=OUTPUT_FOLDER,
@@ -262,8 +351,8 @@ if __name__ == '__main__':
         period = np.array(args.period, dtype='float64')
 
     comp = args.component
-    if comp != 'ellipsis' and comp not in EXT_DICT.values():
-        comp = EXT_DICT[args.component.lower()]
+    # if comp != 'ellipsis' and comp not in EXT_IDX_DICT.values():
+    #     comp = EXT_IDX_DICT[args.component.lower()]
 
     im = args.im
     if isinstance(im, str):
@@ -283,6 +372,9 @@ if __name__ == '__main__':
     mkdir(os.path.join(args.output, OUTPUT_SUBFOLDER))
 
     # multiprocessor
-    compute_measures_multiprocess(args.input_path, file_type, wave_type=None, station_names=station_names, ims=im, comp=comp, period=period, meta_data=None, output=args.output, process=args.process)
+    compute_measures_multiprocess(args.input_path, file_type, wave_type=None, station_names=station_names, ims=im,
+                                  comp=comp, period=period, meta_data=None, output=args.output, process=args.process)
 
 
+if __name__ == '__main__':
+    main()
