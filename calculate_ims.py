@@ -325,7 +325,7 @@ def validate_period(parser, arg_period, arg_extended_period, im):
         period = np.append(period, EXT_PERIOD)
 
     if (extended_period or period.any()) and 'pSA' not in im:
-        parser.error("period or extended period must be used with pSA, but pSA is not in the IM mesaures entered")
+        parser.error("period or extended period must be used with pSA, but pSA is not in the IM measures entered")
 
     return period
 
