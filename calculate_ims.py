@@ -266,6 +266,63 @@ def write_result(result_dict, output_folder, comp, ims, period, geom_only):
                     csv_writer.writerow(row)
 
 
+def validate_comp(parser, arg_comp):
+    """
+    returns validated user input if pass the validation else raise parser error
+    :param parser:
+    :param arg_comp: user input
+    :return: validated comp, only_geom flag
+    """
+    comp = arg_comp
+    if comp not in EXT_IDX_DICT.keys() and comp != 'ellipsis':
+        parser.error("please enter a valid comp name. Available compoents are: 090,000,ver,geom,ellipsis. ellipsis contains all 4 components")
+    geom_only = False  # when only geom is needed, should be treated as ellipsis but only output geom to csv
+    if comp == 'geom':
+        comp = 'ellipsis'
+        geom_only = True
+    return comp, geom_only
+
+
+def validate_im(parser, arg_im):
+    """
+    returns validated user input if pass the validation else raise parser error
+    :param parser:
+    :param arg_im:
+    :return: validated im(s) in a list
+    """
+    im = arg_im
+    if isinstance(im, str):
+        im = im.strip().split()
+        for m in im:
+            if m not in IMS:
+                parser.error('please enter valid im meausre name. Available and default measures are: PGV, PGA, CAV, AI, Ds575, Ds595, pSA')
+    return im
+
+
+def validate_period(parser, arg_period, arg_extended_period, im):
+    """
+    returns validated user input if pass the validation else raise parser error
+    :param parser:
+    :param arg_period:
+    :param arg_extended_period:
+    :param im: validated im(s) in a list
+    :return: period(s) in a numpy arrau
+    """
+    period = arg_period
+    extended_period = arg_extended_period
+
+    if isinstance(period[0], str):
+        period = np.array(period, dtype='float64')
+
+    if extended_period:
+        period = np.append(period, EXT_PERIOD)
+
+    if (extended_period or period.any()) and 'pSA' not in im:
+        parser.error("period or extended period must be used with pSA, but pSA is not in the IM mesaures entered")
+
+    return period
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('input_path', help='path to input bb binary file eg./home/melody/BB.bin')
@@ -289,29 +346,13 @@ def main():
 
     file_type = FILE_TYPE_DICT[args.file_type]
 
-    period = args.period
-    if isinstance(period[0], str):
-        period = np.array(args.period, dtype='float64')
-
-    comp = args.component
-    geom_only = False  # when only geom is needed, should be treated as ellipsis but only output geom to csv
-    if comp == 'geom':
-        comp = 'ellipsis'
-        geom_only = True
-
-    im = args.im
-    if isinstance(im, str):
-        im = args.im.strip().split()
-
     station_names = args.station_names
 
-    extended_period = args.extended_period
+    comp, geom_only = validate_comp(parser, args.component)
 
-    if extended_period:
-        period = np.append(period, EXT_PERIOD)
+    im = validate_im(parser, args.im)
 
-    if (extended_period or period.any()) and 'pSA' not in im:
-        parser.error("period or extended period must be used with pSA, but pSA is not in the IM mesaures entered")
+    period = validate_period(parser, args.period, args.extended_period, im)
 
     mkdir(args.output)
 
