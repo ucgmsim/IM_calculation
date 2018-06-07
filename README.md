@@ -10,8 +10,15 @@ python usage: calculate_rrups.py [-h] [-np PROCESSES] [-s STATIONS [STATIONS ...
 
 To calculate IMs:
 
+We need to first setup Cython script rspectra.pyx so that we can successfully run pSA calculations inside calculate_ims.py.
+In the terminal, type:
+
+$ cd IM_calculation
+
+$ python setup.py build_ext --inplace
+
 ```
-usage: compute_measures.py [-h] [-o OUTPUT] [-m IM [IM ...]]
+usage: calculate_ims.py [-h] [-o OUTPUT] [-m IM [IM ...]]
                            [-p PERIOD [PERIOD ...]] [-e]
                            [-n STATION_NAMES [STATION_NAMES ...]]
                            [-c COMPONENT]
@@ -45,4 +52,7 @@ optional arguments:
   -c COMPONENT, --component COMPONENT
                         Please provide the velocity/acc component(s) you want
                         to calculate eperated by a spave. eg.000 090 ver
+  -np PROCESS, --process PROCESS
+                        Please provide the number of processers
+
 ```

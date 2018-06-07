@@ -1,21 +1,6 @@
-from Cython import rspectra as rspectra
+from rspectra_calculations import rspectra as rspectra
 import numpy as np
 from qcore import timeseries
-
-# pSA
-DELTA = 0.005
-C = 0.05
-M = 1.0
-BETA = 0.25
-GAMMA = 0.5
-EXT_PERIOD = np.logspace(start=np.log10(0.01), stop=np.log10(10.), num=100, base=10)
-BSC_PERIOD = np.array([0.02, 0.05, 0.1, 0.2, 0.3, 0.4, 0.5, 0.75, 1.0, 2.0, 3.0, 4.0, 5.0, 7.5, 10.0])
-DIMS_AXIS = {1:0, 2:0}
-
-
-def get_max(data):
-    # PGV / PGA
-    return np.max(np.abs(data))
 
 
 def get_max_nd(data):
@@ -29,8 +14,6 @@ def get_spectral_acceleration(acceleration, period, NT, DT):
     M = 1.0
     beta = 0.25
     gamma = 0.5
-    # extended_period = np.logspace(start=np.log10(0.01), stop=np.log10(10.), num=100, base=10)
-    # basic_period = [0.02, 0.05, 0.1, 0.2, 0.3, 0.4, 0.5, 0.75, 1.0, 2.0, 3.0, 4.0, 5.0, 7.5, 10.0]
 
     acc_step = np.zeros(NT + 1)
     acc_step[1:] = acceleration
@@ -46,47 +29,24 @@ def get_spectral_acceleration(acceleration, period, NT, DT):
 
 def get_spectral_acceleration_nd(acceleration, period, NT, DT):
     # pSA
-    values = []
-
     if acceleration.ndim != 1:
-        for i in range(3):
-            value = get_spectral_acceleration(acceleration[:, i], period, NT, DT)
-            values.append(value)
-        value = values
+        dims = acceleration.shape[1]
+        values = np.zeros((period.size, dims))
+        for i in range(dims):
+            values[:, i] = get_spectral_acceleration(acceleration[:, i], period, NT, DT)
+        return values
     else:
-        value = get_spectral_acceleration(acceleration, period, NT, DT)
-    print("respectra values",value)
-    return value
-
-
-def get_cumulative_abs_velocity(acceleration, times):
-    # CAV
-    return np.trapz(np.abs(acceleration), times)
+        return get_spectral_acceleration(acceleration, period, NT, DT)
 
 
 def get_cumulative_abs_velocity_nd(acceleration, times):
     return np.trapz(np.abs(acceleration), times, axis=0)
 
 
-def get_arias_intensity(acceleration, g, times):
-    # AI
-    # I_{A}=\frac {\pi }{2g}\int _{0}^{T_{d}}a(t)^{2}dt on http://asciimath.org/
-    # Where the acceleration units for a and g are the same. Below they are considered in cm/s
-    acc_in_cms = acceleration * g
-    integrand = acc_in_cms ** 2
-    return np.pi / (2 * g) * np.trapz(integrand, times)
-
-
 def get_arias_intensity_nd(acceleration, g, times):
     acc_in_cms = acceleration * g
     integrand = acc_in_cms ** 2
     return np.pi / (2 * g) * np.trapz(integrand, times, axis=0)
-
-
-def calculate_MMI(velocities):
-    # MMI
-    pgv = get_max(velocities)
-    return np.float(timeseries.pgv2MMI(pgv))
 
 
 def calculate_MMI_nd(velocities):
@@ -115,7 +75,7 @@ def getDs(dt, fx, percLow=5, percHigh=75):
 
 
 def getDs_nd(dt, accelerations, percLow=5, percHigh=75):
-    """Computes the percLow-percHigh% sign duration for a single ground motion component
+    """Computes the percLow-percHigh% sign duration for a nd(>1) ground motion component
     Based on getDs575.m
     Inputs:
         dt - the time step (s)
@@ -124,24 +84,22 @@ def getDs_nd(dt, accelerations, percLow=5, percHigh=75):
         percHigh - The higher percentage bound (default 75%)
     Outputs:
         Ds - The duration (s)    """
-    ds_values = []
-    for fx in accelerations.transpose():
-        nsteps = np.size(fx)
-        husid = np.zeros(fx.shape)
-        for i in xrange(1, nsteps):
-            husid[i] = husid[i - 1] + dt * (fx[i] ** 2)  # note that pi/(2g) is not used as doesnt affect the result
-        AI = husid[-1]
-        ds = dt * (np.sum(husid / AI <= percHigh / 100., axis=0) - np.sum(husid / AI <= percLow / 100.))
-        ds_values.append(ds)
-    return ds_values
-
-
-def getDs_ugly(comp, dt, fx, percLow, percHigh):
-    if comp != Ellipsis:
-        return getDs(dt, fx, percLow=percLow, percHigh=percHigh)
+    if accelerations.ndim == 1:
+        return getDs(dt, accelerations, percLow, percHigh)
     else:
-        return getDs_nd(dt, fx, percLow=percLow, percHigh=percHigh)
+        values = np.zeros(3)
+        i = 0
+        for fx in accelerations.transpose():
+            values[i] = getDs(dt, fx, percLow, percHigh)
+            i += 1
+        return values
 
 
 def get_geom(d1, d2):
+    """
+    get geom value from the 090 and 000 components
+    :param d1: 090
+    :param d2: 000
+    :return: geom value
+    """
     return np.sqrt(d1 * d2)
