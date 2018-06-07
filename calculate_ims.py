@@ -241,12 +241,14 @@ def write_result(result_dict, output_folder, comp, ims, period, geom_only):
 
     header = get_header(ims, period)
 
+    comp_name, comps = get_comp_name_and_list(comp, geom_only)
+
     # big csv containing all stations
     with open(output_path, 'w') as csv_file:
         csv_writer = csv.writer(csv_file, delimiter=',', quotechar='|')
         csv_writer.writerow(header)
         stations = result_dict.keys()
-        comp_name, comps = get_comp_name_and_list(comp, geom_only)
+
         # sub station csv
         for station in stations:
             station_csv = os.path.join(output_folder, OUTPUT_SUBFOLDER, '{}{}.csv'.format(station, comp_name))
