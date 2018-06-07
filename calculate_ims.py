@@ -17,6 +17,7 @@ from collections import OrderedDict
 import intensity_measures
 import read_waveform
 from rrup import pool_wrapper
+from qcore import utils
 
 G = 981.0
 IMS = ['PGV', 'PGA', 'CAV', 'AI', 'Ds575', 'Ds595', 'MMI', 'pSA']
@@ -34,14 +35,6 @@ OUTPUT_SUBFOLDER = 'stations'
 ALL_STATION_CSV_FILE = 'all_station_ims.csv'
 
 
-def mkdir(directory):
-    try:
-        os.makedirs(directory)
-    except OSError as e:
-        if e.errno != errno.EEXIST:
-            raise
-
-
 def convert_str_comp(comp):
     """
     convert string comp eg '090'/'ellipsis' to int 0/Ellipsis obj
@@ -55,15 +48,15 @@ def convert_str_comp(comp):
     return converted_comp
 
 
-def array_to_dict(value, comp, im):
+def array_to_dict(value, comp, converted_comp, im):
     """
     convert a numpy arrary that contains calculated im values to a dict {comp: value}
     :param value:
     :param comp:
+    :param converted_comp:
     :param im:
     :return: a dict {comp: value}
     """
-    converted_comp = convert_str_comp(comp)
     value_dict = OrderedDict()
     if converted_comp == Ellipsis:
         comps = EXT_IDX_DICT.keys()
@@ -102,6 +95,7 @@ def compute_measure_single((waveform, ims, comp, period)):
     times = waveform_acc.times
     station_name = waveform_acc.station_name
     result[station_name] = {}
+    converted_comp = convert_str_comp(comp)
 
     for im in ims:
         # value = [None, None, None]
@@ -130,7 +124,7 @@ def compute_measure_single((waveform, ims, comp, period)):
             value = intensity_measures.calculate_MMI_nd(waveform_vel.values)
 
         # store a im type values into a dict {comp: np_array/single float}
-        value_dict = array_to_dict(value, comp, im)
+        value_dict = array_to_dict(value, comp, converted_comp, im)
 
         # store value dict into the biggest result dict
         if im == 'pSA':
@@ -139,7 +133,6 @@ def compute_measure_single((waveform, ims, comp, period)):
             result[station_name][im] = value_dict
 
     return result
-
 
 
 def compute_measures_multiprocess(input_path, file_type, geom_only, wave_type, station_names, ims=IMS, comp=None,
@@ -159,7 +152,7 @@ def compute_measures_multiprocess(input_path, file_type, geom_only, wave_type, s
     :param meta_data:
     :param output:
     :param process:
-    :return: writes
+    :return: writes result csvs
     """
     converted_comp = convert_str_comp(comp)
 
@@ -186,7 +179,7 @@ def get_header(ims, period):
     write header colums for output im_calculations csv file
     :param ims: a list of im measures
     :param period: a list of pSA periods
-    :return:
+    :return: header
     """
     header = ['station', 'component']
     psa_names = []
@@ -206,10 +199,10 @@ def get_comp_name_and_list(comp, geom_only):
     get comp_name to become part of the sub station csv name
     get comp list for witting rows to big and sub station csvs
     :param station:
-    :param comp:
-    :param geom_only:
+    :param comp: a string comp, eg'090'
+    :param geom_only: boolean
     :param output_folder:
-    :return:
+    :return: comp_list, geom_only flag
     """
     if geom_only:
         comp_name = '_geom'
@@ -231,8 +224,8 @@ def write_result(result_dict, output_folder, comp, ims, period, geom_only):
     write a big csv that contains all calculated im value and single station csvs
     :param result_dict:
     :param output_folder:
-    :param comp:
-    :param ims:
+    :param comp: a list of comp(s)
+    :param ims: a list of im(s)
     :param period:
     :param geom_only
     :return:output result into csvs
@@ -287,7 +280,7 @@ def validate_im(parser, arg_im):
     """
     returns validated user input if pass the validation else raise parser error
     :param parser:
-    :param arg_im:
+    :param arg_im: input
     :return: validated im(s) in a list
     """
     im = arg_im
@@ -303,10 +296,10 @@ def validate_period(parser, arg_period, arg_extended_period, im):
     """
     returns validated user input if pass the validation else raise parser error
     :param parser:
-    :param arg_period:
-    :param arg_extended_period:
+    :param arg_period: input
+    :param arg_extended_period: input
     :param im: validated im(s) in a list
-    :return: period(s) in a numpy arrau
+    :return: period(s) in a numpy array
     """
     period = arg_period
     extended_period = arg_extended_period
@@ -321,6 +314,18 @@ def validate_period(parser, arg_period, arg_extended_period, im):
         parser.error("period or extended period must be used with pSA, but pSA is not in the IM mesaures entered")
 
     return period
+
+
+def mkdir_output(arg_output):
+    """
+    create big output dir and sub dir 'stations' inside the big output dir
+    :param arg_output:
+    :return: path to the big output_dir
+    """
+    output_dir = arg_output
+    utils.setup_dir(output_dir)
+    utils.setup_dir(os.path.join(output_dir, OUTPUT_SUBFOLDER))
+    return output_dir
 
 
 def main():
@@ -346,24 +351,20 @@ def main():
 
     file_type = FILE_TYPE_DICT[args.file_type]
 
-    station_names = args.station_names
-
     comp, geom_only = validate_comp(parser, args.component)
 
     im = validate_im(parser, args.im)
 
     period = validate_period(parser, args.period, args.extended_period, im)
 
-    mkdir(args.output)
-
-    mkdir(os.path.join(args.output, OUTPUT_SUBFOLDER))
+    output_dir = mkdir_output(args.output)
 
     # multiprocessor
-    compute_measures_multiprocess(args.input_path, file_type, geom_only, wave_type=None, station_names=station_names,
-                                  ims=im, comp=comp, period=period, meta_data=None, output=args.output,
+    compute_measures_multiprocess(args.input_path, file_type, geom_only, wave_type=None, station_names=args.station_names,
+                                  ims=im, comp=comp, period=period, meta_data=None, output=output_dir,
                                   process=args.process)
 
-    print("Calculations are outputted to {}".format(OUTPUT_FOLDER))
+    print("Calculations are outputted to {}".format(output_dir))
 
 
 if __name__ == '__main__':
