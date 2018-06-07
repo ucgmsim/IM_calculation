@@ -303,7 +303,7 @@ def validate_im(parser, arg_im):
     if im != IMS:
         for m in im:
             if m not in IMS:
-                parser.error('please enter valid im meausre name. {}'.format(get_im_or_period_help(IMS, "IM")))
+                parser.error('please enter valid im measure name. {}'.format(get_im_or_period_help(IMS, "IM")))
     return im
 
 
@@ -348,18 +348,18 @@ def main():
     parser.add_argument('-o', '--output', default=OUTPUT_FOLDER,
                         help='path to output folder that stores the computed measures. Default to /home/$user/computed_measures')
     parser.add_argument('-m', '--im', nargs='+', default=IMS,
-                        help='Please specify im measure(s) seperated by a space(if more than one). eg: PGV PGA CAV. {}'.format(get_im_or_period_help(IMS, "IM")))
+                        help='Please specify im measure(s) separated by a space(if more than one). eg: PGV PGA CAV. {}'.format(get_im_or_period_help(IMS, "IM")))
     parser.add_argument('-p', '--period', nargs='+', default=BSC_PERIOD, type=float,
                         help='Please provide pSA period(s) separated by a space. eg: 0.02 0.05 0.1. {}'.format(get_im_or_period_help(BSC_PERIOD, "period")))
     parser.add_argument('-e', '--extended_period', action='store_true',
                         help="Please add '-e' to indicate the use of extended(100) pSA periods. Default not using")
     parser.add_argument('-n', '--station_names', nargs='+',
-                        help='Please provide a station name(s) seperated by a space. eg: 112A 113A')
+                        help='Please provide a station name(s) separated by a space. eg: 112A 113A')
     parser.add_argument('-c', '--component', type=str, default='ellipsis',
                         help='Please provide the velocity/acc component(s) you want to calculate eg.geom. {}'.format(get_comp_help()))
     parser.add_argument('file_type', choices=['a', 'b'],
                         help="Please type 'a'(ascii) or 'b'(binary) to indicate the type of input file")
-    parser.add_argument('-np', '--process', default=2, type=int, help='Please provide the number of processers')
+    parser.add_argument('-np', '--process', default=2, type=int, help='Please provide the number of processors')
 
     args = parser.parse_args()
 
