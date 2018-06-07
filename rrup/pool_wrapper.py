@@ -10,7 +10,7 @@ class PoolWrapper:
 
     def map(self, function, iterable_list):
         result = []
-        if self.debug_mode:
+        if self.debug_mode or self.np == 1:
             print "Ignoring number of processes here, executing for loop"
             for item in iterable_list:
                 result.append(function(item))

@@ -15,3 +15,13 @@ Added
     R_x template code
 Changed
     modified rrup.csv output to conform to the template on wiki	
+
+
+[18.6.1] - 2018-06-07
+Added
+    calculate im script
+    setup.py
+Changed
+    modified pool_wrapper to be able to run with 1 processor
+    modified intensity_measures to be able to process nd array
+    modified read_waveform to be able to read binary file

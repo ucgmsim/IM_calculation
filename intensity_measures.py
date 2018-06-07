@@ -38,10 +38,8 @@ def get_spectral_acceleration_nd(acceleration, period, NT, DT):
                 values = np.zeros((value.shape[0], dims))
                 created = True
             values[:, i] = value
-        print("respectra values", values)
         return values
     else:
-        print("single respectra values", get_spectral_acceleration(acceleration, period, NT, DT))
         return get_spectral_acceleration(acceleration, period, NT, DT)
 
 
@@ -116,33 +114,9 @@ def getDs_nd(dt, accelerations, percLow=5, percHigh=75):
         values = np.zeros(3)
         i = 0
         for fx in accelerations.transpose():
-            print("getting ds",getDs(dt, fx, percLow, percHigh),getDs(dt, fx, percLow, percHigh).shape)
             values[i] = getDs(dt, fx, percLow, percHigh)
             i += 1
         return values
-
-#todo: delete after testing
-# def getDs_nd(dt, accelerations, percLow=5, percHigh=75):
-#     """Computes the percLow-percHigh% sign duration for a single ground motion component
-#     Based on getDs575.m
-#     Inputs:
-#         dt - the time step (s)
-#         fx - a vector (of acceleration)
-#         percLow - The lower percentage bound (default 5%)
-#         percHigh - The higher percentage bound (default 75%)
-#     Outputs:
-#         Ds - The duration (s)    """
-#     ds_values = []
-#     for fx in accelerations.transpose():
-#         nsteps = np.size(fx)
-#         husid = np.zeros(fx.shape)
-#         for i in xrange(1, nsteps):
-#             husid[i] = husid[i - 1] + dt * (fx[i] ** 2)  # note that pi/(2g) is not used as doesnt affect the result
-#         AI = husid[-1]
-#         ds = dt * (np.sum(husid / AI <= percHigh / 100., axis=0) - np.sum(husid / AI <= percLow / 100.))
-#         ds_values.append(ds)
-#     return ds_values
-
 
 
 def get_geom(d1, d2):
