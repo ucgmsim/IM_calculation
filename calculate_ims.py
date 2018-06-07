@@ -107,6 +107,7 @@ def compute_measure_single((waveform, ims, comp, period)):
         if im == "pSA":
             value = intensity_measures.get_spectral_acceleration_nd(accelerations, period, waveform_acc.NT, DT)
 
+        #TODO: Speed up Ds calculations
         if im == "Ds595":
             value = intensity_measures.getDs_nd(DT, accelerations, 5, 95)
 
