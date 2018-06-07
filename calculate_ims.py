@@ -8,7 +8,6 @@ command:
 """
 
 import os
-import errno
 import csv
 import argparse
 import getpass
@@ -23,7 +22,7 @@ G = 981.0
 IMS = ['PGV', 'PGA', 'CAV', 'AI', 'Ds575', 'Ds595', 'MMI', 'pSA']
 
 EXT_PERIOD = np.logspace(start=np.log10(0.01), stop=np.log10(10.), num=100, base=10)
-BSC_PERIOD = np.array([0.02, 0.05, 0.1, 0.2, 0.3, 0.4, 0.5, 0.75, 1.0, 2.0, 3.0, 4.0, 5.0, 7.5, 10.0])
+BSC_PERIOD = [0.02, 0.05, 0.1, 0.2, 0.3, 0.4, 0.5, 0.75, 1.0, 2.0, 3.0, 4.0, 5.0, 7.5, 10.0]
 
 IDX_EXT_DICT = OrderedDict([(0, '090'), (1, '000'), (2, 'ver'), (3, 'geom')])
 EXT_IDX_DICT = OrderedDict((v, k) for k, v in IDX_EXT_DICT.items())
@@ -57,7 +56,7 @@ def array_to_dict(value, comp, converted_comp, im):
     :param im:
     :return: a dict {comp: value}
     """
-    value_dict = OrderedDict()
+    value_dict = {}
     if converted_comp == Ellipsis:
         comps = EXT_IDX_DICT.keys()
         for c in comps[:-1]:  # excludes geom
@@ -259,6 +258,22 @@ def write_result(result_dict, output_folder, comp, ims, period, geom_only):
                     csv_writer.writerow(row)
 
 
+def get_comp_help():
+    """
+    :return: a help message for input component arg
+    """
+    return 'Available compoents are: {},ellipsis. ellipsis contains all {} components. Default is ellipsis'.format(','.join(c for c in EXT_IDX_DICT.keys()), len(EXT_IDX_DICT.keys()))
+
+
+def get_im_or_period_help(default_values, im_or_period):
+    """
+    :param default_values: predefined constants
+    :param im_or_period: should be either string "im" or string "period"
+    :return: a help message for input component arg
+    """
+    return 'Available and default {}s are: {}'.format(im_or_period, ','.join(str(v) for v in default_values))
+
+
 def validate_comp(parser, arg_comp):
     """
     returns validated user input if pass the validation else raise parser error
@@ -267,8 +282,9 @@ def validate_comp(parser, arg_comp):
     :return: validated comp, only_geom flag
     """
     comp = arg_comp
-    if comp not in EXT_IDX_DICT.keys() and comp != 'ellipsis':
-        parser.error("please enter a valid comp name. Available compoents are: 090,000,ver,geom,ellipsis. ellipsis contains all 4 components")
+    available_comps = EXT_IDX_DICT.keys()
+    if comp not in available_comps and comp != 'ellipsis':
+        parser.error("please enter a valid comp name. {}".format(get_comp_help()))
     geom_only = False  # when only geom is needed, should be treated as ellipsis but only output geom to csv
     if comp == 'geom':
         comp = 'ellipsis'
@@ -284,11 +300,10 @@ def validate_im(parser, arg_im):
     :return: validated im(s) in a list
     """
     im = arg_im
-    if isinstance(im, str):
-        im = im.strip().split()
+    if im != IMS:
         for m in im:
             if m not in IMS:
-                parser.error('please enter valid im meausre name. Available and default measures are: PGV, PGA, CAV, AI, Ds575, Ds595, pSA')
+                parser.error('please enter valid im meausre name. {}'.format(get_im_or_period_help(IMS, "IM")))
     return im
 
 
@@ -304,8 +319,7 @@ def validate_period(parser, arg_period, arg_extended_period, im):
     period = arg_period
     extended_period = arg_extended_period
 
-    if isinstance(period[0], str):
-        period = np.array(period, dtype='float64')
+    period = np.array(period, dtype='float64')
 
     if extended_period:
         period = np.append(period, EXT_PERIOD)
@@ -334,15 +348,15 @@ def main():
     parser.add_argument('-o', '--output', default=OUTPUT_FOLDER,
                         help='path to output folder that stores the computed measures. Default to /home/$user/computed_measures')
     parser.add_argument('-m', '--im', nargs='+', default=IMS,
-                        help='Please specify im measure(s) seperated by a space(if more than one). eg: PGV PGA CAV. Available and default measures are: PGV, PGA, CAV, AI, Ds575, Ds595, pSA')
-    parser.add_argument('-p', '--period', nargs='+', default=BSC_PERIOD,
-                        help='Please provide pSA period(s) separated by a space. eg: 0.02 0.05 0.1. Available and default periods are:0.02 0.05 0.1 0.2 0.3 0.4 0.5 0.75 1.0 2.0 3.0 4.0 5.0 7.5 10.0')
+                        help='Please specify im measure(s) seperated by a space(if more than one). eg: PGV PGA CAV. {}'.format(get_im_or_period_help(IMS, "IM")))
+    parser.add_argument('-p', '--period', nargs='+', default=BSC_PERIOD, type=float,
+                        help='Please provide pSA period(s) separated by a space. eg: 0.02 0.05 0.1. {}'.format(get_im_or_period_help(BSC_PERIOD, "period")))
     parser.add_argument('-e', '--extended_period', action='store_true',
                         help="Please add '-e' to indicate the use of extended(100) pSA periods. Default not using")
     parser.add_argument('-n', '--station_names', nargs='+',
                         help='Please provide a station name(s) seperated by a space. eg: 112A 113A')
     parser.add_argument('-c', '--component', type=str, default='ellipsis',
-                        help='Please provide the velocity/acc component(s) you want to calculate eg.geom. Available compoents are: 090,000,ver,geom,ellipsis. ellipsis contains all 4 components')
+                        help='Please provide the velocity/acc component(s) you want to calculate eg.geom. {}'.format(get_comp_help()))
     parser.add_argument('file_type', choices=['a', 'b'],
                         help="Please type 'a'(ascii) or 'b'(binary) to indicate the type of input file")
     parser.add_argument('-np', '--process', default=2, type=int, help='Please provide the number of processers')

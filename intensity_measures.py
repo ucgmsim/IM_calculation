@@ -29,48 +29,24 @@ def get_spectral_acceleration(acceleration, period, NT, DT):
 
 def get_spectral_acceleration_nd(acceleration, period, NT, DT):
     # pSA
-    created = False
     if acceleration.ndim != 1:
         dims = acceleration.shape[1]
+        values = np.zeros((period.size, dims))
         for i in range(dims):
-            value = get_spectral_acceleration(acceleration[:, i], period, NT, DT)
-            if not created:
-                values = np.zeros((value.shape[0], dims))
-                created = True
-            values[:, i] = value
+            values[:, i] = get_spectral_acceleration(acceleration[:, i], period, NT, DT)
         return values
     else:
         return get_spectral_acceleration(acceleration, period, NT, DT)
-
-
-def get_cumulative_abs_velocity(acceleration, times):
-    # CAV
-    return np.trapz(np.abs(acceleration), times)
 
 
 def get_cumulative_abs_velocity_nd(acceleration, times):
     return np.trapz(np.abs(acceleration), times, axis=0)
 
 
-def get_arias_intensity(acceleration, g, times):
-    # AI
-    # I_{A}=\frac {\pi }{2g}\int _{0}^{T_{d}}a(t)^{2}dt on http://asciimath.org/
-    # Where the acceleration units for a and g are the same. Below they are considered in cm/s
-    acc_in_cms = acceleration * g
-    integrand = acc_in_cms ** 2
-    return np.pi / (2 * g) * np.trapz(integrand, times)
-
-
 def get_arias_intensity_nd(acceleration, g, times):
     acc_in_cms = acceleration * g
     integrand = acc_in_cms ** 2
     return np.pi / (2 * g) * np.trapz(integrand, times, axis=0)
-
-
-def calculate_MMI(velocities):
-    # MMI
-    pgv = get_max_nd(velocities)
-    return np.float(timeseries.pgv2MMI(pgv))
 
 
 def calculate_MMI_nd(velocities):
@@ -99,7 +75,7 @@ def getDs(dt, fx, percLow=5, percHigh=75):
 
 
 def getDs_nd(dt, accelerations, percLow=5, percHigh=75):
-    """Computes the percLow-percHigh% sign duration for a single ground motion component
+    """Computes the percLow-percHigh% sign duration for a nd(>1) ground motion component
     Based on getDs575.m
     Inputs:
         dt - the time step (s)
