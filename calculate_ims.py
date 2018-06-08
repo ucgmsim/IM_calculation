@@ -4,7 +4,7 @@ Calculate im values.
 Output computed measures to /home/$user/computed_measures if no output path is specified
 command:
    python compute_measures.py /home/vap30/scratch/2/BB.bin b
-   python compute_measures.py /home/vap30/scratch/2/BB.bin b -p 0.02 -e -n 112A -c 090 -m PGV pSA -np 2
+   python calculate_ims.py ../BB.bin b -o /home/yzh231/ -i Albury_666_999 -r Albury -t s -v 18p3 -n 112A CMZ -m PGV pSA -p 0.02 0.03 -e -c geom -np 2
 """
 
 import os
@@ -13,6 +13,7 @@ import argparse
 import getpass
 import numpy as np
 from collections import OrderedDict
+from datetime import datetime
 import intensity_measures
 import read_waveform
 from rrup import pool_wrapper
@@ -28,10 +29,12 @@ IDX_EXT_DICT = OrderedDict([(0, '090'), (1, '000'), (2, 'ver'), (3, 'geom')])
 EXT_IDX_DICT = OrderedDict((v, k) for k, v in IDX_EXT_DICT.items())
 
 FILE_TYPE_DICT = {'a': 'ascii', 'b': 'binary'}
+META_TYPE_DICT = {'s': 'simulated', 'o': 'observed', 'u': 'unknown'}
 
-OUTPUT_FOLDER = os.path.join('/home', getpass.getuser(), 'computed_measures')
+OUTPUT_PATH = os.path.join('/home', getpass.getuser())
 OUTPUT_SUBFOLDER = 'stations'
-ALL_STATION_CSV_FILE = 'all_station_ims.csv'
+
+RUNNAME_DEFAULT = 'all_station_ims'
 
 
 def convert_str_comp(comp):
@@ -136,11 +139,12 @@ def compute_measure_single((waveform, ims, comp, period)):
 
 
 def compute_measures_multiprocess(input_path, file_type, geom_only, wave_type, station_names, ims=IMS, comp=None,
-                                  period=None, meta_data=None, output=OUTPUT_FOLDER, process=1):
+                                  period=None, output=None, identifier=None, rupture=None, run_type=None, version=None,
+                                  process=1):
     """
     using multiprocesses to computer measures.
     Calls compute_measure_single() to compute measures for a single station
-    wWite results tp csvs
+    write results to csvs and a .info meta data file
     :param input_path:
     :param file_type:
     :param geom_only:
@@ -149,10 +153,13 @@ def compute_measures_multiprocess(input_path, file_type, geom_only, wave_type, s
     :param ims:
     :param comp:
     :param period:
-    :param meta_data:
     :param output:
+    :param identifier:
+    :param rupture:
+    :param type:
+    :param version:
     :param process:
-    :return: writes result csvs
+    :return:
     """
     converted_comp = convert_str_comp(comp)
 
@@ -171,7 +178,13 @@ def compute_measures_multiprocess(input_path, file_type, geom_only, wave_type, s
     for result in result_list:
         all_result_dict.update(result)
 
-    write_result(all_result_dict, output, comp, ims, period, geom_only)
+    write_result(all_result_dict, output, identifier, comp, ims, period, geom_only)
+
+    generate_metadata(output, identifier, rupture, run_type, version)
+
+
+def get_result_filepath(output_folder, arg_identifier, suffix):
+    return os.path.join(output_folder, '{}.{}'.format(arg_identifier, suffix))
 
 
 def get_header(ims, period):
@@ -219,18 +232,19 @@ def get_comp_name_and_list(comp, geom_only):
     return comp_name, comps
 
 
-def write_result(result_dict, output_folder, comp, ims, period, geom_only):
+def write_result(result_dict, output_folder, identifier, comp, ims, period, geom_only):
     """
     write a big csv that contains all calculated im value and single station csvs
     :param result_dict:
     :param output_folder:
+    :param identifier: user input run name
     :param comp: a list of comp(s)
     :param ims: a list of im(s)
     :param period:
     :param geom_only
     :return:output result into csvs
     """
-    output_path = os.path.join(output_folder, ALL_STATION_CSV_FILE)
+    output_path = get_result_filepath(output_folder, identifier, 'csv')
 
     header = get_header(ims, period)
 
@@ -257,6 +271,25 @@ def write_result(result_dict, output_folder, comp, ims, period, geom_only):
                             row += result_dict[station][im][1][c].tolist()
                     sub_csv_writer.writerow(row)
                     csv_writer.writerow(row)
+
+
+def generate_metadata(output_folder, identifier, rupture, run_type, version):
+    """
+    write meta data file
+    :param output_folder:
+    :param identifier: user input
+    :param rupture: user input
+    :param type: user input
+    :param version: user input
+    :return:
+    """
+    date = datetime.now().strftime('%Y%m%d_%H%M%S')
+    output_path = get_result_filepath(output_folder, identifier, 'info')
+
+    with open(output_path, 'w') as meta_file:
+        meta_writer = csv.writer(meta_file, delimiter=',', quotechar='|')
+        meta_writer.writerow(['identifier', 'rupture', 'type', 'date', 'version'])
+        meta_writer.writerow([identifier, rupture, run_type, date, version])
 
 
 def get_comp_help():
@@ -331,23 +364,34 @@ def validate_period(parser, arg_period, arg_extended_period, im):
     return period
 
 
-def mkdir_output(arg_output):
+def mkdir_output(arg_output, arg_identifier):
     """
     create big output dir and sub dir 'stations' inside the big output dir
     :param arg_output:
+    :param arg_identifier:
     :return: path to the big output_dir
     """
-    output_dir = arg_output
+    output_dir = os.path.join(arg_output, arg_identifier)
     utils.setup_dir(output_dir)
     utils.setup_dir(os.path.join(output_dir, OUTPUT_SUBFOLDER))
+
     return output_dir
 
 
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('input_path', help='path to input bb binary file eg./home/melody/BB.bin')
-    parser.add_argument('-o', '--output', default=OUTPUT_FOLDER,
-                        help='path to output folder that stores the computed measures. Default to /home/$user/computed_measures')
+    parser.add_argument('file_type', choices=['a', 'b'],
+                        help="Please type 'a'(ascii) or 'b'(binary) to indicate the type of input file")
+    parser.add_argument('-o', '--output_path', default=OUTPUT_PATH,
+                        help='path to output folder that stores the computed measures.Folder name must not be inclusive.eg.home/tt/. Default to /home/$user/')
+    parser.add_argument('-i', '--identifier', default=RUNNAME_DEFAULT,
+                        help='Please specify the unique runname of the simulation. eg.Albury_HYP01-01_S1244')
+    parser.add_argument('-r', '--rupture', default='unknown',
+                        help='Please specify the rupture name of the simulation. eg.Albury')
+    parser.add_argument('-t', '--run_type', choices=['s', 'o', 'u'], default='u',
+                        help="Please specify the type of the simrun. Type 's'(simulated) or 'o'(observed) or 'u'(unkown)")
+    parser.add_argument('-v', '--version', default='XXpY', help='Please specify the rupture name of the simulation. eg.18p4')
     parser.add_argument('-m', '--im', nargs='+', default=IMS,
                         help='Please specify im measure(s) separated by a space(if more than one). eg: PGV PGA CAV. {}'.format(get_im_or_period_help(IMS, "IM")))
     parser.add_argument('-p', '--period', nargs='+', default=BSC_PERIOD, type=float,
@@ -358,13 +402,13 @@ def main():
                         help='Please provide a station name(s) separated by a space. eg: 112A 113A')
     parser.add_argument('-c', '--component', type=str, default='ellipsis',
                         help='Please provide the velocity/acc component(s) you want to calculate eg.geom. {}'.format(get_comp_help()))
-    parser.add_argument('file_type', choices=['a', 'b'],
-                        help="Please type 'a'(ascii) or 'b'(binary) to indicate the type of input file")
     parser.add_argument('-np', '--process', default=2, type=int, help='Please provide the number of processors')
 
     args = parser.parse_args()
 
     file_type = FILE_TYPE_DICT[args.file_type]
+
+    run_type = META_TYPE_DICT[args.run_type]
 
     comp, geom_only = validate_comp(parser, args.component)
 
@@ -372,11 +416,12 @@ def main():
 
     period = validate_period(parser, args.period, args.extended_period, im)
 
-    output_dir = mkdir_output(args.output)
+    output_dir = mkdir_output(args.output_path, args.identifier)
 
     # multiprocessor
-    compute_measures_multiprocess(args.input_path, file_type, geom_only, wave_type=None, station_names=args.station_names,
-                                  ims=im, comp=comp, period=period, meta_data=None, output=output_dir,
+    compute_measures_multiprocess(args.input_path, file_type, geom_only, wave_type=None,
+                                  station_names=args.station_names, ims=im, comp=comp, period=period, output=output_dir,
+                                  identifier=args.identifier, rupture=args.rupture, run_type=run_type, version=args.version,
                                   process=args.process)
 
     print("Calculations are outputted to {}".format(output_dir))
