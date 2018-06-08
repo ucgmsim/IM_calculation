@@ -99,13 +99,13 @@ def read_waveforms(path, station_names=None, comp=Ellipsis, wave_type=None, file
     :return: a list of waveforms
     """
 
-    if file_type == 'standard':
+    if file_type == 'ascii':
         return read_ascii_folder(path, station_names)
     elif file_type == 'binary':
 
         return read_binary_file(path, comp, station_names, wave_type=wave_type, file_type='binary')
     else:
-        print "Could not determine filetype %s Ignoring this station" % path
+        print "Could not determine filetype %s" % path
         return None
 
 
