@@ -1,7 +1,6 @@
 *.pyc
-Cython/Cython/
-Cython/rspectra.c
-Cython/rspectra.so
-Cython/build
+rspectra_calculations/rspectra.c
+rspectra_calculations/rspectra.so
 computed_measures*/
 .idea
+build/

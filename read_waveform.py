@@ -1,12 +1,8 @@
-# TODO ADD velocities attribute calculation for standard file waveform obj
 import os
 import numpy as np
 import glob
 import itertools
-
 from qcore import timeseries
-
-EXTENSIONS = ["000", "090", "ver"]
 
 
 class Waveform:
@@ -194,9 +190,8 @@ def read_binary_file(input_path, comp, station_names=None, wave_type=None, file_
     if not station_names:
         station_names = bbseries.stations.name
     for station_name in station_names:
-        print("read binary single station name", station_name)
         waveform_acc = read_one_station_from_bbseries(bbseries, station_name, comp, wave_type='a',
-                                                      file_type=file_type)  # TODO should create either a or v not bothm tidy later
+                                                      file_type=file_type)  # TODO should create either a or v not both
         waveform_vel = read_one_station_from_bbseries(bbseries, station_name, comp, wave_type='v', file_type=file_type)
         waveforms.append((waveform_acc, waveform_vel))
     return waveforms
