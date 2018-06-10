@@ -399,8 +399,8 @@ def main():
     parser.add_argument('-r', '--rupture', default='unknown',
                         help='Please specify the rupture name of the simulation. eg.Albury')
     parser.add_argument('-t', '--run_type', choices=['s', 'o', 'u'], default='u',
-                        help="Please specify the type of the simrun. Type 's'(simulated) or 'o'(observed) or 'u'(unkown)")
-    parser.add_argument('-v', '--version', default='XXpY', help='Please specify the rupture name of the simulation. eg.18p4')
+                        help="Please specify the type of the simrun. Type 's'(simulated) or 'o'(observed) or 'u'(unknown)")
+    parser.add_argument('-v', '--version', default='XXpY', help='Please specify the version of the simulation. eg.18p4')
     parser.add_argument('-m', '--im', nargs='+', default=IMS,
                         help='Please specify im measure(s) separated by a space(if more than one). eg: PGV PGA CAV. {}'.format(get_im_or_period_help(IMS, "IM")))
     parser.add_argument('-p', '--period', nargs='+', default=BSC_PERIOD, type=float,
