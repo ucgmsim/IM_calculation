@@ -3,7 +3,7 @@
 Calculate im values.
 Output computed measures to /home/$user/computed_measures if no output path is specified
 command:
-   python compute_measures.py /home/vap30/scratch/2/BB.bin b
+   python calculate_ims.py ../BB.bin b
    python calculate_ims.py ../BB.bin b -o /home/yzh231/ -i Albury_666_999 -r Albury -t s -v 18p3 -n 112A CMZ -m PGV pSA -p 0.02 0.03 -e -c geom -np 2
 """
 
@@ -18,6 +18,7 @@ import intensity_measures
 import read_waveform
 from rrup import pool_wrapper
 from qcore import utils
+from qcore import timeseries
 
 G = 981.0
 IMS = ['PGV', 'PGA', 'CAV', 'AI', 'Ds575', 'Ds595', 'MMI', 'pSA']
@@ -92,17 +93,24 @@ def compute_measure_single((waveform, ims, comp, period)):
     """
     result = {}
     waveform_acc, waveform_vel = waveform
-    accelerations = waveform_acc.values
     DT = waveform_acc.DT
     times = waveform_acc.times
+
+    accelerations = waveform_acc.values
+
+    if waveform_vel is None:
+        # integrating g to cm/s
+        velocities = timeseries.acc2vel(accelerations, DT) * G
+    else:
+        velocities = waveform_vel.values
+
     station_name = waveform_acc.station_name
     result[station_name] = {}
     converted_comp = convert_str_comp(comp)
 
     for im in ims:
-        # value = [None, None, None]
-        if im == 'PGV' and waveform_vel is not None:
-            value = intensity_measures.get_max_nd(waveform_vel.values)
+        if im == 'PGV':
+            value = intensity_measures.get_max_nd(velocities)
 
         if im == "PGA":
             value = intensity_measures.get_max_nd(accelerations)
@@ -123,10 +131,11 @@ def compute_measure_single((waveform, ims, comp, period)):
         if im == "CAV":
             value = intensity_measures.get_cumulative_abs_velocity_nd(accelerations, times)
 
-        if im == "MMI" and waveform_vel is not None:
-            value = intensity_measures.calculate_MMI_nd(waveform_vel.values)
+        if im == "MMI":
+            value = intensity_measures.calculate_MMI_nd(velocities)
 
         # store a im type values into a dict {comp: np_array/single float}
+        # Geometric is also calculated here
         value_dict = array_to_dict(value, comp, converted_comp, im)
 
         # store value dict into the biggest result dict
