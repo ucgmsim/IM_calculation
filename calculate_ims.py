@@ -3,6 +3,7 @@
 Calculate im values.
 Output computed measures to /home/$user/computed_measures if no output path is specified
 command:
+   python calculate_ims.py test/test_calculate_ims/sample1/input/darfield_ascii/ a
    python calculate_ims.py ../BB.bin b
    python calculate_ims.py ../BB.bin b -o /home/yzh231/ -i Albury_666_999 -r Albury -t s -v 18p3 -n 112A CMZ -m PGV pSA -p 0.02 0.03 -e -c geom -np 2
 """
@@ -14,8 +15,8 @@ import getpass
 import numpy as np
 from collections import OrderedDict
 from datetime import datetime
-import intensity_measures
-import read_waveform
+from IM import intensity_measures
+from IM import read_waveform
 from rrup import pool_wrapper
 from qcore import utils
 from qcore import timeseries
@@ -317,6 +318,25 @@ def get_im_or_period_help(default_values, im_or_period):
     return 'Available and default {}s are: {}'.format(im_or_period, ','.join(str(v) for v in default_values))
 
 
+def validate_input_path(parser, arg_input, arg_file_type):
+    """
+    validate input path
+    :param parser:
+    :param arg_input:
+    :param arg_file_type:
+    :return:
+    """
+    if not os.path.exists(arg_input):
+        parser.error("{} does not exist".format(arg_input))
+
+    if arg_file_type == 'b':
+        if os.path.isdir(arg_input):
+            parser.error('The path should point to a binary file but not a directory. Correct Sample: /home/tt/BB.bin')
+    elif arg_file_type == 'a':
+        if os.path.isfile(arg_input):
+            parser.error('The path should be a directory but not a file. Correct Sample: /home/tt/sims/')
+
+
 def validate_comp(parser, arg_comp):
     """
     returns validated user input if pass the validation else raise parser error
@@ -411,9 +431,11 @@ def main():
                         help='Please provide a station name(s) separated by a space. eg: 112A 113A')
     parser.add_argument('-c', '--component', type=str, default='ellipsis',
                         help='Please provide the velocity/acc component(s) you want to calculate eg.geom. {}'.format(get_comp_help()))
-    parser.add_argument('-np', '--process', default=2, type=int, help='Please provide the number of processors')
+    parser.add_argument('-np', '--process', default=2, type=int, help='Please provide the number of processors. Default is 2')
 
     args = parser.parse_args()
+
+    validate_input_path(parser, args.input_path, args.file_type)
 
     file_type = FILE_TYPE_DICT[args.file_type]
 

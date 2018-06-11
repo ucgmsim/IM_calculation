@@ -8,6 +8,6 @@ import numpy
 
 
 setup(
-    ext_modules=cythonize("rspectra_calculations/rspectra.pyx"),
+    ext_modules=cythonize("IM/rspectra_calculations/rspectra.pyx"),
     include_dirs=[numpy.get_include()]
 )
