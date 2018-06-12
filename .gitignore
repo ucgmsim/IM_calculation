@@ -6,3 +6,4 @@ computed_measures*/
 build/
 test/test_calculate_ims/sample1/input/
 test/test_calculate_ims/sample1/output/
+.cache/
