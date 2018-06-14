@@ -62,6 +62,5 @@ for fault in im_faults:
         out_data['f0'] = csv_np[0]['station']
         for i in xrange(n_csv):
             out_data['f%d' % (i + 1)] = csv_np[i][c]
-        with open(out_file, 'w') as f:
-            np.savetxt(out_file, out_data, fmt = fmt, delimiter = ',', \
-                       header = header, comments = '')
+        np.savetxt(out_file, out_data, fmt = fmt, delimiter = ',', \
+                    header = header, comments = '')
