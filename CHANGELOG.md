@@ -8,14 +8,16 @@ Changed
 
 Added
 
-
-[18.5.1] - 2017-05-24 -- Initial Version
+[18.6.3] - 2018-06-14
 Added
-    rrup calculation script
-    R_x template code
-Changed
-    modified rrup.csv output to conform to the template on wiki	
+    Slurm script generation to aide submission for the job to Kupe/Maui/Mahuika for binary and ascii workflows
 
+[18.6.2] - 2018-06-11
+Added
+    -
+Changed
+    modified calculate_im script to be able to generate meta_data file
+    modified README to display the new help message
 
 [18.6.1] - 2018-06-07
 Added
@@ -27,9 +29,13 @@ Changed
     modified read_waveform to be able to read binary file
 
 
-[18.6.2] - 2018-06-11
+[18.5.1] - 2017-05-24 -- Initial Version
 Added
-    -
+    rrup calculation script
+    R_x template code
 Changed
-    modified calculate_im script to be able to generate meta_data file
-    modified README to display the new help message
+    modified rrup.csv output to conform to the template on wiki	
+
+
+
+

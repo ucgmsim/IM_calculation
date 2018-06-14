@@ -71,3 +71,41 @@ optional arguments:
                         Please provide the number of processors
 
 ```
+
+To create submission script for slurm workflow:
+
+```
+usage: generate_sl.py [-h] [-s SIM_DIR] [-o OBS_DIR] [-srf SRF_DIR]
+                      [-ll STATION_FILE] [-np PROCESSES]
+                      rrup_output_dir
+
+Prints out a slurm script to run IM Calculation over a run-group
+
+positional arguments:
+  rrup_output_dir       directory containing rupture distances output
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -s SIM_DIR, --sim_dir SIM_DIR
+                        Path to sim-run-group containing faults and
+                        acceleration in the subfolder */BB/*/*
+  -o OBS_DIR, --obs_dir OBS_DIR
+                        Path to obs-run-group containing faults and
+                        accelerations in the subfolder */*/accBB
+  -srf SRF_DIR, --srf_dir SRF_DIR
+                        Path to run-group containing the srf files in the path
+                        matching */Srf/*.srf
+  -ll STATION_FILE, --station_file STATION_FILE
+                        Path to a single station file for ruputure distance
+                        calculations
+  -np PROCESSES, --processes PROCESSES
+                        number of processors to use
+
+```
+
+e.g.
+
+```
+ python generate_sl.py ~/IM_result_test_robin/ -srf /nesi/nobackup/nesi00213/RunFolder/Validation/IMCalcExample_v1p2/Data/Sources -ll /nesi/transit/nesi00213/StationInfo/cantstations_v1pt2.ll -s /nesi/nobackup/nesi00213/RunFolder/Validation/IMCalcExample_v1p2/Runs -o /nesi/nobackup/nesi00213/ObsGM/Validation/IMCalcExample > ~/im_calc.sl
+
+```

@@ -1,0 +1,45 @@
+#!/bin/bash
+#script version: slurm
+
+# Please modify this file as needed, this is just a sample
+#SBATCH --job-name=im_calc
+#SBATCH --account=nesi00213
+#SBATCH --partition=NeSI
+#SBATCH --ntasks=1
+#SBATCH --time={{time}}
+#SBATCH --output im_calc-%j.out
+#SBATCH --error im_calc-%j.err
+###SBATCH --mail-type=all
+###SBATCH --mail-user=test@test.com
+###SBATCH --mem-per-cpu=16G
+###SBATCH -C avx
+#SBATCH --hint=nomultithread
+
+## END HEADER
+date
+
+source machine_env.sh
+export IMPATH=/nesi/nobackup/nesi00213/IM_calculation
+export PYTHONPATH=/nesi/nobackup/nesi00213/tmp/qcore:/$PYTHONPATH:$IMPATH
+export RUNDIR=/nesi/nobackup/nesi00213/tmp/auto_preproc
+#export PMI_MMAP_SYNC_WAIT_TIME=300
+
+
+
+echo ___calculating simulations___
+{% for sim_dir, sim_name, fault_name in sim_dirs %}
+    time srun python2 $IMPATH/calculate_ims.py {{sim_dir}}/Acc a -o {{sim_dir}}/../../../IM_calc/ -e -np {{np}} -i {{sim_name}} -r {{fault_name}} -t s
+{% endfor %}
+
+echo ___calculating observed____
+{% for obs_dir, obs_name, fault_name in obs_dirs %}
+	time srun python2 $IMPATH/calculate_ims.py {{obs_dir}}/*/*/accBB a -o {{obs_dir}}/../IM_calc/ -e -np {{np}} -i {{obs_name}} -r {{fault_name}} -t o
+{% endfor %}
+
+echo ___calculating rrups___
+{% for srf_file, srf_output in rrup_files %}
+	time srun python2 $IMPATH/rrup/calculate_rrups.py -np {{np}} -o {{output_dir}}/{{srf_output}}.csv {{station_file}} {{srf_file}}
+{% endfor %}
+
+
+date
