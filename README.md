@@ -109,3 +109,13 @@ e.g.
  python generate_sl.py ~/IM_result_test_robin/ -srf /nesi/nobackup/nesi00213/RunFolder/Validation/IMCalcExample_v1p2/Data/Sources -ll /nesi/transit/nesi00213/StationInfo/cantstations_v1pt2.ll -s /nesi/nobackup/nesi00213/RunFolder/Validation/IMCalcExample_v1p2/Runs -o /nesi/nobackup/nesi00213/ObsGM/Validation/IMCalcExample > ~/im_calc.sl
 
 ```
+
+To aggregate IMs across realisations:
+outputs a file per fault per IM that contains a row for each station and columns for each realisation.
+
+```
+usage: im_agg.py [-h] runs_dir
+
+positional arguments:
+  runs_dir    location to Runs folder eg: RunFolder/Cybershake/v18p5/Runs
+```

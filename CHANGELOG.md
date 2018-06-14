@@ -11,6 +11,7 @@ Added
 [18.6.3] - 2018-06-14
 Added
     Slurm script generation to aide submission for the job to Kupe/Maui/Mahuika for binary and ascii workflows
+    aggregation of IMs across realisations script
 
 [18.6.2] - 2018-06-11
 Added
