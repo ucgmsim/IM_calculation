@@ -255,7 +255,7 @@ def write_result(result_dict, output_folder, identifier, comp, ims, period, geom
     :return:output result into csvs
     """
     output_path = get_result_filepath(output_folder, identifier, 'csv')
-
+    print(output_path)
     header = get_header(ims, period)
 
     comp_name, comps = get_comp_name_and_list(comp, geom_only)
@@ -264,7 +264,7 @@ def write_result(result_dict, output_folder, identifier, comp, ims, period, geom
     with open(output_path, 'w') as csv_file:
         csv_writer = csv.writer(csv_file, delimiter=',', quotechar='|')
         csv_writer.writerow(header)
-        stations = result_dict.keys()
+        stations = sorted(result_dict.keys())
 
         # sub station csv
         for station in stations:
@@ -385,7 +385,7 @@ def validate_period(parser, arg_period, arg_extended_period, im):
     period = np.array(period, dtype='float64')
 
     if extended_period:
-        period = np.append(period, EXT_PERIOD)
+        period = np.unique(np.append(period, EXT_PERIOD))
 
     if (extended_period or period.any()) and 'pSA' not in im:
         parser.error("period or extended period must be used with pSA, but pSA is not in the IM measures entered")

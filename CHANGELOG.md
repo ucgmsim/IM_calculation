@@ -33,3 +33,11 @@ Added
 Changed
     modified calculate_im script to be able to generate meta_data file
     modified README to display the new help message
+
+
+[18.6.3] - 2018-06-14
+Added
+    -
+Changed
+    modified calculate_im script to use unique ascending periods when concatenating with extended periods
+    modified calculate_im script to use sorted stations when writing result csvs
