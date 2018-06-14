@@ -33,3 +33,10 @@ Added
 Changed
     modified calculate_im script to be able to generate meta_data file
     modified README to display the new help message
+
+
+[18.6.3] - 2018-06-14
+Added
+    aggregation of IMs accross realisations script
+Changed
+    -

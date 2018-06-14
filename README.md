@@ -71,3 +71,12 @@ optional arguments:
                         Please provide the number of processors
 
 ```
+
+To aggregate IMs accross realisations:
+
+```
+usage: im_agg.py [-h] runs_dir
+
+positional arguments:
+  runs_dir    location to Runs folder eg: RunFolder/Cybershake/v18p5/Runs
+```
