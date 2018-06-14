@@ -72,7 +72,8 @@ optional arguments:
 
 ```
 
-To aggregate IMs accross realisations:
+To aggregate IMs across realisations:
+outputs a file per fault per IM that contains a row for each station and columns for each realisation.
 
 ```
 usage: im_agg.py [-h] runs_dir
