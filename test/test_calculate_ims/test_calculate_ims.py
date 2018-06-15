@@ -1,3 +1,8 @@
+"""
+Comnpars output csvs from calculate_ims.py with the benchmark csvs for selected stations
+pytest -v -s calculate_ims.py
+"""
+
 import os
 from qcore import shared
 
@@ -27,6 +32,12 @@ ERROR_LIMIT = 0.01
 
 
 def run_script_calculate_ims(input_path, input_type, identifier):
+    """
+    :param input_path: INPUT_BINARY/ASCII
+    :param input_type: 'b'/'a'
+    :param identifier: IDENTIFIER_BINARY/ASCII
+    :return: error string
+    """
     cmd = 'python {} {} {} -o {} -i {} -t s -n {} -p {}'.format(SCRIPT, input_path, input_type, OUTPUT_DIR, identifier, STATIONS, PERIODS)
     _, err = shared.exe(cmd)
     return err
@@ -43,6 +54,10 @@ def test_ascii_script_calculate_ims():
 
 
 def get_result_dict(sample_path):
+    """
+    :param sample_path: path to BENCHMARK
+    :return: dict {station: {comp: measure: im_value}}}
+    """
     result_dict = {}
     with open(sample_path, 'r') as result_reader:
         buf = result_reader.readlines()
@@ -68,6 +83,10 @@ def get_result_dict(sample_path):
 
 
 def run_test_calculate_ims(test_output_path):
+    """
+    :param test_output_path: OUTPUT_BINARY/ASCII
+    :return: error string
+    """
     benchmark_dict = get_result_dict(BENCHMARK)
     output_dict = get_result_dict(test_output_path)
     passed = 0
@@ -130,6 +149,7 @@ def test_ascii_single_output_file():
 
 # # This function should only be used when you want to re-generate then benchmark file
 # # sample_bench_path = '/home/yzh231/new_im_sim_benchmark'
+# # sample_bench_path is the path to the folder that contains all single_compoent_summary benchmark csvs
 # def write_benchmark_csv(sample_bench_path):
 #     exts = COMP_DICT.values()
 #     bench_files = ['new_im_sim_{}.csv'.format(ext) for ext in exts]
