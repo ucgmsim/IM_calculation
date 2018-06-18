@@ -4,6 +4,7 @@ rspectra_calculations/rspectra.so
 computed_measures*/
 .idea
 build/
-test/test_calculate_ims/sample1/input/
+test/test_calculate_ims/sample1/input/*.bin
 test/test_calculate_ims/sample1/output/
+test/test_calculate_ims/*.xml
 .cache/

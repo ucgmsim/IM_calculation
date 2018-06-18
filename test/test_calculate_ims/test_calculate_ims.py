@@ -11,7 +11,7 @@ SCRIPT = os.path.abspath(os.path.join(TEST_FOLDER, '..', '..', 'calculate_ims.py
 print(SCRIPT)
 
 INPUT_DIR = os.path.join(TEST_FOLDER,'sample1','input')
-INPUT_BINARY = os.path.join(INPUT_DIR, 'BB_with_siteamp.bin')
+INPUT_BINARY = '/home/yzh231/BB_with_siteamp.bin'
 INPUT_ASCII = os.path.join(INPUT_DIR, 'single_files')
 BENCHMARK = os.path.join(INPUT_DIR, 'new_im_sim_benchmark.csv')
 
