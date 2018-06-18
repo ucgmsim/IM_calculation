@@ -149,7 +149,7 @@ def compute_measure_single((waveform, ims, comp, period)):
 
 def compute_measures_multiprocess(input_path, file_type, geom_only, wave_type, station_names, ims=IMS, comp=None,
                                   period=None, output=None, identifier=None, rupture=None, run_type=None, version=None,
-                                  process=1):
+                                  process=1, units='g'):
     """
     using multiprocesses to computer measures.
     Calls compute_measure_single() to compute measures for a single station
@@ -173,7 +173,7 @@ def compute_measures_multiprocess(input_path, file_type, geom_only, wave_type, s
     converted_comp = convert_str_comp(comp)
 
     waveforms = read_waveform.read_waveforms(input_path, station_names, converted_comp, wave_type=wave_type,
-                                             file_type=file_type)
+                                             file_type=file_type, units=units)
     array_params = []
     all_result_dict = {}
 
@@ -412,6 +412,8 @@ def main():
     parser.add_argument('-c', '--component', type=str, default='ellipsis',
                         help='Please provide the velocity/acc component(s) you want to calculate eg.geom. {}'.format(get_comp_help()))
     parser.add_argument('-np', '--process', default=2, type=int, help='Please provide the number of processors')
+    parser.add_argument('-u', '--units', choices=['cm/s^2', 'g'], default='g',
+                        help="The units that input acceleration files are in")
 
     args = parser.parse_args()
 
@@ -431,7 +433,7 @@ def main():
     compute_measures_multiprocess(args.input_path, file_type, geom_only, wave_type=None,
                                   station_names=args.station_names, ims=im, comp=comp, period=period, output=output_dir,
                                   identifier=args.identifier, rupture=args.rupture, run_type=run_type, version=args.version,
-                                  process=args.process)
+                                  process=args.process, units=args.units)
 
     print("Calculations are outputted to {}".format(output_dir))
 

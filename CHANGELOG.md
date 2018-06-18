@@ -12,6 +12,7 @@ Added
 Added
     Slurm script generation to aide submission for the job to Kupe/Maui/Mahuika for binary and ascii workflows
     aggregation of IMs across realisations script
+    Option to select acc units for each run
 
 [18.6.2] - 2018-06-11
 Added
