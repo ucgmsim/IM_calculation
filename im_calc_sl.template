@@ -21,8 +21,6 @@ date
 source machine_env.sh
 export IMPATH=/nesi/nobackup/nesi00213/IM_calculation
 export PYTHONPATH=/nesi/nobackup/nesi00213/tmp/qcore:/$PYTHONPATH:$IMPATH
-export RUNDIR=/nesi/nobackup/nesi00213/tmp/auto_preproc
-#export PMI_MMAP_SYNC_WAIT_TIME=300
 
 
 

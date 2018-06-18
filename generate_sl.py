@@ -12,6 +12,7 @@ DEFAULT_N_PROCESSES = 40
 # TODO: handle optional arguments correctly
 # TODO: rrup output_dir the csv to each individual simulation folder
 # TODO: one rupture distance calc per fault
+# TODO: remove relative paths on sl.template
 
 
 def generate_sl(sim_dirs, obs_dirs, station_file, rrup_files, output_dir, np=8):
