@@ -1,10 +1,12 @@
 """
 Comnpars output csvs from calculate_ims.py with the benchmark csvs for selected stations
 pytest -v -s calculate_ims.py
+pytest --cov --cov-report=html -s test_calculate_ims.py
 """
 
 import os
-from qcore import shared
+import shutil
+from qcore import shared, utils
 
 TEST_FOLDER = os.path.abspath(os.path.dirname(__file__))
 SCRIPT = os.path.abspath(os.path.join(TEST_FOLDER, '..', '..', 'calculate_ims.py'))
@@ -18,17 +20,39 @@ BENCHMARK = os.path.join(INPUT_DIR, 'new_im_sim_benchmark.csv')
 OUTPUT_DIR = os.path.join(TEST_FOLDER, 'sample1', 'output')
 
 IDENTIFIER_BINARY = 'binary_darfield_im_sim'
-OUTPUT_BINARY = os.path.join(OUTPUT_DIR, IDENTIFIER_BINARY, IDENTIFIER_BINARY + '.csv')
+OUTPUT_BINARY_DIR = os.path.join(OUTPUT_DIR, IDENTIFIER_BINARY)
+OUTPUT_BINARY_FILE = os.path.join(OUTPUT_BINARY_DIR, IDENTIFIER_BINARY + '.csv')
+OUTPUT_BINARY_META = os.path.join(OUTPUT_BINARY_DIR, IDENTIFIER_BINARY + '.info')
 OUTPUT_BINARY_SUBDIR = os.path.join(OUTPUT_DIR, IDENTIFIER_BINARY, 'stations')
 
 IDENTIFIER_ASCII = 'ascii_darfield_im_sim'
-OUTPUT_ASCII = os.path.join(OUTPUT_DIR, IDENTIFIER_ASCII, IDENTIFIER_ASCII + '.csv')
+OUTPUT_ASCII_DIR = os.path.join(OUTPUT_DIR, IDENTIFIER_ASCII)
+OUTPUT_ASCII_FILE = os.path.join(OUTPUT_ASCII_DIR, IDENTIFIER_ASCII + '.csv')
+OUTPUT_ASCII_META = os.path.join(OUTPUT_ASCII_DIR, IDENTIFIER_ASCII + '.info')
 OUTPUT_ASCII_SUBDIR = os.path.join(OUTPUT_DIR, IDENTIFIER_ASCII, 'stations')
 
 STATIONS = '2002199 GRY 00020d3 UNK CASH CFW DLX LSRC EWZ PEAA'
 PERIODS = '0.01 0.2 0.5 1.0 3.0 4.0 10.0'
 COMP_DICT = {'090': '90', 'geom': 'geom', '000': '0', 'ver': 'ver'}
 ERROR_LIMIT = 0.01
+
+
+def setup_module(scope="module"):
+    """ create a tmp directory for storing output from test"""
+    print "----------setup_module----------"
+    utils.setup_dir(OUTPUT_DIR)
+
+
+def teardown_module():
+    """ delete the tmp directory if it is empty"""
+    print "---------teardown_module------------"
+    for f in os.listdir(OUTPUT_DIR):
+        f_path = os.path.join(OUTPUT_DIR, f)
+        if len(os.listdir(f_path)) == 0:
+            remove_folder(f_path)
+
+    if len(os.listdir(OUTPUT_DIR)) == 0:
+        remove_folder(OUTPUT_DIR)
 
 
 def run_script_calculate_ims(input_path, input_type, identifier):
@@ -84,7 +108,7 @@ def get_result_dict(sample_path):
 
 def run_test_calculate_ims(test_output_path):
     """
-    :param test_output_path: OUTPUT_BINARY/ASCII
+    :param test_output_path: OUTPUT_BINARY/ASCII_FILE
     :return: error string
     """
     benchmark_dict = get_result_dict(BENCHMARK)
@@ -119,14 +143,22 @@ def run_test_calculate_ims(test_output_path):
     return errors
 
 
-def test_binary_output():
-    errors = run_test_calculate_ims(OUTPUT_BINARY)
-    assert errors == ''
+def remove_folder(folder_path):
+    """
+    :param folder_path: eg. OUTPUTBINARY
+    :return:
+    """
+    try:
+        shutil.rmtree(folder_path)
+    except (IOError, OSError):
+        raise
 
 
-def test_ascii_output():
-    errors = run_test_calculate_ims(OUTPUT_ASCII)
-    assert errors == ''
+def remove_file(file_path):
+    try:
+        os.remove(file_path)
+    except (IOError, OSError):
+        raise
 
 
 def run_test_single_output_file(test_output_subfolder):
@@ -140,11 +172,27 @@ def run_test_single_output_file(test_output_subfolder):
 def test_binary_single_output_file():
     errors = run_test_single_output_file(OUTPUT_BINARY_SUBDIR)
     assert errors == ''
+    remove_folder(OUTPUT_BINARY_SUBDIR)
 
 
 def test_ascii_single_output_file():
     errors = run_test_single_output_file(OUTPUT_ASCII_SUBDIR)
     assert errors == ''
+    remove_folder(OUTPUT_ASCII_SUBDIR)
+
+
+def test_binary_output():
+    errors = run_test_calculate_ims(OUTPUT_BINARY_FILE)
+    assert errors == ''
+    remove_file(OUTPUT_BINARY_FILE)
+    remove_file(OUTPUT_BINARY_META)
+
+
+def test_ascii_output():
+    errors = run_test_calculate_ims(OUTPUT_ASCII_FILE)
+    assert errors == ''
+    remove_file(OUTPUT_ASCII_FILE)
+    remove_file(OUTPUT_ASCII_META)
 
 
 # # This function should only be used when you want to re-generate then benchmark file

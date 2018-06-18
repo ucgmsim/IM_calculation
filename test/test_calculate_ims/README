@@ -1,7 +1,7 @@
 Regression test with darfield sample data will suffice
 
 Sample data (waveform): /nesi/projects/nesi00213/dev/impp_datasets/Darfield/sim
-             Bindary:/home/yzh231/BB_with_siteamp.bin
+             Binary:/home/yzh231/BB_with_siteamp.bin
 
 Benchmark data (IM calc output): Old good data converted to new format:
 /nesi/projects/nesi00213/dev/impp_datasets/darfield_benchmark
