@@ -150,7 +150,7 @@ def compute_measure_single((waveform, ims, comp, period)):
 
 def compute_measures_multiprocess(input_path, file_type, geom_only, wave_type, station_names, ims=IMS, comp=None,
                                   period=None, output=None, identifier=None, rupture=None, run_type=None, version=None,
-                                  process=1, simple_output=False):
+                                  process=1, simple_output=False, units='g'):
     """
     using multiprocesses to computer measures.
     Calls compute_measure_single() to compute measures for a single station
@@ -175,7 +175,7 @@ def compute_measures_multiprocess(input_path, file_type, geom_only, wave_type, s
     converted_comp = convert_str_comp(comp)
 
     waveforms = read_waveform.read_waveforms(input_path, station_names, converted_comp, wave_type=wave_type,
-                                             file_type=file_type)
+                                             file_type=file_type, units=units)
     array_params = []
     all_result_dict = {}
 
@@ -455,6 +455,8 @@ def main():
     parser.add_argument('-np', '--process', default=2, type=int, help='Please provide the number of processors. Default is 2')
     parser.add_argument('-s', '--simple_output', action='store_true',
                         help="Please add '-s' to indicate if you want to output the big summary csv only(no single station csvs). Default outputting both single station and the big summary csvs")
+    parser.add_argument('-u', '--units', choices=['cm/s^2', 'g'], default='g',
+                        help="The units that input acceleration files are in")
     args = parser.parse_args()
 
     validate_input_path(parser, args.input_path, args.file_type)
@@ -475,7 +477,7 @@ def main():
     compute_measures_multiprocess(args.input_path, file_type, geom_only, wave_type=None,
                                   station_names=args.station_names, ims=im, comp=comp, period=period, output=output_dir,
                                   identifier=args.identifier, rupture=args.rupture, run_type=run_type, version=args.version,
-                                  process=args.process, simple_output=args.simple_output)
+                                  process=args.process, simple_output=args.simple_output, units=args.units)
 
     print("Calculations are outputted to {}".format(output_dir))
 

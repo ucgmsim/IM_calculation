@@ -22,7 +22,7 @@ usage: calculate_ims.py [-h] [-o OUTPUT_PATH] [-i IDENTIFIER] [-r RUPTURE]
                         [-t {s,o,u}] [-v VERSION] [-m IM [IM ...]]
                         [-p PERIOD [PERIOD ...]] [-e]
                         [-n STATION_NAMES [STATION_NAMES ...]] [-c COMPONENT]
-                        [-np PROCESS]
+                        [-np PROCESS] [-s] [-u {cm/s^2,g}]
                         input_path {a,b}
 
 positional arguments:
@@ -50,7 +50,7 @@ optional arguments:
   -m IM [IM ...], --im IM [IM ...]
                         Please specify im measure(s) separated by a space(if
                         more than one). eg: PGV PGA CAV. Available and default
-                        IMs are: PGV,PGA,CAV,AI,Ds575,Ds595,MMI,pSA
+                        IMs are: PGA,PGV,CAV,AI,Ds575,Ds595,MMI,pSA
   -p PERIOD [PERIOD ...], --period PERIOD [PERIOD ...]
                         Please provide pSA period(s) separated by a space. eg:
                         0.02 0.05 0.1. Available and default periods are: 0.02
@@ -68,6 +68,60 @@ optional arguments:
                         090,000,ver,geom,ellipsis. ellipsis contains all 4
                         components. Default is ellipsis
   -np PROCESS, --process PROCESS
-                        Please provide the number of processors
+                        Please provide the number of processors. Default is 2
+  -s, --simple_output   Please add '-s' to indicate if you want to output the
+                        big summary csv only(no single station csvs). Default
+                        outputting both single station and the big summary
+                        csvs
+  -u {cm/s^2,g}, --units {cm/s^2,g}
+                        The units that input acceleration files are in
 
+```
+
+To create submission script for slurm workflow:
+
+```
+usage: generate_sl.py [-h] [-s SIM_DIR] [-o OBS_DIR] [-srf SRF_DIR]
+                      [-ll STATION_FILE] [-np PROCESSES]
+                      rrup_output_dir
+
+Prints out a slurm script to run IM Calculation over a run-group
+
+positional arguments:
+  rrup_output_dir       directory containing rupture distances output
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -s SIM_DIR, --sim_dir SIM_DIR
+                        Path to sim-run-group containing faults and
+                        acceleration in the subfolder */BB/*/*
+  -o OBS_DIR, --obs_dir OBS_DIR
+                        Path to obs-run-group containing faults and
+                        accelerations in the subfolder */*/accBB
+  -srf SRF_DIR, --srf_dir SRF_DIR
+                        Path to run-group containing the srf files in the path
+                        matching */Srf/*.srf
+  -ll STATION_FILE, --station_file STATION_FILE
+                        Path to a single station file for ruputure distance
+                        calculations
+  -np PROCESSES, --processes PROCESSES
+                        number of processors to use
+
+```
+
+e.g.
+
+```
+ python generate_sl.py ~/IM_result_test_robin/ -srf /nesi/nobackup/nesi00213/RunFolder/Validation/IMCalcExample_v1p2/Data/Sources -ll /nesi/transit/nesi00213/StationInfo/cantstations_v1pt2.ll -s /nesi/nobackup/nesi00213/RunFolder/Validation/IMCalcExample_v1p2/Runs -o /nesi/nobackup/nesi00213/ObsGM/Validation/IMCalcExample > ~/im_calc.sl
+
+```
+
+To aggregate IMs across realisations:
+outputs a file per fault per IM that contains a row for each station and columns for each realisation.
+
+```
+usage: im_agg.py [-h] runs_dir
+
+positional arguments:
+  runs_dir    location to Runs folder eg: RunFolder/Cybershake/v18p5/Runs
 ```
