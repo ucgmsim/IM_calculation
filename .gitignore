@@ -1,7 +1,6 @@
 *.pyc
-rspectra_calculations/rspectra.c
-rspectra_calculations/rspectra.so
-computed_measures*/
+/IM/rspectra_calculations/rspectra.c
+/IM/rspectra_calculations/rspectra.so
 .idea
 build/
 test/test_calculate_ims/sample1/input/*.bin

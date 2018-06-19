@@ -41,3 +41,10 @@ Added
 Changed
     modified calculate_im script to use unique ascending periods when concatenating with extended periods
     modified calculate_im script to use sorted stations when writing result csvs
+
+
+[18.6.4] - 2018-06-19
+Added
+    test_calculate_ims.py
+Changed
+    modified calculate_im script with added -s --simple_output option to only output summary csv
