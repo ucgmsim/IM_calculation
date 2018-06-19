@@ -245,7 +245,7 @@ def get_comp_name_and_list(comp, geom_only):
 
 def write_rows(comps, station, ims, result_dict, big_csv_writer, sub_csv_writer=None):
     """
-    write a single row to big csv and, if
+    write rows to big csv and, also to single station csvs if not simple output
     :param comps:
     :param station:
     :param ims:

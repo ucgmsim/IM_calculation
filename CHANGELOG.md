@@ -14,6 +14,7 @@ Added
     test_calculate_ims.py
 Changed
     modified calculate_im script with added -s --simple_output option to only output summary csv
+    Renamed setup.py to setup_rspectra.py
 
 
 [18.6.3] - 2018-06-14
