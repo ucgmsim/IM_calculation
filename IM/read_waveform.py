@@ -139,7 +139,6 @@ def read_ascii_folder(path, selected_stations=None, units='g'):
 
         waveform = read_ascii_file(f_000, f_090, f_ver, 'acceleration')
         if units == 'cm/s^2':
-            print "scaling"
             waveform.values = waveform.values / g
         waveforms.append((waveform, None))
         f_000.close()
