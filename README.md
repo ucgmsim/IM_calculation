@@ -10,12 +10,12 @@ python usage: calculate_rrups.py [-h] [-np PROCESSES] [-s STATIONS [STATIONS ...
 
 To calculate IMs:
 
-We need to first setup Cython script rspectra.pyx so that we can successfully run pSA calculations inside calculate_ims.py.
+First we need to setup Cython script rspectra.pyx so that we can successfully run pSA calculations inside calculate_ims.py.
 In the terminal, type:
 
 $ cd IM_calculation
 
-$ python setup.py build_ext --inplace
+$ python setup_rspectra.py build_ext --inplace
 
 ```
 usage: calculate_ims.py [-h] [-o OUTPUT_PATH] [-i IDENTIFIER] [-r RUPTURE]
