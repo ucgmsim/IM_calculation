@@ -22,7 +22,7 @@ usage: calculate_ims.py [-h] [-o OUTPUT_PATH] [-i IDENTIFIER] [-r RUPTURE]
                         [-t {s,o,u}] [-v VERSION] [-m IM [IM ...]]
                         [-p PERIOD [PERIOD ...]] [-e]
                         [-n STATION_NAMES [STATION_NAMES ...]] [-c COMPONENT]
-                        [-np PROCESS]
+                        [-np PROCESS] [-s] [-u {cm/s^2,g}]
                         input_path {a,b}
 
 positional arguments:
@@ -50,7 +50,7 @@ optional arguments:
   -m IM [IM ...], --im IM [IM ...]
                         Please specify im measure(s) separated by a space(if
                         more than one). eg: PGV PGA CAV. Available and default
-                        IMs are: PGV,PGA,CAV,AI,Ds575,Ds595,MMI,pSA
+                        IMs are: PGA,PGV,CAV,AI,Ds575,Ds595,MMI,pSA
   -p PERIOD [PERIOD ...], --period PERIOD [PERIOD ...]
                         Please provide pSA period(s) separated by a space. eg:
                         0.02 0.05 0.1. Available and default periods are: 0.02
@@ -68,7 +68,13 @@ optional arguments:
                         090,000,ver,geom,ellipsis. ellipsis contains all 4
                         components. Default is ellipsis
   -np PROCESS, --process PROCESS
-                        Please provide the number of processors
+                        Please provide the number of processors. Default is 2
+  -s, --simple_output   Please add '-s' to indicate if you want to output the
+                        big summary csv only(no single station csvs). Default
+                        outputting both single station and the big summary
+                        csvs
+  -u {cm/s^2,g}, --units {cm/s^2,g}
+                        The units that input acceleration files are in
 
 ```
 

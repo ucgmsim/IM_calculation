@@ -3,6 +3,7 @@
 Calculate im values.
 Output computed measures to /home/$user/computed_measures if no output path is specified
 command:
+   python calculate_ims.py test/test_calculate_ims/sample1/input/single_files/ a
    python calculate_ims.py ../BB.bin b
    python calculate_ims.py ../BB.bin b -o /home/yzh231/ -i Albury_666_999 -r Albury -t s -v 18p3 -n 112A CMZ -m PGV pSA -p 0.02 0.03 -e -c geom -np 2
 """
@@ -14,14 +15,14 @@ import getpass
 import numpy as np
 from collections import OrderedDict
 from datetime import datetime
-import intensity_measures
-import read_waveform
+from IM import intensity_measures
+from IM import read_waveform
 from rrup import pool_wrapper
 from qcore import utils
 from qcore import timeseries
 
 G = 981.0
-IMS = ['PGV', 'PGA', 'CAV', 'AI', 'Ds575', 'Ds595', 'MMI', 'pSA']
+IMS = ['PGA', 'PGV', 'CAV', 'AI', 'Ds575', 'Ds595', 'MMI', 'pSA']
 
 EXT_PERIOD = np.logspace(start=np.log10(0.01), stop=np.log10(10.), num=100, base=10)
 BSC_PERIOD = [0.02, 0.05, 0.1, 0.2, 0.3, 0.4, 0.5, 0.75, 1.0, 2.0, 3.0, 4.0, 5.0, 7.5, 10.0]
@@ -149,7 +150,7 @@ def compute_measure_single((waveform, ims, comp, period)):
 
 def compute_measures_multiprocess(input_path, file_type, geom_only, wave_type, station_names, ims=IMS, comp=None,
                                   period=None, output=None, identifier=None, rupture=None, run_type=None, version=None,
-                                  process=1, units='g'):
+                                  process=1, simple_output=False, units='g'):
     """
     using multiprocesses to computer measures.
     Calls compute_measure_single() to compute measures for a single station
@@ -165,9 +166,10 @@ def compute_measures_multiprocess(input_path, file_type, geom_only, wave_type, s
     :param output:
     :param identifier:
     :param rupture:
-    :param type:
+    :param run_type:
     :param version:
     :param process:
+    :param simple_output:
     :return:
     """
     converted_comp = convert_str_comp(comp)
@@ -187,7 +189,7 @@ def compute_measures_multiprocess(input_path, file_type, geom_only, wave_type, s
     for result in result_list:
         all_result_dict.update(result)
 
-    write_result(all_result_dict, output, identifier, comp, ims, period, geom_only)
+    write_result(all_result_dict, output, identifier, comp, ims, period, geom_only, simple_output)
 
     generate_metadata(output, identifier, rupture, run_type, version)
 
@@ -241,7 +243,30 @@ def get_comp_name_and_list(comp, geom_only):
     return comp_name, comps
 
 
-def write_result(result_dict, output_folder, identifier, comp, ims, period, geom_only):
+def write_rows(comps, station, ims, result_dict, big_csv_writer, sub_csv_writer=None):
+    """
+    write a single row to big csv and, if
+    :param comps:
+    :param station:
+    :param ims:
+    :param result_dict:
+    :param big_csv_writer:
+    :param sub_csv_writer:
+    :return: write a single row
+    """
+    for c in comps:
+        row = [station, c]
+        for im in ims:
+            if im != 'pSA':
+                row.append(result_dict[station][im][c])
+            else:
+                row += result_dict[station][im][1][c].tolist()
+        big_csv_writer.writerow(row)
+        if sub_csv_writer:
+            sub_csv_writer.writerow(row)
+        
+
+def write_result(result_dict, output_folder, identifier, comp, ims, period, geom_only, simple_output):
     """
     write a big csv that contains all calculated im value and single station csvs
     :param result_dict:
@@ -251,35 +276,29 @@ def write_result(result_dict, output_folder, identifier, comp, ims, period, geom
     :param ims: a list of im(s)
     :param period:
     :param geom_only
+    :param simple_output
     :return:output result into csvs
     """
     output_path = get_result_filepath(output_folder, identifier, 'csv')
-
     header = get_header(ims, period)
-
     comp_name, comps = get_comp_name_and_list(comp, geom_only)
 
     # big csv containing all stations
     with open(output_path, 'w') as csv_file:
         csv_writer = csv.writer(csv_file, delimiter=',', quotechar='|')
         csv_writer.writerow(header)
-        stations = result_dict.keys()
+        stations = sorted(result_dict.keys())
 
-        # sub station csv
+        # write each row
         for station in stations:
-            station_csv = os.path.join(output_folder, OUTPUT_SUBFOLDER, '{}{}.csv'.format(station, comp_name))
-            with open(station_csv, 'wb') as sub_csv_file:
-                sub_csv_writer = csv.writer(sub_csv_file, delimiter=',', quotechar='|')
-                sub_csv_writer.writerow(header)
-                for c in comps:
-                    row = [station, c]
-                    for im in ims:
-                        if im != 'pSA':
-                            row.append(result_dict[station][im][c])
-                        else:
-                            row += result_dict[station][im][1][c].tolist()
-                    sub_csv_writer.writerow(row)
-                    csv_writer.writerow(row)
+            if not simple_output:  # if single station csvs are needed
+                station_csv = os.path.join(output_folder, OUTPUT_SUBFOLDER, '{}{}.csv'.format(station, comp_name))
+                with open(station_csv, 'wb') as sub_csv_file:
+                    sub_csv_writer = csv.writer(sub_csv_file, delimiter=',', quotechar='|')
+                    sub_csv_writer.writerow(header)
+                    write_rows(comps, station, ims, result_dict, csv_writer, sub_csv_writer=sub_csv_writer)
+            else:  # if only the big summary csv is needed
+                write_rows(comps, station, ims, result_dict, csv_writer)
 
 
 def generate_metadata(output_folder, identifier, rupture, run_type, version):
@@ -315,6 +334,25 @@ def get_im_or_period_help(default_values, im_or_period):
     :return: a help message for input component arg
     """
     return 'Available and default {}s are: {}'.format(im_or_period, ','.join(str(v) for v in default_values))
+
+
+def validate_input_path(parser, arg_input, arg_file_type):
+    """
+    validate input path
+    :param parser:
+    :param arg_input:
+    :param arg_file_type:
+    :return:
+    """
+    if not os.path.exists(arg_input):
+        parser.error("{} does not exist".format(arg_input))
+
+    if arg_file_type == 'b':
+        if os.path.isdir(arg_input):
+            parser.error('The path should point to a binary file but not a directory. Correct Sample: /home/tt/BB.bin')
+    elif arg_file_type == 'a':
+        if os.path.isfile(arg_input):
+            parser.error('The path should be a directory but not a file. Correct Sample: /home/tt/sims/')
 
 
 def validate_comp(parser, arg_comp):
@@ -365,7 +403,7 @@ def validate_period(parser, arg_period, arg_extended_period, im):
     period = np.array(period, dtype='float64')
 
     if extended_period:
-        period = np.append(period, EXT_PERIOD)
+        period = np.unique(np.append(period, EXT_PERIOD))
 
     if (extended_period or period.any()) and 'pSA' not in im:
         parser.error("period or extended period must be used with pSA, but pSA is not in the IM measures entered")
@@ -373,16 +411,19 @@ def validate_period(parser, arg_period, arg_extended_period, im):
     return period
 
 
-def mkdir_output(arg_output, arg_identifier):
+def mkdir_output(arg_output, arg_identifier, arg_simple_output):
     """
     create big output dir and sub dir 'stations' inside the big output dir
     :param arg_output:
     :param arg_identifier:
+    :param arg_simple_output: Boolean. Create 'a subfolder to store single station csvs if True
     :return: path to the big output_dir
     """
-    output_dir = os.path.join(arg_output, arg_identifier)
+    output_dir = os.path.join(arg_output, arg_identifier)  
     utils.setup_dir(output_dir)
-    utils.setup_dir(os.path.join(output_dir, OUTPUT_SUBFOLDER))
+    
+    if not arg_simple_output:
+        utils.setup_dir(os.path.join(output_dir, OUTPUT_SUBFOLDER))
 
     return output_dir
 
@@ -411,11 +452,14 @@ def main():
                         help='Please provide a station name(s) separated by a space. eg: 112A 113A')
     parser.add_argument('-c', '--component', type=str, default='ellipsis',
                         help='Please provide the velocity/acc component(s) you want to calculate eg.geom. {}'.format(get_comp_help()))
-    parser.add_argument('-np', '--process', default=2, type=int, help='Please provide the number of processors')
+    parser.add_argument('-np', '--process', default=2, type=int, help='Please provide the number of processors. Default is 2')
+    parser.add_argument('-s', '--simple_output', action='store_true',
+                        help="Please add '-s' to indicate if you want to output the big summary csv only(no single station csvs). Default outputting both single station and the big summary csvs")
     parser.add_argument('-u', '--units', choices=['cm/s^2', 'g'], default='g',
                         help="The units that input acceleration files are in")
-
     args = parser.parse_args()
+
+    validate_input_path(parser, args.input_path, args.file_type)
 
     file_type = FILE_TYPE_DICT[args.file_type]
 
@@ -427,13 +471,13 @@ def main():
 
     period = validate_period(parser, args.period, args.extended_period, im)
 
-    output_dir = mkdir_output(args.output_path, args.identifier)
+    output_dir = mkdir_output(args.output_path, args.identifier, args.simple_output)
 
     # multiprocessor
     compute_measures_multiprocess(args.input_path, file_type, geom_only, wave_type=None,
                                   station_names=args.station_names, ims=im, comp=comp, period=period, output=output_dir,
                                   identifier=args.identifier, rupture=args.rupture, run_type=run_type, version=args.version,
-                                  process=args.process, units=args.units)
+                                  process=args.process, simple_output=args.simple_output, units=args.units)
 
     print("Calculations are outputted to {}".format(output_dir))
 

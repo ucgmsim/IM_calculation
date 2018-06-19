@@ -1,5 +1,5 @@
 
-import rrup as rrup
+from rrup import rrup as rrup
 import argparse
 
 DEFAULT_N_PROCESSES = 4
