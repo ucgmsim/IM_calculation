@@ -27,16 +27,19 @@ export PYTHONPATH=/nesi/nobackup/nesi00213/tmp/qcore:/$PYTHONPATH:$IMPATH
 echo ___calculating simulations___
 {% for sim_dir, sim_name, fault_name in sim_dirs %}
     time srun python2 $IMPATH/calculate_ims.py {{sim_dir}}/Acc/BB_with_siteamp.bin b -o {{sim_dir}}/../../../IM_calc/ -e -np {{np}} -i {{sim_name}} -r {{fault_name}} -t s
+    echo "time srun python2 $IMPATH/calculate_ims.py {{sim_dir}}/Acc/BB_with_siteamp.bin b -o {{sim_dir}}/../../../IM_calc/ -e -np {{np}} -i {{sim_name}} -r {{fault_name}} -t s" >> completed_ims.log
 {% endfor %}
 
 echo ___calculating observed____
 {% for obs_dir, obs_name, fault_name in obs_dirs %}
 	time srun python2 $IMPATH/calculate_ims.py {{obs_dir}}/*/*/accBB a -o {{obs_dir}}/../IM_calc/ -e -np {{np}} -i {{obs_name}} -r {{fault_name}} -t o
+    echo "time srun python2 $IMPATH/calculate_ims.py {{obs_dir}}/*/*/accBB a -o {{obs_dir}}/../IM_calc/ -e -np {{np}} -i {{obs_name}} -r {{fault_name}} -t o" >> completed_ims.log
 {% endfor %}
 
 echo ___calculating rrups___
 {% for srf_file, srf_output in rrup_files %}
 	time srun python2 $IMPATH/rrup/calculate_rrups.py -np {{np}} -o {{output_dir}}/{{srf_output}}.csv {{station_file}} {{srf_file}}
+	echo "time srun python2 $IMPATH/rrup/calculate_rrups.py -np {{np}} -o {{output_dir}}/{{srf_output}}.csv {{station_file}} {{srf_file}}" >> completed_ims.log
 {% endfor %}
 
 
