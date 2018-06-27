@@ -11,3 +11,6 @@ test/test_calculate_ims/.coverage
 test/test_calculate_ims/output/__pycache*
 .cache/
 test_*.sl
+*.err
+*.out
+

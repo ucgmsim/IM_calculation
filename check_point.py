@@ -34,28 +34,44 @@ def check_point(sim_waveform_dirs):
     removed=0
     count = 0
     j = 0
-    print("sim_wave_dirs",sim_waveform_dirs)
-    for dire in sim_waveform_dirs: 
-        print("single dire", dire)
+    e = 0
+    for dire in sim_waveform_dirs[:]:
         dire_name = dire.split('/')[-1]
-        if 'Kelly' in dire_name:
-            count += 1
-        elif 'JorK' in dire_name:
-            j += 1
-	else:
-            print("lllllllllllllllllllllllllllllllllllllllllllllllllllllllllll", dire_name)
         output_dir = os.path.join(dire, '../../../IM_calc/', dire_name)
-        print("output dir is", output_dir)
         exists = check_output_exits(output_dir)
-        print("{} exists {}".format(output_dir, exists))
+       # print("{} exists {}".format(output_dir, exists))
         if exists:
-            is_completed = check_completion(output_dir)
-            print("{} completed {}".format(output_dir, is_completed))
+            e += 1
+            is_completed = check_completion(output_dir) 
+	#   print("{} completed {}".format(output_dir, is_completed))
             if is_completed:
                 sim_waveform_dirs.remove(dire)
-		removed += 1
-    print("removed", removed,"count kelly", count, "jork",j)
+                removed += 1
+    print("exists", e, "removed", removed, "now sim wave form dir len is ", len(sim_waveform_dirs))
     return sim_waveform_dirs
+
+#TODO merge with check_point
+def check_point_obs(obs_waveform_dirs):
+    removed=0
+    count = 0
+    j = 0
+    e = 0
+    for dire in obs_waveform_dirs[:]:
+        dire_name = dire.split('/')[-1]
+        output_dir = os.path.join(dire, '../IM_calc/', dire_name)
+        print("output_dir", output_dir)
+        exists = check_output_exits(output_dir)
+       # print("{} exists {}".format(output_dir, exists))
+        if exists:
+            e += 1
+            is_completed = check_completion(output_dir)
+        #   print("{} completed {}".format(output_dir, is_completed))
+            if is_completed:
+                obs_waveform_dirs.remove(dire)
+                removed += 1
+    print("exists", e, "removed", removed, "now obs wave form dir len is ", len(obs_waveform_dirs))
+    return obs_waveform_dirs
+
 
 
 def get_header_size(sl_template_path):
@@ -77,3 +93,6 @@ def split_slurms(sim_waveform_dirs, sl_template_path='im_calc_sl.template', line
     if total_scripts * line_max < total_lines:
         total_scripts += 1
     return total_scripts
+
+
+# obs folder /nesi/transit/nesi00213/RunFolder/leer/scratch

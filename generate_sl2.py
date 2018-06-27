@@ -65,6 +65,7 @@ def main():
     rrup_files = zip(srf_files, run_names)
 
     obs_waveform_dirs = glob.glob(os.path.join(args.obs_dir, '*'))
+    print("obs_waveform_dirs", obs_waveform_dirs)
     obs_run_names = map(os.path.basename, obs_waveform_dirs)
     obs_faults = map(get_fault_name, obs_run_names)
     obs_dirs = zip(obs_waveform_dirs, obs_run_names, obs_faults)
