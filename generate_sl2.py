@@ -3,6 +3,7 @@ import argparse
 import os
 import glob
 import check_point
+from qcore import utils
 
 TEMPLATE_NAME = 'im_calc_sl.template'
 TIME = '00:30:00'
@@ -49,23 +50,28 @@ def main():
     parser.add_argument('rrup_output_dir', help="directory containing rupture distances output")
 
     args = parser.parse_args()
-
+    
+    output_dir = args.rrup_output_dir
+    utils.setup_dir(output_dir)
     # /nesi/nobackup/nesi00213/RunFolder/Cybershake/v18p5/Runs
-    sim_waveform_dirs1 = glob.glob(os.path.join(args.sim_dir, '*/BB/*/*'))
-    print("pre sim",len(sim_waveform_dirs1))
-    sim_waveform_dirs = check_point.check_point(sim_waveform_dirs1)   # return dirs that are not calculated yet   
-    print("after removing",len(sim_waveform_dirs))
+    sim_waveform_dirs = glob.glob(os.path.join(args.sim_dir, '*/BB/*/*'))
+   # print("pre sim",len(sim_waveform_dirs1))
+    sim_waveform_dirs = check_point.check_point_merged(sim_waveform_dirs, '../../../IM_calc/')   # return dirs that are not calculated yet   
+  #  print("after removing",len(sim_waveform_dirs))
 
     sim_run_names = map(os.path.basename, sim_waveform_dirs)
     sim_faults = map(get_fault_name, sim_run_names)
     sim_dirs = zip(sim_waveform_dirs, sim_run_names, sim_faults)
 
     srf_files = glob.glob(os.path.join(args.srf_dir, "*/Srf/*.srf"))
+  #  print("srf_files are:", srf_files)
+    srf_files = check_point.check_point_rrup(output_dir, srf_files)
     run_names = map(get_basename_without_ext, srf_files)
     rrup_files = zip(srf_files, run_names)
 
     obs_waveform_dirs = glob.glob(os.path.join(args.obs_dir, '*'))
-    print("obs_waveform_dirs", obs_waveform_dirs)
+   # print("obs_waveform_dirs", obs_waveform_dirs)
+    obs_waveform_dirs = check_point.check_point_merged(obs_waveform_dirs, '../IM_calc/')
     obs_run_names = map(os.path.basename, obs_waveform_dirs)
     obs_faults = map(get_fault_name, obs_run_names)
     obs_dirs = zip(obs_waveform_dirs, obs_run_names, obs_faults)

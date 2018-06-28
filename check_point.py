@@ -29,49 +29,82 @@ def check_completion(output_dir):
 
 # output_sim_dir = /nesi/nobackup/nesi00213/RunFolder/Cybershake/v18p6/Runs/test/Kelly/BB/Cant1D_v3-midQ_OneRay_hfnp2mm+_rvf0p8_sd50_k0p045/Kelly_HYP20-29_S1434/../../../IM_calc/Kelly_HYP20-29_S1434/
 
+def check_point_merged(waveform_dirs, relative_path_to_im_calc):
+    removed = 0
+    e = 0
+    for dire in waveform_dirs[:]:
+        dire_name = dire.split('/')[-1]
+        if dire_name == 'IM_calc':
+            waveform_dirs.remove(dire)
+        else:
+            output_dir = os.path.join(dire, relative_path_to_im_calc, dire_name)
+            # print("output_dir", output_dir)
+            exists = check_output_exits(output_dir)
+            # print("{} exists {}".format(output_dir, exists))
+            if exists:
+                e += 1
+                is_completed = check_completion(output_dir)
+                #   print("{} completed {}".format(output_dir, is_completed))
+                if is_completed:
+                    waveform_dirs.remove(dire)
+                    removed += 1
+                    #  print("exists", e, "removed", removed, "now obs wave form dir len is ", len(obs_waveform_dirs))
+    return waveform_dirs
+
 
 def check_point(sim_waveform_dirs):
     removed=0
-    count = 0
-    j = 0
     e = 0
     for dire in sim_waveform_dirs[:]:
         dire_name = dire.split('/')[-1]
         output_dir = os.path.join(dire, '../../../IM_calc/', dire_name)
         exists = check_output_exits(output_dir)
-       # print("{} exists {}".format(output_dir, exists))
         if exists:
             e += 1
-            is_completed = check_completion(output_dir) 
-	#   print("{} completed {}".format(output_dir, is_completed))
+            is_completed = check_completion(output_dir)
             if is_completed:
                 sim_waveform_dirs.remove(dire)
                 removed += 1
-    print("exists", e, "removed", removed, "now sim wave form dir len is ", len(sim_waveform_dirs))
     return sim_waveform_dirs
+
 
 #TODO merge with check_point
 def check_point_obs(obs_waveform_dirs):
     removed=0
-    count = 0
-    j = 0
     e = 0
     for dire in obs_waveform_dirs[:]:
         dire_name = dire.split('/')[-1]
-        output_dir = os.path.join(dire, '../IM_calc/', dire_name)
-        print("output_dir", output_dir)
-        exists = check_output_exits(output_dir)
-       # print("{} exists {}".format(output_dir, exists))
-        if exists:
-            e += 1
-            is_completed = check_completion(output_dir)
-        #   print("{} completed {}".format(output_dir, is_completed))
-            if is_completed:
-                obs_waveform_dirs.remove(dire)
-                removed += 1
-    print("exists", e, "removed", removed, "now obs wave form dir len is ", len(obs_waveform_dirs))
+        if dire_name == 'IM_calc':
+            obs_waveform_dirs.remove(dire)
+        else:
+            output_dir = os.path.join(dire, '../IM_calc/', dire_name)
+           # print("output_dir", output_dir)
+            exists = check_output_exits(output_dir)
+           # print("{} exists {}".format(output_dir, exists))
+            if exists:
+                e += 1
+                is_completed = check_completion(output_dir)
+            #   print("{} completed {}".format(output_dir, is_completed))
+                if is_completed:
+                    obs_waveform_dirs.remove(dire)
+                    removed += 1
+  #  print("exists", e, "removed", removed, "now obs wave form dir len is ", len(obs_waveform_dirs))
     return obs_waveform_dirs
 
+
+def check_point_rrup(output_dir, srf_files):
+    removed=0
+    #print("srf files", srf_files)
+    for srf in srf_files[:]:
+     #   print("single srf", srf)
+        srf_name = srf.split('/')[-1].split('.')[0]
+        output_path = os.path.join(output_dir, srf_name + '.csv')
+      #  print("output path is", output_path)
+        if os.path.isfile(output_path):
+            srf_files.remove(srf)
+            removed += 1
+   # print("removed", removed,"count kelly", count, "jork",j)
+    return srf_files
 
 
 def get_header_size(sl_template_path):
@@ -95,4 +128,4 @@ def split_slurms(sim_waveform_dirs, sl_template_path='im_calc_sl.template', line
     return total_scripts
 
 
-# obs folder /nesi/transit/nesi00213/RunFolder/leer/scratch
+
