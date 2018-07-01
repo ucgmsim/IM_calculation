@@ -68,7 +68,7 @@ def main():
     parser.add_argument('-ll', '--station_file',
                         help="Path to a single station file for ruputure distance calculations")
     parser.add_argument('-np', '--processes', default=DEFAULT_N_PROCESSES, help="number of processors to use")
-    parser.add_argument('-ml', '--max_line', default=33, help="maximun number of lines in a slurm script")
+    parser.add_argument('-ml', '--max_line', default=33, type=int, help="maximun number of lines in a slurm script")
     parser.add_argument('rrup_output_dir', help="directory containing rupture distances output")
 
     args = parser.parse_args()
