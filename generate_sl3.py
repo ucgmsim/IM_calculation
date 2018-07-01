@@ -19,7 +19,7 @@ DEFAULT_N_PROCESSES = 40
 # TODO: remove relative paths on sl.template
 
 
-def generate_sl(sim_dirs, obs_dirs, station_file, rrup_files, output_dir, i,np=8):
+def generate_sl(sim_dirs, obs_dirs, station_file, rrup_files, output_dir, prefix, i, np=8):
     path = os.path.dirname(os.path.realpath(TEMPLATE_NAME))
     j2_env = Environment(loader=FileSystemLoader(path), trim_blocks=True)
 
@@ -28,11 +28,11 @@ def generate_sl(sim_dirs, obs_dirs, station_file, rrup_files, output_dir, i,np=8
         sim_dirs=sim_dirs, obs_dirs=obs_dirs,
         rrup_files=rrup_files, station_file=station_file,
         output_dir=output_dir, np=np)
-    print("context")
-    with open('im_calc_{}.sl'.format(i), 'w') as sl:
-        print("writing",'im_calc_{}.sl'.format(i))
+    sl_name = '{}_im_calc_{}.sl'.format(prefix, i)
+    with open(sl_name, 'w') as sl:
+        print("writing", sl_name)
         sl.write(context)
-        
+
 
 def get_basename_without_ext(path):
     return os.path.splitext(os.path.basename(path))[0]
@@ -42,17 +42,22 @@ def get_fault_name(run_name):
     return run_name.split('_')[0]
 
 
-def split_and_generate_slurms(sim_dirs, max_lines,station_file, output_dir, processes):
-    total_sim_lines = len(sim_dirs)
-    print(total_sim_lines)
+def split_and_generate_slurms(sim_dirs, obs_dirs, station_file, rrup_files, output_dir, processes, max_lines, prefix):
+    if sim_dirs != []:
+        total_dir_lines = len(sim_dirs)
+    elif obs_dirs != []:
+        total_dir_lines = len(obs_dirs)
+    elif rrup_files != []:
+        total_dir_lines = len(rrup_files)
     i = 0
-    while i < total_sim_lines:
-        last_line_index = i +  max_lines
-        if 0 <= last_line_index - total_sim_lines <= max_lines:
-            last_line_index = total_sim_lines
+    while i < total_dir_lines:
+        last_line_index = i + max_lines
+        if 0 <= last_line_index - total_dir_lines <= max_lines:
+            last_line_index = total_dir_lines
             print("encountering last line in total")
-        print(i,last_line_index)
-        generate_sl(sim_dirs[i: last_line_index], [], station_file, [], output_dir,i, processes)
+        print(i, last_line_index)
+        generate_sl(sim_dirs[i: last_line_index], obs_dirs[i: last_line_index], station_file,
+                    rrup_files[i: last_line_index], output_dir, prefix, i, processes)
         print("generated a sl")
         i += max_lines
 
@@ -78,7 +83,8 @@ def main():
 
     max_lines = args.max_line
     if max_lines <= 0:
-        parser.error("-ml argeument should come with a number that is 0 < -ml <= (max_lines-header/other_prints) allowed by slurm")
+        parser.error(
+            "-ml argeument should come with a number that is 0 < -ml <= (max_lines-header/other_prints) allowed by slurm")
     # /nesi/nobackup/nesi00213/RunFolder/Cybershake/v18p5/Runs
     sim_waveform_dirs = glob.glob(os.path.join(args.sim_dir, '*/BB/*/*'))
     # print("pre sim",len(sim_waveform_dirs1))
@@ -103,9 +109,18 @@ def main():
     obs_faults = map(get_fault_name, obs_run_names)
     obs_dirs = zip(obs_waveform_dirs, obs_run_names, obs_faults)
 
-    split_and_generate_slurms(sim_dirs, max_lines, args.station_file, output_dir, args.processes)
+    station_file = args.station_file
+    processes = args.processes
 
-   # generate_sl(sim_dirs, obs_dirs, args.station_file, rrup_files, output_dir, args.processes)
+    # sim
+    split_and_generate_slurms(sim_dirs, [], station_file, [], output_dir, processes, max_lines, 'sim')
+
+    # obs
+    split_and_generate_slurms([], obs_dirs, station_file, [], output_dir, processes, max_lines, 'obs')
+
+    # rrup
+    split_and_generate_slurms([], [], station_file, rrup_files, output_dir, processes, max_lines, 'rrup')
+    # generate_sl(sim_dirs, obs_dirs, args.station_file, rrup_files, output_dir, args.processes)
 
 
 if __name__ == '__main__':
