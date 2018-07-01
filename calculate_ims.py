@@ -106,7 +106,7 @@ def compute_measure_single((waveform, ims, comp, period)):
         velocities = waveform_vel.values
     
     station_name = waveform_acc.station_name
-    print("computing {}".format(station_name))
+   # print("computing {}".format(station_name))
 
     result[station_name] = {}
     converted_comp = convert_str_comp(comp)
@@ -178,24 +178,24 @@ def compute_measures_multiprocess(input_path, file_type, geom_only, wave_type, s
 
     waveforms = read_waveform.read_waveforms(input_path, station_names, converted_comp, wave_type=wave_type,
                                              file_type=file_type, units=units)
-    print("finished rading waveforms")
+   # print("finished rading waveforms")
     array_params = []
     all_result_dict = {}
   
     for waveform in waveforms:
         array_params.append((waveform, ims, comp, period))
-    print("finished appending params")
+  #  print("finished appending params")
     p = pool_wrapper.PoolWrapper(process)
-    print("finished set up p")
+   # print("finished set up p")
     result_list = p.map(compute_measure_single, array_params)
-    print("finished pumping up result list")
+  #  print("finished pumping up result list")
     for result in result_list:
         all_result_dict.update(result)
-    print("finished result_dict, start wrting csvs")
+   # print("finished result_dict, start wrting csvs")
     write_result(all_result_dict, output, identifier, comp, ims, period, geom_only, simple_output)
-    print("finished writing csvs start meta")
+  #  print("finished writing csvs start meta")
     generate_metadata(output, identifier, rupture, run_type, version)
-    print("finished meta. all finished")
+   # print("finished meta. all finished")
 
 def get_result_filepath(output_folder, arg_identifier, suffix):
     return os.path.join(output_folder, '{}.{}'.format(arg_identifier, suffix))
@@ -288,7 +288,7 @@ def write_result(result_dict, output_folder, identifier, comp, ims, period, geom
     
     # big csv containing all stations
     with open(output_path, 'w') as csv_file:
-        print("writing {}".format(output_path))
+       # print("writing {}".format(output_path))
         csv_writer = csv.writer(csv_file, delimiter=',', quotechar='|')
         csv_writer.writerow(header)
         stations = sorted(result_dict.keys())
@@ -298,7 +298,7 @@ def write_result(result_dict, output_folder, identifier, comp, ims, period, geom
             if not simple_output:  # if single station csvs are needed
                 station_csv = os.path.join(output_folder, OUTPUT_SUBFOLDER, '{}{}.csv'.format(station, comp_name))
                 with open(station_csv, 'wb') as sub_csv_file:
-                    print("writing {}".format(station_csv))
+                   # print("writing {}".format(station_csv))
                     sub_csv_writer = csv.writer(sub_csv_file, delimiter=',', quotechar='|')
                     sub_csv_writer.writerow(header)
                     write_rows(comps, station, ims, result_dict, csv_writer, sub_csv_writer=sub_csv_writer)
