@@ -77,6 +77,8 @@ def main():
     utils.setup_dir(output_dir)
 
     max_lines = args.max_line
+    if max_lines <= 0:
+        parser.error("-ml argeument should come with a number that is 0 < -ml <= (max_lines-header/other_prints) allowed by slurm")
     # /nesi/nobackup/nesi00213/RunFolder/Cybershake/v18p5/Runs
     sim_waveform_dirs = glob.glob(os.path.join(args.sim_dir, '*/BB/*/*'))
     # print("pre sim",len(sim_waveform_dirs1))
@@ -101,7 +103,7 @@ def main():
     obs_faults = map(get_fault_name, obs_run_names)
     obs_dirs = zip(obs_waveform_dirs, obs_run_names, obs_faults)
 
-    split_and_generate_slurms(sim_dirs, max_lines,args.station_file, output_dir, args.processes)
+    split_and_generate_slurms(sim_dirs, max_lines, args.station_file, output_dir, args.processes)
 
    # generate_sl(sim_dirs, obs_dirs, args.station_file, rrup_files, output_dir, args.processes)
 
