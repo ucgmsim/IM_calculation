@@ -26,7 +26,7 @@ export PYTHONPATH=/nesi/nobackup/nesi00213/tmp/qcore:/$PYTHONPATH:$IMPATH
 
 echo ___calculating simulations___
 {% for sim_dir, sim_name, fault_name in sim_dirs %}
-    time srun python2 $IMPATH/calculate_ims.py {{sim_dir}}/Acc/BB_with_siteamp.bin b -o {{sim_dir}}/../../../IM_calc/ -e -np {{np}} -i {{sim_name}} -r {{fault_name}} -t s
+    time srun python2 $IMPATH/calculate_ims.py {{sim_dir}}/Acc/BB.bin b -o {{sim_dir}}/../../../IM_calc/ -e -np {{np}} -i {{sim_name}} -r {{fault_name}} -t s
 {% endfor %}
 
 echo ___calculating observed____
@@ -36,7 +36,7 @@ echo ___calculating observed____
 
 echo ___calculating rrups___
 {% for srf_file, srf_output in rrup_files %}
-	time srun python2 $IMPATH/rrup/calculate_rrups.py -np {{np}} -o {{output_dir}}/{{srf_output}}.csv {{station_file}} {{srf_file}}
+	time srun python2 $IMPATH/calculate_rrups.py -np {{np}} -o {{output_dir}}/{{srf_output}}.csv {{station_file}} {{srf_file}}
 {% endfor %}
 
 
