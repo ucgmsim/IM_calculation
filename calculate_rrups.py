@@ -64,5 +64,5 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     match_stations = get_match_stations(parser, args.fd_station_file, args.stations)
-    print("matched stations", match_stations)
-    write_and_calculate_rrups(args.station_file, args.srf_file, match_stations, processes=args.processes)
+
+    write_and_calculate_rrups(args.station_file, args.srf_file, match_stations, args.processes)
