@@ -4,7 +4,7 @@ import argparse
 DEFAULT_N_PROCESSES = 4
 
 
-def write_and_calculate_rrups(station_file, srf_file, stations=None, processes=DEFAULT_N_PROCESSES):
+def write_and_calculate_rrups(station_file, srf_file, stations, processes=DEFAULT_N_PROCESSES):
     rrups = rrup.computeRrup(station_file, srf_file, stations, processes)
     fname = args.output
     with open(fname, 'w') as f:
@@ -59,10 +59,10 @@ if __name__ == "__main__":
     parser.add_argument('-np', '--processes', type=int, default=DEFAULT_N_PROCESSES)
     parser.add_argument('-s', '--stations', nargs='+', help="space delimited list of stations", default=None)
     parser.add_argument('-o', '--output', type=str, default='rrups.csv')
-    parser.add_argument('-fd' 'fd_station_file', type=str, default=None)
+    parser.add_argument('-fd', '--fd_station_file', type=str, default=None)
 
     args = parser.parse_args()
 
     match_stations = get_match_stations(parser, args.fd_station_file, args.stations)
-
-    write_and_calculate_rrups(args.station_file, args.srf_file, stations=match_stations, processes=args.processes)
+    print("matched stations", match_stations)
+    write_and_calculate_rrups(args.station_file, args.srf_file, match_stations, processes=args.processes)

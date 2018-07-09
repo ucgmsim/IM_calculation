@@ -14,3 +14,4 @@ test/test_calculate_ims/output/__pycache*
 *.err
 *.out
 rrups.csv
+.calculate_rrups.py.swp
