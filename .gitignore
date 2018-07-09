@@ -13,4 +13,4 @@ test/test_calculate_ims/output/__pycache*
 *.sl
 *.err
 *.out
-
+rrups.csv
