@@ -14,7 +14,7 @@ def check_completion(output_dir):
     completed = False
     sum_csv = glob.glob1(output_dir, '*.csv')
     if sum_csv:
-        meta = glob.glob1(output_dir, '*.info')
+        meta = glob.glob1(output_dir, '*.meta_info')
         if meta:
             completed = True
     return completed

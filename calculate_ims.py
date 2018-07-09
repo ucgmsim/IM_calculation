@@ -156,7 +156,7 @@ def compute_measures_multiprocess(input_path, file_type, geom_only, wave_type, s
     """
     using multiprocesses to computer measures.
     Calls compute_measure_single() to compute measures for a single station
-    write results to csvs and a .info meta data file
+    write results to csvs and a .meta_info meta data file
     :param input_path:
     :param file_type:
     :param geom_only:
@@ -317,7 +317,7 @@ def generate_metadata(output_folder, identifier, rupture, run_type, version):
     :return:
     """
     date = datetime.now().strftime('%Y%m%d_%H%M%S')
-    output_path = get_result_filepath(output_folder, identifier, 'info')
+    output_path = get_result_filepath(output_folder, identifier, 'meta_info')
 
     with open(output_path, 'w') as meta_file:
         meta_writer = csv.writer(meta_file, delimiter=',', quotechar='|')
