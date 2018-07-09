@@ -14,7 +14,7 @@ def check_completion(output_dir):
     completed = False
     sum_csv = glob.glob1(output_dir, '*.csv')
     if sum_csv:
-        meta = glob.glob1(output_dir, '*.meta_info')
+        meta = glob.glob1(output_dir, '*imcalc.info')
         if meta:
             completed = True
     return completed
@@ -117,15 +117,15 @@ def get_header_size(sl_template_path):
             else:
                 return header_size
 
-
-def split_slurms(sim_waveform_dirs, sl_template_path='im_calc_sl.template', line_max=1027):
-    header_size = get_header_size(sl_template_path)
-    print("header size is ", header_size)
-    total_lines = len(sim_waveform_dirs) + header_size
-    total_scripts = total_lines // line_max
-    if total_scripts * line_max < total_lines:
-        total_scripts += 1
-    return total_scripts
-
+#
+# def split_slurms(sim_waveform_dirs, sl_template_path='im_calc_sl.template', line_max=1027):
+#     header_size = get_header_size(sl_template_path)
+#     print("header size is ", header_size)
+#     total_lines = len(sim_waveform_dirs) + header_size
+#     total_scripts = total_lines // line_max
+#     if total_scripts * line_max < total_lines:
+#         total_scripts += 1
+#     return total_scripts
+#
 
 

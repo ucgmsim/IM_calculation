@@ -31,6 +31,7 @@ IDX_EXT_DICT = OrderedDict([(0, '090'), (1, '000'), (2, 'ver'), (3, 'geom')])
 EXT_IDX_DICT = OrderedDict((v, k) for k, v in IDX_EXT_DICT.items())
 
 FILE_TYPE_DICT = {'a': 'ascii', 'b': 'binary'}
+FILE_NAME_DICT = {'info': '_imcalc', 'csv': ''}
 META_TYPE_DICT = {'s': 'simulated', 'o': 'observed', 'u': 'unknown'}
 
 OUTPUT_PATH = os.path.join('/home', getpass.getuser())
@@ -156,7 +157,7 @@ def compute_measures_multiprocess(input_path, file_type, geom_only, wave_type, s
     """
     using multiprocesses to computer measures.
     Calls compute_measure_single() to compute measures for a single station
-    write results to csvs and a .meta_info meta data file
+    write results to csvs and an imcalc.info meta data file
     :param input_path:
     :param file_type:
     :param geom_only:
@@ -178,27 +179,26 @@ def compute_measures_multiprocess(input_path, file_type, geom_only, wave_type, s
 
     waveforms = read_waveform.read_waveforms(input_path, station_names, converted_comp, wave_type=wave_type,
                                              file_type=file_type, units=units)
-   # print("finished rading waveforms")
     array_params = []
     all_result_dict = {}
   
     for waveform in waveforms:
         array_params.append((waveform, ims, comp, period))
-  #  print("finished appending params")
+
     p = pool_wrapper.PoolWrapper(process)
-   # print("finished set up p")
+
     result_list = p.map(compute_measure_single, array_params)
-  #  print("finished pumping up result list")
+
     for result in result_list:
         all_result_dict.update(result)
-   # print("finished result_dict, start wrting csvs")
+
     write_result(all_result_dict, output, identifier, comp, ims, period, geom_only, simple_output)
-  #  print("finished writing csvs start meta")
+
     generate_metadata(output, identifier, rupture, run_type, version)
-   # print("finished meta. all finished")
+
 
 def get_result_filepath(output_folder, arg_identifier, suffix):
-    return os.path.join(output_folder, '{}.{}'.format(arg_identifier, suffix))
+    return os.path.join(output_folder, '{}{}.{}'.format(arg_identifier, FILE_NAME_DICT[suffix], suffix))
 
 
 def get_header(ims, period):
@@ -288,7 +288,6 @@ def write_result(result_dict, output_folder, identifier, comp, ims, period, geom
     
     # big csv containing all stations
     with open(output_path, 'w') as csv_file:
-       # print("writing {}".format(output_path))
         csv_writer = csv.writer(csv_file, delimiter=',', quotechar='|')
         csv_writer.writerow(header)
         stations = sorted(result_dict.keys())
@@ -298,7 +297,6 @@ def write_result(result_dict, output_folder, identifier, comp, ims, period, geom
             if not simple_output:  # if single station csvs are needed
                 station_csv = os.path.join(output_folder, OUTPUT_SUBFOLDER, '{}{}.csv'.format(station, comp_name))
                 with open(station_csv, 'wb') as sub_csv_file:
-                   # print("writing {}".format(station_csv))
                     sub_csv_writer = csv.writer(sub_csv_file, delimiter=',', quotechar='|')
                     sub_csv_writer.writerow(header)
                     write_rows(comps, station, ims, result_dict, csv_writer, sub_csv_writer=sub_csv_writer)
@@ -317,7 +315,7 @@ def generate_metadata(output_folder, identifier, rupture, run_type, version):
     :return:
     """
     date = datetime.now().strftime('%Y%m%d_%H%M%S')
-    output_path = get_result_filepath(output_folder, identifier, 'meta_info')
+    output_path = get_result_filepath(output_folder, identifier, 'info')
 
     with open(output_path, 'w') as meta_file:
         meta_writer = csv.writer(meta_file, delimiter=',', quotechar='|')
