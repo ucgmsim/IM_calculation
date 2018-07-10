@@ -4,7 +4,7 @@ import argparse
 DEFAULT_N_PROCESSES = 4
 
 
-def write_and_calculate_rrups(station_file, srf_file, stations, processes=DEFAULT_N_PROCESSES):
+def write_and_calculate_rrups(station_file, srf_file, stations=None, processes=DEFAULT_N_PROCESSES):
     rrups = rrup.computeRrup(station_file, srf_file, stations, processes)
     fname = args.output
     with open(fname, 'w') as f:
@@ -23,8 +23,7 @@ def get_fd_stations(fd_ll):
     """
     stations = []
     with open(fd_ll, 'r') as fd:
-        lines = fd.readlines()
-        for line in lines:
+        for line in fd:
             station = line.strip().split()[-1]
             stations.append(station)
     return stations

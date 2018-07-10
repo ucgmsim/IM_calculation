@@ -31,7 +31,6 @@ IDX_EXT_DICT = OrderedDict([(0, '090'), (1, '000'), (2, 'ver'), (3, 'geom')])
 EXT_IDX_DICT = OrderedDict((v, k) for k, v in IDX_EXT_DICT.items())
 
 FILE_TYPE_DICT = {'a': 'ascii', 'b': 'binary'}
-FILE_NAME_DICT = {'info': '_imcalc', 'csv': ''}
 META_TYPE_DICT = {'s': 'simulated', 'o': 'observed', 'u': 'unknown'}
 
 OUTPUT_PATH = os.path.join('/home', getpass.getuser())
@@ -198,7 +197,7 @@ def compute_measures_multiprocess(input_path, file_type, geom_only, wave_type, s
 
 
 def get_result_filepath(output_folder, arg_identifier, suffix):
-    return os.path.join(output_folder, '{}{}.{}'.format(arg_identifier, FILE_NAME_DICT[suffix], suffix))
+    return os.path.join(output_folder, '{}{}'.format(arg_identifier, suffix))
 
 
 def get_header(ims, period):
@@ -282,7 +281,7 @@ def write_result(result_dict, output_folder, identifier, comp, ims, period, geom
     :param simple_output
     :return:output result into csvs
     """
-    output_path = get_result_filepath(output_folder, identifier, 'csv')
+    output_path = get_result_filepath(output_folder, identifier, '.csv')
     header = get_header(ims, period)
     comp_name, comps = get_comp_name_and_list(comp, geom_only)
     
@@ -315,7 +314,7 @@ def generate_metadata(output_folder, identifier, rupture, run_type, version):
     :return:
     """
     date = datetime.now().strftime('%Y%m%d_%H%M%S')
-    output_path = get_result_filepath(output_folder, identifier, 'info')
+    output_path = get_result_filepath(output_folder, identifier, '_imcalc.info')
 
     with open(output_path, 'w') as meta_file:
         meta_writer = csv.writer(meta_file, delimiter=',', quotechar='|')
