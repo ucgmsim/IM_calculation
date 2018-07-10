@@ -27,7 +27,6 @@ def get_fd_stations(fd_ll):
         for line in lines:
             station = line.strip().split()[-1]
             stations.append(station)
-    print("stations",len(stations))
     return stations
 
 
