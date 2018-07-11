@@ -62,57 +62,57 @@ def split_and_generate_slurms(sim_dirs, obs_dirs, station_file, rrup_files, outp
 
 def main():
     parser = argparse.ArgumentParser(description="Prints out a slurm script to run IM Calculation over a run-group")
-    parser.add_argument('-s', '--sim_dir',
+    parser.add_argument('-s', '--sim_dir', default=None,
                         help="Path to sim-run-group containing faults and acceleration in the subfolder */BB/*/*")
-    parser.add_argument('-o', '--obs_dir',
+    parser.add_argument('-o', '--obs_dir', default=None,
                         help="Path to obs-run-group containing faults and accelerations in the subfolder */*/accBB")
-    parser.add_argument('-srf', '--srf_dir',
+    parser.add_argument('-srf', '--srf_dir', default=None,
                         help="Path to run-group containing the srf files in the path matching */Srf/*.srf")
-    parser.add_argument('-ll', '--station_file',
+    parser.add_argument('-ll', '--station_file', default=None,
                         help="Path to a single station file for ruputure distance calculations")
     parser.add_argument('-np', '--processes', default=DEFAULT_N_PROCESSES, help="number of processors to use")
     parser.add_argument('-ml', '--max_line', default=33, type=int, help="maximun number of lines in a slurm script")
     parser.add_argument('rrup_output_dir', help="directory containing rupture distances output")
 
     args = parser.parse_args()
+    print("args are", args)
 
     output_dir = args.rrup_output_dir
     utils.setup_dir(output_dir)
 
     max_lines = args.max_line
     if max_lines <= 0:
-        parser.error(
-            "-ml argeument should come with a number that is 0 < -ml <= (max_lines-header/other_prints) allowed by slurm")
-    # sim_dir = /nesi/nobackup/nesi00213/RunFolder/Cybershake/v18p5/Runs
-    sim_waveform_dirs = glob.glob(os.path.join(args.sim_dir, '*/BB/*/*'))
-    sim_waveform_dirs = check_point.check_point_sim_obs(sim_waveform_dirs,
-                                                       '../../../IM_calc/')  # return dirs that are not calculated yet
-    sim_run_names = map(os.path.basename, sim_waveform_dirs)
-    sim_faults = map(get_fault_name, sim_run_names)
-    sim_dirs = zip(sim_waveform_dirs, sim_run_names, sim_faults)
-
-    srf_files = glob.glob(os.path.join(args.srf_dir, "*/Srf/*.srf"))
-    srf_files = check_point.check_point_rrup(output_dir, srf_files)
-    run_names = map(get_basename_without_ext, srf_files)
-    rrup_files = zip(srf_files, run_names)
-
-    obs_waveform_dirs = glob.glob(os.path.join(args.obs_dir, '*'))
-    obs_waveform_dirs = check_point.check_point_sim_obs(obs_waveform_dirs, '../IM_calc/')
-    obs_run_names = map(os.path.basename, obs_waveform_dirs)
-    obs_faults = map(get_fault_name, obs_run_names)
-    obs_dirs = zip(obs_waveform_dirs, obs_run_names, obs_faults)
+        parser.error("-ml argeument should come with a number that is 0 < -ml <= (max_lines-header/other_prints) allowed by slurm")
 
     station_file = args.station_file
     processes = args.processes
 
-    # sim
-    split_and_generate_slurms(sim_dirs, [], station_file, [], output_dir, processes, max_lines, 'sim')
+    # sim_dir = /nesi/nobackup/nesi00213/RunFolder/Cybershake/v18p5/Runs
+    if args.sim_dir is not None:
+        sim_waveform_dirs = glob.glob(os.path.join(args.sim_dir, '*/BB/*/*'))
+        sim_waveform_dirs = check_point.check_point_sim_obs(sim_waveform_dirs, '../../../IM_calc/')  # return dirs that are not calculated yet
+        sim_run_names = map(os.path.basename, sim_waveform_dirs)
+        sim_faults = map(get_fault_name, sim_run_names)
+        sim_dirs = zip(sim_waveform_dirs, sim_run_names, sim_faults)
+        # sim
+        split_and_generate_slurms(sim_dirs, [], station_file, [], output_dir, processes, max_lines, 'sim')
 
-    # obs
-    split_and_generate_slurms([], obs_dirs, station_file, [], output_dir, processes, max_lines, 'obs')
+    if args.srf_dir is not None:
+        srf_files = glob.glob(os.path.join(args.srf_dir, "*/Srf/*.srf"))
+        srf_files = check_point.check_point_rrup(output_dir, srf_files)
+        run_names = map(get_basename_without_ext, srf_files)
+        rrup_files = zip(srf_files, run_names)
+        # rrup
+        split_and_generate_slurms([], [], station_file, rrup_files, output_dir, processes, max_lines, 'rrup')
 
-    # rrup
-    split_and_generate_slurms([], [], station_file, rrup_files, output_dir, processes, max_lines, 'rrup')
+    if args.obs_dir is not None:
+        obs_waveform_dirs = glob.glob(os.path.join(args.obs_dir, '*'))
+        obs_waveform_dirs = check_point.check_point_sim_obs(obs_waveform_dirs, '../IM_calc/')
+        obs_run_names = map(os.path.basename, obs_waveform_dirs)
+        obs_faults = map(get_fault_name, obs_run_names)
+        obs_dirs = zip(obs_waveform_dirs, obs_run_names, obs_faults)
+        # obs
+        split_and_generate_slurms([], obs_dirs, station_file, [], output_dir, processes, max_lines, 'obs')
 
 
 if __name__ == '__main__':
