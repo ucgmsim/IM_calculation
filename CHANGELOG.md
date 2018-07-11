@@ -9,6 +9,13 @@ Changed
 Added
 
 
+[18.7.2] - 2018-07-11
+Added
+    -
+Changed
+    modified generate_split_sl script to make optional args acutally optional
+
+
 [18.7.1] - 2018-07-10
 Added
     check_point.py
