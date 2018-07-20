@@ -77,6 +77,8 @@ def main():
     parser.add_argument('dir_path', type=str,
                         help='abs path to *.out folder')
     parser.add_argument('-f', '--file_pattern', type=str, default='sim_bb', help='what file pattern the bb file startswith. eg.sim_bb')
+    parser.add_argument('-c', '--csv_out', action='store_true', help="Please add '-c' to output summary csvs. Default not using")
+    
     args = parser.parse_args()
 
     fraction_dict = get_fraction_dict(args.dir_path)
@@ -115,8 +117,9 @@ def main():
     ax.set_ylabel('core hour utilized')
     plt.text(0.9, 0.9, bb_text, horizontalalignment='center', verticalalignment='center', transform=ax.transAxes)
 
-    df_to_csv(df, 'datetime', 'core_hour_utilized', 'all_jobs.csv')
-    df_to_csv(bb_df, 'datetime', 'number_of_bb_jobs_running', 'bb_jobs.csv')
+    if args.csv_out:
+   	 df_to_csv(df, 'datetime', 'core_hour_utilized', 'all_jobs.csv')
+   	 df_to_csv(bb_df, 'datetime', 'number_of_bb_jobs_running', 'bb_jobs.csv')
 
     fig.tight_layout()
     plt.show()
