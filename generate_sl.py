@@ -62,13 +62,13 @@ def split_and_generate_slurms(sim_dirs, obs_dirs, station_file, rrup_files, outp
 
 def main():
     parser = argparse.ArgumentParser(description="Prints out a slurm script to run IM Calculation over a run-group")
-    parser.add_argument('-s', '--sim_dir', default=None,
+    parser.add_argument('-s', '--sim_dir',
                         help="Path to sim-run-group containing faults and acceleration in the subfolder */BB/*/*")
-    parser.add_argument('-o', '--obs_dir', default=None,
+    parser.add_argument('-o', '--obs_dir',
                         help="Path to obs-run-group containing faults and accelerations in the subfolder */*/accBB")
-    parser.add_argument('-srf', '--srf_dir', default=None,
+    parser.add_argument('-srf', '--srf_dir',
                         help="Path to run-group containing the srf files in the path matching */Srf/*.srf")
-    parser.add_argument('-ll', '--station_file', default=None,
+    parser.add_argument('-ll', '--station_file',
                         help="Path to a single station file for ruputure distance calculations")
     parser.add_argument('-np', '--processes', default=DEFAULT_N_PROCESSES, help="number of processors to use")
     parser.add_argument('-ml', '--max_line', default=33, type=int, help="maximum number of lines in a slurm script")
@@ -81,7 +81,7 @@ def main():
 
     max_lines = args.max_line
     if max_lines <= 0:
-        parser.error("-ml argument should come with a number that is 0 < -ml <= (max_lines-header/other_prints) allowed by slurm")
+        parser.error("-ml argument should come with a number that is 0 < -ml <= (max_lines-header_and_other_prints) allowed by slurm")
 
     station_file = args.station_file
     processes = args.processes
