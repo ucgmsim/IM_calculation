@@ -1,17 +1,20 @@
-"""
-python calculate_utilization.py /nesi/nobackup/nesi00213/RunFolder/Cybershake/v18p6_batched/out_logs -c
-"""
-
 import os
+import sys
 import datetime
 import calendar
 import argparse
+import getpass
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 
+sys.path.insert(0, '../qcore')
+from qcore import utils
+
+
 CALENDAR = {s: n for n, s in enumerate(calendar.month_abbr)}
+OUT_DIR = os.path.join('/home', getpass.getuser(), 'uti_cs_plots')
 
 
 def get_datetime(time_string):
@@ -95,7 +98,7 @@ def calc_fraction(fraction_dict, start_time, end_time):
         populate_dict(fraction_dict, end_time, diff_end)
 
 
-def df_to_csv(df, index_colname, value_colname, csv_name):
+def df_to_csv(df, index_colname, value_colname, out_dir, csv_name):
     """
     converts panda dataframe object to a csv file
     :param df: panda dataframe obj
@@ -106,64 +109,70 @@ def df_to_csv(df, index_colname, value_colname, csv_name):
     """
     df.columns = [value_colname]
     df.index.name = index_colname
-    outpath = '~/{}'.format(csv_name)
+    outpath = os.path.join(out_dir, csv_name)
     df.to_csv(outpath)
     print("csv output to {}".format(outpath))
 
 
 def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument('dir_path', type=str,
-                        help='abs path to *.out folder')
-    parser.add_argument('-f', '--file_pattern', type=str, default='sim_bb',
-                        help='what file pattern the bb file startswith. eg.sim_bb')
-    parser.add_argument('-c', '--csv_out', action='store_true',
-                        help="Please add '-c' to output summary csvs. Default not using")
+        parser = argparse.ArgumentParser()
+        parser.add_argument('dir_path', type=str,
+                            help='abs path to *.out folder')
+        parser.add_argument('-f', '--file_pattern', type=str, default='sim_bb',
+                            help='what file pattern the bb file startswith. eg.sim_bb')
+        parser.add_argument('-o', '--out_dir', default=OUT_DIR,
+                            help="path to output dir. Default {}".format(OUT_DIR))
+        parser.add_argument('-c', '--csv_out', action='store_true',
+                            help="Please add '-c' to output summary csvs. Default not using")
 
-    args = parser.parse_args()
+        args = parser.parse_args()
 
-    fraction_dict = get_fraction_dict(args.dir_path)
-    df = pd.DataFrame.from_dict(fraction_dict, orient='index')
-    df = df.groupby(pd.Grouper(freq='H')).sum()
-    num_of_dates = float(len(df.index))
+        utils.setup_dir(args.out_dir)
 
-    plt.style.use('ggplot')
-    fig, ax = plt.subplots(figsize=(15, 7))
+        fraction_dict = get_fraction_dict(args.dir_path)
+        df = pd.DataFrame.from_dict(fraction_dict, orient='index')
+        df = df.groupby(pd.Grouper(freq='H')).sum()
+        num_of_dates = float(len(df.index))
 
-    ax.bar(df.index, df.values, width=15. / num_of_dates / 24. * 3, align='center')
+        plt.style.use('ggplot')
+        fig, ax = plt.subplots(figsize=(15, 7))
 
-    # uncomment the 3 lines below and comment out 'set major and minor x ticks' for another x-axis date formatter
-    # ax.set_xticks(df.index)
-    # ax.xaxis.set_major_formatter(mdates.DateFormatter("%b-%d-%H"))
-    # _ = plt.xticks(rotation=90)
+        ax.bar(df.index, df.values, width=15. / num_of_dates / 24. * 3, align='center')
 
-    # set major and minor x ticks
-    ax.xaxis.set_major_locator(mdates.DayLocator())
-    ax.xaxis.set_major_formatter(mdates.DateFormatter('%b-%d'))
-    ax.xaxis.set_minor_locator(mdates.HourLocator())
-    ax.xaxis.set_minor_formatter(mdates.DateFormatter('%H'))
-    ax.xaxis.set_tick_params(which='major', pad=15)
-    # plt.setp(ax.get_xticklabels(which='minor'), rotation=90, horizontalalignment='right')
+        # uncomment the 3 lines below and comment out 'set major and minor x ticks' for another x-axis date formatter
+        # ax.set_xticks(df.index)
+        # ax.xaxis.set_major_formatter(mdates.DateFormatter("%b-%d-%H"))
+        # _ = plt.xticks(rotation=90)
 
-    # count total of BB jobs
-    bb_fraction_dict = get_fraction_dict(args.dir_path, args.file_pattern)
-    bb_df = pd.DataFrame.from_dict(bb_fraction_dict, orient='index')
-    bb_df = bb_df.groupby(pd.Grouper(freq='D')).count()
-    bb_per_day = np.divide(np.sum(bb_df.values), np.size(bb_df.values))
-    bb_text = 'Average bb jobs run per day is {}'.format(bb_per_day)
+        # set major and minor x ticks
+        ax.xaxis.set_major_locator(mdates.DayLocator())
+        ax.xaxis.set_major_formatter(mdates.DateFormatter('%b-%d'))
+        ax.xaxis.set_minor_locator(mdates.HourLocator())
+        ax.xaxis.set_minor_formatter(mdates.DateFormatter('%H'))
+        ax.xaxis.set_tick_params(which='major', pad=15)
+        # plt.setp(ax.get_xticklabels(which='minor'), rotation=90, horizontalalignment='right')
 
-    ax.set_title('Kupe core hour utilized per realtime hour')
-    ax.set_xlabel('datetime')
-    ax.set_ylabel('core hour utilized (h)')
-    plt.text(0.9, 0.9, bb_text, horizontalalignment='center', verticalalignment='center', transform=ax.transAxes)
+        # count total of BB jobs
+        bb_fraction_dict = get_fraction_dict(args.dir_path, args.file_pattern)
+        bb_df = pd.DataFrame.from_dict(bb_fraction_dict, orient='index')
+        bb_df = bb_df.groupby(pd.Grouper(freq='D')).count()
+        bb_per_day = np.divide(np.sum(bb_df.values), np.size(bb_df.values))
+        bb_text = 'Average bb jobs run per day is {}'.format(bb_per_day)
 
-    if args.csv_out:
-        df_to_csv(df, 'datetime', 'core_hour_utilized', 'all_jobs.csv')
-        df_to_csv(bb_df, 'datetime', 'number_of_bb_jobs_running', 'bb_jobs.csv')
+        ax.set_title('Kupe core hour '
+                     ' per realtime hour')
+        ax.set_xlabel('datetime')
+        ax.set_ylabel('core hour utilized (h)')
+        plt.text(0.1, 0.9, bb_text, bbox=dict(facecolor='none', edgecolor='blue', boxstyle='round'), horizontalalignment='center', verticalalignment='center', transform=ax.transAxes)
+        plt.rcParams.update({'font.size': 8})
+        if args.csv_out:
+            df_to_csv(df, 'datetime', 'core_hour_utilized', args.out_dir, 'all_jobs.csv')
+            df_to_csv(bb_df, 'datetime', 'number_of_bb_jobs_running', args.out_dir, 'bb_jobs.csv')
 
-    print("start plotting.......")
-    fig.tight_layout()
-    plt.show()
+        print("start plotting.......")
+        fig.tight_layout()
+        plt.savefig(os.path.join(args.out_dir, 'kupe_core_hour_utilization.png'))
+        plt.show()
 
 
 if __name__ == '__main__':
