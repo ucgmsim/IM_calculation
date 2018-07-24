@@ -8,14 +8,12 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
+
 from qcore import utils
 
 
 CALENDAR = {s: n for n, s in enumerate(calendar.month_abbr)}
 OUT_DIR = os.path.join('/home', getpass.getuser(), 'uti_cs_plots')
-SMALL_SIZE = 8
-MEDIUM_SIZE = 11
-BIGGER_SIZE = 14
 
 
 def get_datetime(time_string):
@@ -160,27 +158,21 @@ def main():
         bb_per_day = np.divide(np.sum(bb_df.values), np.size(bb_df.values))
         bb_text = 'Average bb jobs run per day is {}'.format(bb_per_day)
 
-        ax.set_title('Kupe core hour per realtime hour')
+        ax.set_title('Kupe core hour '
+                     ' per realtime hour')
         ax.set_xlabel('datetime')
         ax.set_ylabel('core hour utilized (h)')
         plt.text(0.1, 0.9, bb_text, bbox=dict(facecolor='none', edgecolor='blue', boxstyle='round'), horizontalalignment='center', verticalalignment='center', transform=ax.transAxes)
         plt.rcParams.update({'font.size': 8})
-       # plt.rc('font', size=SMALL_SIZE)          # controls default text sizes
-       # plt.rc('axes', titlesize=BIGGER_SIZE)     # fontsize of the axes title
-       # plt.rc('axes', labelsize=MEDIUM_SIZE)    # fontsize of the x and y labels
-       # plt.rc('xtick', labelsize=SMALL_SIZE)    # fontsize of the tick labels
-       # plt.rc('ytick', labelsize=SMALL_SIZE)    # fontsize of the tick labels
-       # plt.rc('legend', fontsize=MEDIUM_SIZE)    # legend fontsize
-       # plt.rc('figure', titlesize=BIGGER_SIZE)
 
         if args.csv_out:
             df_to_csv(df, 'datetime', 'core_hour_utilized', args.out_dir, 'all_jobs.csv')
             df_to_csv(bb_df, 'datetime', 'number_of_bb_jobs_running', args.out_dir, 'bb_jobs.csv')
 
         fig.tight_layout()
-        plot_output_path = os.path.join(args.out_dir, 'kupe_core_hour_utilization.png')
-        plt.savefig(plot_output_path)
-        print("plot saved to {}".format(plot_output_path))
+        plot_outpath = os.path.join(args.out_dir, 'kupe_core_hour_utilization.png')
+        plt.savefig(plot_outpath)
+        print("plot saved to {}".format(plot_outpath))
         plt.show()
 
 
