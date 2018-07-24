@@ -1,3 +1,4 @@
+#TODO SAVED PLOT HAS OVERLAPPED X AXIES LABLES
 import os
 import sys
 import datetime
@@ -158,8 +159,7 @@ def main():
         bb_per_day = np.divide(np.sum(bb_df.values), np.size(bb_df.values))
         bb_text = 'Average bb jobs run per day is {}'.format(bb_per_day)
 
-        ax.set_title('Kupe core hour '
-                     ' per realtime hour')
+        ax.set_title('Kupe core hour per realtime hour')
         ax.set_xlabel('datetime')
         ax.set_ylabel('core hour utilized (h)')
         plt.text(0.1, 0.9, bb_text, bbox=dict(facecolor='none', edgecolor='blue', boxstyle='round'), horizontalalignment='center', verticalalignment='center', transform=ax.transAxes)
