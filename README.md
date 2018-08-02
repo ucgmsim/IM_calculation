@@ -106,6 +106,9 @@ optional arguments:
                         calculations
   -np PROCESSES, --processes PROCESSES
                         number of processors to use
+                        
+  -ml MAX_LINE, --max_line MAX_LINE
+                        maximum number of lines in a slurm script
 
 ```
 
@@ -115,6 +118,7 @@ e.g.
  python generate_sl.py ~/IM_result_test_robin/ -srf /nesi/nobackup/nesi00213/RunFolder/Validation/IMCalcExample_v1p2/Data/Sources -ll /nesi/transit/nesi00213/StationInfo/cantstations_v1pt2.ll -s /nesi/nobackup/nesi00213/RunFolder/Validation/IMCalcExample_v1p2/Runs -o /nesi/nobackup/nesi00213/ObsGM/Validation/IMCalcExample > ~/im_calc.sl
 
 ```
+The MAX_LINE option is to work-around the SLURM's 1000 line length limitation. If the length of .sl file exceeds the specified MAX_LINE, it closes the current file and opens another .sl file that contains remaining computation. 
 
 To aggregate IMs across realisations:
 outputs a file per fault per IM that contains a row for each station and columns for each realisation.
