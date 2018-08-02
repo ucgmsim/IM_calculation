@@ -20,7 +20,7 @@ DEFAULT_N_PROCESSES = 40
 
 
 def generate_sl(sim_dirs, obs_dirs, station_file, rrup_files, output_dir, prefix, i, np=8):
-    path = os.path.dirname(os.path.realpath(TEMPLATE_NAME))
+    path = os.path.dirname(os.path.abspath(__file__))
     j2_env = Environment(loader=FileSystemLoader(path), trim_blocks=True)
 
     context = j2_env.get_template(TEMPLATE_NAME).render(
