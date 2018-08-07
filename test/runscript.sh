@@ -1,6 +1,5 @@
-echo "im calc tests"
-//cd /home/tester/IM_calculattest
-cd test
+//echo "im calc tests"
+//cd /home/tester/IM_calculation/test
 DIRS='test_*'
 curdir=$PWD
 for DIR in $DIRS
