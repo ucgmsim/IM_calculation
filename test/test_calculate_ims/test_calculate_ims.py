@@ -1,5 +1,5 @@
 """
-Comnpars output csvs from calculate_ims.py with the benchmark csvs for selected stations
+Compares output csvs from calculate_ims.py with the benchmark csvs for selected stations
 pytest -v -s test_calculate_ims.py
 pytest --cov --cov-report=html -s test_calculate_ims.py
 """
@@ -13,7 +13,8 @@ SCRIPT = os.path.abspath(os.path.join(TEST_FOLDER, '..', '..', 'calculate_ims.py
 print(SCRIPT)
 
 INPUT_DIR = os.path.join(TEST_FOLDER,'sample1','input')
-INPUT_BINARY = '/home/yzh231/BB_with_siteamp.bin'
+print("INPUT_DIR : ",INPUT_DIR)
+INPUT_BINARY = '/home/tester/BB_with_siteamp.bin'
 INPUT_ASCII = os.path.join(INPUT_DIR, 'single_files')
 BENCHMARK = os.path.join(INPUT_DIR, 'new_im_sim_benchmark.csv')
 

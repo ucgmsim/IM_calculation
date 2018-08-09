@@ -81,7 +81,7 @@ def main():
 
     max_lines = args.max_line
     if max_lines <= 0:
-        parser.error("-ml argument should come with a number that is 0 < -ml <= (max_lines-header/other_prints) allowed by slurm")
+        parser.error("-ml argument should come with a number that is 0 < -ml <= (max_lines-header_and_other_prints) allowed by slurm")
 
     station_file = args.station_file
     processes = args.processes
