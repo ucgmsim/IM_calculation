@@ -19,8 +19,8 @@
 date
 
 source machine_env.sh
-export IMPATH=/nesi/nobackup/nesi00213/IM_calculation
-export PYTHONPATH=/nesi/transit/nesi00213/qcore:/$PYTHONPATH:$IMPATH
+export IMPATH=$gmsim/IM_calculation
+export PYTHONPATH=$gmsim/qcore:/$PYTHONPATH:$IMPATH
 
 echo ___calculating simulations___
 {% for sim_dir, sim_name, fault_name in sim_dirs %}
