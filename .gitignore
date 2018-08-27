@@ -10,3 +10,8 @@ test/test_calculate_ims/html*
 test/test_calculate_ims/.coverage
 test/test_calculate_ims/output/__pycache*
 .cache/
+*.sl
+*.err
+*.out
+rrups.csv
+.calculate_rrups.py.swp

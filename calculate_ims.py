@@ -104,8 +104,10 @@ def compute_measure_single((waveform, ims, comp, period)):
         velocities = timeseries.acc2vel(accelerations, DT) * G
     else:
         velocities = waveform_vel.values
-
+    
     station_name = waveform_acc.station_name
+   # print("computing {}".format(station_name))
+
     result[station_name] = {}
     converted_comp = convert_str_comp(comp)
 
@@ -154,7 +156,7 @@ def compute_measures_multiprocess(input_path, file_type, geom_only, wave_type, s
     """
     using multiprocesses to computer measures.
     Calls compute_measure_single() to compute measures for a single station
-    write results to csvs and a .info meta data file
+    write results to csvs and an imcalc.info meta data file
     :param input_path:
     :param file_type:
     :param geom_only:
@@ -178,7 +180,7 @@ def compute_measures_multiprocess(input_path, file_type, geom_only, wave_type, s
                                              file_type=file_type, units=units)
     array_params = []
     all_result_dict = {}
-
+  
     for waveform in waveforms:
         array_params.append((waveform, ims, comp, period))
 
@@ -195,7 +197,7 @@ def compute_measures_multiprocess(input_path, file_type, geom_only, wave_type, s
 
 
 def get_result_filepath(output_folder, arg_identifier, suffix):
-    return os.path.join(output_folder, '{}.{}'.format(arg_identifier, suffix))
+    return os.path.join(output_folder, '{}{}'.format(arg_identifier, suffix))
 
 
 def get_header(ims, period):
@@ -279,10 +281,10 @@ def write_result(result_dict, output_folder, identifier, comp, ims, period, geom
     :param simple_output
     :return:output result into csvs
     """
-    output_path = get_result_filepath(output_folder, identifier, 'csv')
+    output_path = get_result_filepath(output_folder, identifier, '.csv')
     header = get_header(ims, period)
     comp_name, comps = get_comp_name_and_list(comp, geom_only)
-
+    
     # big csv containing all stations
     with open(output_path, 'w') as csv_file:
         csv_writer = csv.writer(csv_file, delimiter=',', quotechar='|')
@@ -312,7 +314,7 @@ def generate_metadata(output_folder, identifier, rupture, run_type, version):
     :return:
     """
     date = datetime.now().strftime('%Y%m%d_%H%M%S')
-    output_path = get_result_filepath(output_folder, identifier, 'info')
+    output_path = get_result_filepath(output_folder, identifier, '_imcalc.info')
 
     with open(output_path, 'w') as meta_file:
         meta_writer = csv.writer(meta_file, delimiter=',', quotechar='|')

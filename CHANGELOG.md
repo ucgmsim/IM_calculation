@@ -9,6 +9,23 @@ Changed
 Added
 
 
+[18.7.2] - 2018-07-11
+Added
+    -
+Changed
+    modified generate_split_sl script to make optional args acutally optional
+
+
+[18.7.1] - 2018-07-10
+Added
+    check_point.py
+    generate_split_sl.py
+Changed
+    modified calculate_im script to output '_imcalc.info' metadata file instead of '.info' file
+    modified im_calc_sl.template to work with the current input Cybershake sim/obs/rrup data folder structure
+    modified calculate_rrups script with added option '-fd' to take a list of in_sim_domain stations instead of whole nz stations 
+
+
 [18.6.4] - 2018-06-19
 Added
     test_calculate_ims.py

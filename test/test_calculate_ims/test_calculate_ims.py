@@ -1,6 +1,6 @@
 """
-Comnpars output csvs from calculate_ims.py with the benchmark csvs for selected stations
-pytest -v -s calculate_ims.py
+Compares output csvs from calculate_ims.py with the benchmark csvs for selected stations
+pytest -v -s test_calculate_ims.py
 pytest --cov --cov-report=html -s test_calculate_ims.py
 """
 
@@ -13,7 +13,8 @@ SCRIPT = os.path.abspath(os.path.join(TEST_FOLDER, '..', '..', 'calculate_ims.py
 print(SCRIPT)
 
 INPUT_DIR = os.path.join(TEST_FOLDER,'sample1','input')
-INPUT_BINARY = '/home/yzh231/BB_with_siteamp.bin'
+print("INPUT_DIR : ",INPUT_DIR)
+INPUT_BINARY = '/home/tester/BB_with_siteamp.bin'
 INPUT_ASCII = os.path.join(INPUT_DIR, 'single_files')
 BENCHMARK = os.path.join(INPUT_DIR, 'new_im_sim_benchmark.csv')
 
@@ -22,13 +23,13 @@ OUTPUT_DIR = os.path.join(TEST_FOLDER, 'sample1', 'output')
 IDENTIFIER_BINARY = 'binary_darfield_im_sim'
 OUTPUT_BINARY_DIR = os.path.join(OUTPUT_DIR, IDENTIFIER_BINARY)
 OUTPUT_BINARY_FILE = os.path.join(OUTPUT_BINARY_DIR, IDENTIFIER_BINARY + '.csv')
-OUTPUT_BINARY_META = os.path.join(OUTPUT_BINARY_DIR, IDENTIFIER_BINARY + '.info')
+OUTPUT_BINARY_META = os.path.join(OUTPUT_BINARY_DIR, IDENTIFIER_BINARY + '_imcalc.info')
 OUTPUT_BINARY_SUBDIR = os.path.join(OUTPUT_DIR, IDENTIFIER_BINARY, 'stations')
 
 IDENTIFIER_ASCII = 'ascii_darfield_im_sim'
 OUTPUT_ASCII_DIR = os.path.join(OUTPUT_DIR, IDENTIFIER_ASCII)
 OUTPUT_ASCII_FILE = os.path.join(OUTPUT_ASCII_DIR, IDENTIFIER_ASCII + '.csv')
-OUTPUT_ASCII_META = os.path.join(OUTPUT_ASCII_DIR, IDENTIFIER_ASCII + '.info')
+OUTPUT_ASCII_META = os.path.join(OUTPUT_ASCII_DIR, IDENTIFIER_ASCII + '_imcalc.info')
 OUTPUT_ASCII_SUBDIR = os.path.join(OUTPUT_DIR, IDENTIFIER_ASCII, 'stations')
 
 STATIONS = '2002199 GRY 00020d3 UNK CASH CFW DLX LSRC EWZ PEAA'
