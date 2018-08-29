@@ -98,6 +98,7 @@ def main():
 
     extended = stringfy_bool(args.extended, 'e')
     simple = stringfy_bool(args.simple_output, 's')
+
     # sim_dir = /nesi/nobackup/nesi00213/RunFolder/Cybershake/v18p5/Runs
     if args.sim_dir is not None:
         sim_waveform_dirs = glob.glob(os.path.join(args.sim_dir, '*/BB/*/*'))
