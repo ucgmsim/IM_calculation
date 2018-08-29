@@ -12,7 +12,6 @@ TEMPLATE_NAME = 'im_calc_sl.template'
 TIME = '00:30:00'
 DEFAULT_N_PROCESSES = 40
 DEFAULT_RRUP_OUTDIR = os.path.join('/home', getpass.getuser(),'imcalc_rrup_out_{}'.format(datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d-%H-%M-%S')))
-print(DEFAULT_RRUP_OUTDIR)
 
 # TODO: calculate wall-clock time
 # TODO: read fd*.ll file to limit the stations that rrups is calculated for

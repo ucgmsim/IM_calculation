@@ -32,7 +32,7 @@ echo ___calculating simulations___
 echo ___calculating observed____
 {% for obs_dir, obs_name, fault_name in obs_dirs %}
     echo {{obs_dir}}
-	time python2 $IMPATH/calculate_ims.py {{obs_dir}}/*/*/accBB a -o {{obs_dir}}/../IM_calc/ -np {{np}} -i {{obs_name}} -r {{fault_name}} -t o -s {{extended}} {{simple}}
+	time python2 $IMPATH/calculate_ims.py {{obs_dir}}/*/*/accBB a -o {{obs_dir}}/../IM_calc/ -np {{np}} -i {{obs_name}} -r {{fault_name}} -t o {{extended}} {{simple}}
 {% endfor %}
 
 echo ___calculating rrups___
