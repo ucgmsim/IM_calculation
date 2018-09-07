@@ -20,7 +20,7 @@ DEFAULT_RRUP_OUTDIR = os.path.join('/home', getpass.getuser(),'imcalc_rrup_out_{
 # TODO: rrup output_dir the csv to each individual simulation folder
 # TODO: one rupture distance calc per fault
 # TODO: remove relative paths on sl.template
-
+# python generate_sl.py -o ~/test_obs/IMCalcExample  -ll /scale_akl_nobackup/filesets/transit/nesi00213/StationInfo/non_uniform_whole_nz_with_real_stations-hh400_v18p6.ll -ml 1000 -simple -e
 
 def generate_sl(sim_dirs, obs_dirs, station_file, rrup_files, output_dir, prefix, i, np, extended, simple):
     path = os.path.dirname(os.path.abspath(__file__))
