@@ -84,7 +84,7 @@ def main():
     parser.add_argument('-ml', '--max_lines', default=100, type=int, help="maximum number of lines in a slurm script. Default 100")
     parser.add_argument('-e', '--extended', action='store_true', help="add '-e' to indicate the use of extended pSA period. Default not using")
     parser.add_argument('-simple', '--simple_output', action='store_true',
-                        help="Please add '-s' to indicate if you want to output the big summary csv only(no single station csvs). Default outputting both single station and the big summary csvs")
+                        help="Please add '-simple' to indicate if you want to output the big summary csv only(no single station csvs). Default outputting both single station and the big summary csvs")
     parser.add_argument('-rrup_out_dir', default=DEFAULT_RRUP_OUTDIR, help="output directory to store rupture distances output.Default is {}".format(DEFAULT_RRUP_OUTDIR))
     
     args = parser.parse_args()
