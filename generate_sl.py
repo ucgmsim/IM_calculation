@@ -22,7 +22,7 @@ DEFAULT_RRUP_OUTDIR = os.path.join('/home', getpass.getuser(),'imcalc_rrup_out_{
 # TODO: remove relative paths on sl.template
 # python generate_sl.py -o ~/test_obs/IMCalcExample  -ll /scale_akl_nobackup/filesets/transit/nesi00213/StationInfo/non_uniform_whole_nz_with_real_stations-hh400_v18p6.ll -ml 1000 -simple -e
 
-def generate_sl(sim_dirs, obs_dirs, station_file, rrup_files, output_dir, prefix, i, np, extended, simple):
+def generate_sl(sim_dirs, obs_dirs, station_file, rrup_files, output_dir, prefix, i, np, extended, simple, fd):
     path = os.path.dirname(os.path.abspath(__file__))
     j2_env = Environment(loader=FileSystemLoader(path), trim_blocks=True)
 
@@ -30,7 +30,7 @@ def generate_sl(sim_dirs, obs_dirs, station_file, rrup_files, output_dir, prefix
         time=TIME,
         sim_dirs=sim_dirs, obs_dirs=obs_dirs,
         rrup_files=rrup_files, station_file=station_file,
-        output_dir=output_dir, np=np, extended=extended, simple=simple)
+        output_dir=output_dir, np=np, extended=extended, simple=simple, fd=fd)
     sl_name = '{}_im_calc_{}.sl'.format(prefix, i)
     with open(sl_name, 'w') as sl:
         print("writing {}".format(sl_name))
@@ -45,7 +45,7 @@ def get_fault_name(run_name):
     return run_name.split('_')[0]
 
 
-def split_and_generate_slurms(sim_dirs, obs_dirs, station_file, rrup_files, output_dir, processes, max_lines, prefix, extended, simple):
+def split_and_generate_slurms(sim_dirs, obs_dirs, station_file, rrup_files, output_dir, processes, max_lines, prefix, extended='', simple='', fd=None):
     total_dir_lines = 0
     if sim_dirs != []:
         total_dir_lines = len(sim_dirs)
@@ -59,15 +59,15 @@ def split_and_generate_slurms(sim_dirs, obs_dirs, station_file, rrup_files, outp
         if 0 <= last_line_index - total_dir_lines <= max_lines:
             last_line_index = total_dir_lines
         generate_sl(sim_dirs[i: last_line_index], obs_dirs[i: last_line_index], station_file,
-                    rrup_files[i: last_line_index], output_dir, prefix, i, processes, extended, simple)
+                    rrup_files[i: last_line_index], output_dir, prefix, i, processes, extended, simple, fd)
         i += max_lines
 
 
 def main():
     parser = argparse.ArgumentParser(description="Prints out a slurm script to run IM Calculation over a run-group")
-    parser.add_argument('-s', '--sim_dir',
+    parser.add_argument('-sim', '--sim_dir',
                         help="Path to sim-run-group containing faults and acceleration in the subfolder */BB/*/*")
-    parser.add_argument('-o', '--obs_dir',
+    parser.add_argument('-obs', '--obs_dir',
                         help="Path to obs-run-group containing faults and accelerations in the subfolder */*/accBB")
     parser.add_argument('-srf', '--srf_dir',
                         help="Path to run-group containing the srf files in the path matching */Srf/*.srf")
@@ -75,11 +75,12 @@ def main():
                         help="Path to a single station file for ruputure distance calculations")
     parser.add_argument('-np', '--processes', default=DEFAULT_N_PROCESSES, help="number of processors to use")
     parser.add_argument('-ml', '--max_lines', default=100, type=int, help="maximum number of lines in a slurm script. Default 100")
-    parser.add_argument('-e', '--extended', action='store_const', const='-e', default='', help="add '-e' to indicate the use of extended pSA period. Default not using")
-    parser.add_argument('-simple', action='store_const',const='-s',default='',
-                        help="Please add '-simple' to indicate if you want to output the big summary csv only(no single station csvs). Default outputting both single station and the big summary csvs")
-    parser.add_argument('-rrup_out_dir', default=DEFAULT_RRUP_OUTDIR, help="output directory to store rupture distances output.Default is {}".format(DEFAULT_RRUP_OUTDIR))
-    
+    parser.add_argument('-e', '--extended_period', action='store_const', const='-e', default='', help="add '-e' to indicate the use of extended pSA period. Default not using")
+    parser.add_argument('-s', '--simple_output', action='store_const',const='-s',default='',
+                        help="Please add '-s' to indicate if you want to output the big summary csv only(no single station csvs). Default outputting both single station and the big summary csvs")
+    parser.add_argument('-o', '--rrup_out_dir', default=DEFAULT_RRUP_OUTDIR, help="output directory to store rupture distances output.Default is {}".format(DEFAULT_RRUP_OUTDIR))
+    parser.add_argument('-fd', '--fd_station_file', help="path to a trimmed station file. eg.'/nesi/nobackup/nesi00213/RunFolder/Cybershake/v18p6/Runs/Kelly/fd_rt01-h0.400.ll'")
+   
     args = parser.parse_args()
     
     if args.srf_dir is not None:
@@ -96,7 +97,7 @@ def main():
         sim_faults = map(get_fault_name, sim_run_names)
         sim_dirs = zip(sim_waveform_dirs, sim_run_names, sim_faults)
         # sim
-        split_and_generate_slurms(sim_dirs, [], args.station_file, [], args.rrup_out_dir, args.processes, args.max_lines, 'sim', args.extended, args.simple)
+        split_and_generate_slurms(sim_dirs, [], args.station_file, [], args.rrup_out_dir, args.processes, args.max_lines, 'sim', extended=args.extended_period, simple=args.simple_output_output)
 
     if args.srf_dir is not None:
         srf_files = glob.glob(os.path.join(args.srf_dir, "*/Srf/*.srf"))
@@ -104,7 +105,7 @@ def main():
         run_names = map(get_basename_without_ext, srf_files)
         rrup_files = zip(srf_files, run_names)
         # rrup
-        split_and_generate_slurms([], [], args.station_file, rrup_files, args.rrup_out_dir, args.processes, args.max_lines, 'rrup', args.extended, args.simple)
+        split_and_generate_slurms([], [], args.station_file, rrup_files, args.rrup_out_dir, args.processes, args.max_lines, 'rrup', extended=args.extended_period, simple=args.simple_output)
 
     if args.obs_dir is not None:
         obs_waveform_dirs = glob.glob(os.path.join(args.obs_dir, '*'))
@@ -113,7 +114,7 @@ def main():
         obs_faults = map(get_fault_name, obs_run_names)
         obs_dirs = zip(obs_waveform_dirs, obs_run_names, obs_faults)
         # obs
-        split_and_generate_slurms([], obs_dirs, args.station_file, [], args.rrup_out_dir, args.processes, args.max_lines, 'obs', args.extended, args.simple)
+        split_and_generate_slurms([], obs_dirs, args.station_file, [], args.rrup_out_dir, args.processes, args.max_lines, 'obs', fd=args.fd_station_file)
 
 
 if __name__ == '__main__':
