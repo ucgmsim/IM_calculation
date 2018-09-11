@@ -63,13 +63,6 @@ def split_and_generate_slurms(sim_dirs, obs_dirs, station_file, rrup_files, outp
         i += max_lines
 
 
-def stringfy_bool(input_bool_arg, symbol):
-    stringfied_arg = ''
-    if input_bool_arg:
-        stringfied_arg = '-{}'.format(symbol)
-    return stringfied_arg
-
-
 def main():
     parser = argparse.ArgumentParser(description="Prints out a slurm script to run IM Calculation over a run-group")
     parser.add_argument('-s', '--sim_dir',
@@ -82,8 +75,8 @@ def main():
                         help="Path to a single station file for ruputure distance calculations")
     parser.add_argument('-np', '--processes', default=DEFAULT_N_PROCESSES, help="number of processors to use")
     parser.add_argument('-ml', '--max_lines', default=100, type=int, help="maximum number of lines in a slurm script. Default 100")
-    parser.add_argument('-e', '--extended', action='store_true', help="add '-e' to indicate the use of extended pSA period. Default not using")
-    parser.add_argument('-simple', '--simple_output', action='store_true',
+    parser.add_argument('-e', '--extended', action='store_const', const='-e', default='', help="add '-e' to indicate the use of extended pSA period. Default not using")
+    parser.add_argument('-simple', action='store_const',const='-s',default='',
                         help="Please add '-simple' to indicate if you want to output the big summary csv only(no single station csvs). Default outputting both single station and the big summary csvs")
     parser.add_argument('-rrup_out_dir', default=DEFAULT_RRUP_OUTDIR, help="output directory to store rupture distances output.Default is {}".format(DEFAULT_RRUP_OUTDIR))
     
@@ -95,9 +88,6 @@ def main():
     if args.max_lines <= 0:
         parser.error("-ml argument should come with a number that is 0 < -ml <= (max_lines-header_and_other_prints) allowed by slurm")
 
-    extended = stringfy_bool(args.extended, 'e')
-    simple = stringfy_bool(args.simple_output, 's')
-
     # sim_dir = /nesi/nobackup/nesi00213/RunFolder/Cybershake/v18p5/Runs
     if args.sim_dir is not None:
         sim_waveform_dirs = glob.glob(os.path.join(args.sim_dir, '*/BB/*/*'))
@@ -106,7 +96,7 @@ def main():
         sim_faults = map(get_fault_name, sim_run_names)
         sim_dirs = zip(sim_waveform_dirs, sim_run_names, sim_faults)
         # sim
-        split_and_generate_slurms(sim_dirs, [], args.station_file, [], args.rrup_out_dir, args.processes, args.max_lines, 'sim', extended, simple)
+        split_and_generate_slurms(sim_dirs, [], args.station_file, [], args.rrup_out_dir, args.processes, args.max_lines, 'sim', args.extended, args.simple)
 
     if args.srf_dir is not None:
         srf_files = glob.glob(os.path.join(args.srf_dir, "*/Srf/*.srf"))
@@ -114,7 +104,7 @@ def main():
         run_names = map(get_basename_without_ext, srf_files)
         rrup_files = zip(srf_files, run_names)
         # rrup
-        split_and_generate_slurms([], [], args.station_file, rrup_files, args.rrup_out_dir, args.processes, args.max_lines, 'rrup', extended, simple)
+        split_and_generate_slurms([], [], args.station_file, rrup_files, args.rrup_out_dir, args.processes, args.max_lines, 'rrup', args.extended, args.simple)
 
     if args.obs_dir is not None:
         obs_waveform_dirs = glob.glob(os.path.join(args.obs_dir, '*'))
@@ -123,7 +113,7 @@ def main():
         obs_faults = map(get_fault_name, obs_run_names)
         obs_dirs = zip(obs_waveform_dirs, obs_run_names, obs_faults)
         # obs
-        split_and_generate_slurms([], obs_dirs, args.station_file, [], args.rrup_out_dir, args.processes, args.max_lines, 'obs', extended, simple)
+        split_and_generate_slurms([], obs_dirs, args.station_file, [], args.rrup_out_dir, args.processes, args.max_lines, 'obs', args.extended, args.simple)
 
 
 if __name__ == '__main__':
