@@ -45,7 +45,7 @@ def get_fault_name(run_name):
     return run_name.split('_')[0]
 
 
-def split_and_generate_slurms(sim_dirs, obs_dirs, station_file, rrup_files, output_dir, processes, max_lines, prefix, extended='', simple='', fd=None):
+def split_and_generate_slurms(sim_dirs, obs_dirs, station_file, rrup_files, output_dir, processes, max_lines, prefix, extended='', simple='', fd=''):
     total_dir_lines = 0
     if sim_dirs != []:
         total_dir_lines = len(sim_dirs)
@@ -88,7 +88,10 @@ def main():
 
     if args.max_lines <= 0:
         parser.error("-ml argument should come with a number that is 0 < -ml <= (max_lines-header_and_other_prints) allowed by slurm")
-
+    
+    if args.fd_station_file is not None:
+        args.fd_station_file = ' -fd {}'.format(args.fd_station_file)
+    print args.fd_station_file
     # sim_dir = /nesi/nobackup/nesi00213/RunFolder/Cybershake/v18p5/Runs
     if args.sim_dir is not None:
         sim_waveform_dirs = glob.glob(os.path.join(args.sim_dir, '*/BB/*/*'))
@@ -97,7 +100,7 @@ def main():
         sim_faults = map(get_fault_name, sim_run_names)
         sim_dirs = zip(sim_waveform_dirs, sim_run_names, sim_faults)
         # sim
-        split_and_generate_slurms(sim_dirs, [], args.station_file, [], args.rrup_out_dir, args.processes, args.max_lines, 'sim', extended=args.extended_period, simple=args.simple_output_output)
+        split_and_generate_slurms(sim_dirs, [], args.station_file, [], args.rrup_out_dir, args.processes, args.max_lines, 'sim', extended=args.extended_period, simple=args.simple_output)
 
     if args.srf_dir is not None:
         srf_files = glob.glob(os.path.join(args.srf_dir, "*/Srf/*.srf"))
@@ -105,7 +108,7 @@ def main():
         run_names = map(get_basename_without_ext, srf_files)
         rrup_files = zip(srf_files, run_names)
         # rrup
-        split_and_generate_slurms([], [], args.station_file, rrup_files, args.rrup_out_dir, args.processes, args.max_lines, 'rrup', extended=args.extended_period, simple=args.simple_output)
+        split_and_generate_slurms([], [], args.station_file, rrup_files, args.rrup_out_dir, args.processes, args.max_lines, 'rrup', fd=args.fd_station_file)
 
     if args.obs_dir is not None:
         obs_waveform_dirs = glob.glob(os.path.join(args.obs_dir, '*'))
@@ -114,7 +117,7 @@ def main():
         obs_faults = map(get_fault_name, obs_run_names)
         obs_dirs = zip(obs_waveform_dirs, obs_run_names, obs_faults)
         # obs
-        split_and_generate_slurms([], obs_dirs, args.station_file, [], args.rrup_out_dir, args.processes, args.max_lines, 'obs', fd=args.fd_station_file)
+        split_and_generate_slurms([], obs_dirs, args.station_file, [], args.rrup_out_dir, args.processes, args.max_lines, 'obs', extended=args.extended_period, simple=args.simple_output)
 
 
 if __name__ == '__main__':
