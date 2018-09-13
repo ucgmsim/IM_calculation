@@ -7,11 +7,14 @@ import time
 from datetime import datetime
 import checkpoint
 from qcore import utils
+import subprocess
 
 TEMPLATE_NAME = 'im_calc_sl.template'
 TIME = '00:30:00'
 DEFAULT_N_PROCESSES = 40
-DEFAULT_RRUP_OUTDIR = os.path.join('/home', getpass.getuser(),'imcalc_rrup_out_{}'.format(datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d-%H-%M-%S')))
+DEFAULT_RRUP_OUTDIR = os.path.join('/home', getpass.getuser(), 'imcalc_rrup_out_{}'.format(
+    datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d-%H-%M-%S')))
+PARAMS_BASE = 'params_base.py'
 
 # TODO: calculate wall-clock time
 # TODO: read fd*.ll file to limit the stations that rrups is calculated for
@@ -22,7 +25,7 @@ DEFAULT_RRUP_OUTDIR = os.path.join('/home', getpass.getuser(),'imcalc_rrup_out_{
 # TODO: remove relative paths on sl.template
 # python generate_sl.py -o ~/test_obs/IMCalcExample  -ll /scale_akl_nobackup/filesets/transit/nesi00213/StationInfo/non_uniform_whole_nz_with_real_stations-hh400_v18p6.ll -ml 1000 -simple -e
 
-def generate_sl(sim_dirs, obs_dirs, station_file, rrup_files, output_dir, prefix, i, np, extended, simple, fd):
+def generate_sl(sim_dirs, obs_dirs, station_file, rrup_files, output_dir, prefix, i, np, extended, simple):
     path = os.path.dirname(os.path.abspath(__file__))
     j2_env = Environment(loader=FileSystemLoader(path), trim_blocks=True)
 
@@ -30,7 +33,7 @@ def generate_sl(sim_dirs, obs_dirs, station_file, rrup_files, output_dir, prefix
         time=TIME,
         sim_dirs=sim_dirs, obs_dirs=obs_dirs,
         rrup_files=rrup_files, station_file=station_file,
-        output_dir=output_dir, np=np, extended=extended, simple=simple, fd=fd)
+        output_dir=output_dir, np=np, extended=extended, simple=simple)
     sl_name = '{}_im_calc_{}.sl'.format(prefix, i)
     with open(sl_name, 'w') as sl:
         print("writing {}".format(sl_name))
@@ -45,7 +48,9 @@ def get_fault_name(run_name):
     return run_name.split('_')[0]
 
 
-def split_and_generate_slurms(sim_dirs, obs_dirs, station_file, rrup_files, output_dir, processes, max_lines, prefix, extended='', simple='', fd=''):
+def split_and_generate_slurms(sim_dirs, obs_dirs, station_file, rrup_files, output_dir, processes, max_lines, prefix,
+                              extended='', simple='', owd='.'):
+    os.chdir(owd)
     total_dir_lines = 0
     if sim_dirs != []:
         total_dir_lines = len(sim_dirs)
@@ -59,8 +64,25 @@ def split_and_generate_slurms(sim_dirs, obs_dirs, station_file, rrup_files, outp
         if 0 <= last_line_index - total_dir_lines <= max_lines:
             last_line_index = total_dir_lines
         generate_sl(sim_dirs[i: last_line_index], obs_dirs[i: last_line_index], station_file,
-                    rrup_files[i: last_line_index], output_dir, prefix, i, processes, extended, simple, fd)
+                    rrup_files[i: last_line_index], output_dir, prefix, i, processes, extended, simple)
         i += max_lines
+
+
+def get_fd_path(srf_filepath):
+    fd = ''
+    run_name = get_fault_name(get_basename_without_ext(srf_filepath))
+    fault_dir = os.path.join(srf_filepath.split('Data')[0], 'Runs', run_name)
+    try:     
+        os.chdir(fault_dir)
+        params_base = os.path.join(fault_dir, PARAMS_BASE)
+        if os.path.isfile(params_base):
+            cmd = "grep 'FD_STATLIST=' params_base.py"
+            output = subprocess.Popen(cmd, stdout=subprocess.PIPE, shell=True).communicate()[0]
+            # output = "FD_STATLIST='/nesi/nobackup/nesi00213/RunFolder/Cybershake/v18p6_batched/v18p6_exclude_1k_batch_7/Runs/OtaraWest02/fd_rt01-h0.400.ll'\n"
+            fd = "-fd {}".format(output.strip().split("=")[1].replace("'", ''))
+            return fd
+    except Exception as e:
+        return fd
 
 
 def main():
@@ -74,41 +96,47 @@ def main():
     parser.add_argument('-ll', '--station_file',
                         help="Path to a single station file for ruputure distance calculations")
     parser.add_argument('-np', '--processes', default=DEFAULT_N_PROCESSES, help="number of processors to use")
-    parser.add_argument('-ml', '--max_lines', default=100, type=int, help="maximum number of lines in a slurm script. Default 100")
-    parser.add_argument('-e', '--extended_period', action='store_const', const='-e', default='', help="add '-e' to indicate the use of extended pSA period. Default not using")
-    parser.add_argument('-s', '--simple_output', action='store_const',const='-s',default='',
+    parser.add_argument('-ml', '--max_lines', default=100, type=int,
+                        help="maximum number of lines in a slurm script. Default 100")
+    parser.add_argument('-e', '--extended_period', action='store_const', const='-e', default='',
+                        help="add '-e' to indicate the use of extended pSA period. Default not using")
+    parser.add_argument('-s', '--simple_output', action='store_const', const='-s', default='',
                         help="Please add '-s' to indicate if you want to output the big summary csv only(no single station csvs). Default outputting both single station and the big summary csvs")
-    parser.add_argument('-o', '--rrup_out_dir', default=DEFAULT_RRUP_OUTDIR, help="output directory to store rupture distances output.Default is {}".format(DEFAULT_RRUP_OUTDIR))
-    parser.add_argument('-fd', '--fd_station_file', help="path to a trimmed station file. eg.'/nesi/nobackup/nesi00213/RunFolder/Cybershake/v18p6/Runs/Kelly/fd_rt01-h0.400.ll'")
-   
+    parser.add_argument('-o', '--rrup_out_dir', default=DEFAULT_RRUP_OUTDIR,
+                        help="output directory to store rupture distances output.Default is {}".format(
+                            DEFAULT_RRUP_OUTDIR))
+
     args = parser.parse_args()
-    
+
     if args.srf_dir is not None:
         utils.setup_dir(args.rrup_out_dir)
 
     if args.max_lines <= 0:
         parser.error("-ml argument should come with a number that is 0 < -ml <= (max_lines-header_and_other_prints) allowed by slurm")
     
-    if args.fd_station_file is not None:
-        args.fd_station_file = ' -fd {}'.format(args.fd_station_file)
-    print args.fd_station_file
+    owd = os.getcwd()
     # sim_dir = /nesi/nobackup/nesi00213/RunFolder/Cybershake/v18p5/Runs
     if args.sim_dir is not None:
         sim_waveform_dirs = glob.glob(os.path.join(args.sim_dir, '*/BB/*/*'))
-        sim_waveform_dirs = checkpoint.checkpoint_sim_obs(sim_waveform_dirs, '../../../IM_calc/')  # return dirs that are not calculated yet
+        sim_waveform_dirs = checkpoint.checkpoint_sim_obs(sim_waveform_dirs,
+                                                          '../../../IM_calc/')  # return dirs that are not calculated yet
         sim_run_names = map(os.path.basename, sim_waveform_dirs)
         sim_faults = map(get_fault_name, sim_run_names)
         sim_dirs = zip(sim_waveform_dirs, sim_run_names, sim_faults)
         # sim
-        split_and_generate_slurms(sim_dirs, [], args.station_file, [], args.rrup_out_dir, args.processes, args.max_lines, 'sim', extended=args.extended_period, simple=args.simple_output)
+        split_and_generate_slurms(sim_dirs, [], args.station_file, [], args.rrup_out_dir, args.processes,
+                                  args.max_lines, 'sim', extended=args.extended_period, simple=args.simple_output, owd=owd)
 
     if args.srf_dir is not None:
         srf_files = glob.glob(os.path.join(args.srf_dir, "*/Srf/*.srf"))
         srf_files = checkpoint.checkpoint_rrup(args.rrup_out_dir, srf_files)
         run_names = map(get_basename_without_ext, srf_files)
-        rrup_files = zip(srf_files, run_names)
+        fds = map(get_fd_path, srf_files)
+        rrup_files = zip(srf_files, run_names, fds)
+        print("fds",fds)
         # rrup
-        split_and_generate_slurms([], [], args.station_file, rrup_files, args.rrup_out_dir, args.processes, args.max_lines, 'rrup', fd=args.fd_station_file)
+        split_and_generate_slurms([], [], args.station_file, rrup_files, args.rrup_out_dir, args.processes,
+                                  args.max_lines, 'rrup', owd=owd)
 
     if args.obs_dir is not None:
         obs_waveform_dirs = glob.glob(os.path.join(args.obs_dir, '*'))
@@ -117,11 +145,9 @@ def main():
         obs_faults = map(get_fault_name, obs_run_names)
         obs_dirs = zip(obs_waveform_dirs, obs_run_names, obs_faults)
         # obs
-        split_and_generate_slurms([], obs_dirs, args.station_file, [], args.rrup_out_dir, args.processes, args.max_lines, 'obs', extended=args.extended_period, simple=args.simple_output)
+        split_and_generate_slurms([], obs_dirs, args.station_file, [], args.rrup_out_dir, args.processes,
+                                  args.max_lines, 'obs', extended=args.extended_period, simple=args.simple_output, owd=owd)
 
 
 if __name__ == '__main__':
     main()
-
-
-

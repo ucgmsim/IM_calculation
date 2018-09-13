@@ -36,8 +36,8 @@ echo ___calculating observed____
 {% endfor %}
 
 echo ___calculating rrups___
-{% for srf_file, srf_output in rrup_files %}
-	time python2 $IMPATH/calculate_rrups.py -np {{np}} -o {{output_dir}}/{{srf_output}}.csv{{fd}} {{station_file}} {{srf_file}} 
+{% for srf_file, srf_output, fd in rrup_files %}
+	time python2 $IMPATH/calculate_rrups.py -np {{np}} -o {{output_dir}}/{{srf_output}}.csv {{station_file}} {{srf_file}} {{fd}} 
 {% endfor %}
 
 date
