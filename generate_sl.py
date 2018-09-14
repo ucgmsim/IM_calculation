@@ -1,3 +1,7 @@
+"""
+python generate_sl.py -obs ~/test_obs -sim runs/Runs -srf /nesi/nobackup/nesi00213/RunFolder/Cybershake/v18p6_batched/v18p6_exclude_1k_batch_6/Data/Sources -ll /scale_akl_nobackup/filesets/transit/nesi00213/StationInfo/non_uniform_whole_nz_with_real_stations-hh400_v18p6.ll -o ~/rrup_out -ml 1000 -e -s 
+"""
+
 from jinja2 import Template, Environment, FileSystemLoader
 import argparse
 import os
