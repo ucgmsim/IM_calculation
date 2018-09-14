@@ -133,7 +133,6 @@ def main():
         run_names = map(get_basename_without_ext, srf_files)
         fds = map(get_fd_path, srf_files)
         rrup_files = zip(srf_files, run_names, fds)
-        print("fds",fds)
         # rrup
         split_and_generate_slurms([], [], args.station_file, rrup_files, args.rrup_out_dir, args.processes,
                                   args.max_lines, 'rrup', owd=owd)
