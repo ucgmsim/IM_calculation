@@ -78,12 +78,11 @@ def get_fd_path(srf_filepath):
     fault_dir = os.path.join(srf_filepath.split('Data')[0], 'Runs', run_name)
     params_base = os.path.join(fault_dir, PARAMS_BASE)
     try:
-        with open(params_base,'r') as f:
-            for line in f:
-                if line.startswith('FD_STATLIST='):
-                    fd = "-fd {}".format(line.strip().split("=")[1].replace("'", ''))           
-                    return fd
+        fd_path = utils.load_py_cfg(params_base)['FD_STATLIST']
+        fd = "-fd {}".format(fd_path)           
+        return fd
     except Exception as e:
+        print(e)
         return fd
 
 
