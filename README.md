@@ -81,21 +81,18 @@ optional arguments:
 To create submission script for slurm workflow:
 
 ```
-usage: generate_sl.py [-h] [-s SIM_DIR] [-o OBS_DIR] [-srf SRF_DIR]
-                      [-ll STATION_FILE] [-np PROCESSES]
-                      rrup_output_dir
+usage: generate_sl.py [-h] [-sim SIM_DIR] [-obs OBS_DIR] [-srf SRF_DIR]
+                      [-ll STATION_FILE] [-np PROCESSES] [-ml MAX_LINES] [-e]
+                      [-s] [-o RRUP_OUT_DIR]
 
 Prints out a slurm script to run IM Calculation over a run-group
 
-positional arguments:
-  rrup_output_dir       directory containing rupture distances output
-
 optional arguments:
   -h, --help            show this help message and exit
-  -s SIM_DIR, --sim_dir SIM_DIR
+  -sim SIM_DIR, --sim_dir SIM_DIR
                         Path to sim-run-group containing faults and
                         acceleration in the subfolder */BB/*/*
-  -o OBS_DIR, --obs_dir OBS_DIR
+  -obs OBS_DIR, --obs_dir OBS_DIR
                         Path to obs-run-group containing faults and
                         accelerations in the subfolder */*/accBB
   -srf SRF_DIR, --srf_dir SRF_DIR
@@ -106,6 +103,19 @@ optional arguments:
                         calculations
   -np PROCESSES, --processes PROCESSES
                         number of processors to use
+  -ml MAX_LINES, --max_lines MAX_LINES
+                        maximum number of lines in a slurm script. Default 100
+  -e, --extended_period
+                        add '-e' to indicate the use of extended pSA period.
+                        Default not using
+  -s, --simple_output   Please add '-s' to indicate if you want to output the
+                        big summary csv only(no single station csvs). Default
+                        outputting both single station and the big summary
+                        csvs
+  -o RRUP_OUT_DIR, --rrup_out_dir RRUP_OUT_DIR
+                        output directory to store rupture distances
+                        output.Default is
+                        /home/$user/imcalc_rrup_out_2018-09-14-02-49-49
 
 ```
 
@@ -113,6 +123,7 @@ e.g.
 
 ```
  python generate_sl.py ~/IM_result_test_robin/ -srf /nesi/nobackup/nesi00213/RunFolder/Validation/IMCalcExample_v1p2/Data/Sources -ll /nesi/transit/nesi00213/StationInfo/cantstations_v1pt2.ll -s /nesi/nobackup/nesi00213/RunFolder/Validation/IMCalcExample_v1p2/Runs -o /nesi/nobackup/nesi00213/ObsGM/Validation/IMCalcExample > ~/im_calc.sl
+n generate_sl.py -obs ~/test_obs -sim runs/Runs -srf /nesi/nobackup/nesi00213/RunFolder/Cybershake/v18p6_batched/v18p6_exclude_1k_batch_6/Data/Sources -ll /scale_akl_nobackup/filesets/transit/nesi00213/StationInfo/non_uniform_whole_nz_with_real_stations-hh400_v18p6.ll -o ~/rrup_out -ml 1000 -e -s 
 
 ```
 
