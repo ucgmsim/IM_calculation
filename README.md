@@ -122,9 +122,7 @@ optional arguments:
 e.g.
 
 ```
- python generate_sl.py ~/IM_result_test_robin/ -srf /nesi/nobackup/nesi00213/RunFolder/Validation/IMCalcExample_v1p2/Data/Sources -ll /nesi/transit/nesi00213/StationInfo/cantstations_v1pt2.ll -s /nesi/nobackup/nesi00213/RunFolder/Validation/IMCalcExample_v1p2/Runs -o /nesi/nobackup/nesi00213/ObsGM/Validation/IMCalcExample > ~/im_calc.sl
-n generate_sl.py -obs ~/test_obs -sim runs/Runs -srf /nesi/nobackup/nesi00213/RunFolder/Cybershake/v18p6_batched/v18p6_exclude_1k_batch_6/Data/Sources -ll /scale_akl_nobackup/filesets/transit/nesi00213/StationInfo/non_uniform_whole_nz_with_real_stations-hh400_v18p6.ll -o ~/rrup_out -ml 1000 -e -s 
-
+python generate_sl.py -obs ~/test_obs -sim runs/Runs -srf /nesi/nobackup/nesi00213/RunFolder/Cybershake/v18p6_batched/v18p6_exclude_1k_batch_6/Data/Sources -ll /scale_akl_nobackup/filesets/transit/nesi00213/StationInfo/non_uniform_whole_nz_with_real_stations-hh400_v18p6.ll -o ~/rrup_out -ml 1000 -e -s 
 ```
 
 To aggregate IMs across realisations:
