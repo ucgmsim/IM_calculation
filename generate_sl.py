@@ -20,6 +20,7 @@ DEFAULT_RRUP_OUTDIR = os.path.join('/home', getpass.getuser(), 'imcalc_rrup_out_
     datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d-%H-%M-%S')))
 PARAMS_BASE = 'params_base.py'
 
+
 # TODO: calculate wall-clock time
 # TODO: read fd*.ll file to limit the stations that rrups is calculated for
 # TODO: option for binary workflow
@@ -53,8 +54,7 @@ def get_fault_name(run_name):
 
 
 def split_and_generate_slurms(sim_dirs, obs_dirs, station_file, rrup_files, output_dir, processes, max_lines, prefix,
-                              extended='', simple='', owd='.'):
-    os.chdir(owd)
+                              extended='', simple=''):
     total_dir_lines = 0
     if sim_dirs != []:
         total_dir_lines = len(sim_dirs)
@@ -76,15 +76,13 @@ def get_fd_path(srf_filepath):
     fd = ''
     run_name = get_fault_name(get_basename_without_ext(srf_filepath))
     fault_dir = os.path.join(srf_filepath.split('Data')[0], 'Runs', run_name)
-    try:     
-        os.chdir(fault_dir)
-        params_base = os.path.join(fault_dir, PARAMS_BASE)
-        if os.path.isfile(params_base):
-            cmd = "grep 'FD_STATLIST=' params_base.py"
-            output = subprocess.Popen(cmd, stdout=subprocess.PIPE, shell=True).communicate()[0]
-            # output = "FD_STATLIST='/nesi/nobackup/nesi00213/RunFolder/Cybershake/v18p6_batched/v18p6_exclude_1k_batch_7/Runs/OtaraWest02/fd_rt01-h0.400.ll'\n"
-            fd = "-fd {}".format(output.strip().split("=")[1].replace("'", ''))
-            return fd
+    params_base = os.path.join(fault_dir, PARAMS_BASE)
+    try:
+        with open(params_base,'r') as f:
+            for line in f:
+                if line.startswith('FD_STATLIST='):
+                    fd = "-fd {}".format(line.strip().split("=")[1].replace("'", ''))           
+                    return fd
     except Exception as e:
         return fd
 
@@ -116,9 +114,9 @@ def main():
         utils.setup_dir(args.rrup_out_dir)
 
     if args.max_lines <= 0:
-        parser.error("-ml argument should come with a number that is 0 < -ml <= (max_lines-header_and_other_prints) allowed by slurm")
-    
-    owd = os.getcwd()
+        parser.error(
+            "-ml argument should come with a number that is 0 < -ml <= (max_lines-header_and_other_prints) allowed by slurm")
+
     # sim_dir = /nesi/nobackup/nesi00213/RunFolder/Cybershake/v18p5/Runs
     if args.sim_dir is not None:
         sim_waveform_dirs = glob.glob(os.path.join(args.sim_dir, '*/BB/*/*'))
@@ -129,7 +127,7 @@ def main():
         sim_dirs = zip(sim_waveform_dirs, sim_run_names, sim_faults)
         # sim
         split_and_generate_slurms(sim_dirs, [], args.station_file, [], args.rrup_out_dir, args.processes,
-                                  args.max_lines, 'sim', extended=args.extended_period, simple=args.simple_output, owd=owd)
+                                  args.max_lines, 'sim', extended=args.extended_period, simple=args.simple_output)
 
     if args.srf_dir is not None:
         srf_files = glob.glob(os.path.join(args.srf_dir, "*/Srf/*.srf"))
@@ -139,7 +137,7 @@ def main():
         rrup_files = zip(srf_files, run_names, fds)
         # rrup
         split_and_generate_slurms([], [], args.station_file, rrup_files, args.rrup_out_dir, args.processes,
-                                  args.max_lines, 'rrup', owd=owd)
+                                  args.max_lines, 'rrup')
 
     if args.obs_dir is not None:
         obs_waveform_dirs = glob.glob(os.path.join(args.obs_dir, '*'))
@@ -149,8 +147,9 @@ def main():
         obs_dirs = zip(obs_waveform_dirs, obs_run_names, obs_faults)
         # obs
         split_and_generate_slurms([], obs_dirs, args.station_file, [], args.rrup_out_dir, args.processes,
-                                  args.max_lines, 'obs', extended=args.extended_period, simple=args.simple_output, owd=owd)
+                                  args.max_lines, 'obs', extended=args.extended_period, simple=args.simple_output)
 
 
 if __name__ == '__main__':
     main()
+
