@@ -80,10 +80,9 @@ def get_fd_path(srf_filepath):
     try:
         fd_path = utils.load_py_cfg(params_base)['FD_STATLIST']
         fd = "-fd {}".format(fd_path)           
-        return fd
     except Exception as e:
         print(e)
-        return fd
+    return fd
 
 
 def main():
