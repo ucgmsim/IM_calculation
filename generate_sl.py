@@ -1,5 +1,5 @@
 """
-python generate_sl.py -obs ~/test_obs -sim runs/Runs -srf /nesi/nobackup/nesi00213/RunFolder/Cybershake/v18p6_batched/v18p6_exclude_1k_batch_6/Data/Sources -ll /scale_akl_nobackup/filesets/transit/nesi00213/StationInfo/non_uniform_whole_nz_with_real_stations-hh400_v18p6.ll -o ~/rrup_out -ml 1000 -e -s 
+python generate_sl.py -obs ~/test_obs -sim runs/Runs -srf /nesi/nobackup/nesi00213/RunFolder/Cybershake/v18p6_batched/v18p6_exclude_1k_batch_6/Data/Sources -ll /scale_akl_nobackup/filesets/transit/nesi00213/StationInfo/non_uniform_whole_nz_with_real_stations-hh400_v18p6.ll -o ~/rrup_out -ml 1000 -e -s
 """
 
 from jinja2 import Template, Environment, FileSystemLoader
@@ -72,16 +72,17 @@ def split_and_generate_slurms(sim_dirs, obs_dirs, station_file, rrup_files, outp
         i += max_lines
 
 
-def get_fd_path(srf_filepath):
+def get_fd_path(srf_filepath, sim_dir):
     fd = ''
     run_name = get_fault_name(get_basename_without_ext(srf_filepath))
-    fault_dir = os.path.join(srf_filepath.split('Data')[0], 'Runs', run_name)
-    params_base = os.path.join(fault_dir, PARAMS_BASE)
-    try:
-        fd_path = utils.load_py_cfg(params_base)['FD_STATLIST']
-        fd = "-fd {}".format(fd_path)           
-    except Exception as e:
-        print(e)
+    if sim_dir is not None:
+        fault_dir = os.path.join(sim_dir, run_name)
+        params_base = os.path.join(fault_dir, PARAMS_BASE)
+        try:
+            fd_path = utils.load_py_cfg(params_base)['FD_STATLIST']
+            fd = "-fd {}".format(fd_path)
+        except Exception as e:
+            fd = 'skip'
     return fd
 
 
@@ -130,9 +131,12 @@ def main():
     if args.srf_dir is not None:
         srf_files = glob.glob(os.path.join(args.srf_dir, "*/Srf/*.srf"))
         srf_files = checkpoint.checkpoint_rrup(args.rrup_out_dir, srf_files)
-        run_names = map(get_basename_without_ext, srf_files)
-        fds = map(get_fd_path, srf_files)
-        rrup_files = zip(srf_files, run_names, fds)
+        rrup_files = []
+        for srf_file in srf_files:
+            fd = get_fd_path(srf_file, args.sim_dir)
+            if fd != 'skip':
+                run_name = get_basename_without_ext(srf_file)
+                rrup_files.append((srf_file, run_name, fd))
         # rrup
         split_and_generate_slurms([], [], args.station_file, rrup_files, args.rrup_out_dir, args.processes,
                                   args.max_lines, 'rrup')
