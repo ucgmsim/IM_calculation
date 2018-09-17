@@ -30,6 +30,7 @@ PARAMS_BASE = 'params_base.py'
 # TODO: remove relative paths on sl.template
 # python generate_sl.py -o ~/test_obs/IMCalcExample  -ll /scale_akl_nobackup/filesets/transit/nesi00213/StationInfo/non_uniform_whole_nz_with_real_stations-hh400_v18p6.ll -ml 1000 -simple -e
 
+
 def generate_sl(sim_dirs, obs_dirs, station_file, rrup_files, output_dir, prefix, i, np, extended, simple):
     path = os.path.dirname(os.path.abspath(__file__))
     j2_env = Environment(loader=FileSystemLoader(path), trim_blocks=True)
@@ -40,9 +41,14 @@ def generate_sl(sim_dirs, obs_dirs, station_file, rrup_files, output_dir, prefix
         rrup_files=rrup_files, station_file=station_file,
         output_dir=output_dir, np=np, extended=extended, simple=simple)
     sl_name = '{}_im_calc_{}.sl'.format(prefix, i)
-    with open(sl_name, 'w') as sl:
-        print("writing {}".format(sl_name))
-        sl.write(context)
+    return sl_name, context
+
+
+def write_sl(name_context_list):
+    for sl_name, context in name_context_list:
+        with open(sl_name, 'w') as sl:
+            print("writing {}".format(sl_name))
+            sl.write(context)
 
 
 def get_basename_without_ext(path):
@@ -62,14 +68,20 @@ def split_and_generate_slurms(sim_dirs, obs_dirs, station_file, rrup_files, outp
         total_dir_lines = len(obs_dirs)
     elif rrup_files != []:
         total_dir_lines = len(rrup_files)
+    
+    name_context_list = []
     i = 0
     while i < total_dir_lines:
         last_line_index = i + max_lines
         if 0 <= last_line_index - total_dir_lines <= max_lines:
             last_line_index = total_dir_lines
-        generate_sl(sim_dirs[i: last_line_index], obs_dirs[i: last_line_index], station_file,
+        name, context = generate_sl(sim_dirs[i: last_line_index], obs_dirs[i: last_line_index], station_file,
                     rrup_files[i: last_line_index], output_dir, prefix, i, processes, extended, simple)
+        name_context_list.append((name, context))
         i += max_lines
+    
+    print("adfasfdasfd", name_context_list)
+    return name_context_list
 
 
 def get_fd_path(srf_filepath, sim_dir):
