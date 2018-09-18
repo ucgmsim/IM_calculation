@@ -23,11 +23,12 @@ PARAMS_BASE = 'params_base.py'
 VERSION = 'slurm'
 JOB = 'im_calc'
 ACCOUNT = 'nesi00213'
-CPUS = 1
+NTASKS = 1
 EXE_TIME = '%j'
 MAIL = 'test@test.com'
 MEMORY = '90G'
 ADDI = '#SBATCH --hint=nomultithread'
+TIME_REGEX = '(24:00:00)|(^(2[0-3]|[01]?[0-9]):([0-5]?[0-9]):([0-5]?[0-9])$)'
 
 
 # TODO: calculate wall-clock time
@@ -55,7 +56,7 @@ def generate_sl(sim_dirs, obs_dirs, station_file, rrup_files, output_dir, prefix
         rrup_files=rrup_files, station_file=station_file,
         output_dir=output_dir, np=np, extended=extended, simple=simple)
     sl_name = '{}_im_calc_{}.sl'.format(prefix, i)
-    return sl_name, "{}\n{}c".format(header, context)
+    return sl_name, "{}\n{}".format(header, context)
 
 
 def write_sl(name_context_list):
@@ -76,7 +77,7 @@ def get_fault_name(run_name):
 
 def split_and_generate_slurms(sim_dirs, obs_dirs, station_file, rrup_files, output_dir, processes, max_lines, prefix,
                               extended='', simple='', version=VERSION, job_description='', job_name=JOB,
-                              account=ACCOUNT, nb_cpus=CPUS, wallclock_limit=TIME, exe_time=EXE_TIME, mail=MAIL,
+                              account=ACCOUNT, nb_cpus=NTASKS, wallclock_limit=TIME, exe_time=EXE_TIME, mail=MAIL,
                               memory=MEMORY, additional_lines=ADDI):
     total_dir_lines = 0
     if sim_dirs != []:
@@ -121,6 +122,8 @@ def get_dirs(run_folder, arg_identifiers, com_pattern):
     for identifier in arg_identifiers:
         fault_name = identifier.split("_")[0]
         dir_path = glob.glob(os.path.join(run_folder, com_pattern.format(fault_name, identifier)))
+        if dir_path == []:
+            print("{} does not exists".format(dir_path))
         print("id dir_path", dir_path)
         dirs += dir_path
     return dirs
@@ -151,14 +154,14 @@ def main():
     parser.add_argument('-t', '--time', default=TIME,
                         help="estimated running time for each slurm sciprt. must be in 'hh:mm:ss' format. Default is '00:30:00'")
     parser.add_argument('--version', default=VERSION, help="default version is 'slurm'")
-    parser.add_argument('--job_description', default=JOB)
-    parser.add_argument('--job_name', default=JOB)
-    parser.add_argument('--account', default=ACCOUNT)
-    parser.add_argument('--ntasks', default=CPUS)
-    parser.add_argument('--exe_time', default=EXE_TIME)
-    parser.add_argument('--mail', default=MAIL)
-    parser.add_argument('--memory', default=MEMORY)
-    parser.add_argument('--additional_lines', default=ADDI)
+    parser.add_argument('--job_description', default=JOB, help="job description of slurm script. Default is {}".format(JOB))
+    parser.add_argument('--job_name', default=JOB, help="job name of slurm script. Default is {}".format(JOB))
+    parser.add_argument('--account', default=ACCOUNT, help="Account name. Default is {}.".format(ACCOUNT))
+    parser.add_argument('--ntasks', default=NTASKS, type=int, help="number of tasks per node. Default is {}".format(NTASKS))
+    parser.add_argument('--exe_time', default=EXE_TIME, help="Default is {}".format(EXE_TIME))
+    parser.add_argument('--mail', default=MAIL, help="Default is {}".format(MAIL))
+    parser.add_argument('--memory', default=MEMORY, help="Memory per cpu. Default is {}".format(MEMORY))
+    parser.add_argument('--additional_lines', default=ADDI, help="additional lines add to slurm header. Default is {}".format(ADDI))
 
     args = parser.parse_args()
 
@@ -166,10 +169,9 @@ def main():
         utils.setup_dir(args.rrup_out_dir)
 
     if args.max_lines <= 0:
-        parser.error(
-            "-ml argument should come with a number that is 0 < -ml <= (max_lines-header_and_other_prints) allowed by slurm")
+        parser.error("-ml argument should come with a number that is 0 < -ml <= (max_lines-header_and_other_prints) allowed by slurm")
 
-    if not re.match('(24:00:00)|(^(2[0-3]|[01]?[0-9]):([0-5]?[0-9]):([0-5]?[0-9])$)', args.time):
+    if not re.match(TIME_REGEX, args.time):
         parser.error("time must be in 'hh:mm:ss' format and not exceeding 24:00:00")
 
     # sim_dir = /nesi/nobackup/nesi00213/RunFolder/Cybershake/v18p5/Runs
