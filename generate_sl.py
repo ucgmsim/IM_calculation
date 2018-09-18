@@ -68,7 +68,7 @@ def split_and_generate_slurms(sim_dirs, obs_dirs, station_file, rrup_files, outp
         total_dir_lines = len(obs_dirs)
     elif rrup_files != []:
         total_dir_lines = len(rrup_files)
-    
+
     name_context_list = []
     i = 0
     while i < total_dir_lines:
@@ -76,11 +76,10 @@ def split_and_generate_slurms(sim_dirs, obs_dirs, station_file, rrup_files, outp
         if 0 <= last_line_index - total_dir_lines <= max_lines:
             last_line_index = total_dir_lines
         name, context = generate_sl(sim_dirs[i: last_line_index], obs_dirs[i: last_line_index], station_file,
-                    rrup_files[i: last_line_index], output_dir, prefix, i, processes, extended, simple)
+                                    rrup_files[i: last_line_index], output_dir, prefix, i, processes, extended, simple)
         name_context_list.append((name, context))
         i += max_lines
-    
-    print("adfasfdasfd", name_context_list)
+
     return name_context_list
 
 
@@ -96,6 +95,18 @@ def get_fd_path(srf_filepath, sim_dir):
         except Exception as e:
             fd = 'skip'
     return fd
+
+
+def get_dirs(run_folder, arg_identifiers, com_pattern):
+    dirs = []
+    print("Arg_identifiers", arg_identifiers)
+    for identifier in arg_identifiers:
+        fault_name = identifier.split("_")[0]
+        dir_path = glob.glob(os.path.join(run_folder, com_pattern.format(fault_name, identifier)))
+        print("id dir_path", dir_path)
+        dirs += dir_path
+    print(dirs)
+    return dirs
 
 
 def main():
@@ -116,8 +127,8 @@ def main():
     parser.add_argument('-s', '--simple_output', action='store_const', const='-s', default='',
                         help="Please add '-s' to indicate if you want to output the big summary csv only(no single station csvs). Default outputting both single station and the big summary csvs")
     parser.add_argument('-o', '--rrup_out_dir', default=DEFAULT_RRUP_OUTDIR,
-                        help="output directory to store rupture distances output.Default is {}".format(
-                            DEFAULT_RRUP_OUTDIR))
+                        help="output directory to store rupture distances output.Default is {}".format(DEFAULT_RRUP_OUTDIR))
+    parser.add_argument('-i', '--identifiers', default='*', nargs='+', help="a list of space-seperated unique runnames of the simulations.eg.'Albury_HYP01-01_S1244 OpouaweUruti_HYP44-47_S1674'")
 
     args = parser.parse_args()
 
@@ -130,18 +141,22 @@ def main():
 
     # sim_dir = /nesi/nobackup/nesi00213/RunFolder/Cybershake/v18p5/Runs
     if args.sim_dir is not None:
-        sim_waveform_dirs = glob.glob(os.path.join(args.sim_dir, '*/BB/*/*'))
+        print("Args.sim_dir", args.sim_dir)
+        sim_waveform_dirs = get_dirs(args.sim_dir, args.identifiers, '{}/BB/*/{}')
+        print("sim_waveform_dirs",sim_waveform_dirs)
         sim_waveform_dirs = checkpoint.checkpoint_sim_obs(sim_waveform_dirs,
                                                           '../../../IM_calc/')  # return dirs that are not calculated yet
         sim_run_names = map(os.path.basename, sim_waveform_dirs)
         sim_faults = map(get_fault_name, sim_run_names)
         sim_dirs = zip(sim_waveform_dirs, sim_run_names, sim_faults)
         # sim
-        split_and_generate_slurms(sim_dirs, [], args.station_file, [], args.rrup_out_dir, args.processes,
+        name_context_list = split_and_generate_slurms(sim_dirs, [], args.station_file, [], args.rrup_out_dir, args.processes,
                                   args.max_lines, 'sim', extended=args.extended_period, simple=args.simple_output)
+        write_sl(name_context_list)
 
     if args.srf_dir is not None:
-        srf_files = glob.glob(os.path.join(args.srf_dir, "*/Srf/*.srf"))
+        srf_files = get_dirs(args.srf_dir, args.identifiers, "{}/Srf/{}.srf")
+        # srf_files = glob.glob(os.path.join(args.srf_dir, "*/Srf/*.srf"))
         srf_files = checkpoint.checkpoint_rrup(args.rrup_out_dir, srf_files)
         rrup_files = []
         for srf_file in srf_files:
@@ -150,8 +165,8 @@ def main():
                 run_name = get_basename_without_ext(srf_file)
                 rrup_files.append((srf_file, run_name, fd))
         # rrup
-        split_and_generate_slurms([], [], args.station_file, rrup_files, args.rrup_out_dir, args.processes,
-                                  args.max_lines, 'rrup')
+        name_context_list = split_and_generate_slurms([], [], args.station_file, rrup_files, args.rrup_out_dir, args.processes,args.max_lines, 'rrup')
+        write_sl(name_context_list)
 
     if args.obs_dir is not None:
         obs_waveform_dirs = glob.glob(os.path.join(args.obs_dir, '*'))
@@ -160,8 +175,9 @@ def main():
         obs_faults = map(get_fault_name, obs_run_names)
         obs_dirs = zip(obs_waveform_dirs, obs_run_names, obs_faults)
         # obs
-        split_and_generate_slurms([], obs_dirs, args.station_file, [], args.rrup_out_dir, args.processes,
+        name_context_list = split_and_generate_slurms([], obs_dirs, args.station_file, [], args.rrup_out_dir, args.processes,
                                   args.max_lines, 'obs', extended=args.extended_period, simple=args.simple_output)
+        write_sl(name_context_list)
 
 
 if __name__ == '__main__':
