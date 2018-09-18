@@ -16,3 +16,4 @@ test/test_calculate_ims/output/__pycache*
 rrups.csv
 *.swp
 runs/
+slurm_header.cfg
