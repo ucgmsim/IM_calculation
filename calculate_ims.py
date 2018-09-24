@@ -152,6 +152,58 @@ def compute_measure_single((waveform, ims, comp, period)):
 
 def compute_measures_multiprocess(input_path, file_type, geom_only, wave_type, station_names, ims=IMS, comp=None,
                                   period=None, output=None, identifier=None, rupture=None, run_type=None, version=None,
+                                  process=1, simple_output=False, units='g', steps=5):
+    """
+    using multiprocesses to computer measures.
+    Calls compute_measure_single() to compute measures for a single station
+    write results to csvs and an imcalc.info meta data file
+    :param input_path:
+    :param file_type:
+    :param geom_only:
+    :param wave_type:
+    :param station_names:
+    :param ims:
+    :param comp:
+    :param period:
+    :param output:
+    :param identifier:
+    :param rupture:
+    :param run_type:
+    :param version:
+    :param process:
+    :param simple_output:
+    :return:
+    """
+    converted_comp = convert_str_comp(comp)
+    bbseries = timeseries.BBSeis(input_path)
+
+    if station_names is None:
+        station_names = bbseries.stations.name
+
+    i = 0
+    while i < len(station_names):
+        waveforms = read_waveform.read_waveforms(input_path, bbseries, station_names[i: i + steps], converted_comp, wave_type=wave_type, file_type=file_type, units=units)
+        i += steps
+        array_params = []
+        all_result_dict = {}
+
+        for waveform in waveforms:
+            array_params.append((waveform, ims, comp, period))
+
+        p = pool_wrapper.PoolWrapper(process)
+
+        result_list = p.map(compute_measure_single, array_params)
+
+        for result in result_list:
+            all_result_dict.update(result)
+
+        write_result(all_result_dict, output, identifier, comp, ims, period, geom_only, simple_output)
+
+        generate_metadata(output, identifier, rupture, run_type, version)
+
+
+def compute_measures_multiprocess_old(input_path, file_type, geom_only, wave_type, station_names, ims=IMS, comp=None,
+                                  period=None, output=None, identifier=None, rupture=None, run_type=None, version=None,
                                   process=1, simple_output=False, units='g'):
     """
     using multiprocesses to computer measures.
@@ -459,6 +511,7 @@ def main():
                         help="Please add '-s' to indicate if you want to output the big summary csv only(no single station csvs). Default outputting both single station and the big summary csvs")
     parser.add_argument('-u', '--units', choices=['cm/s^2', 'g'], default='g',
                         help="The units that input acceleration files are in")
+    parser.add_argument('--steps', type=int, default=5, help="number of waveforms per read to reduce memory usage")
     args = parser.parse_args()
 
     validate_input_path(parser, args.input_path, args.file_type)
@@ -479,7 +532,7 @@ def main():
     compute_measures_multiprocess(args.input_path, file_type, geom_only, wave_type=None,
                                   station_names=args.station_names, ims=im, comp=comp, period=period, output=output_dir,
                                   identifier=args.identifier, rupture=args.rupture, run_type=run_type, version=args.version,
-                                  process=args.process, simple_output=args.simple_output, units=args.units)
+                                  process=args.process, simple_output=args.simple_output, units=args.units, steps=args.steps)
 
     print("Calculations are outputted to {}".format(output_dir))
 

@@ -89,7 +89,7 @@ def create_waveform_from_data(data, wave_type=None, base_waveform=None, NT=None,
     return waveform
 
 
-def read_waveforms(path, station_names=None, comp=Ellipsis, wave_type=None, file_type=None, units='g'):
+def read_waveforms(path, bbseis, station_names=None, comp=Ellipsis, wave_type=None, file_type=None, units='g'):
     """
     read either a ascii or binary file
     :param path:
@@ -104,9 +104,9 @@ def read_waveforms(path, station_names=None, comp=Ellipsis, wave_type=None, file
     if file_type == 'ascii':
         return read_ascii_folder(path, station_names, units=units)
     elif file_type == 'binary':
-        return read_binary_file(path, comp, station_names, wave_type=wave_type, file_type='binary', units=units)
+        return read_binary_file(bbseis, comp, station_names, wave_type=wave_type, file_type='binary', units=units)
     else:
-        print "Could not determine filetype %s" % path
+        #print "Could not determine filetype %s" % path
         return None
 
 
@@ -178,7 +178,7 @@ def read_one_station_from_bbseries(bbseries, station_name, comp, wave_type=None,
     return waveform
 
 
-def read_binary_file(input_path, comp, station_names=None, wave_type=None, file_type=None, units='g'):
+def read_binary_file(bbseries, comp, station_names=None, wave_type=None, file_type=None, units='g'):
     """
     read all stations into a list of waveforms
     :param input_path:
@@ -188,10 +188,9 @@ def read_binary_file(input_path, comp, station_names=None, wave_type=None, file_
     :param file_type:
     :return: [(waveform_acc, waveform_vel])
     """
-    bbseries = timeseries.BBSeis(input_path)
     waveforms = []
-    if not station_names:
-        station_names = bbseries.stations.name
+    # if not station_names:
+    #     station_names = bbseries.stations.name
     for station_name in station_names:
         waveform_acc = read_one_station_from_bbseries(bbseries, station_name, comp, wave_type='a',
                                                       file_type=file_type)  # TODO should create either a or v not both
