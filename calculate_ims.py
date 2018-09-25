@@ -21,6 +21,9 @@ from rrup import pool_wrapper
 from qcore import utils
 from qcore import timeseries
 
+from memory_profiler import profile
+fp=open('step_darf_memory_profiler.log','w+')
+
 G = 981.0
 IMS = ['PGA', 'PGV', 'CAV', 'AI', 'Ds575', 'Ds595', 'MMI', 'pSA']
 
@@ -37,6 +40,7 @@ OUTPUT_PATH = os.path.join('/home', getpass.getuser())
 OUTPUT_SUBFOLDER = 'stations'
 
 RUNNAME_DEFAULT = 'all_station_ims'
+
 
 
 def convert_str_comp(comp):
@@ -149,7 +153,7 @@ def compute_measure_single((waveform, ims, comp, period)):
 
     return result
 
-
+@profile(stream=fp)
 def compute_measures_multiprocess(input_path, file_type, geom_only, wave_type, station_names, ims=IMS, comp=None,
                                   period=None, output=None, identifier=None, rupture=None, run_type=None, version=None,
                                   process=1, simple_output=False, units='g', steps=5):
@@ -179,14 +183,14 @@ def compute_measures_multiprocess(input_path, file_type, geom_only, wave_type, s
 
     if station_names is None:
         station_names = bbseries.stations.name
-
+    print("lllllll",len(station_names))
     i = 0
+    all_result_dict = {}
     while i < len(station_names):
+        print("i, i+step", i, i+steps)
         waveforms = read_waveform.read_waveforms(input_path, bbseries, station_names[i: i + steps], converted_comp, wave_type=wave_type, file_type=file_type, units=units)
         i += steps
         array_params = []
-        all_result_dict = {}
-
         for waveform in waveforms:
             array_params.append((waveform, ims, comp, period))
 
@@ -197,11 +201,11 @@ def compute_measures_multiprocess(input_path, file_type, geom_only, wave_type, s
         for result in result_list:
             all_result_dict.update(result)
 
-        write_result(all_result_dict, output, identifier, comp, ims, period, geom_only, simple_output)
+    write_result(all_result_dict, output, identifier, comp, ims, period, geom_only, simple_output)
 
-        generate_metadata(output, identifier, rupture, run_type, version)
+    generate_metadata(output, identifier, rupture, run_type, version)
 
-
+@profile(stream=fp)
 def compute_measures_multiprocess_old(input_path, file_type, geom_only, wave_type, station_names, ims=IMS, comp=None,
                                   period=None, output=None, identifier=None, rupture=None, run_type=None, version=None,
                                   process=1, simple_output=False, units='g'):
