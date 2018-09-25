@@ -5,7 +5,7 @@ import itertools
 from qcore import timeseries
 
 from memory_profiler import profile
-fp=open('step_read_darf_memory_profiler.log','w+')
+fp=open('step_read_esk_memory_profiler.log','w+')
 
 g = 981
 
@@ -27,8 +27,7 @@ def read_ascii_file(f_000, f_090, f_ver, wave_type=None):
     waveform.wave_type = wave_type
     waveform.file_type = 'EMOD3D_ascii'
 
-    (waveform.station_name, waveform.NT,
-     waveform.DT, waveform.time_offset) = read_ascii_header(f_000)
+    (waveform.station_name, waveform.NT, waveform.DT, waveform.time_offset) = read_ascii_header(f_000)
     skip_header(f_090)
     skip_header(f_ver)
 

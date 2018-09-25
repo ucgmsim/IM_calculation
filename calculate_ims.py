@@ -22,7 +22,7 @@ from qcore import utils
 from qcore import timeseries
 
 from memory_profiler import profile
-fp=open('step_darf_memory_profiler.log','w+')
+fp=open('step_esk_memory_profiler.log','w+')
 
 G = 981.0
 IMS = ['PGA', 'PGV', 'CAV', 'AI', 'Ds575', 'Ds595', 'MMI', 'pSA']
@@ -200,52 +200,6 @@ def compute_measures_multiprocess(input_path, file_type, geom_only, wave_type, s
 
         for result in result_list:
             all_result_dict.update(result)
-
-    write_result(all_result_dict, output, identifier, comp, ims, period, geom_only, simple_output)
-
-    generate_metadata(output, identifier, rupture, run_type, version)
-
-@profile(stream=fp)
-def compute_measures_multiprocess_old(input_path, file_type, geom_only, wave_type, station_names, ims=IMS, comp=None,
-                                  period=None, output=None, identifier=None, rupture=None, run_type=None, version=None,
-                                  process=1, simple_output=False, units='g'):
-    """
-    using multiprocesses to computer measures.
-    Calls compute_measure_single() to compute measures for a single station
-    write results to csvs and an imcalc.info meta data file
-    :param input_path:
-    :param file_type:
-    :param geom_only:
-    :param wave_type:
-    :param station_names:
-    :param ims:
-    :param comp:
-    :param period:
-    :param output:
-    :param identifier:
-    :param rupture:
-    :param run_type:
-    :param version:
-    :param process:
-    :param simple_output:
-    :return:
-    """
-    converted_comp = convert_str_comp(comp)
-
-    waveforms = read_waveform.read_waveforms(input_path, station_names, converted_comp, wave_type=wave_type,
-                                             file_type=file_type, units=units)
-    array_params = []
-    all_result_dict = {}
-  
-    for waveform in waveforms:
-        array_params.append((waveform, ims, comp, period))
-
-    p = pool_wrapper.PoolWrapper(process)
-
-    result_list = p.map(compute_measure_single, array_params)
-
-    for result in result_list:
-        all_result_dict.update(result)
 
     write_result(all_result_dict, output, identifier, comp, ims, period, geom_only, simple_output)
 
