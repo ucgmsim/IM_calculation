@@ -21,7 +21,7 @@ from rrup import pool_wrapper
 from qcore import utils
 from qcore import timeseries
 
-from memory_profiler import profile
+#from memory_profiler import profile
 # fp=open('stepnp_alb_memory_profiler.log','w+')
 
 G = 981.0
@@ -41,7 +41,7 @@ OUTPUT_SUBFOLDER = 'stations'
 
 RUNNAME_DEFAULT = 'all_station_ims'
 
-
+MEM_PER_CORE = 1e9
 
 def convert_str_comp(comp):
     """
@@ -156,7 +156,7 @@ def compute_measure_single((waveform, ims, comp, period)):
 
 def compute_measures_multiprocess(input_path, file_type, geom_only, wave_type, station_names, ims=IMS, comp=None,
                                   period=None, output=None, identifier=None, rupture=None, run_type=None, version=None,
-                                  process=1, simple_output=False, units='g', steps=5):
+                                  process=1, simple_output=False, units='g'):
     """
     using multiprocesses to computer measures.
     Calls compute_measure_single() to compute measures for a single station
@@ -183,18 +183,20 @@ def compute_measures_multiprocess(input_path, file_type, geom_only, wave_type, s
 
     if station_names is None:
         station_names = bbseries.stations.name
-    print("lllllll",len(station_names))
+
+    total_stations = len(station_names)
+    steps = get_steps(input_path, process, total_stations)
     i = 0
     all_result_dict = {}
-    while i < len(station_names) and i < 400:
+    p = pool_wrapper.PoolWrapper(process)
+
+    while i < total_stations and i < 400:
         print("i, i+step", i, i+steps)
         waveforms = read_waveform.read_waveforms(input_path, bbseries, station_names[i: i + steps], converted_comp, wave_type=wave_type, file_type=file_type, units=units)
         i += steps
         array_params = []
         for waveform in waveforms:
             array_params.append((waveform, ims, comp, period))
-
-        p = pool_wrapper.PoolWrapper(process)
 
         result_list = p.map(compute_measure_single, array_params)
 
@@ -440,6 +442,18 @@ def mkdir_output(arg_output, arg_identifier, arg_simple_output):
     return output_dir
 
 
+def get_steps(input_path, nps, total_stations):
+    binary_size = os.stat(input_path).st_size
+    print("binary size", binary_size)
+    nps_total = nps * MEM_PER_CORE
+    print("nps total", nps_total)
+    batches = np.ceil(np.divide(binary_size, nps_total))
+    print("batches", batches)
+    steps = int(np.floor(np.divide(total_stations, batches)))
+    print("steps", steps)
+    return steps
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('input_path', help='path to input bb binary file eg./home/melody/BB.bin')
@@ -469,7 +483,7 @@ def main():
                         help="Please add '-s' to indicate if you want to output the big summary csv only(no single station csvs). Default outputting both single station and the big summary csvs")
     parser.add_argument('-u', '--units', choices=['cm/s^2', 'g'], default='g',
                         help="The units that input acceleration files are in")
-    parser.add_argument('--steps', type=int, help="number of waveforms per read to reduce memory usage")
+
     args = parser.parse_args()
 
     validate_input_path(parser, args.input_path, args.file_type)
@@ -486,16 +500,15 @@ def main():
 
     output_dir = mkdir_output(args.output_path, args.identifier, args.simple_output)
 
-    if args.steps is None:
-        args.steps=args.process
     # multiprocessor
     compute_measures_multiprocess(args.input_path, file_type, geom_only, wave_type=None,
                                   station_names=args.station_names, ims=im, comp=comp, period=period, output=output_dir,
                                   identifier=args.identifier, rupture=args.rupture, run_type=run_type, version=args.version,
-                                  process=args.process, simple_output=args.simple_output, units=args.units, steps=args.steps)
+                                  process=args.process, simple_output=args.simple_output, units=args.units)
 
     print("Calculations are outputted to {}".format(output_dir))
 
 
 if __name__ == '__main__':
     main()
+
