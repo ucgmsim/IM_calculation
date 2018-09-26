@@ -22,7 +22,7 @@ from qcore import utils
 from qcore import timeseries
 
 from memory_profiler import profile
-fp=open('step_esk_memory_profiler.log','w+')
+# fp=open('stepnp_alb_memory_profiler.log','w+')
 
 G = 981.0
 IMS = ['PGA', 'PGV', 'CAV', 'AI', 'Ds575', 'Ds595', 'MMI', 'pSA']
@@ -153,7 +153,7 @@ def compute_measure_single((waveform, ims, comp, period)):
 
     return result
 
-@profile(stream=fp)
+
 def compute_measures_multiprocess(input_path, file_type, geom_only, wave_type, station_names, ims=IMS, comp=None,
                                   period=None, output=None, identifier=None, rupture=None, run_type=None, version=None,
                                   process=1, simple_output=False, units='g', steps=5):
@@ -186,7 +186,7 @@ def compute_measures_multiprocess(input_path, file_type, geom_only, wave_type, s
     print("lllllll",len(station_names))
     i = 0
     all_result_dict = {}
-    while i < len(station_names):
+    while i < len(station_names) and i < 400:
         print("i, i+step", i, i+steps)
         waveforms = read_waveform.read_waveforms(input_path, bbseries, station_names[i: i + steps], converted_comp, wave_type=wave_type, file_type=file_type, units=units)
         i += steps
@@ -469,7 +469,7 @@ def main():
                         help="Please add '-s' to indicate if you want to output the big summary csv only(no single station csvs). Default outputting both single station and the big summary csvs")
     parser.add_argument('-u', '--units', choices=['cm/s^2', 'g'], default='g',
                         help="The units that input acceleration files are in")
-    parser.add_argument('--steps', type=int, default=5, help="number of waveforms per read to reduce memory usage")
+    parser.add_argument('--steps', type=int, help="number of waveforms per read to reduce memory usage")
     args = parser.parse_args()
 
     validate_input_path(parser, args.input_path, args.file_type)
@@ -486,6 +486,8 @@ def main():
 
     output_dir = mkdir_output(args.output_path, args.identifier, args.simple_output)
 
+    if args.steps is None:
+        args.steps=args.process
     # multiprocessor
     compute_measures_multiprocess(args.input_path, file_type, geom_only, wave_type=None,
                                   station_names=args.station_names, ims=im, comp=comp, period=period, output=output_dir,
