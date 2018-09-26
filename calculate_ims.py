@@ -443,7 +443,7 @@ def mkdir_output(arg_output, arg_identifier, arg_simple_output):
 
 
 def get_steps(input_path, nps, total_stations):
-    binary_size = os.stat(input_path).st_size
+    binary_size = os.stat(input_path).st_size * 4
     print("binary size", binary_size)
     nps_total = nps * MEM_PER_CORE
     print("nps total", nps_total)
