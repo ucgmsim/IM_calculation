@@ -190,7 +190,7 @@ def compute_measures_multiprocess(input_path, file_type, geom_only, wave_type, s
     all_result_dict = {}
     p = pool_wrapper.PoolWrapper(process)
 
-    while i < total_stations and i < 400:
+    while i < total_stations:
         print("i, i+step", i, i+steps)
         waveforms = read_waveform.read_waveforms(input_path, bbseries, station_names[i: i + steps], converted_comp, wave_type=wave_type, file_type=file_type, units=units)
         i += steps
