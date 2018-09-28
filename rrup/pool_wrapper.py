@@ -8,7 +8,7 @@ class PoolWrapper:
         if self.debug_mode or self.np == 1:
             self.pool = None
         else:
-            self.pool = Pool(self.np)
+            self.pool = Pool(processes=self.np)
 
     def map(self, function, iterable_list):
         result = []

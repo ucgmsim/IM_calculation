@@ -2,12 +2,10 @@ import os
 import numpy as np
 import glob
 import itertools
-from qcore import timeseries
-
-#from memory_profiler import profile
-#fp=open('stepnp_alb_read_memory_profiler.log','w+')
+import sys
 
 g = 981
+
 
 class Waveform:
     def __init__(self, NT=None, DT=None, time_offset=None, values=None, wave_type=None, file_type=None, times=None,
@@ -21,7 +19,7 @@ class Waveform:
         self.file_type = file_type
         self.station_name = station_name
 
-# @profile
+
 def read_ascii_file(f_000, f_090, f_ver, wave_type=None):
     waveform = Waveform()
     waveform.wave_type = wave_type
@@ -76,7 +74,7 @@ def skip_header(fid):
 def calculate_timesteps(NT, DT):
     return np.arange(NT) * DT
 
-# @profile
+
 def create_waveform_from_data(data, wave_type=None, base_waveform=None, NT=None, DT=None, offset=None, name=None):
     if base_waveform is not None:
         NT = base_waveform.NT
@@ -90,7 +88,7 @@ def create_waveform_from_data(data, wave_type=None, base_waveform=None, NT=None,
                         times=times, station_name=name)
     return waveform
 
-#@profile
+
 def read_waveforms(path, bbseis, station_names=None, comp=Ellipsis, wave_type=None, file_type=None, units='g'):
     """
     read either a ascii or binary file
@@ -108,7 +106,7 @@ def read_waveforms(path, bbseis, station_names=None, comp=Ellipsis, wave_type=No
     elif file_type == 'binary':
         return read_binary_file(bbseis, comp, station_names, wave_type=wave_type, file_type='binary', units=units)
     else:
-        #print "Could not determine filetype %s" % path
+        print "Could not determine filetype %s" % path
         return None
 
 
@@ -117,7 +115,7 @@ def get_station_name_from_filepath(path):
     station_name = os.path.splitext(base_station_name)[0]
     return station_name
 
-#@profile
+
 def read_ascii_folder(path, selected_stations=None, units='g'):
     waveforms = list()
 
@@ -150,7 +148,6 @@ def read_ascii_folder(path, selected_stations=None, units='g'):
     return waveforms
 
 
-#@profile
 def read_one_station_from_bbseries(bbseries, station_name, comp, wave_type=None, file_type=None):
     """
     read one station data into a waveform obj
@@ -176,11 +173,10 @@ def read_one_station_from_bbseries(bbseries, station_name, comp, wave_type=None,
         elif wave_type == 'v':
             waveform.values = bbseries.vel(station=station_name, comp=comp)
     except KeyError:
-        print("station name {} does not exist".format(station_name))
-        return None
+        sys.exit("station name {} does not exist".format(station_name))
     return waveform
 
-#@profile
+
 def read_binary_file(bbseries, comp, station_names=None, wave_type=None, file_type=None, units='g'):
     """
     read all stations into a list of waveforms

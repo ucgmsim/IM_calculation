@@ -21,9 +21,6 @@ from rrup import pool_wrapper
 from qcore import utils
 from qcore import timeseries
 
-#from memory_profiler import profile
-# fp=open('stepnp_alb_memory_profiler.log','w+')
-
 G = 981.0
 IMS = ['PGA', 'PGV', 'CAV', 'AI', 'Ds575', 'Ds595', 'MMI', 'pSA']
 
@@ -41,7 +38,8 @@ OUTPUT_SUBFOLDER = 'stations'
 
 RUNNAME_DEFAULT = 'all_station_ims'
 
-MEM_PER_CORE = 1e9
+MEM_PER_CORE = 7.5e8
+
 
 def convert_str_comp(comp):
     """
@@ -110,7 +108,6 @@ def compute_measure_single((waveform, ims, comp, period)):
         velocities = waveform_vel.values
     
     station_name = waveform_acc.station_name
-   # print("computing {}".format(station_name))
 
     result[station_name] = {}
     converted_comp = convert_str_comp(comp)
@@ -186,10 +183,10 @@ def compute_measures_multiprocess(input_path, file_type, geom_only, wave_type, s
 
     total_stations = len(station_names)
     steps = get_steps(input_path, process, total_stations)
-    i = 0
     all_result_dict = {}
     p = pool_wrapper.PoolWrapper(process)
 
+    i = 0
     while i < total_stations:
         print("i, i+step", i, i+steps)
         waveforms = read_waveform.read_waveforms(input_path, bbseries, station_names[i: i + steps], converted_comp, wave_type=wave_type, file_type=file_type, units=units)
@@ -451,6 +448,9 @@ def get_steps(input_path, nps, total_stations):
     print("batches", batches)
     steps = int(np.floor(np.divide(total_stations, batches)))
     print("steps", steps)
+    if steps == 0:
+        steps = total_stations
+        print("steps=totalstaitons", steps)
     return steps
 
 
