@@ -41,7 +41,7 @@ OUTPUT_SUBFOLDER = 'stations'
 RUNNAME_DEFAULT = 'all_station_ims'
 
 MEM_PER_CORE = 7.5e8
-CORES = 4
+MEM_FACTOR = 4
 
 
 def convert_str_comp(comp):
@@ -469,9 +469,9 @@ def get_steps(input_path, nps, total_stations):
     :param total_stations: total number of stations
     :return: number of stations per iteration/batch
     """
-    binary_size = os.stat(input_path).st_size * CORES
-    nps_total = nps * MEM_PER_CORE
-    batches = np.ceil(np.divide(binary_size, nps_total))
+    estimated_mem = os.stat(input_path).st_size * MEM_FACTOR
+    available_mem = nps * MEM_PER_CORE
+    batches = np.ceil(np.divide(estimated_mem, available_mem))
     steps = int(np.floor(np.divide(total_stations, batches)))
     if steps == 0:
         steps = total_stations
