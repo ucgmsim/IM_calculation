@@ -116,14 +116,8 @@ def get_station_name_from_filepath(path):
     return station_name
 
 
-def read_ascii_folder(path, selected_stations=None, units='g'):
+def read_ascii_folder(path, station_names, units='g'):
     waveforms = list()
-
-    search_path = os.path.abspath(os.path.join(path, '*'))
-    files = glob.glob(search_path)
-    station_names = set(map(get_station_name_from_filepath, files))
-    if selected_stations:
-        station_names = station_names.intersection(selected_stations)
 
     for station in station_names:
         filename_000 = os.path.join(path, station + '.000')

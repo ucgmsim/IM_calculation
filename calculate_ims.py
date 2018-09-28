@@ -12,7 +12,9 @@ import os
 import csv
 import argparse
 import getpass
+import glob
 import numpy as np
+import sys
 from collections import OrderedDict
 from datetime import datetime
 from IM import intensity_measures
@@ -39,6 +41,7 @@ OUTPUT_SUBFOLDER = 'stations'
 RUNNAME_DEFAULT = 'all_station_ims'
 
 MEM_PER_CORE = 7.5e8
+CORES = 4
 
 
 def convert_str_comp(comp):
@@ -151,6 +154,31 @@ def compute_measure_single((waveform, ims, comp, period)):
     return result
 
 
+def get_bbseis(input_path, file_type, selected_stations):
+    """
+    :param input_path: user input path to bb.bin or a folder containing ascii files
+    :param file_type: binary or ascii
+    :param selected_stations: list of user input stations
+    :return: bbseries, station_names
+    """
+    bbseries = None
+    if file_type == FILE_TYPE_DICT['b']:
+        bbseries = timeseries.BBSeis(input_path)
+        if selected_stations is None:
+            station_names = bbseries.stations.name
+        else:
+            station_names = selected_stations
+    elif file_type == FILE_TYPE_DICT['a']:
+        search_path = os.path.abspath(os.path.join(input_path, '*'))
+        files = glob.glob(search_path)
+        station_names = set(map(read_waveform.get_station_name_from_filepath, files))
+        if selected_stations is not None:
+            station_names = station_names.intersection(selected_stations)
+            if len(station_names) == 0:  # empty set
+                sys.exit("could not find specified stations {} in folder {}".format(selected_stations, input_path))
+    return bbseries, list(station_names)
+
+
 def compute_measures_multiprocess(input_path, file_type, geom_only, wave_type, station_names, ims=IMS, comp=None,
                                   period=None, output=None, identifier=None, rupture=None, run_type=None, version=None,
                                   process=1, simple_output=False, units='g'):
@@ -176,19 +204,17 @@ def compute_measures_multiprocess(input_path, file_type, geom_only, wave_type, s
     :return:
     """
     converted_comp = convert_str_comp(comp)
-    bbseries = timeseries.BBSeis(input_path)
 
-    if station_names is None:
-        station_names = bbseries.stations.name
+    bbseries, station_names = get_bbseis(input_path, file_type, station_names)
 
     total_stations = len(station_names)
     steps = get_steps(input_path, process, total_stations)
+
     all_result_dict = {}
     p = pool_wrapper.PoolWrapper(process)
 
     i = 0
     while i < total_stations:
-        print("i, i+step", i, i+steps)
         waveforms = read_waveform.read_waveforms(input_path, bbseries, station_names[i: i + steps], converted_comp, wave_type=wave_type, file_type=file_type, units=units)
         i += steps
         array_params = []
@@ -408,15 +434,12 @@ def validate_period(parser, arg_period, arg_extended_period, im):
     :param im: validated im(s) in a list
     :return: period(s) in a numpy array
     """
-    period = arg_period
-    extended_period = arg_extended_period
+    period = np.array(arg_period, dtype='float64')
 
-    period = np.array(period, dtype='float64')
-
-    if extended_period:
+    if arg_extended_period:
         period = np.unique(np.append(period, EXT_PERIOD))
 
-    if (extended_period or period.any()) and 'pSA' not in im:
+    if (arg_extended_period or period.any()) and 'pSA' not in im:
         parser.error("period or extended period must be used with pSA, but pSA is not in the IM measures entered")
 
     return period
@@ -440,17 +463,18 @@ def mkdir_output(arg_output, arg_identifier, arg_simple_output):
 
 
 def get_steps(input_path, nps, total_stations):
-    binary_size = os.stat(input_path).st_size * 4
-    print("binary size", binary_size)
+    """
+    :param input_path: user input file/dir path
+    :param nps: number of processes
+    :param total_stations: total number of stations
+    :return: number of stations per iteration/batch
+    """
+    binary_size = os.stat(input_path).st_size * CORES
     nps_total = nps * MEM_PER_CORE
-    print("nps total", nps_total)
     batches = np.ceil(np.divide(binary_size, nps_total))
-    print("batches", batches)
     steps = int(np.floor(np.divide(total_stations, batches)))
-    print("steps", steps)
     if steps == 0:
         steps = total_stations
-        print("steps=totalstaitons", steps)
     return steps
 
 
