@@ -2,9 +2,10 @@ import os
 import numpy as np
 import glob
 import itertools
-from qcore import timeseries
+import sys
 
 g = 981
+
 
 class Waveform:
     def __init__(self, NT=None, DT=None, time_offset=None, values=None, wave_type=None, file_type=None, times=None,
@@ -24,8 +25,7 @@ def read_ascii_file(f_000, f_090, f_ver, wave_type=None):
     waveform.wave_type = wave_type
     waveform.file_type = 'EMOD3D_ascii'
 
-    (waveform.station_name, waveform.NT,
-     waveform.DT, waveform.time_offset) = read_ascii_header(f_000)
+    (waveform.station_name, waveform.NT, waveform.DT, waveform.time_offset) = read_ascii_header(f_000)
     skip_header(f_090)
     skip_header(f_ver)
 
@@ -89,7 +89,7 @@ def create_waveform_from_data(data, wave_type=None, base_waveform=None, NT=None,
     return waveform
 
 
-def read_waveforms(path, station_names=None, comp=Ellipsis, wave_type=None, file_type=None, units='g'):
+def read_waveforms(path, bbseis, station_names=None, comp=Ellipsis, wave_type=None, file_type=None, units='g'):
     """
     read either a ascii or binary file
     :param path:
@@ -104,7 +104,7 @@ def read_waveforms(path, station_names=None, comp=Ellipsis, wave_type=None, file
     if file_type == 'ascii':
         return read_ascii_folder(path, station_names, units=units)
     elif file_type == 'binary':
-        return read_binary_file(path, comp, station_names, wave_type=wave_type, file_type='binary', units=units)
+        return read_binary_file(bbseis, comp, station_names, wave_type=wave_type, file_type='binary', units=units)
     else:
         print "Could not determine filetype %s" % path
         return None
@@ -116,14 +116,8 @@ def get_station_name_from_filepath(path):
     return station_name
 
 
-def read_ascii_folder(path, selected_stations=None, units='g'):
+def read_ascii_folder(path, station_names, units='g'):
     waveforms = list()
-
-    search_path = os.path.abspath(os.path.join(path, '*'))
-    files = glob.glob(search_path)
-    station_names = set(map(get_station_name_from_filepath, files))
-    if selected_stations:
-        station_names = station_names.intersection(selected_stations)
 
     for station in station_names:
         filename_000 = os.path.join(path, station + '.000')
@@ -173,12 +167,11 @@ def read_one_station_from_bbseries(bbseries, station_name, comp, wave_type=None,
         elif wave_type == 'v':
             waveform.values = bbseries.vel(station=station_name, comp=comp)
     except KeyError:
-        print("station name {} does not exist".format(station_name))
-        return None
+        sys.exit("station name {} does not exist".format(station_name))
     return waveform
 
 
-def read_binary_file(input_path, comp, station_names=None, wave_type=None, file_type=None, units='g'):
+def read_binary_file(bbseries, comp, station_names=None, wave_type=None, file_type=None, units='g'):
     """
     read all stations into a list of waveforms
     :param input_path:
@@ -188,10 +181,9 @@ def read_binary_file(input_path, comp, station_names=None, wave_type=None, file_
     :param file_type:
     :return: [(waveform_acc, waveform_vel])
     """
-    bbseries = timeseries.BBSeis(input_path)
     waveforms = []
-    if not station_names:
-        station_names = bbseries.stations.name
+    # if not station_names:
+    #     station_names = bbseries.stations.name
     for station_name in station_names:
         waveform_acc = read_one_station_from_bbseries(bbseries, station_name, comp, wave_type='a',
                                                       file_type=file_type)  # TODO should create either a or v not both

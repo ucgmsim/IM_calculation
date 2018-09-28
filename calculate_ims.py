@@ -12,7 +12,9 @@ import os
 import csv
 import argparse
 import getpass
+import glob
 import numpy as np
+import sys
 from collections import OrderedDict
 from datetime import datetime
 from IM import intensity_measures
@@ -37,6 +39,9 @@ OUTPUT_PATH = os.path.join('/home', getpass.getuser())
 OUTPUT_SUBFOLDER = 'stations'
 
 RUNNAME_DEFAULT = 'all_station_ims'
+
+MEM_PER_CORE = 7.5e8
+MEM_FACTOR = 4
 
 
 def convert_str_comp(comp):
@@ -106,7 +111,6 @@ def compute_measure_single((waveform, ims, comp, period)):
         velocities = waveform_vel.values
     
     station_name = waveform_acc.station_name
-   # print("computing {}".format(station_name))
 
     result[station_name] = {}
     converted_comp = convert_str_comp(comp)
@@ -150,6 +154,31 @@ def compute_measure_single((waveform, ims, comp, period)):
     return result
 
 
+def get_bbseis(input_path, file_type, selected_stations):
+    """
+    :param input_path: user input path to bb.bin or a folder containing ascii files
+    :param file_type: binary or ascii
+    :param selected_stations: list of user input stations
+    :return: bbseries, station_names
+    """
+    bbseries = None
+    if file_type == FILE_TYPE_DICT['b']:
+        bbseries = timeseries.BBSeis(input_path)
+        if selected_stations is None:
+            station_names = bbseries.stations.name
+        else:
+            station_names = selected_stations
+    elif file_type == FILE_TYPE_DICT['a']:
+        search_path = os.path.abspath(os.path.join(input_path, '*'))
+        files = glob.glob(search_path)
+        station_names = set(map(read_waveform.get_station_name_from_filepath, files))
+        if selected_stations is not None:
+            station_names = station_names.intersection(selected_stations)
+            if len(station_names) == 0:  # empty set
+                sys.exit("could not find specified stations {} in folder {}".format(selected_stations, input_path))
+    return bbseries, list(station_names)
+
+
 def compute_measures_multiprocess(input_path, file_type, geom_only, wave_type, station_names, ims=IMS, comp=None,
                                   period=None, output=None, identifier=None, rupture=None, run_type=None, version=None,
                                   process=1, simple_output=False, units='g'):
@@ -176,20 +205,26 @@ def compute_measures_multiprocess(input_path, file_type, geom_only, wave_type, s
     """
     converted_comp = convert_str_comp(comp)
 
-    waveforms = read_waveform.read_waveforms(input_path, station_names, converted_comp, wave_type=wave_type,
-                                             file_type=file_type, units=units)
-    array_params = []
-    all_result_dict = {}
-  
-    for waveform in waveforms:
-        array_params.append((waveform, ims, comp, period))
+    bbseries, station_names = get_bbseis(input_path, file_type, station_names)
 
+    total_stations = len(station_names)
+    steps = get_steps(input_path, process, total_stations)
+
+    all_result_dict = {}
     p = pool_wrapper.PoolWrapper(process)
 
-    result_list = p.map(compute_measure_single, array_params)
+    i = 0
+    while i < total_stations:
+        waveforms = read_waveform.read_waveforms(input_path, bbseries, station_names[i: i + steps], converted_comp, wave_type=wave_type, file_type=file_type, units=units)
+        i += steps
+        array_params = []
+        for waveform in waveforms:
+            array_params.append((waveform, ims, comp, period))
 
-    for result in result_list:
-        all_result_dict.update(result)
+        result_list = p.map(compute_measure_single, array_params)
+
+        for result in result_list:
+            all_result_dict.update(result)
 
     write_result(all_result_dict, output, identifier, comp, ims, period, geom_only, simple_output)
 
@@ -399,15 +434,12 @@ def validate_period(parser, arg_period, arg_extended_period, im):
     :param im: validated im(s) in a list
     :return: period(s) in a numpy array
     """
-    period = arg_period
-    extended_period = arg_extended_period
+    period = np.array(arg_period, dtype='float64')
 
-    period = np.array(period, dtype='float64')
-
-    if extended_period:
+    if arg_extended_period:
         period = np.unique(np.append(period, EXT_PERIOD))
 
-    if (extended_period or period.any()) and 'pSA' not in im:
+    if (arg_extended_period or period.any()) and 'pSA' not in im:
         parser.error("period or extended period must be used with pSA, but pSA is not in the IM measures entered")
 
     return period
@@ -428,6 +460,22 @@ def mkdir_output(arg_output, arg_identifier, arg_simple_output):
         utils.setup_dir(os.path.join(output_dir, OUTPUT_SUBFOLDER))
 
     return output_dir
+
+
+def get_steps(input_path, nps, total_stations):
+    """
+    :param input_path: user input file/dir path
+    :param nps: number of processes
+    :param total_stations: total number of stations
+    :return: number of stations per iteration/batch
+    """
+    estimated_mem = os.stat(input_path).st_size * MEM_FACTOR
+    available_mem = nps * MEM_PER_CORE
+    batches = np.ceil(np.divide(estimated_mem, available_mem))
+    steps = int(np.floor(np.divide(total_stations, batches)))
+    if steps == 0:
+        steps = total_stations
+    return steps
 
 
 def main():
@@ -459,6 +507,7 @@ def main():
                         help="Please add '-s' to indicate if you want to output the big summary csv only(no single station csvs). Default outputting both single station and the big summary csvs")
     parser.add_argument('-u', '--units', choices=['cm/s^2', 'g'], default='g',
                         help="The units that input acceleration files are in")
+
     args = parser.parse_args()
 
     validate_input_path(parser, args.input_path, args.file_type)
@@ -486,3 +535,4 @@ def main():
 
 if __name__ == '__main__':
     main()
+
