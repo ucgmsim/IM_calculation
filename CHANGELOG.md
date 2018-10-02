@@ -9,6 +9,15 @@ Changed
 Added
 
 
+[18.9.20] - 2018-09-20
+Added
+    -
+Changed
+    renamed generate_sl.py to submit_imcalc.py
+    modified submit_imcalc.py and checkpoint.py to be able to integrate with the slurm_gm_workflow
+    moved submit_imcalc.py, checkpoint.py and im_calc_sl.template to slurm_gm_workflow
+    
+
 [18.7.2] - 2018-07-11
 Added
     -

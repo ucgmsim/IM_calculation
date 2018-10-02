@@ -78,41 +78,13 @@ optional arguments:
 
 ```
 
-To create submission script for slurm workflow:
-
-```
-usage: generate_sl.py [-h] [-s SIM_DIR] [-o OBS_DIR] [-srf SRF_DIR]
-                      [-ll STATION_FILE] [-np PROCESSES]
-                      rrup_output_dir
-
-Prints out a slurm script to run IM Calculation over a run-group
-
-positional arguments:
-  rrup_output_dir       directory containing rupture distances output
-
-optional arguments:
-  -h, --help            show this help message and exit
-  -s SIM_DIR, --sim_dir SIM_DIR
-                        Path to sim-run-group containing faults and
-                        acceleration in the subfolder */BB/*/*
-  -o OBS_DIR, --obs_dir OBS_DIR
-                        Path to obs-run-group containing faults and
-                        accelerations in the subfolder */*/accBB
-  -srf SRF_DIR, --srf_dir SRF_DIR
-                        Path to run-group containing the srf files in the path
-                        matching */Srf/*.srf
-  -ll STATION_FILE, --station_file STATION_FILE
-                        Path to a single station file for ruputure distance
-                        calculations
-  -np PROCESSES, --processes PROCESSES
-                        number of processors to use
-
-```
+To create submission script for slurm workflow, refer to the script under gm_sim_workflow repository:
+https://github.com/ucgmsim/slurm_gm_workflow/blob/master/scripts/submit_imcalc.py
 
 e.g.
+``` python submit_imcalc.py -obs ~/test_obs/IMCalcExample/ -sim runs/Runs -srf /nesi/nobackup/nesi00213/RunFolder/Cybershake/v18p6_batched/v18p6_exclude_1k_batch_6/Data/Sources -ll /scale_akl_nobackup/filesets/transit/nesi00213/StationInfo/non_uniform_whole_nz_with_real_stations-hh400_v18p6.ll -o ~/rrup_out -ml 1000 -e -s -i OtaraWest02_HYP01-21_S1244 Pahiatua_HYP01-26_S1244 -t 24:00:00```
 
-```
- python generate_sl.py ~/IM_result_test_robin/ -srf /nesi/nobackup/nesi00213/RunFolder/Validation/IMCalcExample_v1p2/Data/Sources -ll /nesi/transit/nesi00213/StationInfo/cantstations_v1pt2.ll -s /nesi/nobackup/nesi00213/RunFolder/Validation/IMCalcExample_v1p2/Runs -o /nesi/nobackup/nesi00213/ObsGM/Validation/IMCalcExample > ~/im_calc.sl
+
 
 ```
 
