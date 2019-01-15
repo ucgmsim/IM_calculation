@@ -445,15 +445,12 @@ def validate_period(parser, arg_period, arg_extended_period, im):
     return period
 
 
-def mkdir_output(arg_output, arg_identifier, arg_simple_output):
+def mkdir_output(output_dir, arg_simple_output):
     """
     create big output dir and sub dir 'stations' inside the big output dir
-    :param arg_output:
-    :param arg_identifier:
     :param arg_simple_output: Boolean. Create 'a subfolder to store single station csvs if True
     :return: path to the big output_dir
     """
-    output_dir = os.path.join(arg_output, arg_identifier)  
     utils.setup_dir(output_dir)
     
     if not arg_simple_output:
@@ -522,7 +519,7 @@ def main():
 
     period = validate_period(parser, args.period, args.extended_period, im)
 
-    output_dir = mkdir_output(args.output_path, args.identifier, args.simple_output)
+    output_dir = mkdir_output(args.output_path, args.simple_output)
 
     # multiprocessor
     compute_measures_multiprocess(args.input_path, file_type, geom_only, wave_type=None,
