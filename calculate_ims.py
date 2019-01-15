@@ -692,7 +692,7 @@ def main():
         units=args.units,
     )
 
-    print("Calculations are outputted to {}".format(args.output_dir))
+    print("Calculations are outputted to {}".format(args.output_path))
 
 
 if __name__ == "__main__":
