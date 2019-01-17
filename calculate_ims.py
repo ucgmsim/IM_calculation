@@ -84,7 +84,7 @@ def array_to_dict(value, comp, converted_comp, im):
     """
     value_dict = {}
     if converted_comp == Ellipsis:
-        comps = EXT_IDX_DICT.keys()
+        comps = list(EXT_IDX_DICT.keys())
         for c in comps[:-1]:  # excludes geom
             column = EXT_IDX_DICT[c]
             if im == "pSA":  # pSA returns 2d array
@@ -321,7 +321,7 @@ def get_comp_name_and_list(comp, geom_only):
 
     elif comp == "ellipsis":
         comp_name = ""
-        comps = EXT_IDX_DICT.keys()
+        comps = list(EXT_IDX_DICT.keys())
 
     else:
         comp_name = "_{}".format(comp)
@@ -478,7 +478,7 @@ def validate_comp(parser, arg_comp):
     :return: validated comp, only_geom flag
     """
     comp = arg_comp
-    available_comps = EXT_IDX_DICT.keys()
+    available_comps = list(EXT_IDX_DICT.keys())
     if comp not in available_comps and comp != "ellipsis":
         parser.error("please enter a valid comp name. {}".format(get_comp_help()))
     geom_only = (
