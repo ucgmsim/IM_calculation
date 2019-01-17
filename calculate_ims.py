@@ -19,9 +19,7 @@ from collections import OrderedDict
 from datetime import datetime
 from IM import intensity_measures
 from IM import read_waveform
-from rrup import pool_wrapper
-from qcore import utils
-from qcore import timeseries
+from qcore import utils, timeseries, pool_wrapper
 
 G = 981.0
 IMS = ["PGA", "PGV", "CAV", "AI", "Ds575", "Ds595", "MMI", "pSA"]

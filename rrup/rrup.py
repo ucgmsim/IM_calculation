@@ -12,9 +12,9 @@ Function and variable names from matlab are mostly preserved.
 
 from math import radians, sin, cos, asin, sqrt, ceil
 import sys
-import pool_wrapper
 
 from qcore.srf import read_latlondepth
+from qcore.pool_wrapper import PoolWrapper
 
 
 class Point:
@@ -108,7 +108,7 @@ def computeRrup(station_file, srf_file, match_stations, n_processes):
 
     # loop over the stations
     # TODO: pass the pool size somehow
-    p = pool_wrapper.PoolWrapper(n_processes)
+    p = PoolWrapper(n_processes)
     packaged_data_list = []
     for station_name, station in stations.iteritems():
         packaged_data_list.append((finite_fault, station, station_name))

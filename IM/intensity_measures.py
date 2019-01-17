@@ -1,4 +1,4 @@
-from rspectra_calculations import rspectra as rspectra
+from IM.rspectra_calculations import rspectra as rspectra
 import numpy as np
 from qcore import timeseries
 
