@@ -427,7 +427,7 @@ def get_comp_help():
     return (
         "Available compoents are: {},ellipsis. ellipsis contains all {} "
         "components. Default is ellipsis".format(
-            ",".join(c for c in EXT_IDX_DICT.keys()), len(EXT_IDX_DICT.keys())
+            ",".join(list(EXT_IDX_DICT.keys())), len(list(EXT_IDX_DICT.keys()))
         )
     )
 
@@ -680,7 +680,7 @@ def main():
         ims=im,
         comp=comp,
         period=period,
-        output=args.output_dir,
+        output=args.output_path,
         identifier=args.identifier,
         rupture=args.rupture,
         run_type=run_type,

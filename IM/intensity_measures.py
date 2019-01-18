@@ -67,7 +67,7 @@ def getDs(dt, fx, percLow=5, percHigh=75):
     nsteps = np.size(fx)
     husid = np.zeros(nsteps)
     husid[0] = 0  # initialize first to 0
-    for i in xrange(1, nsteps):
+    for i in range(1, nsteps):
         husid[i] = husid[i - 1] + dt * (fx[i] ** 2)  # note that pi/(2g) is not used as doesnt affect the result
     AI = husid[-1]
     Ds = dt * (np.sum(husid / AI <= percHigh / 100.) - np.sum(husid / AI <= percLow / 100.))
