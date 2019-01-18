@@ -19,9 +19,7 @@ from collections import OrderedDict
 from datetime import datetime
 from IM import intensity_measures
 from IM import read_waveform
-from rrup import pool_wrapper
-from qcore import utils
-from qcore import timeseries
+from qcore import utils, timeseries, pool_wrapper
 
 G = 981.0
 IMS = ["PGA", "PGV", "CAV", "AI", "Ds575", "Ds595", "MMI", "pSA"]
@@ -84,7 +82,7 @@ def array_to_dict(value, comp, converted_comp, im):
     """
     value_dict = {}
     if converted_comp == Ellipsis:
-        comps = EXT_IDX_DICT.keys()
+        comps = list(EXT_IDX_DICT.keys())
         for c in comps[:-1]:  # excludes geom
             column = EXT_IDX_DICT[c]
             if im == "pSA":  # pSA returns 2d array
@@ -321,7 +319,7 @@ def get_comp_name_and_list(comp, geom_only):
 
     elif comp == "ellipsis":
         comp_name = ""
-        comps = EXT_IDX_DICT.keys()
+        comps = list(EXT_IDX_DICT.keys())
 
     else:
         comp_name = "_{}".format(comp)
@@ -429,7 +427,7 @@ def get_comp_help():
     return (
         "Available compoents are: {},ellipsis. ellipsis contains all {} "
         "components. Default is ellipsis".format(
-            ",".join(c for c in EXT_IDX_DICT.keys()), len(EXT_IDX_DICT.keys())
+            ",".join(list(EXT_IDX_DICT.keys())), len(list(EXT_IDX_DICT.keys()))
         )
     )
 
@@ -478,7 +476,7 @@ def validate_comp(parser, arg_comp):
     :return: validated comp, only_geom flag
     """
     comp = arg_comp
-    available_comps = EXT_IDX_DICT.keys()
+    available_comps = list(EXT_IDX_DICT.keys())
     if comp not in available_comps and comp != "ellipsis":
         parser.error("please enter a valid comp name. {}".format(get_comp_help()))
     geom_only = (
@@ -682,7 +680,7 @@ def main():
         ims=im,
         comp=comp,
         period=period,
-        output=args.output_dir,
+        output=args.output_path,
         identifier=args.identifier,
         rupture=args.rupture,
         run_type=run_type,
