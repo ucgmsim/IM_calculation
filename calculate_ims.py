@@ -340,7 +340,7 @@ def write_rows(comps, station, ims, result_dict, big_csv_writer, sub_csv_writer=
     :return: write a single row
     """
     for c in comps:
-        row = [station, c]
+        row = [station.decode(), c]
         for im in ims:
             if im != "pSA":
                 row.append(result_dict[station][im][c])
@@ -382,9 +382,9 @@ def write_result(
                 station_csv = os.path.join(
                     output_folder,
                     OUTPUT_SUBFOLDER,
-                    "{}{}.csv".format(station, comp_name),
+                    "{}{}.csv".format(station.decode(), comp_name),
                 )
-                with open(station_csv, "wb") as sub_csv_file:
+                with open(station_csv, "w") as sub_csv_file:
                     sub_csv_writer = csv.writer(
                         sub_csv_file, delimiter=",", quotechar="|"
                     )
