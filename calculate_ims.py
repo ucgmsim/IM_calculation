@@ -299,7 +299,7 @@ def get_header(ims, period):
                 if p in BSC_PERIOD:
                     psa_names.append("pSA_{}".format(p))
                 else:
-                    psa_names.append("pSA_{.12}".format(p))
+                    psa_names.append("pSA_{:.12f}".format(p))
             header += psa_names
         else:
             header.append(im)
