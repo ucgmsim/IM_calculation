@@ -3,7 +3,7 @@ import calculate_ims
 import os.path
 
 
-test_data_save_dir = '/home/jpa198/test_space/im_calc_test/pickled/Hossack_HYP01-10_S1244'
+test_data_save_dir = 'pickled_test_data'
 REALISATION = 'Hossack_HYP01-10_S1244'
 
 def test_convert_str_comp():
