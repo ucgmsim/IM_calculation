@@ -5,8 +5,8 @@ import pickle
 import os
 
 
-test_data_save_dir = '/home/jpa198/test_space/im_calc_test/pickled/Hossack_HYP01-10_S1244'
-REALISATION = 'Hossack_HYP01-10_S1244'
+test_data_save_dir = '/home/jpa198/test_space/im_calc_test/pickled'
+REALISATION = 'PangopangoF29_HYP01-10_S1244'
 data_taken = {'get_max_nd': False,
               'get_spectral_acceleration': False,
               'get_spectral_acceleration_nd': False,
@@ -21,11 +21,11 @@ data_taken = {'get_max_nd': False,
 def get_max_nd(data):
     function = 'get_max_nd'
     if not data_taken[function]:
-        with open(os.path.join(test_data_save_dir, function + '_data.P'), 'wb') as save_file:
+        with open(os.path.join(test_data_save_dir, REALISATION, function + '_data.P'), 'wb') as save_file:
             pickle.dump(data, save_file)
     ret_val = np.max(np.abs(data), axis=0)
     if not data_taken[function]:
-        with open(os.path.join(test_data_save_dir, function + '_ret_val.P'), 'wb') as save_file:
+        with open(os.path.join(test_data_save_dir, REALISATION, function + '_ret_val.P'), 'wb') as save_file:
             pickle.dump(ret_val, save_file)
     return ret_val
 
@@ -33,13 +33,13 @@ def get_max_nd(data):
 def get_spectral_acceleration(acceleration, period, NT, DT):
     function = 'get_spectral_acceleration'
     if not data_taken[function]:
-        with open(os.path.join(test_data_save_dir, function + '_acceleration.P'), 'wb') as save_file:
+        with open(os.path.join(test_data_save_dir, REALISATION, function + '_acceleration.P'), 'wb') as save_file:
             pickle.dump(acceleration, save_file)
-        with open(os.path.join(test_data_save_dir, function + '_period.P'), 'wb') as save_file:
+        with open(os.path.join(test_data_save_dir, REALISATION, function + '_period.P'), 'wb') as save_file:
             pickle.dump(period, save_file)
-        with open(os.path.join(test_data_save_dir, function + '_NT.P'), 'wb') as save_file:
+        with open(os.path.join(test_data_save_dir, REALISATION, function + '_NT.P'), 'wb') as save_file:
             pickle.dump(NT, save_file)
-        with open(os.path.join(test_data_save_dir, function + '_DT.P'), 'wb') as save_file:
+        with open(os.path.join(test_data_save_dir, REALISATION, function + '_DT.P'), 'wb') as save_file:
             pickle.dump(DT, save_file)
 
     # pSA
@@ -61,7 +61,7 @@ def get_spectral_acceleration(acceleration, period, NT, DT):
     ret_val = rspectra.Response_Spectra(acc_step, deltat, c, period, M, gamma, beta)
 
     if not data_taken[function]:
-        with open(os.path.join(test_data_save_dir, function + '_ret_val.P'), 'wb') as save_file:
+        with open(os.path.join(test_data_save_dir, REALISATION, function + '_ret_val.P'), 'wb') as save_file:
             pickle.dump(ret_val, save_file)
         data_taken[function] = True
     return ret_val
@@ -74,13 +74,13 @@ def get_spectral_acceleration_nd(acceleration, period, NT, DT):
         #Only useful if >2, otherwise just mirrors non nd version
         function = 'get_spectral_acceleration_nd'
         if not data_taken[function]:
-            with open(os.path.join(test_data_save_dir, function + '_acceleration.P'), 'wb') as save_file:
+            with open(os.path.join(test_data_save_dir, REALISATION, function + '_acceleration.P'), 'wb') as save_file:
                 pickle.dump(acceleration, save_file)
-            with open(os.path.join(test_data_save_dir, function + '_period.P'), 'wb') as save_file:
+            with open(os.path.join(test_data_save_dir, REALISATION, function + '_period.P'), 'wb') as save_file:
                 pickle.dump(period, save_file)
-            with open(os.path.join(test_data_save_dir, function + '_NT.P'), 'wb') as save_file:
+            with open(os.path.join(test_data_save_dir, REALISATION, function + '_NT.P'), 'wb') as save_file:
                 pickle.dump(NT, save_file)
-            with open(os.path.join(test_data_save_dir, function + '_DT.P'), 'wb') as save_file:
+            with open(os.path.join(test_data_save_dir, REALISATION, function + '_DT.P'), 'wb') as save_file:
                 pickle.dump(DT, save_file)
         dims = acceleration.shape[1]
         values = np.zeros((period.size, dims))
@@ -89,7 +89,7 @@ def get_spectral_acceleration_nd(acceleration, period, NT, DT):
             values[:, i] = get_spectral_acceleration(acceleration[:, i], period, NT, DT)
 
         if not data_taken[function]:
-            with open(os.path.join(test_data_save_dir, function + '_values.P'), 'wb') as save_file:
+            with open(os.path.join(test_data_save_dir, REALISATION, function + '_values.P'), 'wb') as save_file:
                 pickle.dump(values, save_file)
             data_taken[function] = True
         return values
@@ -100,13 +100,13 @@ def get_spectral_acceleration_nd(acceleration, period, NT, DT):
 def get_cumulative_abs_velocity_nd(acceleration, times):
     function = 'get_cumulative_abs_velocity_nd'
     if not data_taken[function]:
-        with open(os.path.join(test_data_save_dir, function + '_acceleration.P'), 'wb') as save_file:
+        with open(os.path.join(test_data_save_dir, REALISATION, function + '_acceleration.P'), 'wb') as save_file:
             pickle.dump(acceleration, save_file)
-        with open(os.path.join(test_data_save_dir, function + '_times.P'), 'wb') as save_file:
+        with open(os.path.join(test_data_save_dir, REALISATION, function + '_times.P'), 'wb') as save_file:
             pickle.dump(times, save_file)
     ret_val = np.trapz(np.abs(acceleration), times, axis=0)
     if not data_taken[function]:
-        with open(os.path.join(test_data_save_dir, function + '_ret_val.P'), 'wb') as save_file:
+        with open(os.path.join(test_data_save_dir, REALISATION, function + '_ret_val.P'), 'wb') as save_file:
             pickle.dump(ret_val, save_file)
         data_taken[function] = True
     return ret_val
@@ -115,17 +115,17 @@ def get_cumulative_abs_velocity_nd(acceleration, times):
 def get_arias_intensity_nd(acceleration, g, times):
     function = 'get_arias_intensity_nd'
     if not data_taken[function]:
-        with open(os.path.join(test_data_save_dir, function + '_acceleration.P'), 'wb') as save_file:
+        with open(os.path.join(test_data_save_dir, REALISATION, function + '_acceleration.P'), 'wb') as save_file:
             pickle.dump(acceleration, save_file)
-        with open(os.path.join(test_data_save_dir, function + '_g.P'), 'wb') as save_file:
+        with open(os.path.join(test_data_save_dir, REALISATION, function + '_g.P'), 'wb') as save_file:
             pickle.dump(g, save_file)
-        with open(os.path.join(test_data_save_dir, function + '_times.P'), 'wb') as save_file:
+        with open(os.path.join(test_data_save_dir, REALISATION, function + '_times.P'), 'wb') as save_file:
             pickle.dump(times, save_file)
     acc_in_cms = acceleration * g
     integrand = acc_in_cms ** 2
     ret_val = np.pi / (2 * g) * np.trapz(integrand, times, axis=0)
     if not data_taken[function]:
-        with open(os.path.join(test_data_save_dir, function + '_ret_val.P'), 'wb') as save_file:
+        with open(os.path.join(test_data_save_dir, REALISATION, function + '_ret_val.P'), 'wb') as save_file:
             pickle.dump(ret_val, save_file)
         data_taken[function] = True
     return ret_val
@@ -134,12 +134,12 @@ def get_arias_intensity_nd(acceleration, g, times):
 def calculate_MMI_nd(velocities):
     function = 'calculate_MMI_nd'
     if not data_taken[function]:
-        with open(os.path.join(test_data_save_dir, function + '_velocities.P'), 'wb') as save_file:
+        with open(os.path.join(test_data_save_dir, REALISATION, function + '_velocities.P'), 'wb') as save_file:
             pickle.dump(velocities, save_file)
     pgv = get_max_nd(velocities)
     ret_val = timeseries.pgv2MMI(pgv)
     if not data_taken[function]:
-        with open(os.path.join(test_data_save_dir, function + '_ret_val.P'), 'wb') as save_file:
+        with open(os.path.join(test_data_save_dir, REALISATION, function + '_ret_val.P'), 'wb') as save_file:
             pickle.dump(ret_val, save_file)
         data_taken[function] = True
     return ret_val
@@ -157,13 +157,13 @@ def getDs(dt, fx, percLow=5, percHigh=75):
         Ds - The duration (s)    """
     function = 'getDs'
     if not data_taken[function]:
-        with open(os.path.join(test_data_save_dir, function + '_dt.P'), 'wb') as save_file:
+        with open(os.path.join(test_data_save_dir, REALISATION, function + '_dt.P'), 'wb') as save_file:
             pickle.dump(dt, save_file)
-        with open(os.path.join(test_data_save_dir, function + '_fx.P'), 'wb') as save_file:
+        with open(os.path.join(test_data_save_dir, REALISATION, function + '_fx.P'), 'wb') as save_file:
             pickle.dump(fx, save_file)
-        with open(os.path.join(test_data_save_dir, function + '_percLow.P'), 'wb') as save_file:
+        with open(os.path.join(test_data_save_dir, REALISATION, function + '_percLow.P'), 'wb') as save_file:
             pickle.dump(percLow, save_file)
-        with open(os.path.join(test_data_save_dir, function + '_percHigh.P'), 'wb') as save_file:
+        with open(os.path.join(test_data_save_dir, REALISATION, function + '_percHigh.P'), 'wb') as save_file:
             pickle.dump(percHigh, save_file)
     nsteps = np.size(fx)
     husid = np.zeros(nsteps)
@@ -173,7 +173,7 @@ def getDs(dt, fx, percLow=5, percHigh=75):
     AI = husid[-1]
     Ds = dt * (np.sum(husid / AI <= percHigh / 100.) - np.sum(husid / AI <= percLow / 100.))
     if not data_taken[function]:
-        with open(os.path.join(test_data_save_dir, function + '_Ds.P'), 'wb') as save_file:
+        with open(os.path.join(test_data_save_dir, REALISATION, function + '_Ds.P'), 'wb') as save_file:
             pickle.dump(Ds, save_file)
         data_taken[function] = True
     return Ds
@@ -194,13 +194,13 @@ def getDs_nd(dt, accelerations, percLow=5, percHigh=75):
     else:
         function = 'getDs_nd'
         if not data_taken[function]:
-            with open(os.path.join(test_data_save_dir, function + '_dt.P'), 'wb') as save_file:
+            with open(os.path.join(test_data_save_dir, REALISATION, function + '_dt.P'), 'wb') as save_file:
                 pickle.dump(dt, save_file)
-            with open(os.path.join(test_data_save_dir, function + '_accelerations.P'), 'wb') as save_file:
+            with open(os.path.join(test_data_save_dir, REALISATION, function + '_accelerations.P'), 'wb') as save_file:
                 pickle.dump(accelerations, save_file)
-            with open(os.path.join(test_data_save_dir, function + '_percLow.P'), 'wb') as save_file:
+            with open(os.path.join(test_data_save_dir, REALISATION, function + '_percLow.P'), 'wb') as save_file:
                 pickle.dump(percLow, save_file)
-            with open(os.path.join(test_data_save_dir, function + '_percHigh.P'), 'wb') as save_file:
+            with open(os.path.join(test_data_save_dir, REALISATION, function + '_percHigh.P'), 'wb') as save_file:
                 pickle.dump(percHigh, save_file)
         values = np.zeros(3)
         i = 0
@@ -209,7 +209,7 @@ def getDs_nd(dt, accelerations, percLow=5, percHigh=75):
             i += 1
 
         if not data_taken[function]:
-            with open(os.path.join(test_data_save_dir, function + '_values.P'), 'wb') as save_file:
+            with open(os.path.join(test_data_save_dir, REALISATION, function + '_values.P'), 'wb') as save_file:
                 pickle.dump(values, save_file)
             data_taken[function] = True
         return values
@@ -224,13 +224,13 @@ def get_geom(d1, d2):
     """
     function = 'get_geom'
     if not data_taken[function]:
-        with open(os.path.join(test_data_save_dir, function + '_d1.P'), 'wb') as save_file:
+        with open(os.path.join(test_data_save_dir, REALISATION, function + '_d1.P'), 'wb') as save_file:
             pickle.dump(d1, save_file)
-        with open(os.path.join(test_data_save_dir, function + '_d2.P'), 'wb') as save_file:
+        with open(os.path.join(test_data_save_dir, REALISATION, function + '_d2.P'), 'wb') as save_file:
             pickle.dump(d2, save_file)
     ret_val = np.sqrt(d1 * d2)
     if not data_taken[function]:
-        with open(os.path.join(test_data_save_dir, function + '_ret_val.P'), 'wb') as save_file:
+        with open(os.path.join(test_data_save_dir, REALISATION, function + '_ret_val.P'), 'wb') as save_file:
             pickle.dump(ret_val, save_file)
         data_taken[function] = True
     return ret_val

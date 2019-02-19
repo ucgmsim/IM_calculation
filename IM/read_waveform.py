@@ -7,8 +7,8 @@ import pickle
 
 g = 981
 
-test_data_save_dir = '/home/jpa198/test_space/im_calc_test/pickled/Hossack_HYP01-10_S1244'
-REALISATION = 'Hossack_HYP01-10_S1244'
+test_data_save_dir = '/home/jpa198/test_space/im_calc_test/pickled'
+REALISATION = 'PangopangoF29_HYP01-10_S1244'
 data_taken = {'calculate_timesteps': False,
               'read_waveforms': False,
               'read_one_station_from_bbseries': False,
@@ -41,13 +41,13 @@ class Waveform:
 def calculate_timesteps(NT, DT):
     function = 'calculate_timesteps'
     if not data_taken[function]:
-        with open(os.path.join(test_data_save_dir, function + '_NT.P'), 'wb') as save_file:
+        with open(os.path.join(test_data_save_dir, REALISATION, function + '_NT.P'), 'wb') as save_file:
             pickle.dump(NT, save_file)
-        with open(os.path.join(test_data_save_dir, function + '_DT.P'), 'wb') as save_file:
+        with open(os.path.join(test_data_save_dir, REALISATION, function + '_DT.P'), 'wb') as save_file:
             pickle.dump(DT, save_file)
     ret_val = np.arange(NT) * DT
     if not data_taken[function]:
-        with open(os.path.join(test_data_save_dir, function + '_ret_val.P'), 'wb') as save_file:
+        with open(os.path.join(test_data_save_dir, REALISATION, function + '_ret_val.P'), 'wb') as save_file:
             pickle.dump(ret_val, save_file)
         data_taken[function] = True
     return ret_val
@@ -73,19 +73,19 @@ def read_waveforms(
     """
     function = 'read_waveforms'
     if not data_taken[function]:
-        with open(os.path.join(test_data_save_dir, function + '_path.P'), 'wb') as save_file:
+        with open(os.path.join(test_data_save_dir, REALISATION, function + '_path.P'), 'wb') as save_file:
             pickle.dump(path, save_file)
-        with open(os.path.join(test_data_save_dir, function + '_bbseis.P'), 'wb') as save_file:
+        with open(os.path.join(test_data_save_dir, REALISATION, function + '_bbseis.P'), 'wb') as save_file:
             pickle.dump(bbseis, save_file)
-        with open(os.path.join(test_data_save_dir, function + '_station_names.P'), 'wb') as save_file:
+        with open(os.path.join(test_data_save_dir, REALISATION, function + '_station_names.P'), 'wb') as save_file:
             pickle.dump(station_names, save_file)
-        with open(os.path.join(test_data_save_dir, function + '_comp.P'), 'wb') as save_file:
+        with open(os.path.join(test_data_save_dir, REALISATION, function + '_comp.P'), 'wb') as save_file:
             pickle.dump(comp, save_file)
-        with open(os.path.join(test_data_save_dir, function + 'wave_type.P'), 'wb') as save_file:
+        with open(os.path.join(test_data_save_dir, REALISATION, function + 'wave_type.P'), 'wb') as save_file:
             pickle.dump(wave_type, save_file)
-        with open(os.path.join(test_data_save_dir, function + '_file_type.P'), 'wb') as save_file:
+        with open(os.path.join(test_data_save_dir, REALISATION, function + '_file_type.P'), 'wb') as save_file:
             pickle.dump(file_type, save_file)
-        with open(os.path.join(test_data_save_dir, function + '_units.P'), 'wb') as save_file:
+        with open(os.path.join(test_data_save_dir, REALISATION, function + '_units.P'), 'wb') as save_file:
             pickle.dump(units, save_file)
 
     print(units)
@@ -100,7 +100,7 @@ def read_waveforms(
         )
 
         if not data_taken[function]:
-            with open(os.path.join(test_data_save_dir, function + '_ret_val.P'), 'wb') as save_file:
+            with open(os.path.join(test_data_save_dir, REALISATION, function + '_ret_val.P'), 'wb') as save_file:
                 pickle.dump(ret_val, save_file)
             data_taken[function] = True
 
@@ -108,7 +108,7 @@ def read_waveforms(
     else:
         print("Could not determine filetype %s" % path)
         if not data_taken[function]:
-            with open(os.path.join(test_data_save_dir, function + '_ret_val.P'), 'wb') as save_file:
+            with open(os.path.join(test_data_save_dir, REALISATION, function + '_ret_val.P'), 'wb') as save_file:
                 pickle.dump(None, save_file)
             data_taken[function] = True
         return None
@@ -128,15 +128,15 @@ def read_one_station_from_bbseries(
     """
     function = 'read_one_station_from_bbseries'
     if not data_taken[function]:
-        with open(os.path.join(test_data_save_dir, function + '_bbseries.P'), 'wb') as save_file:
+        with open(os.path.join(test_data_save_dir, REALISATION, function + '_bbseries.P'), 'wb') as save_file:
             pickle.dump(bbseries, save_file)
-        with open(os.path.join(test_data_save_dir, function + '_station_name.P'), 'wb') as save_file:
+        with open(os.path.join(test_data_save_dir, REALISATION, function + '_station_name.P'), 'wb') as save_file:
             pickle.dump(station_name, save_file)
-        with open(os.path.join(test_data_save_dir, function + '_comp.P'), 'wb') as save_file:
+        with open(os.path.join(test_data_save_dir, REALISATION, function + '_comp.P'), 'wb') as save_file:
             pickle.dump(comp, save_file)
-        with open(os.path.join(test_data_save_dir, function + '_wave_type.P'), 'wb') as save_file:
+        with open(os.path.join(test_data_save_dir, REALISATION, function + '_wave_type.P'), 'wb') as save_file:
             pickle.dump(wave_type, save_file)
-        with open(os.path.join(test_data_save_dir, function + '_file_type.P'), 'wb') as save_file:
+        with open(os.path.join(test_data_save_dir, REALISATION, function + '_file_type.P'), 'wb') as save_file:
             pickle.dump(file_type, save_file)
 
     waveform = Waveform()  # instance of Waveform
@@ -161,7 +161,7 @@ def read_one_station_from_bbseries(
         sys.exit("station name {} does not exist".format(station_name))
     function = 'read_waveforms'
     if not data_taken[function]:
-        with open(os.path.join(test_data_save_dir, function + '_waveform.P'), 'wb') as save_file:
+        with open(os.path.join(test_data_save_dir, REALISATION, function + '_waveform.P'), 'wb') as save_file:
             pickle.dump(waveform, save_file)
         data_taken[function] = True
     return waveform
@@ -181,17 +181,17 @@ def read_binary_file(
     """
     function = 'read_binary_file'
     if not data_taken[function]:
-        with open(os.path.join(test_data_save_dir, function + '_bbseries.P'), 'wb') as save_file:
+        with open(os.path.join(test_data_save_dir, REALISATION, function + '_bbseries.P'), 'wb') as save_file:
             pickle.dump(bbseries, save_file)
-        with open(os.path.join(test_data_save_dir, function + '_station_names.P'), 'wb') as save_file:
+        with open(os.path.join(test_data_save_dir, REALISATION, function + '_station_names.P'), 'wb') as save_file:
             pickle.dump(station_names, save_file)
-        with open(os.path.join(test_data_save_dir, function + '_comp.P'), 'wb') as save_file:
+        with open(os.path.join(test_data_save_dir, REALISATION, function + '_comp.P'), 'wb') as save_file:
             pickle.dump(comp, save_file)
-        with open(os.path.join(test_data_save_dir, function + '_wave_type.P'), 'wb') as save_file:
+        with open(os.path.join(test_data_save_dir, REALISATION, function + '_wave_type.P'), 'wb') as save_file:
             pickle.dump(wave_type, save_file)
-        with open(os.path.join(test_data_save_dir, function + '_file_type.P'), 'wb') as save_file:
+        with open(os.path.join(test_data_save_dir, REALISATION, function + '_file_type.P'), 'wb') as save_file:
             pickle.dump(file_type, save_file)
-        with open(os.path.join(test_data_save_dir, function + '_units.P'), 'wb') as save_file:
+        with open(os.path.join(test_data_save_dir, REALISATION, function + '_units.P'), 'wb') as save_file:
             pickle.dump(units, save_file)
 
     waveforms = []
@@ -209,7 +209,7 @@ def read_binary_file(
         waveforms.append((waveform_acc, waveform_vel))
 
     if not data_taken[function]:
-        with open(os.path.join(test_data_save_dir, function + '_waveforms.P'), 'wb') as save_file:
+        with open(os.path.join(test_data_save_dir, REALISATION, function + '_waveforms.P'), 'wb') as save_file:
             pickle.dump(waveforms, save_file)
         data_taken[function] = True
     return waveforms
