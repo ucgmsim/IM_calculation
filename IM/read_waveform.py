@@ -126,6 +126,19 @@ def read_one_station_from_bbseries(
     :param file_type:
     :return: a waveform obj with either acc or vel in values
     """
+    function = 'read_one_station_from_bbseries'
+    if not data_taken[function]:
+        with open(os.path.join(test_data_save_dir, function + '_bbseries.P'), 'wb') as save_file:
+            pickle.dump(bbseries, save_file)
+        with open(os.path.join(test_data_save_dir, function + '_station_name.P'), 'wb') as save_file:
+            pickle.dump(station_name, save_file)
+        with open(os.path.join(test_data_save_dir, function + '_comp.P'), 'wb') as save_file:
+            pickle.dump(comp, save_file)
+        with open(os.path.join(test_data_save_dir, function + '_wave_type.P'), 'wb') as save_file:
+            pickle.dump(wave_type, save_file)
+        with open(os.path.join(test_data_save_dir, function + '_file_type.P'), 'wb') as save_file:
+            pickle.dump(file_type, save_file)
+
     waveform = Waveform()  # instance of Waveform
     waveform.wave_type = wave_type
     waveform.file_type = file_type
@@ -146,6 +159,11 @@ def read_one_station_from_bbseries(
             waveform.values = bbseries.vel(station=station_name, comp=comp)
     except KeyError:
         sys.exit("station name {} does not exist".format(station_name))
+    function = 'read_waveforms'
+    if not data_taken[function]:
+        with open(os.path.join(test_data_save_dir, function + '_waveform.P'), 'wb') as save_file:
+            pickle.dump(waveform, save_file)
+        data_taken[function] = True
     return waveform
 
 
@@ -161,6 +179,21 @@ def read_binary_file(
     :param file_type:
     :return: [(waveform_acc, waveform_vel])
     """
+    function = 'read_binary_file'
+    if not data_taken[function]:
+        with open(os.path.join(test_data_save_dir, function + '_bbseries.P'), 'wb') as save_file:
+            pickle.dump(bbseries, save_file)
+        with open(os.path.join(test_data_save_dir, function + '_station_names.P'), 'wb') as save_file:
+            pickle.dump(station_names, save_file)
+        with open(os.path.join(test_data_save_dir, function + '_comp.P'), 'wb') as save_file:
+            pickle.dump(comp, save_file)
+        with open(os.path.join(test_data_save_dir, function + '_wave_type.P'), 'wb') as save_file:
+            pickle.dump(wave_type, save_file)
+        with open(os.path.join(test_data_save_dir, function + '_file_type.P'), 'wb') as save_file:
+            pickle.dump(file_type, save_file)
+        with open(os.path.join(test_data_save_dir, function + '_units.P'), 'wb') as save_file:
+            pickle.dump(units, save_file)
+
     waveforms = []
     # if not station_names:
     #     station_names = bbseries.stations.name
@@ -174,4 +207,9 @@ def read_binary_file(
         if units == "cm/s^2":
             waveform_acc.values = waveform_acc.values / 981
         waveforms.append((waveform_acc, waveform_vel))
+
+    if not data_taken[function]:
+        with open(os.path.join(test_data_save_dir, function + '_waveforms.P'), 'wb') as save_file:
+            pickle.dump(waveforms, save_file)
+        data_taken[function] = True
     return waveforms
