@@ -20,6 +20,30 @@ from datetime import datetime
 from IM import intensity_measures
 from IM import read_waveform
 from qcore import utils, timeseries, pool_wrapper
+import pickle
+
+test_data_save_dir = '/home/jpa198/test_space/im_calc_test/pickled/Hossack_HYP01-10_S1244'
+REALISATION = 'Hossack_HYP01-10_S1244'
+data_taken = {'convert_str_comp': False,
+              'array_to_dict': False,
+              'compute_measure_single': False,
+              'get_bbseis': False,
+              'compute_measures_multiprocess': False,
+              'get_result_filepath': False,
+              'get_header': False,
+              'get_comp_name_and_list': False,
+              'write_rows': False,
+              'write_result': False,
+              'generate_metadata': False,
+              'get_comp_help': False,
+              'get_im_or_period_help': False,
+              'validate_input_path': False,
+              'validate_comp': False,
+              'validate_im': False,
+              'validate_period': False,
+              'get_steps': False,
+              }
+
 
 G = 981.0
 IMS = ["PGA", "PGV", "CAV", "AI", "Ds575", "Ds595", "MMI", "pSA"]
@@ -64,10 +88,20 @@ def convert_str_comp(comp):
     :param comp: user input
     :return: converted comp
     """
+    function = 'convert_str_comp'
+    if not data_taken[function]:
+        with open(os.path.join(test_data_save_dir, function + '_comp.P'), 'wb') as save_file:
+            pickle.dump(comp, save_file)
+
     if comp == "ellipsis":
         converted_comp = Ellipsis
     else:
         converted_comp = EXT_IDX_DICT[comp]
+
+    if not data_taken[function]:
+        with open(os.path.join(test_data_save_dir, function + '_converted_comp.P'), 'wb') as save_file:
+            pickle.dump(converted_comp, save_file)
+        data_taken[function] = True
     return converted_comp
 
 
@@ -80,6 +114,17 @@ def array_to_dict(value, comp, converted_comp, im):
     :param im:
     :return: a dict {comp: value}
     """
+    function = 'array_to_dict'
+    if not data_taken[function]:
+        with open(os.path.join(test_data_save_dir, function + '_value.P'), 'wb') as save_file:
+            pickle.dump(value, save_file)
+        with open(os.path.join(test_data_save_dir, function + '_comp.P'), 'wb') as save_file:
+            pickle.dump(comp, save_file)
+        with open(os.path.join(test_data_save_dir, function + '_converted_comp.P'), 'wb') as save_file:
+            pickle.dump(converted_comp, save_file)
+        with open(os.path.join(test_data_save_dir, function + '_im.P'), 'wb') as save_file:
+            pickle.dump(im, save_file)
+
     value_dict = {}
     if converted_comp == Ellipsis:
         comps = list(EXT_IDX_DICT.keys())
@@ -101,6 +146,12 @@ def array_to_dict(value, comp, converted_comp, im):
         if im == "MMI":
             value = value.item(0)  # mmi somehow returns a single array instead of a num
         value_dict[comp] = value
+
+    if not data_taken[function]:
+        with open(os.path.join(test_data_save_dir, function + '_value_dict.P'), 'wb') as save_file:
+            pickle.dump(value_dict, save_file)
+        data_taken[function] = True
+
     return value_dict
 
 
@@ -111,6 +162,12 @@ def compute_measure_single(value_tuple):
     waveform: a single tuple that contains (waveform_acc,waveform_vel)
     :return: {result[station_name]: {[im]: value or (period,value}}
     """
+
+    function = 'compute_measure_single'
+    if not data_taken[function]:
+        with open(os.path.join(test_data_save_dir, function + '_value_tuple.P'), 'wb') as save_file:
+            pickle.dump(value_tuple, save_file)
+
     waveform, ims, comp, period = value_tuple
     result = {}
     waveform_acc, waveform_vel = waveform
@@ -170,6 +227,11 @@ def compute_measure_single(value_tuple):
         else:
             result[station_name][im] = value_dict
 
+    if not data_taken[function]:
+        with open(os.path.join(test_data_save_dir, function + '_result.P'), 'wb') as save_file:
+            pickle.dump(result, save_file)
+        data_taken[function] = True
+
     return result
 
 
@@ -180,6 +242,15 @@ def get_bbseis(input_path, file_type, selected_stations):
     :param selected_stations: list of user input stations
     :return: bbseries, station_names
     """
+    function = 'compute_measure_single'
+    if not data_taken[function]:
+        with open(os.path.join(test_data_save_dir, function + '_input_path.P'), 'wb') as save_file:
+            pickle.dump(input_path, save_file)
+        with open(os.path.join(test_data_save_dir, function + '_file_type.P'), 'wb') as save_file:
+            pickle.dump(file_type, save_file)
+        with open(os.path.join(test_data_save_dir, function + '_selected_stations.P'), 'wb') as save_file:
+            pickle.dump(selected_stations, save_file)
+
     bbseries = None
     if file_type == FILE_TYPE_DICT["b"]:
         bbseries = timeseries.BBSeis(input_path)
@@ -187,18 +258,13 @@ def get_bbseis(input_path, file_type, selected_stations):
             station_names = bbseries.stations.name
         else:
             station_names = selected_stations
-    elif file_type == FILE_TYPE_DICT["a"]:
-        search_path = os.path.abspath(os.path.join(input_path, "*"))
-        files = glob.glob(search_path)
-        station_names = set(map(read_waveform.get_station_name_from_filepath, files))
-        if selected_stations is not None:
-            station_names = station_names.intersection(selected_stations)
-            if len(station_names) == 0:  # empty set
-                sys.exit(
-                    "could not find specified stations {} in folder {}".format(
-                        selected_stations, input_path
-                    )
-                )
+
+    if not data_taken[function]:
+        with open(os.path.join(test_data_save_dir, function + '_bbseries.P'), 'wb') as save_file:
+            pickle.dump(bbseries, save_file)
+        with open(os.path.join(test_data_save_dir, function + '_station_names.P'), 'wb') as save_file:
+            pickle.dump(list(station_names), save_file)
+        data_taken[function] = True
     return bbseries, list(station_names)
 
 
@@ -369,6 +435,27 @@ def write_result(
     :param simple_output
     :return:output result into csvs
     """
+
+    function = 'write_result'
+    if not data_taken[function]:
+        with open(os.path.join(test_data_save_dir, function + '_result_dict.P'), 'wb') as save_file:
+            pickle.dump(result_dict, save_file)
+        with open(os.path.join(test_data_save_dir, function + '_output_folder.P'), 'wb') as save_file:
+            pickle.dump(output_folder, save_file)
+        with open(os.path.join(test_data_save_dir, function + '_identifier.P'), 'wb') as save_file:
+            pickle.dump(identifier, save_file)
+        with open(os.path.join(test_data_save_dir, function + '_comp.P'), 'wb') as save_file:
+            pickle.dump(comp, save_file)
+        with open(os.path.join(test_data_save_dir, function + '_ims.P'), 'wb') as save_file:
+            pickle.dump(ims, save_file)
+        with open(os.path.join(test_data_save_dir, function + '_period.P'), 'wb') as save_file:
+            pickle.dump(period, save_file)
+        with open(os.path.join(test_data_save_dir, function + '_geom_only.P'), 'wb') as save_file:
+            pickle.dump(geom_only, save_file)
+        with open(os.path.join(test_data_save_dir, function + '_simple_output.P'), 'wb') as save_file:
+            pickle.dump(simple_output, save_file)
+        data_taken[function] = True
+
     output_path = get_result_filepath(output_folder, identifier, ".csv")
     header = get_header(ims, period)
     comp_name, comps = get_comp_name_and_list(comp, geom_only)
@@ -415,8 +502,22 @@ def generate_metadata(output_folder, identifier, rupture, run_type, version):
     :return:
     """
     date = datetime.now().strftime("%Y%m%d_%H%M%S")
-    output_path = get_result_filepath(output_folder, identifier, "_imcalc.info")
 
+    function = 'generate_metadata'
+    if not data_taken[function]:
+        with open(os.path.join(test_data_save_dir, function + '_output_folder.P'), 'wb') as save_file:
+            pickle.dump(output_folder, save_file)
+        with open(os.path.join(test_data_save_dir, function + '_identifier.P'), 'wb') as save_file:
+            pickle.dump(identifier, save_file)
+        with open(os.path.join(test_data_save_dir, function + '_rupture.P'), 'wb') as save_file:
+            pickle.dump(rupture, save_file)
+        with open(os.path.join(test_data_save_dir, function + '_run_type.P'), 'wb') as save_file:
+            pickle.dump(run_type, save_file)
+        with open(os.path.join(test_data_save_dir, function + '_version.P'), 'wb') as save_file:
+            pickle.dump(version, save_file)
+        data_taken[function] = True
+
+    output_path = get_result_filepath(output_folder, identifier, "_imcalc.info")
     with open(output_path, "w") as meta_file:
         meta_writer = csv.writer(meta_file, delimiter=",", quotechar="|")
         meta_writer.writerow(["identifier", "rupture", "type", "date", "version"])
@@ -427,12 +528,16 @@ def get_comp_help():
     """
     :return: a help message for input component arg
     """
-    return (
-        "Available compoents are: {},ellipsis. ellipsis contains all {} "
-        "components. Default is ellipsis".format(
+    ret_val = "Available compoents are: {},ellipsis. ellipsis contains all {} components. Default is ellipsis".format(
             ",".join(list(EXT_IDX_DICT.keys())), len(list(EXT_IDX_DICT.keys()))
         )
-    )
+
+    function = 'get_comp_help'
+    if not data_taken[function]:
+        with open(os.path.join(test_data_save_dir, function + '_ret_val.P'), 'wb') as save_file:
+            pickle.dump(ret_val, save_file)
+        data_taken[function] = True
+    return (ret_val)
 
 
 def get_im_or_period_help(default_values, im_or_period):
@@ -441,9 +546,22 @@ def get_im_or_period_help(default_values, im_or_period):
     :param im_or_period: should be either string "im" or string "period"
     :return: a help message for input component arg
     """
-    return "Available and default {}s are: {}".format(
+    function = 'get_im_or_period_help'
+    if not data_taken[function]:
+        with open(os.path.join(test_data_save_dir, function + '_default_values.P'), 'wb') as save_file:
+            pickle.dump(default_values, save_file)
+        with open(os.path.join(test_data_save_dir, function + '_im_or_period.P'), 'wb') as save_file:
+            pickle.dump(im_or_period, save_file)
+
+    ret_val = "Available and default {}s are: {}".format(
         im_or_period, ",".join(str(v) for v in default_values)
     )
+
+    if not data_taken[function]:
+        with open(os.path.join(test_data_save_dir, function + '_ret_val.P'), 'wb') as save_file:
+            pickle.dump(ret_val, save_file)
+        data_taken[function] = True
+    return ret_val
 
 
 def validate_input_path(parser, arg_input, arg_file_type):
@@ -454,6 +572,15 @@ def validate_input_path(parser, arg_input, arg_file_type):
     :param arg_file_type:
     :return:
     """
+
+    function = 'validate_input_path'
+    if not data_taken[function]:
+        with open(os.path.join(test_data_save_dir, function + '_arg_input.P'), 'wb') as save_file:
+            pickle.dump(arg_input, save_file)
+        with open(os.path.join(test_data_save_dir, function + '_arg_file_type.P'), 'wb') as save_file:
+            pickle.dump(arg_file_type, save_file)
+        data_taken[function] = True
+
     if not os.path.exists(arg_input):
         parser.error("{} does not exist".format(arg_input))
 
@@ -478,16 +605,35 @@ def validate_comp(parser, arg_comp):
     :param arg_comp: user input
     :return: validated comp, only_geom flag
     """
+
+    function = 'validate_comp'
+    if not data_taken[function]:
+        with open(os.path.join(test_data_save_dir, function + '_arg_comp.P'), 'wb') as save_file:
+            pickle.dump(arg_comp, save_file)
+
     comp = arg_comp
     available_comps = list(EXT_IDX_DICT.keys())
     if comp not in available_comps and comp != "ellipsis":
-        parser.error("please enter a valid comp name. {}".format(get_comp_help()))
+        function = 'get_comp_help'
+        ret_val = get_comp_help()
+        if not data_taken[function]:
+            with open(os.path.join(test_data_save_dir, function + '_return_value.P'), 'wb') as save_file:
+                pickle.dump(ret_val, save_file)
+        parser.error("please enter a valid comp name. {}".format(ret_val))
     geom_only = (
         False
     )  # when only geom is needed, should be treated as ellipsis but only output geom to csv
     if comp == "geom":
         comp = "ellipsis"
         geom_only = True
+
+    if not data_taken[function]:
+        with open(os.path.join(test_data_save_dir, function + '_comp.P'), 'wb') as save_file:
+            pickle.dump(comp, save_file)
+        with open(os.path.join(test_data_save_dir, function + '_geom_only.P'), 'wb') as save_file:
+            pickle.dump(geom_only, save_file)
+        data_taken[function] = True
+
     return comp, geom_only
 
 
@@ -498,6 +644,11 @@ def validate_im(parser, arg_im):
     :param arg_im: input
     :return: validated im(s) in a list
     """
+    function = 'validate_im'
+    if not data_taken[function]:
+        with open(os.path.join(test_data_save_dir, function + '_arg_im.P'), 'wb') as save_file:
+            pickle.dump(arg_im, save_file)
+
     im = arg_im
     if im != IMS:
         for m in im:
@@ -507,6 +658,11 @@ def validate_im(parser, arg_im):
                         get_im_or_period_help(IMS, "IM")
                     )
                 )
+
+    if not data_taken[function]:
+        with open(os.path.join(test_data_save_dir, function + '_im.P'), 'wb') as save_file:
+            pickle.dump(im, save_file)
+        data_taken[function] = True
     return im
 
 
@@ -519,6 +675,15 @@ def validate_period(parser, arg_period, arg_extended_period, im):
     :param im: validated im(s) in a list
     :return: period(s) in a numpy array
     """
+    function = 'validate_period'
+    if not data_taken[function]:
+        with open(os.path.join(test_data_save_dir, function + '_arg_period.P'), 'wb') as save_file:
+            pickle.dump(arg_period, save_file)
+        with open(os.path.join(test_data_save_dir, function + '_arg_extended_period.P'), 'wb') as save_file:
+            pickle.dump(arg_extended_period, save_file)
+        with open(os.path.join(test_data_save_dir, function + '_im.P'), 'wb') as save_file:
+            pickle.dump(im, save_file)
+
     period = np.array(arg_period, dtype="float64")
 
     if arg_extended_period:
@@ -530,6 +695,10 @@ def validate_period(parser, arg_period, arg_extended_period, im):
             "IM measures entered"
         )
 
+    if not data_taken[function]:
+        with open(os.path.join(test_data_save_dir, function + '_period.P'), 'wb') as save_file:
+            pickle.dump(period, save_file)
+        data_taken[function] = True
     return period
 
 
@@ -540,12 +709,27 @@ def get_steps(input_path, nps, total_stations):
     :param total_stations: total number of stations
     :return: number of stations per iteration/batch
     """
+    function = 'get_steps'
+    if not data_taken[function]:
+        with open(os.path.join(test_data_save_dir, function + '_input_path.P'), 'wb') as save_file:
+            pickle.dump(input_path, save_file)
+        with open(os.path.join(test_data_save_dir, function + '_nps.P'), 'wb') as save_file:
+            pickle.dump(nps, save_file)
+        with open(os.path.join(test_data_save_dir, function + '_total_stations.P'), 'wb') as save_file:
+            pickle.dump(total_stations, save_file)
+
     estimated_mem = os.stat(input_path).st_size * MEM_FACTOR
     available_mem = nps * MEM_PER_CORE
     batches = np.ceil(np.divide(estimated_mem, available_mem))
     steps = int(np.floor(np.divide(total_stations, batches)))
     if steps == 0:
         steps = total_stations
+
+    if not data_taken[function]:
+        with open(os.path.join(test_data_save_dir, function + '_steps.P'), 'wb') as save_file:
+            pickle.dump(steps, save_file)
+        data_taken[function] = True
+
     return steps
 
 
