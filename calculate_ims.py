@@ -487,10 +487,6 @@ def write_rows(comps, station, ims, result_dict, big_csv_writer, sub_csv_writer=
             pickle.dump(ims, save_file)
         with open(os.path.join(test_data_save_dir, REALISATION, function + '_result_dict.P'), 'wb') as save_file:
             pickle.dump(result_dict, save_file)
-        with open(os.path.join(test_data_save_dir, REALISATION, function + '_big_csv_writer.P'), 'wb') as save_file:
-            pickle.dump(big_csv_writer, save_file)
-        with open(os.path.join(test_data_save_dir, REALISATION, function + '_sub_csv_writer.P'), 'wb') as save_file:
-            pickle.dump(sub_csv_writer, save_file)
         data_taken[function] = True
     for c in comps:
         row = [station.decode(), c]
