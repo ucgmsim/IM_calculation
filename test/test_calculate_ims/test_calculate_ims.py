@@ -59,13 +59,13 @@ def set_up():
 
         ZIP_DOWNLOAD_PATH = os.path.join(DATA_STORE_PATH, REALISATION+".zip")
         OUTPUT_DIR_PATH = os.path.join(DATA_STORE_PATH, "input")
-        os.makedirs(OUTPUT_DIR_PATH, exist_ok=True)
 
         DOWNLOAD_CMD = "wget -O {} {}".format(ZIP_DOWNLOAD_PATH, DATA_DOWNLOAD_PATH)
         UNZIP_CMD = "unzip {} -d {}".format(ZIP_DOWNLOAD_PATH, OUTPUT_DIR_PATH)
 
         test_data_save_dirs.append(DATA_STORE_PATH)
         if not os.path.isdir(DATA_STORE_PATH):
+            os.makedirs(OUTPUT_DIR_PATH, exist_ok=True)
             out, err = shared.exe(DOWNLOAD_CMD, debug=False)
             if b"failed" in err:
                 os.remove(ZIP_DOWNLOAD_PATH)
@@ -79,7 +79,7 @@ def set_up():
                 shutil.rmtree(OUTPUT_DIR_PATH)
                 sys.exit("{} failed to extract data folder".format(err))
         else:
-            print("Benchmark data folder already exits")
+            print("Benchmark data folder already exits: ", DATA_STORE_PATH)
 
     # Run all tests
     yield
@@ -143,4 +143,4 @@ class TestPickleTesting():
             sub_csv_writer = csv.writer(io.StringIO())
 
             calculate_ims.write_rows(comps, station, ims, result_dict, big_csv_writer, sub_csv_writer=sub_csv_writer)
-            #print(big_csv_writer.read())
+            print(big_csv.read())
