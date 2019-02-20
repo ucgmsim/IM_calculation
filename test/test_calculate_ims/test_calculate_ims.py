@@ -10,6 +10,7 @@ import os
 import getpass
 import sys
 import io
+import csv
 from qcore import shared
 
 from qcore import utils
@@ -97,8 +98,8 @@ def set_up():
     yield
 
     # Remove the test data directory
-    #for PATH in test_data_save_dirs:
-        #shutil.rmtree(PATH)
+    for PATH in test_data_save_dirs:
+        shutil.rmtree(PATH)
 
 
 class TestPickleTesting():
@@ -150,10 +151,13 @@ class TestPickleTesting():
                 ims = pickle.load(load_file)
             with open(os.path.join(root_path, function + '_result_dict.P'), 'rb') as load_file:
                 result_dict = pickle.load(load_file)
-            #big_csv_writer = io.TextIO()
-            #sub_csv_writer = io.TextIO()
 
-            #calculate_ims.write_rows(comps, station, ims, result_dict, big_csv_writer, sub_csv_writer=sub_csv_writer)
+            big_csv = io.StringIO()
+            big_csv_writer = csv.writer(big_csv)
+            sub_csv_writer = csv.writer(io.StringIO())
+
+            calculate_ims.write_rows(comps, station, ims, result_dict, big_csv_writer, sub_csv_writer=sub_csv_writer)
+            #print(big_csv_writer.read())
 
     def test_get_bbseis_selected_stations(self):
         function = 'get_bbseis'
@@ -170,4 +174,8 @@ class TestPickleTesting():
             print(value_to_test)
             print(converted_stations)
             assert value_to_test == converted_stations
+
+
+
+
 
