@@ -74,13 +74,13 @@ def set_up():
 
         ZIP_DOWNLOAD_PATH = os.path.join(DATA_STORE_PATH, REALISATION+".zip")
         OUTPUT_DIR_PATH = os.path.join(DATA_STORE_PATH, "input")
-        os.makedirs(OUTPUT_DIR_PATH, exist_ok=True)
 
         DOWNLOAD_CMD = "wget -O {} {}".format(ZIP_DOWNLOAD_PATH, DATA_DOWNLOAD_PATH)
         UNZIP_CMD = "unzip {} -d {}".format(ZIP_DOWNLOAD_PATH, OUTPUT_DIR_PATH)
 
         test_data_save_dirs.append(DATA_STORE_PATH)
         if not os.path.isdir(DATA_STORE_PATH):
+            os.makedirs(OUTPUT_DIR_PATH, exist_ok=True)
             out, err = shared.exe(DOWNLOAD_CMD, debug=False)
             if b"failed" in err:
                 os.remove(ZIP_DOWNLOAD_PATH)
@@ -94,7 +94,7 @@ def set_up():
                 shutil.rmtree(OUTPUT_DIR_PATH)
                 sys.exit("{} failed to extract data folder".format(err))
         else:
-            print("Benchmark data folder already exits")
+            print("Benchmark data folder already exits: ", DATA_STORE_PATH)
 
     # Run all tests
     yield
@@ -159,7 +159,7 @@ class TestPickleTesting():
             sub_csv_writer = csv.writer(io.StringIO())
 
             calculate_ims.write_rows(comps, station, ims, result_dict, big_csv_writer, sub_csv_writer=sub_csv_writer)
-            #print(big_csv_writer.read())
+            
 
     def test_get_bbseis_selected_stations(self):
         function = 'get_bbseis'
@@ -168,7 +168,7 @@ class TestPickleTesting():
                 stations = pickle.load(load_file)
                 print("stations", stations)
 
-            value_to_test = calculate_ims.get_bbseis(os.path.join(root_path, 'BB.bin'), 'binary', stations)[1]
+            value_to_test = calculate_ims.get_bbseis(os.path.join(root_path, INPUT, 'BB.bin'), 'binary', stations)[1]
 
             with open(os.path.join(root_path, INPUT, function + '_station_names.P'), 'rb') as load_file:
                 converted_stations = pickle.load(load_file)
@@ -176,8 +176,5 @@ class TestPickleTesting():
             print(value_to_test)
             print(converted_stations)
             assert value_to_test == converted_stations
-
-
-
 
 
