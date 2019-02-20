@@ -71,57 +71,6 @@ class TestPickleTesting():
 
             assert actual_converted_comp == expected_converted_comp
 
-    def test_get_comp_name_and_list(self):
-
-        function = 'get_comp_name_and_list'
-        for root_path in test_data_save_dirs:
-            with open(os.path.join(root_path, INPUT, function + '_comp.P'), 'rb') as load_file:
-                comp = pickle.load(load_file)
-            with open(os.path.join(root_path, INPUT, function + '_geom_only.P'), 'rb') as load_file:
-                geom_only = pickle.load(load_file)
-
-            actual_comp_name, actual_comps = calculate_ims.get_comp_name_and_list(comp, geom_only)
-
-            with open(os.path.join(root_path, OUTPUT, function + '_comp_name.P'), 'rb') as load_file:
-                expected_comp_name = pickle.load(load_file)
-            with open(os.path.join(root_path, OUTPUT, function + '_comps.P'), 'rb') as load_file:
-                expected_comps = pickle.load(load_file)
-
-            assert actual_comp_name == expected_comp_name
-            assert actual_comps == expected_comps
-
-    def test_write_rows(self):
-
-        function = 'write_rows'
-        for root_path in test_data_save_dirs:
-            with open(os.path.join(root_path, INPUT, function + '_comps.P'), 'rb') as load_file:
-                comps = pickle.load(load_file)
-            with open(os.path.join(root_path, INPUT, function + '_station.P'), 'rb') as load_file:
-                station = pickle.load(load_file)
-            with open(os.path.join(root_path, INPUT, function + '_ims.P'), 'rb') as load_file:
-                ims = pickle.load(load_file)
-            with open(os.path.join(root_path, INPUT, function + '_result_dict.P'), 'rb') as load_file:
-                result_dict = pickle.load(load_file)
-
-            big_csv = io.StringIO()
-            big_csv_writer = csv.writer(big_csv)
-            sub_csv_writer = csv.writer(io.StringIO())
-
-            calculate_ims.write_rows(comps, station, ims, result_dict, big_csv_writer, sub_csv_writer=sub_csv_writer)
-
-    def test_get_bbseis(self):
-        function = 'get_bbseis'
-        for root_path in test_data_save_dirs:
-            with open(os.path.join(root_path, INPUT, function + '_selected_stations.P'), 'rb') as load_file:
-                stations = pickle.load(load_file)
-
-            actual_converted_stations = calculate_ims.get_bbseis(os.path.join(root_path, INPUT, 'BB.bin'), 'binary', stations)[1]
-
-            with open(os.path.join(root_path, OUTPUT, function + '_station_names.P'), 'rb') as load_file:
-                expected_converted_stations = pickle.load(load_file)
-
-            assert actual_converted_stations == expected_converted_stations
-
     def test_array_to_dict(self):
         function = 'array_to_dict'
         for root_path in test_data_save_dirs:
@@ -153,6 +102,19 @@ class TestPickleTesting():
                 expected_result = pickle.load(load_file)
 
             compare_dicts(actual_result, expected_result)
+
+    def test_get_bbseis(self):
+        function = 'get_bbseis'
+        for root_path in test_data_save_dirs:
+            with open(os.path.join(root_path, INPUT, function + '_selected_stations.P'), 'rb') as load_file:
+                stations = pickle.load(load_file)
+
+            actual_converted_stations = calculate_ims.get_bbseis(os.path.join(root_path, INPUT, 'BB.bin'), 'binary', stations)[1]
+
+            with open(os.path.join(root_path, OUTPUT, function + '_station_names.P'), 'rb') as load_file:
+                expected_converted_stations = pickle.load(load_file)
+
+            assert actual_converted_stations == expected_converted_stations
 
     def test_compute_measures_multiprocess(self):
         function = 'compute_measures_multiprocess'
@@ -223,6 +185,44 @@ class TestPickleTesting():
                 expected_header = pickle.load(load_file)
 
             assert actual_header == expected_header
+
+    def test_get_comp_name_and_list(self):
+
+        function = 'get_comp_name_and_list'
+        for root_path in test_data_save_dirs:
+            with open(os.path.join(root_path, INPUT, function + '_comp.P'), 'rb') as load_file:
+                comp = pickle.load(load_file)
+            with open(os.path.join(root_path, INPUT, function + '_geom_only.P'), 'rb') as load_file:
+                geom_only = pickle.load(load_file)
+
+            actual_comp_name, actual_comps = calculate_ims.get_comp_name_and_list(comp, geom_only)
+
+            with open(os.path.join(root_path, OUTPUT, function + '_comp_name.P'), 'rb') as load_file:
+                expected_comp_name = pickle.load(load_file)
+            with open(os.path.join(root_path, OUTPUT, function + '_comps.P'), 'rb') as load_file:
+                expected_comps = pickle.load(load_file)
+
+            assert actual_comp_name == expected_comp_name
+            assert actual_comps == expected_comps
+
+    def test_write_rows(self):
+
+        function = 'write_rows'
+        for root_path in test_data_save_dirs:
+            with open(os.path.join(root_path, INPUT, function + '_comps.P'), 'rb') as load_file:
+                comps = pickle.load(load_file)
+            with open(os.path.join(root_path, INPUT, function + '_station.P'), 'rb') as load_file:
+                station = pickle.load(load_file)
+            with open(os.path.join(root_path, INPUT, function + '_ims.P'), 'rb') as load_file:
+                ims = pickle.load(load_file)
+            with open(os.path.join(root_path, INPUT, function + '_result_dict.P'), 'rb') as load_file:
+                result_dict = pickle.load(load_file)
+
+            big_csv = io.StringIO()
+            big_csv_writer = csv.writer(big_csv)
+            sub_csv_writer = csv.writer(io.StringIO())
+
+            calculate_ims.write_rows(comps, station, ims, result_dict, big_csv_writer, sub_csv_writer=sub_csv_writer)
 
     def test_write_result(self):
         function = 'write_result'
