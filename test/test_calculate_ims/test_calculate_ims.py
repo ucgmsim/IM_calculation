@@ -47,26 +47,32 @@ def test_validate_period_fail(test_period, test_extended, test_im):
 class TestPickleTesting():
 
     REALISATIONS = [('PangopangoF29_HYP01-10_S1244',"https://www.dropbox.com/sh/dgpfukqd01zucjv/AAA8iMASZWn5vbr0PdDCgTG3a?dl=0")]
-    # Run this once, but run it for any test/collection of tests that is run
+    test_data_save_dirs = []
+
+    # Run this once, but run it for any test/collection of tests that is run in this class
     @pytest.fixture(scope='class', autouse=True)
     def set_up(self):
         for (REALISATION, DATA_DOWNLOAD_PATH) in self.REALISATIONS:
-            DATA_STORE_PATH = os.path.join("/home", getpass.getuser(), REALISATION)
-            DOWNLOAD_CMD = "wget -O {} {}".format(DATA_STORE_PATH + '.zip', DATA_DOWNLOAD_PATH)
-            self.test_data_save_dir = os.path.join("/home", getpass.getuser(), REALISATION)
-            if not os.path.isfile(DATA_STORE_PATH):
+            DATA_STORE_PATH = os.path.join(".", "sample1")
+
+            ZIP_DOWNLOAD_PATH = os.path.join(".", "sample1", REALISATION+".zip")
+            OUTPUT_DIR_PATH = os.path.join(".", "sample1", "input")
+            DOWNLOAD_CMD = "wget -O {} {}".format(ZIP_DOWNLOAD_PATH, DATA_DOWNLOAD_PATH)
+            UNZIP_CMD = "unzip {} -d {}".format(ZIP_DOWNLOAD_PATH, OUTPUT_DIR_PATH)
+
+            self.test_data_save_dirs.append(OUTPUT_DIR_PATH)
+            if not os.path.isfile(OUTPUT_DIR_PATH):
                 out, err = shared.exe(DOWNLOAD_CMD, debug=False)
                 if b"failed" in err:
-                    os.remove(DATA_STORE_PATH+'.zip')
+                    os.remove(ZIP_DOWNLOAD_PATH)
                     sys.exit("{} failed to download data folder".format(err))
                 else:
                     print("Successfully downloaded benchmark data folder")
-                UNZIP_CMD = "unzip {} -d {}".format(os.path.join("/home", getpass.getuser(), REALISATION + '.zip'),
-                                                    os.path.join("/home", getpass.getuser(), REALISATION))
+
                 out, err = shared.exe(UNZIP_CMD, debug=False)
-                os.remove(DATA_STORE_PATH+'.zip')
+                os.remove(ZIP_DOWNLOAD_PATH)
                 if b"error" in err:
-                    shutil.rmtree(DATA_STORE_PATH)
+                    shutil.rmtree(OUTPUT_DIR_PATH)
                     sys.exit("{} failed to extract data folder".format(err))
             else:
                 print("Benchmark data folder already exits")
@@ -75,22 +81,25 @@ class TestPickleTesting():
         yield
 
         # Remove the test data directory
-        shutil.rmtree(DATA_STORE_PATH)
+        for _, PATH in self.REALISATIONS:
+            shutil.rmtree(PATH)
 
     def test_convert_str_comp(self):
 
         function = 'convert_str_comp'
-        with open(os.path.join(self.test_data_save_dir, function + '_comp.P'), 'rb') as load_file:
-            comp = pickle.load(load_file)
+        for _, root_path in self.REALISATIONS:
 
-        print(comp)
-        value_to_test = calculate_ims.convert_str_comp(comp)
+            with open(os.path.join(root_path, function + '_comp.P'), 'rb') as load_file:
+                comp = pickle.load(load_file)
 
-        with open(os.path.join(self.test_data_save_dir, function + '_converted_comp.P'), 'rb') as load_file:
-            converted_comp = pickle.load(load_file)
-        print(converted_comp)
+            print(comp)
+            value_to_test = calculate_ims.convert_str_comp(comp)
 
-        assert value_to_test == converted_comp
+            with open(os.path.join(root_path, function + '_converted_comp.P'), 'rb') as load_file:
+                converted_comp = pickle.load(load_file)
+            print(converted_comp)
+
+            assert value_to_test == converted_comp
 
     def t1est_get_comp_name_and_list(self):
 
@@ -100,10 +109,13 @@ class TestPickleTesting():
         with open(os.path.join(self.test_data_save_dir, function + '_geom_only.P'), 'rb') as load_file:
             geom_only = pickle.load(load_file)
 
-        value_to_test = calculate_ims.get_comp_name_and_list(comp, geom_only)
+        value1_to_test, value2_to_test = calculate_ims.get_comp_name_and_list(comp, geom_only)
 
         with open(os.path.join(self.test_data_save_dir, function + '_converted_comp.P'), 'rb') as load_file:
             converted_comp = pickle.load(load_file)
+        with open(os.path.join(self.test_data_save_dir, function + '_converted_comp.P'), 'rb') as load_file:
+            converted_comp2 = pickle.load(load_file)
 
-        assert value_to_test == converted_comp
+        assert value1_to_test == converted_comp
+        assert value2_to_test == converted_comp2
 
