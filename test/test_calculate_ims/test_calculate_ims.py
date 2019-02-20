@@ -60,10 +60,12 @@ def test_validate_input_path_fail(test_path, test_file_type):
     with pytest.raises(SystemExit):
         calculate_ims.validate_input_path(PARSER, test_path, test_file_type)
 
-
+INPUT = "input"
+OUTPUT = "output"
 REALISATIONS = [
-    ('PangopangoF29_HYP01-10_S1244', "https://www.dropbox.com/sh/dgpfukqd01zucjv/AAA8iMASZWn5vbr0PdDCgTG3a?dl=0")]
+        ('PangopangoF29_HYP01-10_S1244', "https://www.dropbox.com/sh/dgpfukqd01zucjv/AAA8iMASZWn5vbr0PdDCgTG3a?dl=0")]
 test_data_save_dirs = []
+
 # Run this once, but run it for any test/collection of tests that is run in this class
 @pytest.fixture(scope='session', autouse=True)
 def set_up():
@@ -77,8 +79,8 @@ def set_up():
         DOWNLOAD_CMD = "wget -O {} {}".format(ZIP_DOWNLOAD_PATH, DATA_DOWNLOAD_PATH)
         UNZIP_CMD = "unzip {} -d {}".format(ZIP_DOWNLOAD_PATH, OUTPUT_DIR_PATH)
 
-        test_data_save_dirs.append(OUTPUT_DIR_PATH)
-        if not os.path.isfile(OUTPUT_DIR_PATH):
+        test_data_save_dirs.append(DATA_STORE_PATH)
+        if not os.path.isdir(DATA_STORE_PATH):
             out, err = shared.exe(DOWNLOAD_CMD, debug=False)
             if b"failed" in err:
                 os.remove(ZIP_DOWNLOAD_PATH)
@@ -108,13 +110,13 @@ class TestPickleTesting():
         function = 'convert_str_comp'
         for root_path in test_data_save_dirs:
 
-            with open(os.path.join(root_path, function + '_comp.P'), 'rb') as load_file:
+            with open(os.path.join(root_path, INPUT, function + '_comp.P'), 'rb') as load_file:
                 comp = pickle.load(load_file)
 
             print(comp)
             value_to_test = calculate_ims.convert_str_comp(comp)
 
-            with open(os.path.join(root_path, function + '_converted_comp.P'), 'rb') as load_file:
+            with open(os.path.join(root_path, INPUT, function + '_converted_comp.P'), 'rb') as load_file:
                 converted_comp = pickle.load(load_file)
             print(converted_comp)
 
@@ -124,16 +126,16 @@ class TestPickleTesting():
 
         function = 'get_comp_name_and_list'
         for root_path in test_data_save_dirs:
-            with open(os.path.join(root_path, function + '_comp.P'), 'rb') as load_file:
+            with open(os.path.join(root_path, INPUT, function + '_comp.P'), 'rb') as load_file:
                 comp = pickle.load(load_file)
-            with open(os.path.join(root_path, function + '_geom_only.P'), 'rb') as load_file:
+            with open(os.path.join(root_path, INPUT, function + '_geom_only.P'), 'rb') as load_file:
                 geom_only = pickle.load(load_file)
 
             value1_to_test, value2_to_test = calculate_ims.get_comp_name_and_list(comp, geom_only)
 
-            with open(os.path.join(root_path, function + '_comp_name.P'), 'rb') as load_file:
+            with open(os.path.join(root_path, INPUT, function + '_comp_name.P'), 'rb') as load_file:
                 comp_name = pickle.load(load_file)
-            with open(os.path.join(root_path, function + '_comps.P'), 'rb') as load_file:
+            with open(os.path.join(root_path, INPUT, function + '_comps.P'), 'rb') as load_file:
                 comps = pickle.load(load_file)
 
             assert value1_to_test == comp_name
@@ -143,13 +145,13 @@ class TestPickleTesting():
 
         function = 'write_rows'
         for root_path in test_data_save_dirs:
-            with open(os.path.join(root_path, function + '_comps.P'), 'rb') as load_file:
+            with open(os.path.join(root_path, INPUT, function + '_comps.P'), 'rb') as load_file:
                 comps = pickle.load(load_file)
-            with open(os.path.join(root_path, function + '_station.P'), 'rb') as load_file:
+            with open(os.path.join(root_path, INPUT, function + '_station.P'), 'rb') as load_file:
                 station = pickle.load(load_file)
-            with open(os.path.join(root_path, function + '_ims.P'), 'rb') as load_file:
+            with open(os.path.join(root_path, INPUT, function + '_ims.P'), 'rb') as load_file:
                 ims = pickle.load(load_file)
-            with open(os.path.join(root_path, function + '_result_dict.P'), 'rb') as load_file:
+            with open(os.path.join(root_path, INPUT, function + '_result_dict.P'), 'rb') as load_file:
                 result_dict = pickle.load(load_file)
 
             big_csv = io.StringIO()
@@ -162,13 +164,13 @@ class TestPickleTesting():
     def test_get_bbseis_selected_stations(self):
         function = 'get_bbseis'
         for root_path in test_data_save_dirs:
-            with open(os.path.join(root_path, function + '_selected_stations.P'), 'rb') as load_file:
+            with open(os.path.join(root_path, INPUT, function + '_selected_stations.P'), 'rb') as load_file:
                 stations = pickle.load(load_file)
                 print("stations", stations)
 
             value_to_test = calculate_ims.get_bbseis(os.path.join(root_path, 'BB.bin'), 'binary', stations)[1]
 
-            with open(os.path.join(root_path, function + '_station_names.P'), 'rb') as load_file:
+            with open(os.path.join(root_path, INPUT, function + '_station_names.P'), 'rb') as load_file:
                 converted_stations = pickle.load(load_file)
 
             print(value_to_test)
