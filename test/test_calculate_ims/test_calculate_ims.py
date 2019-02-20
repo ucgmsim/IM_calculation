@@ -9,6 +9,7 @@ import os
 import getpass
 import sys
 import io
+import csv
 from qcore import shared
 
 #sys.path.insert(0, '../../')
@@ -125,7 +126,7 @@ class TestPickleTesting():
 
     def test_write_rows(self):
 
-        function = 'test_write_rows'
+        function = 'write_rows'
         for root_path in test_data_save_dirs:
             with open(os.path.join(root_path, function + '_comps.P'), 'rb') as load_file:
                 comps = pickle.load(load_file)
@@ -135,7 +136,9 @@ class TestPickleTesting():
                 ims = pickle.load(load_file)
             with open(os.path.join(root_path, function + '_result_dict.P'), 'rb') as load_file:
                 result_dict = pickle.load(load_file)
-            big_csv_writer = io.TextIO()
-            sub_csv_writer = io.TextIO()
+            big_csv = io.StringIO()
+            big_csv_writer = csv.writer(big_csv)
+            sub_csv_writer = csv.writer(io.StringIO())
 
             calculate_ims.write_rows(comps, station, ims, result_dict, big_csv_writer, sub_csv_writer=sub_csv_writer)
+            #print(big_csv_writer.read())
