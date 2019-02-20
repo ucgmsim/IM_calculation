@@ -242,7 +242,7 @@ def get_bbseis(input_path, file_type, selected_stations):
     :param selected_stations: list of user input stations
     :return: bbseries, station_names
     """
-    function = 'compute_measure_single'
+    function = 'get_bbseis'
     if not data_taken[function]:
         with open(os.path.join(test_data_save_dir, REALISATION, function + '_input_path.P'), 'wb') as save_file:
             pickle.dump(input_path, save_file)
@@ -307,6 +307,40 @@ def compute_measures_multiprocess(
     :param simple_output:
     :return:
     """
+    function = 'compute_measures_multiprocess'
+    if not data_taken[function]:
+        with open(os.path.join(test_data_save_dir, REALISATION, function + '_input_path.P'), 'wb') as save_file:
+            pickle.dump(input_path, save_file)
+        with open(os.path.join(test_data_save_dir, REALISATION, function + '_file_type.P'), 'wb') as save_file:
+            pickle.dump(file_type, save_file)
+        with open(os.path.join(test_data_save_dir, REALISATION, function + '_geom_only.P'), 'wb') as save_file:
+            pickle.dump(geom_only, save_file)
+        with open(os.path.join(test_data_save_dir, REALISATION, function + '_wave_type.P'), 'wb') as save_file:
+            pickle.dump(wave_type, save_file)
+        with open(os.path.join(test_data_save_dir, REALISATION, function + '_station_names.P'), 'wb') as save_file:
+            pickle.dump(station_names, save_file)
+        with open(os.path.join(test_data_save_dir, REALISATION, function + '_ims.P'), 'wb') as save_file:
+            pickle.dump(ims, save_file)
+        with open(os.path.join(test_data_save_dir, REALISATION, function + '_comp.P'), 'wb') as save_file:
+            pickle.dump(comp, save_file)
+        with open(os.path.join(test_data_save_dir, REALISATION, function + '_period.P'), 'wb') as save_file:
+            pickle.dump(period, save_file)
+        with open(os.path.join(test_data_save_dir, REALISATION, function + '_output.P'), 'wb') as save_file:
+            pickle.dump(output, save_file)
+        with open(os.path.join(test_data_save_dir, REALISATION, function + '_identifier.P'), 'wb') as save_file:
+            pickle.dump(identifier, save_file)
+        with open(os.path.join(test_data_save_dir, REALISATION, function + '_rupture.P'), 'wb') as save_file:
+            pickle.dump(rupture, save_file)
+        with open(os.path.join(test_data_save_dir, REALISATION, function + '_run_type.P'), 'wb') as save_file:
+            pickle.dump(run_type, save_file)
+        with open(os.path.join(test_data_save_dir, REALISATION, function + '_version.P'), 'wb') as save_file:
+            pickle.dump(version, save_file)
+        with open(os.path.join(test_data_save_dir, REALISATION, function + '_process.P'), 'wb') as save_file:
+            pickle.dump(process, save_file)
+        with open(os.path.join(test_data_save_dir, REALISATION, function + '_simple_output.P'), 'wb') as save_file:
+            pickle.dump(simple_output, save_file)
+        data_taken[function] = True
+
     converted_comp = convert_str_comp(comp)
 
     bbseries, station_names = get_bbseis(input_path, file_type, station_names)
@@ -346,7 +380,20 @@ def compute_measures_multiprocess(
 
 
 def get_result_filepath(output_folder, arg_identifier, suffix):
-    return os.path.join(output_folder, "{}{}".format(arg_identifier, suffix))
+    function = 'get_result_filepath'
+    if not data_taken[function]:
+        with open(os.path.join(test_data_save_dir, REALISATION, function + '_output_folder.P'), 'wb') as save_file:
+            pickle.dump(output_folder, save_file)
+        with open(os.path.join(test_data_save_dir, REALISATION, function + '_arg_identifier.P'), 'wb') as save_file:
+            pickle.dump(arg_identifier, save_file)
+        with open(os.path.join(test_data_save_dir, REALISATION, function + '_suffix.P'), 'wb') as save_file:
+            pickle.dump(suffix, save_file)
+    ret_val = os.path.join(output_folder, "{}{}".format(arg_identifier, suffix))
+    if not data_taken[function]:
+        with open(os.path.join(test_data_save_dir, REALISATION, function + '_ret_val.P'), 'wb') as save_file:
+            pickle.dump(ret_val, save_file)
+        data_taken[function] = True
+    return ret_val
 
 
 def get_header(ims, period):
@@ -356,6 +403,12 @@ def get_header(ims, period):
     :param period: a list of pSA periods
     :return: header
     """
+    function = 'get_header'
+    if not data_taken[function]:
+        with open(os.path.join(test_data_save_dir, REALISATION, function + '_ims.P'), 'wb') as save_file:
+            pickle.dump(ims, save_file)
+        with open(os.path.join(test_data_save_dir, REALISATION, function + '_period.P'), 'wb') as save_file:
+            pickle.dump(period, save_file)
     header = ["station", "component"]
     psa_names = []
 
@@ -369,6 +422,10 @@ def get_header(ims, period):
             header += psa_names
         else:
             header.append(im)
+    if not data_taken[function]:
+        with open(os.path.join(test_data_save_dir, REALISATION, function + '_header.P'), 'wb') as save_file:
+            pickle.dump(header, save_file)
+        data_taken[function] = True
     return header
 
 
@@ -382,6 +439,12 @@ def get_comp_name_and_list(comp, geom_only):
     :param output_folder:
     :return: comp_list, geom_only flag
     """
+    function = 'get_comp_name_and_list'
+    if not data_taken[function]:
+        with open(os.path.join(test_data_save_dir, REALISATION, function + '_comp.P'), 'wb') as save_file:
+            pickle.dump(comp, save_file)
+        with open(os.path.join(test_data_save_dir, REALISATION, function + '_geom_only.P'), 'wb') as save_file:
+            pickle.dump(geom_only, save_file)
     if geom_only:
         comp_name = "_geom"
         comps = ["geom"]
@@ -394,6 +457,12 @@ def get_comp_name_and_list(comp, geom_only):
         comp_name = "_{}".format(comp)
         comps = [comp]
 
+    if not data_taken[function]:
+        with open(os.path.join(test_data_save_dir, REALISATION, function + '_comp_name.P'), 'wb') as save_file:
+            pickle.dump(comp_name, save_file)
+        with open(os.path.join(test_data_save_dir, REALISATION, function + '_comps.P'), 'wb') as save_file:
+            pickle.dump(comps, save_file)
+        data_taken[function] = True
     return comp_name, comps
 
 
@@ -878,6 +947,7 @@ def main():
     )
 
     print("Calculations are outputted to {}".format(args.output_path))
+    print(data_taken)
 
 
 if __name__ == "__main__":
