@@ -477,6 +477,21 @@ def write_rows(comps, station, ims, result_dict, big_csv_writer, sub_csv_writer=
     :param sub_csv_writer:
     :return: write a single row
     """
+    function = 'write_rows'
+    if not data_taken[function]:
+        with open(os.path.join(test_data_save_dir, REALISATION, function + '_comps.P'), 'wb') as save_file:
+            pickle.dump(comps, save_file)
+        with open(os.path.join(test_data_save_dir, REALISATION, function + '_station.P'), 'wb') as save_file:
+            pickle.dump(station, save_file)
+        with open(os.path.join(test_data_save_dir, REALISATION, function + '_ims.P'), 'wb') as save_file:
+            pickle.dump(ims, save_file)
+        with open(os.path.join(test_data_save_dir, REALISATION, function + '_result_dict.P'), 'wb') as save_file:
+            pickle.dump(result_dict, save_file)
+        with open(os.path.join(test_data_save_dir, REALISATION, function + '_big_csv_writer.P'), 'wb') as save_file:
+            pickle.dump(big_csv_writer, save_file)
+        with open(os.path.join(test_data_save_dir, REALISATION, function + '_sub_csv_writer.P'), 'wb') as save_file:
+            pickle.dump(sub_csv_writer, save_file)
+        data_taken[function] = True
     for c in comps:
         row = [station.decode(), c]
         for im in ims:
