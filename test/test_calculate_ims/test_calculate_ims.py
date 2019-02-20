@@ -285,3 +285,76 @@ class TestPickleTesting():
                 expected_ret_val = pickle.load(load_file)
 
             assert actual_ret_val == expected_ret_val
+
+    def test_validate_input_path(self):
+        function = 'validate_input_path'
+        for root_path in test_data_save_dirs:
+            with open(os.path.join(root_path, INPUT, function + '_arg_input.P'), 'rb') as load_file:
+                arg_input = pickle.load(load_file)
+            with open(os.path.join(root_path, INPUT, function + '_arg_file_type.P'), 'rb') as load_file:
+                arg_file_type = pickle.load(load_file)
+
+            calculate_ims.validate_input_path(PARSER, arg_input, arg_file_type)
+
+    def test_validate_comp(self):
+        function = 'validate_comp'
+        for root_path in test_data_save_dirs:
+            with open(os.path.join(root_path, INPUT, function + '_arg_comp.P'), 'rb') as load_file:
+                arg_comp = pickle.load(load_file)
+
+            actual_comp, acutal_geom_only = calculate_ims.validate_comp(PARSER, arg_comp)
+
+            with open(os.path.join(root_path, OUTPUT, function + '_comp.P'), 'rb') as load_file:
+                expected_comp = pickle.load(load_file)
+            with open(os.path.join(root_path, OUTPUT, function + '_geom_only.P'), 'rb') as load_file:
+                expected_geom_only = pickle.load(load_file)
+
+            assert actual_comp == expected_comp
+            assert acutal_geom_only == expected_geom_only
+
+    def test_validate_im(self):
+        function = 'validate_im'
+        for root_path in test_data_save_dirs:
+            with open(os.path.join(root_path, INPUT, function + '_arg_im.P'), 'rb') as load_file:
+                arg_im = pickle.load(load_file)
+
+            actual_im = calculate_ims.validate_im(PARSER, arg_im)
+
+            with open(os.path.join(root_path, OUTPUT, function + '_im.P'), 'rb') as load_file:
+                expected_im = pickle.load(load_file)
+
+            assert actual_im == expected_im
+
+    def test_validate_period(self):
+        function = 'validate_period'
+        for root_path in test_data_save_dirs:
+            with open(os.path.join(root_path, INPUT, function + '_arg_period.P'), 'rb') as load_file:
+                arg_period = pickle.load(load_file)
+            with open(os.path.join(root_path, INPUT, function + '_arg_extended_period.P'), 'rb') as load_file:
+                arg_extended_period = pickle.load(load_file)
+            with open(os.path.join(root_path, INPUT, function + '_im.P'), 'rb') as load_file:
+                im = pickle.load(load_file)
+
+            actual_period = calculate_ims.validate_period(PARSER, arg_period, arg_extended_period, im)
+
+            with open(os.path.join(root_path, OUTPUT, function + '_period.P'), 'rb') as load_file:
+                expected_period = pickle.load(load_file)
+
+            assert not (actual_period - expected_period).any()
+
+    def test_get_steps(self):
+        function = 'get_steps'
+        for root_path in test_data_save_dirs:
+            with open(os.path.join(root_path, INPUT, function + '_input_path.P'), 'rb') as load_file:
+                input_path = pickle.load(load_file)
+            with open(os.path.join(root_path, INPUT, function + '_nps.P'), 'rb') as load_file:
+                nps = pickle.load(load_file)
+            with open(os.path.join(root_path, INPUT, function + '_total_stations.P'), 'rb') as load_file:
+                total_stations = pickle.load(load_file)
+
+            actual_steps = calculate_ims.get_steps(input_path, nps, total_stations)
+
+            with open(os.path.join(root_path, OUTPUT, function + '_steps.P'), 'rb') as load_file:
+                expected_steps = pickle.load(load_file)
+
+            assert actual_steps == expected_steps

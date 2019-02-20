@@ -102,7 +102,7 @@ def computeRrup(station_file, srf_file, match_stations, n_processes):
     try:
         finite_fault = read_latlondepth(srf_file)
     except IOError:
-        print 'SRF filename is not valid. Returning from function computeRrup'
+        print('SRF filename is not valid. Returning from function computeRrup')
         raise
         return
 
