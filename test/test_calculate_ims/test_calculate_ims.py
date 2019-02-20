@@ -8,6 +8,7 @@ import calculate_ims
 import os
 import getpass
 import sys
+import io
 from qcore import shared
 
 #sys.path.insert(0, '../../')
@@ -134,7 +135,7 @@ class TestPickleTesting():
                 ims = pickle.load(load_file)
             with open(os.path.join(root_path, function + '_result_dict.P'), 'rb') as load_file:
                 result_dict = pickle.load(load_file)
-            big_csv_writer = None
-            sub_csv_writer = None
+            big_csv_writer = io.TextIO()
+            sub_csv_writer = io.TextIO()
 
             calculate_ims.write_rows(comps, station, ims, result_dict, big_csv_writer, sub_csv_writer=sub_csv_writer)
