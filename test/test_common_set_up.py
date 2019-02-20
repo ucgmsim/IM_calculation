@@ -2,6 +2,7 @@ import os
 from qcore import shared
 import shutil
 import sys
+import pytest
 
 INPUT = "input"
 OUTPUT = "output"
@@ -43,5 +44,5 @@ def set_up():
     yield
 
     # Remove the test data directory
-    #for PATH in test_data_save_dirs:
-        #shutil.rmtree(PATH)
+    for PATH in test_data_save_dirs:
+        shutil.rmtree(PATH)

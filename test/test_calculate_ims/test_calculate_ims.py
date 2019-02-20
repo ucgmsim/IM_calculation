@@ -1,17 +1,11 @@
-import sys
-import shutil
 import numpy as np
 import argparse
 import pickle
 import pytest
-import shutil
 import calculate_ims
 import os
-import getpass
-import sys
 import io
 import csv
-from qcore import shared
 
 from qcore import utils
 
@@ -115,7 +109,7 @@ class TestPickleTesting():
 
             calculate_ims.write_rows(comps, station, ims, result_dict, big_csv_writer, sub_csv_writer=sub_csv_writer)
 
-    def test_get_bbseis_selected_stations(self):
+    def test_get_bbseis(self):
         function = 'get_bbseis'
         for root_path in test_data_save_dirs:
             with open(os.path.join(root_path, INPUT, function + '_selected_stations.P'), 'rb') as load_file:
@@ -146,3 +140,29 @@ class TestPickleTesting():
                 expected_value_dict = pickle.load(load_file)
 
             assert actual_value_dict == expected_value_dict
+
+    def test_compute_measure_single(selfs):
+        function = 'compute_measure_single'
+        for root_path in test_data_save_dirs:
+            with open(os.path.join(root_path, INPUT, function + '_value_tuple.P'), 'rb') as load_file:
+                value_tuple = pickle.load(load_file)
+
+            actual_result = calculate_ims.compute_measure_single(value_tuple)
+
+            with open(os.path.join(root_path, OUTPUT, function + '_result.P'), 'rb') as load_file:
+                expected_result = pickle.load(load_file)
+
+            assert actual_result == expected_result
+
+    def test_compute_measures_multiprocess(selfs):
+        function = 'compute_measures_multiprocess'
+        for root_path in test_data_save_dirs:
+            with open(os.path.join(root_path, INPUT, function + '_value_tuple.P'), 'rb') as load_file:
+                value_tuple = pickle.load(load_file)
+
+            actual_result = calculate_ims.compute_measure_single(value_tuple)
+
+            with open(os.path.join(root_path, OUTPUT, function + '_result.P'), 'rb') as load_file:
+                expected_result = pickle.load(load_file)
+
+            #assert actual_result == expected_result
