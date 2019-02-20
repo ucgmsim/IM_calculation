@@ -1,11 +1,16 @@
-import os
 import sys
 import numpy as np
 import argparse
+import pickle
 import pytest
-sys.path.insert(0, '../../')
+import shutil
 import calculate_ims
+import os
+import getpass
+import sys
+from qcore import shared
 
+#sys.path.insert(0, '../../')
 
 PARSER = argparse.ArgumentParser()
 BSC_PERIOD = [0.05, 0.1,  5.0, 10.0]
@@ -38,3 +43,67 @@ def test_validate_period(test_period, test_extended, test_im, expected_period):
 def test_validate_period_fail(test_period, test_extended, test_im):
     with pytest.raises(SystemExit):
         calculate_ims.validate_period(PARSER, test_period, test_extended, test_im)
+
+class TestPickleTesting():
+
+    REALISATIONS = [('PangopangoF29_HYP01-10_S1244',"https://www.dropbox.com/sh/dgpfukqd01zucjv/AAA8iMASZWn5vbr0PdDCgTG3a?dl=0")]
+    # Run this once, but run it for any test/collection of tests that is run
+    @pytest.fixture(scope='class', autouse=True)
+    def set_up(self):
+        for (REALISATION, DATA_DOWNLOAD_PATH) in self.REALISATIONS:
+            DATA_STORE_PATH = os.path.join("/home", getpass.getuser(), REALISATION)
+            DOWNLOAD_CMD = "wget -O {} {}".format(DATA_STORE_PATH + '.zip', DATA_DOWNLOAD_PATH)
+            self.test_data_save_dir = os.path.join("/home", getpass.getuser(), REALISATION)
+            if not os.path.isfile(DATA_STORE_PATH):
+                out, err = shared.exe(DOWNLOAD_CMD, debug=False)
+                if b"failed" in err:
+                    os.remove(DATA_STORE_PATH+'.zip')
+                    sys.exit("{} failed to download data folder".format(err))
+                else:
+                    print("Successfully downloaded benchmark data folder")
+                UNZIP_CMD = "unzip {} -d {}".format(os.path.join("/home", getpass.getuser(), REALISATION + '.zip'),
+                                                    os.path.join("/home", getpass.getuser(), REALISATION))
+                out, err = shared.exe(UNZIP_CMD, debug=False)
+                os.remove(DATA_STORE_PATH+'.zip')
+                if b"error" in err:
+                    shutil.rmtree(DATA_STORE_PATH)
+                    sys.exit("{} failed to extract data folder".format(err))
+            else:
+                print("Benchmark data folder already exits")
+
+        # Run all tests
+        yield
+
+        # Remove the test data directory
+        shutil.rmtree(DATA_STORE_PATH)
+
+    def test_convert_str_comp(self):
+
+        function = 'convert_str_comp'
+        with open(os.path.join(self.test_data_save_dir, function + '_comp.P'), 'rb') as load_file:
+            comp = pickle.load(load_file)
+
+        print(comp)
+        value_to_test = calculate_ims.convert_str_comp(comp)
+
+        with open(os.path.join(self.test_data_save_dir, function + '_converted_comp.P'), 'rb') as load_file:
+            converted_comp = pickle.load(load_file)
+        print(converted_comp)
+
+        assert value_to_test == converted_comp
+
+    def t1est_get_comp_name_and_list(self):
+
+        function = 'get_comp_name_and_list'
+        with open(os.path.join(self.test_data_save_dir, function + '_comp.P'), 'rb') as load_file:
+            comp = pickle.load(load_file)
+        with open(os.path.join(self.test_data_save_dir, function + '_geom_only.P'), 'rb') as load_file:
+            geom_only = pickle.load(load_file)
+
+        value_to_test = calculate_ims.get_comp_name_and_list(comp, geom_only)
+
+        with open(os.path.join(self.test_data_save_dir, function + '_converted_comp.P'), 'rb') as load_file:
+            converted_comp = pickle.load(load_file)
+
+        assert value_to_test == converted_comp
+
