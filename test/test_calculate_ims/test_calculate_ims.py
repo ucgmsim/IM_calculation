@@ -1,15 +1,21 @@
 import os
 import sys
+import shutil
 import numpy as np
 import argparse
 import pytest
 sys.path.insert(0, '../../')
 import calculate_ims
 
+from qcore import utils
+
 
 PARSER = argparse.ArgumentParser()
 BSC_PERIOD = [0.05, 0.1,  5.0, 10.0]
 TEST_IMS = ['PGA', 'PGV', 'Ds575', 'pSA']
+
+FAKE_DIR = 'fake_dir' # should be in set_up module and remove in tear_down module
+utils.setup_dir("fake_dir")
 
 
 @pytest.mark.parametrize(
@@ -38,3 +44,13 @@ def test_validate_period(test_period, test_extended, test_im, expected_period):
 def test_validate_period_fail(test_period, test_extended, test_im):
     with pytest.raises(SystemExit):
         calculate_ims.validate_period(PARSER, test_period, test_extended, test_im)
+
+
+@pytest.mark.parametrize(
+    "test_path, test_file_type", [("asdf", 'b'), (FAKE_DIR, 'b')]
+)
+def test_validate_input_path_fail(test_path, test_file_type):
+    with pytest.raises(SystemExit):
+        calculate_ims.validate_input_path(PARSER, test_path, test_file_type)
+
+
