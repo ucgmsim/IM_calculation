@@ -76,7 +76,7 @@ def set_up():
         OUTPUT_DIR_PATH = os.path.join(DATA_STORE_PATH, "input")
 
         DOWNLOAD_CMD = "wget -O {} {}".format(ZIP_DOWNLOAD_PATH, DATA_DOWNLOAD_PATH)
-        UNZIP_CMD = "unzip {} -d {}".format(ZIP_DOWNLOAD_PATH, OUTPUT_DIR_PATH)
+        UNZIP_CMD = "unzip {} -d {}".format(ZIP_DOWNLOAD_PATH, DATA_STORE_PATH)
 
         test_data_save_dirs.append(DATA_STORE_PATH)
         if not os.path.isdir(DATA_STORE_PATH):
@@ -116,7 +116,7 @@ class TestPickleTesting():
             print(comp)
             value_to_test = calculate_ims.convert_str_comp(comp)
 
-            with open(os.path.join(root_path, INPUT, function + '_converted_comp.P'), 'rb') as load_file:
+            with open(os.path.join(root_path, OUTPUT, function + '_converted_comp.P'), 'rb') as load_file:
                 converted_comp = pickle.load(load_file)
             print(converted_comp)
 
@@ -133,9 +133,9 @@ class TestPickleTesting():
 
             value1_to_test, value2_to_test = calculate_ims.get_comp_name_and_list(comp, geom_only)
 
-            with open(os.path.join(root_path, INPUT, function + '_comp_name.P'), 'rb') as load_file:
+            with open(os.path.join(root_path, OUTPUT, function + '_comp_name.P'), 'rb') as load_file:
                 comp_name = pickle.load(load_file)
-            with open(os.path.join(root_path, INPUT, function + '_comps.P'), 'rb') as load_file:
+            with open(os.path.join(root_path, OUTPUT, function + '_comps.P'), 'rb') as load_file:
                 comps = pickle.load(load_file)
 
             assert value1_to_test == comp_name
@@ -170,7 +170,7 @@ class TestPickleTesting():
 
             value_to_test = calculate_ims.get_bbseis(os.path.join(root_path, INPUT, 'BB.bin'), 'binary', stations)[1]
 
-            with open(os.path.join(root_path, INPUT, function + '_station_names.P'), 'rb') as load_file:
+            with open(os.path.join(root_path, OUTPUT, function + '_station_names.P'), 'rb') as load_file:
                 converted_stations = pickle.load(load_file)
 
             print(value_to_test)
