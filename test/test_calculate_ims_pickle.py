@@ -20,6 +20,7 @@ UNZIP_CMD = "unzip {} -d {}".format(os.path.join("/home", getpass.getuser(), REA
 test_data_save_dir = os.path.join("/home", getpass.getuser(), REALISATION)
 
 
+# Run this once, but run it for any test/collection of tests that is run
 @pytest.fixture(scope='session', autouse=True)
 def set_up():
     if not os.path.isfile(DATA_STORE_PATH):
@@ -39,10 +40,10 @@ def set_up():
     else:
         print("Benchmark data folder already exits")
 
-
-@pytest.fixture(scope='session', autouse=True)
-def tear_down():
+    # Run all tests
     yield
+
+    # Remove the test data directory
     shutil.rmtree(DATA_STORE_PATH)
 
 
