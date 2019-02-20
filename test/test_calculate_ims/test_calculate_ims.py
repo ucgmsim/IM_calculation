@@ -1,11 +1,16 @@
-import os
 import sys
 import shutil
 import numpy as np
 import argparse
+import pickle
 import pytest
-sys.path.insert(0, '../../')
+import shutil
 import calculate_ims
+import os
+import getpass
+import sys
+from qcore import shared
+
 
 from qcore import utils
 
@@ -16,6 +21,7 @@ TEST_IMS = ['PGA', 'PGV', 'Ds575', 'pSA']
 
 FAKE_DIR = 'fake_dir' # should be in set_up module and remove in tear_down module
 utils.setup_dir("fake_dir")
+
 
 
 @pytest.mark.parametrize(
@@ -53,4 +59,79 @@ def test_validate_input_path_fail(test_path, test_file_type):
     with pytest.raises(SystemExit):
         calculate_ims.validate_input_path(PARSER, test_path, test_file_type)
 
+
+
+
+class TestPickleTesting():
+
+    REALISATIONS = [('PangopangoF29_HYP01-10_S1244', "https://www.dropbox.com/sh/dgpfukqd01zucjv/AAA8iMASZWn5vbr0PdDCgTG3a?dl=0")]
+    test_data_save_dirs = []
+
+    # Run this once, but run it for any test/collection of tests that is run in this class
+    @pytest.fixture(scope='class', autouse=True)
+    def set_up(self):
+        for i, (REALISATION, DATA_DOWNLOAD_PATH) in enumerate(self.REALISATIONS):
+            DATA_STORE_PATH = os.path.join(".", "sample"+str(i))
+            utils.setup_dir(DATA_STORE_PATH)
+
+            ZIP_DOWNLOAD_PATH = os.path.join(DATA_STORE_PATH, REALISATION+".zip")
+            OUTPUT_DIR_PATH = os.path.join(DATA_STORE_PATH, "input")
+            utils.setup_dir(OUTPUT_DIR_PATH)
+
+            DOWNLOAD_CMD = "wget -O {} {}".format(ZIP_DOWNLOAD_PATH, DATA_DOWNLOAD_PATH)
+            UNZIP_CMD = "unzip {} -d {}".format(ZIP_DOWNLOAD_PATH, OUTPUT_DIR_PATH)
+
+            self.test_data_save_dirs.append(OUTPUT_DIR_PATH)
+            if not os.path.isfile(OUTPUT_DIR_PATH):
+                out, err = shared.exe(DOWNLOAD_CMD, debug=False)
+                if b"failed" in err:
+                    os.remove(ZIP_DOWNLOAD_PATH)
+                    sys.exit("{} failed to download data folder".format(err))
+                else:
+                    print("Successfully downloaded benchmark data folder")
+
+                out, err = shared.exe(UNZIP_CMD, debug=False)
+                os.remove(ZIP_DOWNLOAD_PATH)
+                if b"error" in err:
+                    shutil.rmtree(OUTPUT_DIR_PATH)
+                    sys.exit("{} failed to extract data folder".format(err))
+            else:
+                print("Benchmark data folder already exits")
+
+        # Run all tests
+        yield
+
+        # Remove the test data directory
+        for PATH in self.test_data_save_dirs:
+            shutil.rmtree(PATH)
+
+    def test_convert_str_comp(self):
+
+        function = 'convert_str_comp'
+        for root_path in self.test_data_save_dirs:
+
+            with open(os.path.join(root_path, function + '_comp.P'), 'rb') as load_file:
+                comp = pickle.load(load_file)
+
+            print(comp)
+            value_to_test = calculate_ims.convert_str_comp(comp)
+
+            with open(os.path.join(root_path, function + '_converted_comp.P'), 'rb') as load_file:
+                converted_comp = pickle.load(load_file)
+            print(converted_comp)
+
+            assert value_to_test == converted_comp
+
+    def test_get_bbseis_input_path(self):
+        function = 'get_bbseis'
+        for root_path in self.test_data_save_dirs:
+            with open(os.path.join(root_path, function + '_input_path.P'), 'rb') as load_file:
+                stations = pickle.load(load_file)
+
+            value_to_test = calculate_ims.get_bbseis(os.path.join(root_path, 'BB.bin'), 'b', stations)[1]
+
+            with open(os.path.join(root_path, function + '_station_names.P'), 'rb') as load_file:
+                converted_stations = pickle.load(load_file)
+
+                assert value_to_test == converted_stations
 
