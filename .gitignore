@@ -18,3 +18,4 @@ rrups.csv
 *.log
 runs/
 **.so
+**sample0
