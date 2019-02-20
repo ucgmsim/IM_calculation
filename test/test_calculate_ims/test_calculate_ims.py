@@ -113,12 +113,10 @@ class TestPickleTesting():
             with open(os.path.join(root_path, INPUT, function + '_comp.P'), 'rb') as load_file:
                 comp = pickle.load(load_file)
 
-            print(comp)
             value_to_test = calculate_ims.convert_str_comp(comp)
 
             with open(os.path.join(root_path, OUTPUT, function + '_converted_comp.P'), 'rb') as load_file:
                 converted_comp = pickle.load(load_file)
-            print(converted_comp)
 
             assert value_to_test == converted_comp
 
