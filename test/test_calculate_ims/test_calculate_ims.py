@@ -15,6 +15,7 @@ from qcore import shared
 
 from qcore import utils
 
+from test.test_common_set_up import test_data_save_dirs, INPUT, OUTPUT
 
 PARSER = argparse.ArgumentParser()
 BSC_PERIOD = [0.05, 0.1,  5.0, 10.0]
@@ -60,50 +61,6 @@ def test_validate_input_path_fail(test_path, test_file_type):
     with pytest.raises(SystemExit):
         calculate_ims.validate_input_path(PARSER, test_path, test_file_type)
 
-INPUT = "input"
-OUTPUT = "output"
-REALISATIONS = [
-        ('PangopangoF29_HYP01-10_S1244', "https://www.dropbox.com/sh/dgpfukqd01zucjv/AAA8iMASZWn5vbr0PdDCgTG3a?dl=0")]
-test_data_save_dirs = []
-
-# Run this once, but run it for any test/collection of tests that is run in this class
-@pytest.fixture(scope='session', autouse=True)
-def set_up():
-    for i, (REALISATION, DATA_DOWNLOAD_PATH) in enumerate(REALISATIONS):
-        DATA_STORE_PATH = os.path.join(".", "sample"+str(i))
-
-        ZIP_DOWNLOAD_PATH = os.path.join(DATA_STORE_PATH, REALISATION+".zip")
-        OUTPUT_DIR_PATH = os.path.join(DATA_STORE_PATH, "input")
-
-        DOWNLOAD_CMD = "wget -O {} {}".format(ZIP_DOWNLOAD_PATH, DATA_DOWNLOAD_PATH)
-        UNZIP_CMD = "unzip {} -d {}".format(ZIP_DOWNLOAD_PATH, DATA_STORE_PATH)
-
-        test_data_save_dirs.append(DATA_STORE_PATH)
-        if not os.path.isdir(DATA_STORE_PATH):
-            os.makedirs(OUTPUT_DIR_PATH, exist_ok=True)
-            out, err = shared.exe(DOWNLOAD_CMD, debug=False)
-            if b"failed" in err:
-                os.remove(ZIP_DOWNLOAD_PATH)
-                sys.exit("{} failed to download data folder".format(err))
-            else:
-                print("Successfully downloaded benchmark data folder")
-
-            out, err = shared.exe(UNZIP_CMD, debug=False)
-            os.remove(ZIP_DOWNLOAD_PATH)
-            if b"error" in err:
-                shutil.rmtree(OUTPUT_DIR_PATH)
-                sys.exit("{} failed to extract data folder".format(err))
-        else:
-            print("Benchmark data folder already exits: ", DATA_STORE_PATH)
-
-    # Run all tests
-    yield
-
-    # Remove the test data directory
-    for PATH in test_data_save_dirs:
-        shutil.rmtree(PATH)
-
-
 class TestPickleTesting():
     def test_convert_str_comp(self):
 
@@ -118,7 +75,7 @@ class TestPickleTesting():
             with open(os.path.join(root_path, OUTPUT, function + '_converted_comp.P'), 'rb') as load_file:
                 expected_converted_comp = pickle.load(load_file)
 
-            assert expected_converted_comp == actual_converted_comp
+            assert actual_converted_comp == expected_converted_comp
 
     def test_get_comp_name_and_list(self):
 
@@ -136,8 +93,8 @@ class TestPickleTesting():
             with open(os.path.join(root_path, OUTPUT, function + '_comps.P'), 'rb') as load_file:
                 expected_comps = pickle.load(load_file)
 
-            assert expected_comp_name == actual_comp_name
-            assert expected_comps == actual_comps
+            assert actual_comp_name == expected_comp_name
+            assert actual_comps == expected_comps
 
     def test_write_rows(self):
 
@@ -169,7 +126,7 @@ class TestPickleTesting():
             with open(os.path.join(root_path, OUTPUT, function + '_station_names.P'), 'rb') as load_file:
                 expected_converted_stations = pickle.load(load_file)
 
-            assert expected_converted_stations == actual_converted_stations
+            assert actual_converted_stations == expected_converted_stations
 
     def test_array_to_dict(selfs):
         function = 'array_to_dict'
@@ -188,4 +145,4 @@ class TestPickleTesting():
             with open(os.path.join(root_path, OUTPUT, function + '_value_dict.P'), 'rb') as load_file:
                 expected_value_dict = pickle.load(load_file)
 
-            assert expected_value_dict == actual_value_dict
+            assert actual_value_dict == expected_value_dict
