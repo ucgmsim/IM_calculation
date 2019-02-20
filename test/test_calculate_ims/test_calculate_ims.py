@@ -49,8 +49,8 @@ test_data_save_dirs = []
 
 # Run this once, but run it for any test/collection of tests that is run in this class
 @pytest.fixture(scope='session', autouse=True)
-def set_up(self):
-    for i, (REALISATION, DATA_DOWNLOAD_PATH) in enumerate(self.REALISATIONS):
+def set_up():
+    for i, (REALISATION, DATA_DOWNLOAD_PATH) in enumerate(REALISATIONS):
         DATA_STORE_PATH = os.path.join(".", "sample"+str(i))
 
         ZIP_DOWNLOAD_PATH = os.path.join(DATA_STORE_PATH, REALISATION+".zip")
@@ -60,7 +60,7 @@ def set_up(self):
         DOWNLOAD_CMD = "wget -O {} {}".format(ZIP_DOWNLOAD_PATH, DATA_DOWNLOAD_PATH)
         UNZIP_CMD = "unzip {} -d {}".format(ZIP_DOWNLOAD_PATH, OUTPUT_DIR_PATH)
 
-        self.test_data_save_dirs.append(OUTPUT_DIR_PATH)
+        test_data_save_dirs.append(OUTPUT_DIR_PATH)
         if not os.path.isfile(OUTPUT_DIR_PATH):
             out, err = shared.exe(DOWNLOAD_CMD, debug=False)
             if b"failed" in err:
@@ -81,12 +81,11 @@ def set_up(self):
     yield
 
     # Remove the test data directory
-    for PATH in self.test_data_save_dirs:
+    for PATH in test_data_save_dirs:
         shutil.rmtree(PATH)
 
 
 class TestPickleTesting():
-
     def test_convert_str_comp(self):
 
         function = 'convert_str_comp'
@@ -123,3 +122,19 @@ class TestPickleTesting():
             assert value1_to_test == comp_name
             assert value2_to_test == comps
 
+    def test_write_rows(self):
+
+        function = 'test_write_rows'
+        for root_path in test_data_save_dirs:
+            with open(os.path.join(root_path, function + '_comps.P'), 'rb') as load_file:
+                comps = pickle.load(load_file)
+            with open(os.path.join(root_path, function + '_station.P'), 'rb') as load_file:
+                station = pickle.load(load_file)
+            with open(os.path.join(root_path, function + '_ims.P'), 'rb') as load_file:
+                ims = pickle.load(load_file)
+            with open(os.path.join(root_path, function + '_result_dict.P'), 'rb') as load_file:
+                result_dict = pickle.load(load_file)
+            big_csv_writer = None
+            sub_csv_writer = None
+
+            calculate_ims.write_rows(comps, station, ims, result_dict, big_csv_writer, sub_csv_writer=sub_csv_writer)
