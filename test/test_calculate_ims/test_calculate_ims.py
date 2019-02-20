@@ -174,12 +174,18 @@ class TestPickleTesting():
     def test_array_to_dict(selfs):
         function = 'array_to_dict'
         for root_path in test_data_save_dirs:
+            with open(os.path.join(root_path, INPUT, function + '_value.P'), 'rb') as load_file:
+                value = pickle.load(load_file)
             with open(os.path.join(root_path, INPUT, function + '_comp.P'), 'rb') as load_file:
                 comp = pickle.load(load_file)
+            with open(os.path.join(root_path, INPUT, function + '_converted_comp.P'), 'rb') as load_file:
+                converted_comp = pickle.load(load_file)
+            with open(os.path.join(root_path, INPUT, function + '_im.P'), 'rb') as load_file:
+                im = pickle.load(load_file)
 
-            test_converted_comp = calculate_ims.array_to_dict(comp)
+            actual_value_dict = calculate_ims.array_to_dict(value, comp, converted_comp, im)
 
-            with open(os.path.join(root_path, OUTPUT, function + '_station_names.P'), 'rb') as load_file:
-                expected_converted_comp = pickle.load(load_file)
+            with open(os.path.join(root_path, OUTPUT, function + '_value_dict.P'), 'rb') as load_file:
+                expected_value_dict = pickle.load(load_file)
 
-            assert expected_converted_comp == test_converted_comp
+            assert expected_value_dict == actual_value_dict
