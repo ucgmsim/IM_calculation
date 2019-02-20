@@ -52,11 +52,14 @@ class TestPickleTesting():
     # Run this once, but run it for any test/collection of tests that is run in this class
     @pytest.fixture(scope='class', autouse=True)
     def set_up(self):
-        for (REALISATION, DATA_DOWNLOAD_PATH) in self.REALISATIONS:
-            DATA_STORE_PATH = os.path.join(".", "sample1")
+        for i, (REALISATION, DATA_DOWNLOAD_PATH) in enumerate(self.REALISATIONS):
+            DATA_STORE_PATH = os.path.join(".", "sample"+str(i))
+            os.mkdir(DATA_STORE_PATH)
 
-            ZIP_DOWNLOAD_PATH = os.path.join(".", "sample1", REALISATION+".zip")
-            OUTPUT_DIR_PATH = os.path.join(".", "sample1", "input")
+            ZIP_DOWNLOAD_PATH = os.path.join(DATA_STORE_PATH, REALISATION+".zip")
+            OUTPUT_DIR_PATH = os.path.join(DATA_STORE_PATH, "input")
+            os.mkdir(OUTPUT_DIR_PATH)
+
             DOWNLOAD_CMD = "wget -O {} {}".format(ZIP_DOWNLOAD_PATH, DATA_DOWNLOAD_PATH)
             UNZIP_CMD = "unzip {} -d {}".format(ZIP_DOWNLOAD_PATH, OUTPUT_DIR_PATH)
 
@@ -87,7 +90,7 @@ class TestPickleTesting():
     def test_convert_str_comp(self):
 
         function = 'convert_str_comp'
-        for _, root_path in self.REALISATIONS:
+        for root_path in self.test_data_save_dirs:
 
             with open(os.path.join(root_path, function + '_comp.P'), 'rb') as load_file:
                 comp = pickle.load(load_file)
@@ -101,21 +104,22 @@ class TestPickleTesting():
 
             assert value_to_test == converted_comp
 
-    def t1est_get_comp_name_and_list(self):
+    def test_get_comp_name_and_list(self):
 
         function = 'get_comp_name_and_list'
-        with open(os.path.join(self.test_data_save_dir, function + '_comp.P'), 'rb') as load_file:
-            comp = pickle.load(load_file)
-        with open(os.path.join(self.test_data_save_dir, function + '_geom_only.P'), 'rb') as load_file:
-            geom_only = pickle.load(load_file)
+        for root_path in self.test_data_save_dirs:
+            with open(os.path.join(root_path, function + '_comp.P'), 'rb') as load_file:
+                comp = pickle.load(load_file)
+            with open(os.path.join(root_path, function + '_geom_only.P'), 'rb') as load_file:
+                geom_only = pickle.load(load_file)
 
-        value1_to_test, value2_to_test = calculate_ims.get_comp_name_and_list(comp, geom_only)
+            value1_to_test, value2_to_test = calculate_ims.get_comp_name_and_list(comp, geom_only)
 
-        with open(os.path.join(self.test_data_save_dir, function + '_converted_comp.P'), 'rb') as load_file:
-            converted_comp = pickle.load(load_file)
-        with open(os.path.join(self.test_data_save_dir, function + '_converted_comp.P'), 'rb') as load_file:
-            converted_comp2 = pickle.load(load_file)
+            with open(os.path.join(root_path, function + '_converted_comp.P'), 'rb') as load_file:
+                converted_comp = pickle.load(load_file)
+            with open(os.path.join(root_path, function + '_converted_comp.P'), 'rb') as load_file:
+                converted_comp2 = pickle.load(load_file)
 
-        assert value1_to_test == converted_comp
-        assert value2_to_test == converted_comp2
+            assert value1_to_test == converted_comp
+            assert value2_to_test == converted_comp2
 
