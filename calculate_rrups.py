@@ -1,10 +1,34 @@
-from rrup import rrup as rrup
+from rrup import rrup
 import argparse
+import os
+import pickle
 
 DEFAULT_N_PROCESSES = 4
 
 
+INPUT = 'input'
+OUTPUT = 'output'
+
+test_data_save_dir = '/home/jpa198/test_space/im_calc_test/pickled/'
+REALISATION = 'PangopangoF29_HYP01-10_S1244'
+data_taken = {'write_and_calculate_rrups': False,
+              'get_fd_stations': False,
+              'get_match_stations': False,
+              }
+
+
 def write_and_calculate_rrups(station_file, srf_file, stations=None, processes=DEFAULT_N_PROCESSES):
+    function = 'write_and_calculate_rrups'
+    if not data_taken[function]:
+        with open(os.path.join(test_data_save_dir, REALISATION, INPUT, function + '_station_file.P'), 'wb') as save_file:
+            pickle.dump(station_file, save_file)
+        with open(os.path.join(test_data_save_dir, REALISATION, INPUT, function + '_srf_file.P'), 'wb') as save_file:
+            pickle.dump(srf_file, save_file)
+        with open(os.path.join(test_data_save_dir, REALISATION, INPUT, function + '_stations.P'), 'wb') as save_file:
+            pickle.dump(stations, save_file)
+        with open(os.path.join(test_data_save_dir, REALISATION, INPUT, function + '_processes.P'), 'wb') as save_file:
+            pickle.dump(processes, save_file)
+        data_taken[function] = True
     rrups = rrup.computeRrup(station_file, srf_file, stations, processes)
     fname = args.output
     with open(fname, 'w') as f:
@@ -21,11 +45,21 @@ def get_fd_stations(fd_ll):
     :param fd_ll: path to fd_ll station file
     :return: a list of useful stations
     """
+    function = 'get_fd_stations'
+    if not data_taken[function]:
+        with open(os.path.join(test_data_save_dir, REALISATION, INPUT, function + '_fd_ll.P'), 'wb') as save_file:
+            pickle.dump(fd_ll, save_file)
+
     stations = []
     with open(fd_ll, 'r') as fd:
         for line in fd:
             station = line.strip().split()[-1]
             stations.append(station)
+
+    if not data_taken[function]:
+        with open(os.path.join(test_data_save_dir, REALISATION, OUTPUT, function + '_stations.P'), 'wb') as save_file:
+            pickle.dump(stations, save_file)
+        data_taken[function] = True
     return stations
 
 
@@ -36,6 +70,13 @@ def get_match_stations(parser, arg_fd, arg_stations):
     :param arg_stations: input space delimited list of stations
     :return: None or a list of match stations
     """
+    function = 'get_match_stations'
+    if not data_taken[function]:
+        with open(os.path.join(test_data_save_dir, REALISATION, INPUT, function + '_arg_fd.P'), 'wb') as save_file:
+            pickle.dump(arg_fd, save_file)
+        with open(os.path.join(test_data_save_dir, REALISATION, INPUT, function + '_arg_stations.P'), 'wb') as save_file:
+            pickle.dump(arg_stations, save_file)
+
     match_stations = None
 
     if arg_fd is not None and arg_stations is not None:
@@ -47,6 +88,10 @@ def get_match_stations(parser, arg_fd, arg_stations):
     if arg_stations is not None:
         match_stations = arg_stations
 
+    if not data_taken[function]:
+        with open(os.path.join(test_data_save_dir, REALISATION, OUTPUT, function + '_match_stations.P'), 'wb') as save_file:
+            pickle.dump(match_stations, save_file)
+        data_taken[function] = True
     return match_stations
 
 
