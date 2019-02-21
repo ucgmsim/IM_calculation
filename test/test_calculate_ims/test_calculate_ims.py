@@ -119,8 +119,7 @@ class TestPickleTesting():
     def test_compute_measures_multiprocess(self):
         function = 'compute_measures_multiprocess'
         for root_path in test_data_save_dirs:
-            with open(os.path.join(root_path, INPUT, function + '_input_path.P'), 'rb') as load_file:
-                input_path = pickle.load(load_file)
+            input_path = os.path.join(root_path, INPUT, "BB.bin")
             with open(os.path.join(root_path, INPUT, function + '_file_type.P'), 'rb') as load_file:
                 file_type = pickle.load(load_file)
             with open(os.path.join(root_path, INPUT, function + '_geom_only.P'), 'rb') as load_file:
@@ -289,8 +288,7 @@ class TestPickleTesting():
     def test_validate_input_path(self):
         function = 'validate_input_path'
         for root_path in test_data_save_dirs:
-            with open(os.path.join(root_path, INPUT, function + '_arg_input.P'), 'rb') as load_file:
-                arg_input = pickle.load(load_file)
+            arg_input = os.path.join(root_path, INPUT, "BB.bin")
             with open(os.path.join(root_path, INPUT, function + '_arg_file_type.P'), 'rb') as load_file:
                 arg_file_type = pickle.load(load_file)
 
@@ -345,8 +343,7 @@ class TestPickleTesting():
     def test_get_steps(self):
         function = 'get_steps'
         for root_path in test_data_save_dirs:
-            with open(os.path.join(root_path, INPUT, function + '_input_path.P'), 'rb') as load_file:
-                input_path = pickle.load(load_file)
+            input_path = os.path.join(root_path, INPUT, "BB.bin")
             with open(os.path.join(root_path, INPUT, function + '_nps.P'), 'rb') as load_file:
                 nps = pickle.load(load_file)
             with open(os.path.join(root_path, INPUT, function + '_total_stations.P'), 'rb') as load_file:
