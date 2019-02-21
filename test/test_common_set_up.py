@@ -5,6 +5,8 @@ import sys
 import pytest
 import numpy as np
 
+from rrup.rrup import Point
+
 INPUT = "input"
 OUTPUT = "output"
 REALISATIONS = [
@@ -45,8 +47,18 @@ def set_up():
     yield
 
     # Remove the test data directory
-    for PATH in TEST_DATA_SAVE_DIRS:
-        shutil.rmtree(PATH)
+    #for PATH in TEST_DATA_SAVE_DIRS:
+        #shutil.rmtree(PATH)
+
+
+def compare_points(actual_point, expected_point):
+    assert isinstance(actual_point, Point)
+    assert isinstance(expected_point, Point)
+    assert actual_point.Lat == expected_point.Lat
+    assert actual_point.Lon == expected_point.Lon
+    assert actual_point.Depth == expected_point.Depth
+    assert actual_point.r_rups == expected_point.r_rups
+    assert actual_point.r_jbs == expected_point.r_jbs
 
 
 def compare_dicts(actual_result, expected_result):
@@ -62,12 +74,15 @@ def compare_dicts(actual_result, expected_result):
             compare_iterable(actual_result[key], expected_result[key])
         elif isinstance(actual_result[key], np.ndarray) or isinstance(expected_result[key], np.ndarray):
             assert not (actual_result[key] - expected_result[key]).any()
+        elif isinstance(actual_result[key], Point) or isinstance(expected_result[key], Point):
+            compare_points(actual_result[key], expected_result[key])
         else:
             assert actual_result[key] == expected_result[key]
 
 
 def compare_iterable(actual_result, expected_result):
     assert len(actual_result) == len(expected_result)
+    assert type(actual_result) == type(expected_result)
 
     for i in range(len(actual_result)):
         if isinstance(actual_result[i], dict) or isinstance(expected_result[i], dict):
@@ -76,5 +91,7 @@ def compare_iterable(actual_result, expected_result):
             compare_iterable(actual_result[i], expected_result[i])
         elif isinstance(actual_result[i], np.ndarray) or isinstance(expected_result[i], np.ndarray):
             assert not (actual_result[i] - expected_result[i]).any()
+        elif isinstance(actual_result[i], Point) or isinstance(expected_result[i], Point):
+            compare_points(actual_result[i], expected_result[i])
         else:
             assert actual_result[i] == expected_result[i]
