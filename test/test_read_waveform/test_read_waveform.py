@@ -47,12 +47,11 @@ def test_calculate_timesteps():
 def test_read_waveforms():
     function = 'read_waveforms'
     for root_path in TEST_DATA_SAVE_DIRS:
-        with open(os.path.join(root_path, INPUT, function + '_path.P'), 'rb') as load_file:
-            path = pickle.load(load_file)
         station_names, units = get_common_bbseis_values(root_path, function)
         bbseis, comp, wave_type, file_type = get_common_waveform_values(root_path, function)
 
-        test_ouput = read_waveform.read_waveforms(path, bbseis, station_names, comp, wave_type, file_type, units)
+        # only test for binary, path to ascii folder is not neede
+        test_ouput = read_waveform.read_waveforms(None, bbseis, station_names, comp, wave_type, file_type, units)
 
         with open(os.path.join(root_path, INPUT, function + '_ret_val.P'), 'rb') as load_file:
             bench_output = pickle.load(load_file)
