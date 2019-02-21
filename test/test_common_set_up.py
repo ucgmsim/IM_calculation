@@ -8,7 +8,7 @@ INPUT = "input"
 OUTPUT = "output"
 REALISATIONS = [
         ('PangopangoF29_HYP01-10_S1244', "https://www.dropbox.com/sh/dgpfukqd01zucjv/AAA8iMASZWn5vbr0PdDCgTG3a?dl=0")]
-test_data_save_dirs = []
+TEST_DATA_SAVE_DIRS = []
 
 # Run this once, but run it for any test/collection of tests that is run in this class
 @pytest.fixture(scope='session', autouse=True)
@@ -22,7 +22,7 @@ def set_up():
         DOWNLOAD_CMD = "wget -O {} {}".format(ZIP_DOWNLOAD_PATH, DATA_DOWNLOAD_PATH)
         UNZIP_CMD = "unzip {} -d {}".format(ZIP_DOWNLOAD_PATH, DATA_STORE_PATH)
 
-        test_data_save_dirs.append(DATA_STORE_PATH)
+        TEST_DATA_SAVE_DIRS.append(DATA_STORE_PATH)
         if not os.path.isdir(DATA_STORE_PATH):
             os.makedirs(OUTPUT_DIR_PATH, exist_ok=True)
             out, err = shared.exe(DOWNLOAD_CMD, debug=False)
@@ -44,5 +44,5 @@ def set_up():
     yield
 
     # Remove the test data directory
-    for PATH in test_data_save_dirs:
+    for PATH in TEST_DATA_SAVE_DIRS:
         shutil.rmtree(PATH)
