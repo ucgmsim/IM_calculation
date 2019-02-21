@@ -191,6 +191,21 @@ class TestPickleTesting():
             units = pickle.load(load_file)
         return station_names, units
 
+    def test_calculate_timesteps(self):
+        function = 'calculate_timesteps'
+        for root_path in TEST_DATA_SAVE_DIRS:
+            with open(os.path.join(root_path, INPUT, function + '_NT.P'), 'rb') as load_file:
+                NT = pickle.load(load_file)
+            with open(os.path.join(root_path, INPUT, function + '_DT.P'), 'rb') as load_file:
+                DT = pickle.load(load_file)
+
+            test_output = read_waveform.calculate_timesteps(NT, DT)
+
+            with open(os.path.join(root_path, INPUT, function + '_ret_val.P'), 'rb') as load_file:
+                bench_output = pickle.load(load_file)
+
+            assert test_output == bench_output
+
     def test_read_waveforms(self):
         function = 'read_waveforms'
         for root_path in TEST_DATA_SAVE_DIRS:
@@ -234,3 +249,4 @@ class TestPickleTesting():
                 bench_output = pickle.load(load_file)
 
             assert test_output == bench_output
+
