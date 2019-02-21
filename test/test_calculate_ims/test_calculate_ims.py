@@ -5,6 +5,7 @@ import os
 import pickle
 import numpy as np
 import pytest
+import filecmp
 
 from qcore import utils
 import calculate_ims
@@ -219,16 +220,22 @@ class TestPickleTesting():
 
             big_csv = io.StringIO()
             big_csv_writer = csv.writer(big_csv)
-            sub_csv_writer = csv.writer(io.StringIO())
+            sub_csv = io.StringIO()
+            sub_csv_writer = csv.writer(sub_csv)
 
             calculate_ims.write_rows(comps, station, ims, result_dict, big_csv_writer, sub_csv_writer=sub_csv_writer)
+
+            with open(os.path.join(root_path, OUTPUT, function+'_out_data.P'), 'rb') as load_file:
+                expected_out_data = pickle.load(load_file)
+
+            assert expected_out_data == big_csv.getvalue()
+            assert expected_out_data == sub_csv.getvalue()
 
     def test_write_result(self):
         function = 'write_result'
         for root_path in TEST_DATA_SAVE_DIRS:
             with open(os.path.join(root_path, INPUT, function + '_result_dict.P'), 'rb') as load_file:
                 result_dict = pickle.load(load_file)
-            output_folder = root_path
             with open(os.path.join(root_path, INPUT, function + '_identifier.P'), 'rb') as load_file:
                 identifier = pickle.load(load_file)
             with open(os.path.join(root_path, INPUT, function + '_comp.P'), 'rb') as load_file:
@@ -242,13 +249,21 @@ class TestPickleTesting():
             with open(os.path.join(root_path, INPUT, function + '_simple_output.P'), 'rb') as load_file:
                 simple_output = pickle.load(load_file)
 
+            output_folder = root_path
+
+            os.makedirs(os.path.join(output_folder, calculate_ims.OUTPUT_SUBFOLDER), exist_ok=True)
+
             calculate_ims.write_result(result_dict, output_folder, identifier, comp, ims, period, geom_only, simple_output)
+
+            expected_output_path = calculate_ims.get_result_filepath(output_folder, identifier, ".csv")
+            actual_output_path = os.path.join(root_path, OUTPUT, function+'_outfile.csv')
+
+            assert filecmp.cmp(expected_output_path, actual_output_path)
 
     def test_generate_metadata(self):
         function = 'generate_metadata'
         for root_path in TEST_DATA_SAVE_DIRS:
-            output_folder = root_path
-            os.makedirs(os.path.join(root_path, 'stations'), exist_ok=True)
+
             with open(os.path.join(root_path, INPUT, function + '_identifier.P'), 'rb') as load_file:
                 identifier = pickle.load(load_file)
             with open(os.path.join(root_path, INPUT, function + '_rupture.P'), 'rb') as load_file:
@@ -258,7 +273,15 @@ class TestPickleTesting():
             with open(os.path.join(root_path, INPUT, function + '_version.P'), 'rb') as load_file:
                 version = pickle.load(load_file)
 
+            #Save to the realisations folder that will be deleted after the run has finished
+            output_folder = root_path
+
             calculate_ims.generate_metadata(output_folder, identifier, rupture, run_type, version)
+
+            actual_output_path = calculate_ims.get_result_filepath(output_folder, identifier, "_imcalc.info")
+            expected_output_path = os.path.join(root_path, OUTPUT, function+'_outfile.info')
+
+            filecmp.cmp(actual_output_path, expected_output_path)
 
     def test_get_comp_help(self):
         function = 'get_comp_help'
@@ -293,6 +316,7 @@ class TestPickleTesting():
                 arg_file_type = pickle.load(load_file)
 
             calculate_ims.validate_input_path(PARSER, arg_input, arg_file_type)
+            # Function does not return anything, only raises errors through the parser
 
     def test_validate_comp(self):
         function = 'validate_comp'
@@ -338,7 +362,7 @@ class TestPickleTesting():
             with open(os.path.join(root_path, OUTPUT, function + '_period.P'), 'rb') as load_file:
                 expected_period = pickle.load(load_file)
 
-            assert not (actual_period - expected_period).any()
+            assert (actual_period == expected_period).all()
 
     def test_get_steps(self):
         function = 'get_steps'

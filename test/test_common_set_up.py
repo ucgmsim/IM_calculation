@@ -18,14 +18,13 @@ def set_up():
         DATA_STORE_PATH = os.path.join(".", "sample"+str(i))
 
         ZIP_DOWNLOAD_PATH = os.path.join(DATA_STORE_PATH, REALISATION+".zip")
-        OUTPUT_DIR_PATH = os.path.join(DATA_STORE_PATH, "input")
 
         DOWNLOAD_CMD = "wget -O {} {}".format(ZIP_DOWNLOAD_PATH, DATA_DOWNLOAD_PATH)
         UNZIP_CMD = "unzip {} -d {}".format(ZIP_DOWNLOAD_PATH, DATA_STORE_PATH)
-        print(DATA_STORE_PATH)
+        #print(DATA_STORE_PATH)
         TEST_DATA_SAVE_DIRS.append(DATA_STORE_PATH)
         if not os.path.isdir(DATA_STORE_PATH):
-            os.makedirs(OUTPUT_DIR_PATH, exist_ok=True)
+            os.makedirs(DATA_STORE_PATH, exist_ok=True)
             out, err = shared.exe(DOWNLOAD_CMD, debug=False)
             if b"failed" in err:
                 os.remove(ZIP_DOWNLOAD_PATH)
@@ -36,8 +35,9 @@ def set_up():
             out, err = shared.exe(UNZIP_CMD, debug=False)
             os.remove(ZIP_DOWNLOAD_PATH)
             if b"error" in err:
-                shutil.rmtree(OUTPUT_DIR_PATH)
+                shutil.rmtree(DATA_STORE_PATH)
                 sys.exit("{} failed to extract data folder".format(err))
+
         else:
             print("Benchmark data folder already exits: ", DATA_STORE_PATH)
 
@@ -45,8 +45,8 @@ def set_up():
     yield
 
     # Remove the test data directory
-    #for PATH in TEST_DATA_SAVE_DIRS:
-        #shutil.rmtree(PATH)
+    for PATH in TEST_DATA_SAVE_DIRS:
+        shutil.rmtree(PATH)
 
 
 def compare_dicts(actual_result, expected_result):
