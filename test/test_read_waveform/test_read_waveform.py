@@ -1,9 +1,10 @@
 import os
 import pickle
+import pytest
 
 from IM import read_waveform
 
-from test.test_common_set_up import TEST_DATA_SAVE_DIRS, INPUT
+from test.test_common_set_up import set_up, TEST_DATA_SAVE_DIRS, INPUT, OUTPUT
 
 
 def get_common_waveform_values(root_path, function_name):
@@ -38,10 +39,10 @@ def test_calculate_timesteps():
 
         test_output = read_waveform.calculate_timesteps(NT, DT)
 
-        with open(os.path.join(root_path, INPUT, function + '_ret_val.P'), 'rb') as load_file:
+        with open(os.path.join(root_path, OUTPUT, function + '_ret_val.P'), 'rb') as load_file:
             bench_output = pickle.load(load_file)
 
-        assert test_output == bench_output
+        assert all(test_output == bench_output)
 
 
 def test_read_waveforms():
@@ -53,7 +54,7 @@ def test_read_waveforms():
         # only test for binary, path to ascii folder is not neede
         test_ouput = read_waveform.read_waveforms(None, bbseis, station_names, comp, wave_type, file_type, units)
 
-        with open(os.path.join(root_path, INPUT, function + '_ret_val.P'), 'rb') as load_file:
+        with open(os.path.join(root_path, OUTPUT, function + '_ret_val.P'), 'rb') as load_file:
             bench_output = pickle.load(load_file)
 
         assert test_ouput == bench_output
@@ -69,9 +70,10 @@ def test_read_one_station_from_bbseis():
 
         test_output = read_waveform.read_one_station_from_bbseries(bbseis, station_name, comp, wave_type, file_type)
 
-        with open(os.path.join(root_path, INPUT, function + '_waveform.P'), 'rb') as load_file:
+        with open(os.path.join(root_path, OUTPUT, function + '_waveform.P'), 'rb') as load_file:
             bench_output = pickle.load(load_file)
-
+        print("test", test_output)
+        print("bench", bench_output)
         assert test_output == bench_output
 
 
@@ -83,8 +85,7 @@ def test_read_binary_file():
 
         test_output = read_waveform.read_binary_file(bbseis, comp, station_names, wave_type, file_type, units)
 
-        with open(os.path.join(root_path, INPUT, function + '_waveforms.P'), 'rb') as load_file:
+        with open(os.path.join(root_path, OUTPUT, function + '_waveforms.P'), 'rb') as load_file:
             bench_output = pickle.load(load_file)
 
         assert test_output == bench_output
-
