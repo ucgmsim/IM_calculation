@@ -19,6 +19,8 @@ def get_common_waveform_values(root_path, function_name):
     return bbseis, comp, wave_type, file_type
 
 
+
+
 def get_common_bbseis_values(root_path, function_name):
     with open(os.path.join(root_path, INPUT, function_name + '_station_names.P'), 'rb') as load_file:
         station_names = pickle.load(load_file)
@@ -33,7 +35,7 @@ def compare_waveforms(bench_waveform, test_waveform):
     vars_bench = vars(bench_waveform)
     for k in vars_bench.keys():
         if isinstance(vars_bench[k], np.ndarray):
-            assert (vars_test[k] == vars_bench[k]).all()
+            assert np.isclose(vars_test[k], vars_bench[k]).all()
         else:
             assert vars_test[k] == vars_bench[k]
 
@@ -51,7 +53,7 @@ def test_calculate_timesteps():
         with open(os.path.join(root_path, OUTPUT, function + '_ret_val.P'), 'rb') as load_file:
             bench_output = pickle.load(load_file)
 
-        assert (test_output == bench_output).all()
+        assert np.isclose(test_output, bench_output).all()
 
 
 def test_read_waveforms():
