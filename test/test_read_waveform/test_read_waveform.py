@@ -33,8 +33,6 @@ def get_common_waveform_values(root_path, function_name):
     return bbseis, comp, wave_type, file_type
 
 
-
-
 def get_common_bbseis_values(root_path, function_name):
     with open(
         os.path.join(root_path, INPUT, function_name + "_station_names.P"), "rb"
