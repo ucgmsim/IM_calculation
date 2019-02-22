@@ -47,6 +47,7 @@ def get_common_bbseis_values(root_path, function_name):
         units = pickle.load(load_file)
     return station_names, units
 
+
 def test_calculate_timesteps(set_up):
     function = "calculate_timesteps"
     for root_path in set_up:
@@ -92,12 +93,10 @@ def test_read_waveforms(set_up):
 def test_read_one_station_from_bbseis(set_up):  # station name not the same
     function = "read_one_station_from_bbseries"
     for root_path in set_up:
-        print("root_path", root_path)
         with open(
             os.path.join(root_path, INPUT, function + "_station_name.P"), "rb"
         ) as load_file:
             station_name = pickle.load(load_file)
-            print("station_name from pikle", station_name)
 
         bbseis, comp, wave_type, file_type = get_common_waveform_values(
             root_path, function
