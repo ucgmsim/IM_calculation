@@ -8,7 +8,6 @@ from test.test_common_set_up import (
     INPUT,
     OUTPUT,
     set_up,
-    compare_dicts,
 )
 
 
@@ -103,12 +102,10 @@ def test_read_waveforms():
 def test_read_one_station_from_bbseis():  # station name not the same
     function = "read_one_station_from_bbseries"
     for root_path in TEST_DATA_SAVE_DIRS:
-        print("root_path", root_path)
         with open(
             os.path.join(root_path, INPUT, function + "_station_name.P"), "rb"
         ) as load_file:
             station_name = pickle.load(load_file)
-            print("station_name from pikle", station_name)
 
         bbseis, comp, wave_type, file_type = get_common_waveform_values(
             root_path, function

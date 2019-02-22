@@ -25,7 +25,6 @@ def set_up():
 
         DOWNLOAD_CMD = "wget -O {} {}".format(ZIP_DOWNLOAD_PATH, DATA_DOWNLOAD_PATH)
         UNZIP_CMD = "unzip {} -d {}".format(ZIP_DOWNLOAD_PATH, DATA_STORE_PATH)
-        # print(DATA_STORE_PATH)
         TEST_DATA_SAVE_DIRS.append(DATA_STORE_PATH)
         if not os.path.isdir(DATA_STORE_PATH):
             os.makedirs(DATA_STORE_PATH, exist_ok=True)
