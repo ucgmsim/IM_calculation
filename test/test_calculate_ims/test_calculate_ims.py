@@ -1,224 +1,604 @@
-"""
-Compares output csvs from calculate_ims.py with the benchmark csvs for selected stations
-pytest -v -s test_calculate_ims.py
-pytest --cov --cov-report=html -s test_calculate_ims.py
-"""
-
+import argparse
+import csv
+import io
 import os
-import shutil
-from qcore import shared, utils
+import pickle
+import numpy as np
+import pytest
+import filecmp
 
-TEST_FOLDER = os.path.abspath(os.path.dirname(__file__))
-SCRIPT = os.path.abspath(os.path.join(TEST_FOLDER, '..', '..', 'calculate_ims.py'))
-print(SCRIPT)
+from qcore import utils
+import calculate_ims
+from test.test_common_set_up import (
+    TEST_DATA_SAVE_DIRS,
+    INPUT,
+    OUTPUT,
+    set_up,
+    compare_dicts,
+)
 
-INPUT_DIR = os.path.join(TEST_FOLDER,'sample1','input')
-print("INPUT_DIR : ",INPUT_DIR)
-INPUT_BINARY = '/home/tester/BB_with_siteamp.bin'
-INPUT_ASCII = os.path.join(INPUT_DIR, 'single_files')
-BENCHMARK = os.path.join(INPUT_DIR, 'new_im_sim_benchmark.csv')
+PARSER = argparse.ArgumentParser()
+BSC_PERIOD = [0.05, 0.1, 5.0, 10.0]
+TEST_IMS = ["PGA", "PGV", "Ds575", "pSA"]
 
-OUTPUT_DIR = os.path.join(TEST_FOLDER, 'sample1', 'output')
-
-IDENTIFIER_BINARY = 'binary_darfield_im_sim'
-OUTPUT_BINARY_DIR = os.path.join(OUTPUT_DIR, IDENTIFIER_BINARY)
-OUTPUT_BINARY_FILE = os.path.join(OUTPUT_BINARY_DIR, IDENTIFIER_BINARY + '.csv')
-OUTPUT_BINARY_META = os.path.join(OUTPUT_BINARY_DIR, IDENTIFIER_BINARY + '_imcalc.info')
-OUTPUT_BINARY_SUBDIR = os.path.join(OUTPUT_DIR, IDENTIFIER_BINARY, 'stations')
-
-IDENTIFIER_ASCII = 'ascii_darfield_im_sim'
-OUTPUT_ASCII_DIR = os.path.join(OUTPUT_DIR, IDENTIFIER_ASCII)
-OUTPUT_ASCII_FILE = os.path.join(OUTPUT_ASCII_DIR, IDENTIFIER_ASCII + '.csv')
-OUTPUT_ASCII_META = os.path.join(OUTPUT_ASCII_DIR, IDENTIFIER_ASCII + '_imcalc.info')
-OUTPUT_ASCII_SUBDIR = os.path.join(OUTPUT_DIR, IDENTIFIER_ASCII, 'stations')
-
-STATIONS = '2002199 GRY 00020d3 UNK CASH CFW DLX LSRC EWZ PEAA'
-PERIODS = '0.01 0.2 0.5 1.0 3.0 4.0 10.0'
-COMP_DICT = {'090': '90', 'geom': 'geom', '000': '0', 'ver': 'ver'}
-ERROR_LIMIT = 0.01
+FAKE_DIR = (
+    "fake_dir"
+)  # should be created in set_up module and remove in tear_down module
+utils.setup_dir("fake_dir")
 
 
-def setup_module(scope="module"):
-    """ create a tmp directory for storing output from test"""
-    print "----------setup_module----------"
-    utils.setup_dir(OUTPUT_DIR)
+@pytest.mark.parametrize(
+    "test_comp, expected_comp",
+    [
+        ("ellipsis", "ellipsis"),
+        ("000", "000"),
+        ("090", "090"),
+        ("ver", "ver"),
+        ("geom", "ellipsis"),
+    ],
+)
+def test_validate_comp(test_comp, expected_comp):
+    assert calculate_ims.validate_comp(PARSER, test_comp)[0] == expected_comp
 
 
-def teardown_module():
-    """ delete the tmp directory if it is empty"""
-    print "---------teardown_module------------"
-    for f in os.listdir(OUTPUT_DIR):
-        f_path = os.path.join(OUTPUT_DIR, f)
-        if len(os.listdir(f_path)) == 0:
-            remove_folder(f_path)
-
-    if len(os.listdir(OUTPUT_DIR)) == 0:
-        remove_folder(OUTPUT_DIR)
+@pytest.mark.parametrize("test_comp_fail", ["adsf"])
+def test_validate_comp_fail(test_comp_fail):
+    with pytest.raises(SystemExit):
+        calculate_ims.validate_comp(PARSER, test_comp_fail)
 
 
-def run_script_calculate_ims(input_path, input_type, identifier):
-    """
-    :param input_path: INPUT_BINARY/ASCII
-    :param input_type: 'b'/'a'
-    :param identifier: IDENTIFIER_BINARY/ASCII
-    :return: error string
-    """
-    cmd = 'python {} {} {} -o {} -i {} -t s -n {} -p {}'.format(SCRIPT, input_path, input_type, OUTPUT_DIR, identifier, STATIONS, PERIODS)
-    _, err = shared.exe(cmd)
-    return err
+@pytest.mark.parametrize(
+    "test_period, test_extended, test_im, expected_period",
+    [
+        (BSC_PERIOD, False, TEST_IMS, np.array(BSC_PERIOD)),
+        (
+            BSC_PERIOD,
+            True,
+            TEST_IMS,
+            np.unique(np.append(BSC_PERIOD, calculate_ims.EXT_PERIOD)),
+        ),
+    ],
+)
+def test_validate_period(test_period, test_extended, test_im, expected_period):
+    assert all(
+        np.equal(
+            calculate_ims.validate_period(PARSER, test_period, test_extended, test_im),
+            expected_period,
+        )
+    )
 
 
-def test_binary_script_calculate_ims():
-    err = run_script_calculate_ims(INPUT_BINARY, 'b', IDENTIFIER_BINARY)
-    assert err == ''
+@pytest.mark.parametrize(
+    "test_period, test_extended, test_im",
+    [(BSC_PERIOD, False, TEST_IMS[:-1]), (BSC_PERIOD, True, TEST_IMS[:-1])],
+)
+def test_validate_period_fail(test_period, test_extended, test_im):
+    with pytest.raises(SystemExit):
+        calculate_ims.validate_period(PARSER, test_period, test_extended, test_im)
 
 
-def test_ascii_script_calculate_ims():
-    err = run_script_calculate_ims(INPUT_ASCII, 'a', IDENTIFIER_ASCII)
-    assert err == ''
+@pytest.mark.parametrize("test_path, test_file_type", [("asdf", "b"), (FAKE_DIR, "b")])
+def test_validate_input_path_fail(test_path, test_file_type):
+    with pytest.raises(SystemExit):
+        calculate_ims.validate_input_path(PARSER, test_path, test_file_type)
 
 
-def get_result_dict(sample_path):
-    """
-    :param sample_path: path to BENCHMARK
-    :return: dict {station: {comp: measure: im_value}}}
-    """
-    result_dict = {}
-    with open(sample_path, 'r') as result_reader:
-        buf = result_reader.readlines()
-        measures = buf[0].strip().split(',')[2:]
-        for i in range(len(measures)):
-            if 'pSA' in measures[i]:
-                pre, suf = measures[i].split('_')
-                num = '{:.9f}'.format(float(suf.replace('p', '.')))
-                measures[i] = pre + '_' + num
-        for line in buf[1:]:
-            line_seg = line.strip().split(',')
-            station = line_seg[0]
-            comp = line_seg[1]
-            im_values = line_seg[2:]
-            try:
-                result_dict[station].update({comp: {}})
-            except KeyError:
-                result_dict[station] = {comp: {}}
-            for i in range(len(im_values)):
-                if measures[i] != '':
-                    result_dict[station][comp][measures[i]] = im_values[i]
-    return result_dict
+class TestPickleTesting:
+    def test_convert_str_comp(self):
 
+        function = "convert_str_comp"
+        for root_path in TEST_DATA_SAVE_DIRS:
 
-def run_test_calculate_ims(test_output_path):
-    """
-    :param test_output_path: OUTPUT_BINARY/ASCII_FILE
-    :return: error string
-    """
-    benchmark_dict = get_result_dict(BENCHMARK)
-    output_dict = get_result_dict(test_output_path)
-    passed = 0
-    failed = 0
-    errors = ''
-    warning = ''
-    for station in output_dict.keys():
-        for comp in output_dict[station].keys():
-            for im in output_dict[station][comp].keys():
-                try:
-                    float1 = float(benchmark_dict[station][COMP_DICT[comp]][im])
-                    float2 = float(output_dict[station][comp][im])
-                    relative_error = abs(float1 - float2) / float1
-                    if relative_error > ERROR_LIMIT:
-                        e = "{}: {}: {} relative error:{} of output {}, benchmark {} exceeding 1%".format(station, comp, im, relative_error, float2, float1)
-                        errors += e + '\n'
-                        failed += 1
-                    else:
-                        passed += 1
-                except KeyError:
-                        w = '{} does not exists in benchmark_dict'.format(im)
-                        warning += w + '\n'
-                except ValueError:
-                    w = "Benchmark {} value is None".format(im)
-                    warning += w + '\n'
-    if warning:
-        print("Warning: {}".format(warning))
-    print("{} passed\n{} failed".format(passed, failed))
+            with open(
+                os.path.join(root_path, INPUT, function + "_comp.P"), "rb"
+            ) as load_file:
+                comp = pickle.load(load_file)
 
-    return errors
+            actual_converted_comp = calculate_ims.convert_str_comp(comp)
 
+            with open(
+                os.path.join(root_path, OUTPUT, function + "_converted_comp.P"), "rb"
+            ) as load_file:
+                expected_converted_comp = pickle.load(load_file)
 
-def remove_folder(folder_path):
-    """
-    :param folder_path: eg. OUTPUTBINARY
-    :return:
-    """
-    try:
-        shutil.rmtree(folder_path)
-    except (IOError, OSError):
-        raise
+            assert actual_converted_comp == expected_converted_comp
 
+    def test_array_to_dict(self):
+        function = "array_to_dict"
+        for root_path in TEST_DATA_SAVE_DIRS:
+            with open(
+                os.path.join(root_path, INPUT, function + "_value.P"), "rb"
+            ) as load_file:
+                value = pickle.load(load_file)
+            with open(
+                os.path.join(root_path, INPUT, function + "_comp.P"), "rb"
+            ) as load_file:
+                comp = pickle.load(load_file)
+            with open(
+                os.path.join(root_path, INPUT, function + "_converted_comp.P"), "rb"
+            ) as load_file:
+                converted_comp = pickle.load(load_file)
+            with open(
+                os.path.join(root_path, INPUT, function + "_im.P"), "rb"
+            ) as load_file:
+                im = pickle.load(load_file)
 
-def remove_file(file_path):
-    try:
-        os.remove(file_path)
-    except (IOError, OSError):
-        raise
+            actual_value_dict = calculate_ims.array_to_dict(
+                value, comp, converted_comp, im
+            )
 
+            with open(
+                os.path.join(root_path, OUTPUT, function + "_value_dict.P"), "rb"
+            ) as load_file:
+                expected_value_dict = pickle.load(load_file)
 
-def run_test_single_output_file(test_output_subfolder):
-    errors = ''
-    for f in os.listdir(test_output_subfolder):
-        f_path = os.path.join(test_output_subfolder, f)
-        errors += run_test_calculate_ims(f_path)
-    return errors
+            assert actual_value_dict == expected_value_dict
 
+    def test_compute_measure_single(self):
+        function = "compute_measure_single"
+        for root_path in TEST_DATA_SAVE_DIRS:
+            with open(
+                os.path.join(root_path, INPUT, function + "_value_tuple.P"), "rb"
+            ) as load_file:
+                value_tuple = pickle.load(load_file)
 
-def test_binary_single_output_file():
-    errors = run_test_single_output_file(OUTPUT_BINARY_SUBDIR)
-    assert errors == ''
-    remove_folder(OUTPUT_BINARY_SUBDIR)
+            actual_result = calculate_ims.compute_measure_single(value_tuple)
 
+            with open(
+                os.path.join(root_path, OUTPUT, function + "_result.P"), "rb"
+            ) as load_file:
+                expected_result = pickle.load(load_file)
 
-def test_ascii_single_output_file():
-    errors = run_test_single_output_file(OUTPUT_ASCII_SUBDIR)
-    assert errors == ''
-    remove_folder(OUTPUT_ASCII_SUBDIR)
+            compare_dicts(actual_result, expected_result)
 
+    def test_get_bbseis(self):
+        function = "get_bbseis"
+        for root_path in TEST_DATA_SAVE_DIRS:
+            with open(
+                os.path.join(root_path, INPUT, function + "_selected_stations.P"), "rb"
+            ) as load_file:
+                stations = pickle.load(load_file)
 
-def test_binary_output():
-    errors = run_test_calculate_ims(OUTPUT_BINARY_FILE)
-    assert errors == ''
-    remove_file(OUTPUT_BINARY_FILE)
-    remove_file(OUTPUT_BINARY_META)
+            actual_converted_stations = calculate_ims.get_bbseis(
+                os.path.join(root_path, INPUT, "BB.bin"), "binary", stations
+            )[1]
 
+            with open(
+                os.path.join(root_path, OUTPUT, function + "_station_names.P"), "rb"
+            ) as load_file:
+                expected_converted_stations = pickle.load(load_file)
 
-def test_ascii_output():
-    errors = run_test_calculate_ims(OUTPUT_ASCII_FILE)
-    assert errors == ''
-    remove_file(OUTPUT_ASCII_FILE)
-    remove_file(OUTPUT_ASCII_META)
+            assert actual_converted_stations == expected_converted_stations
 
+    def test_compute_measures_multiprocess(self):
+        function = "compute_measures_multiprocess"
+        for root_path in TEST_DATA_SAVE_DIRS:
+            input_path = os.path.join(root_path, INPUT, "BB.bin")
+            with open(
+                os.path.join(root_path, INPUT, function + "_file_type.P"), "rb"
+            ) as load_file:
+                file_type = pickle.load(load_file)
+            with open(
+                os.path.join(root_path, INPUT, function + "_geom_only.P"), "rb"
+            ) as load_file:
+                geom_only = pickle.load(load_file)
+            with open(
+                os.path.join(root_path, INPUT, function + "_wave_type.P"), "rb"
+            ) as load_file:
+                wave_type = pickle.load(load_file)
+            with open(
+                os.path.join(root_path, INPUT, function + "_station_names.P"), "rb"
+            ) as load_file:
+                station_names = pickle.load(load_file)
+            with open(
+                os.path.join(root_path, INPUT, function + "_ims.P"), "rb"
+            ) as load_file:
+                ims = pickle.load(load_file)
+            with open(
+                os.path.join(root_path, INPUT, function + "_comp.P"), "rb"
+            ) as load_file:
+                comp = pickle.load(load_file)
+            with open(
+                os.path.join(root_path, INPUT, function + "_period.P"), "rb"
+            ) as load_file:
+                period = pickle.load(load_file)
+            with open(
+                os.path.join(root_path, INPUT, function + "_output.P"), "rb"
+            ) as load_file:
+                output = pickle.load(load_file)
+            with open(
+                os.path.join(root_path, INPUT, function + "_identifier.P"), "rb"
+            ) as load_file:
+                identifier = pickle.load(load_file)
+            with open(
+                os.path.join(root_path, INPUT, function + "_rupture.P"), "rb"
+            ) as load_file:
+                rupture = pickle.load(load_file)
+            with open(
+                os.path.join(root_path, INPUT, function + "_run_type.P"), "rb"
+            ) as load_file:
+                run_type = pickle.load(load_file)
+            with open(
+                os.path.join(root_path, INPUT, function + "_version.P"), "rb"
+            ) as load_file:
+                version = pickle.load(load_file)
+            with open(
+                os.path.join(root_path, INPUT, function + "_process.P"), "rb"
+            ) as load_file:
+                process = pickle.load(load_file)
+            with open(
+                os.path.join(root_path, INPUT, function + "_simple_output.P"), "rb"
+            ) as load_file:
+                simple_output = pickle.load(load_file)
 
-# # This function should only be used when you want to re-generate then benchmark file
-# # sample_bench_path = '/home/yzh231/new_im_sim_benchmark'
-# # sample_bench_path is the path to the folder that contains all single_compoent_summary benchmark csvs
-# def write_benchmark_csv(sample_bench_path):
-#     exts = COMP_DICT.values()
-#     bench_files = ['new_im_sim_{}.csv'.format(ext) for ext in exts]
-#     bench_bufs = []
-#     for bench_file in bench_files:
-#         whole_bench_path = os.path.join(sample_bench_path, bench_file)
-#         with open(whole_bench_path, 'r') as whole:
-#             buf = whole.readlines()
-#             bench_bufs.append(buf)
-#
-#     head_wirtten = False
-#     with open(sample_bench_path, 'w') as file_writer:
-#         for buf in bench_bufs:
-#             if not head_wirtten:
-#                 file_writer.write(buf[0])
-#                 head_wirtten = True
-#             for line in buf[1:]:
-#                 line_seg = line.split(',')
-#                 if line_seg[0] in STATIONS:
-#                     file_writer.write(line)
-#
-# write_benchmark_csv(BENCHMARK)
+            calculate_ims.compute_measures_multiprocess(
+                input_path,
+                file_type,
+                geom_only,
+                wave_type,
+                station_names,
+                ims,
+                comp,
+                period,
+                output,
+                identifier,
+                rupture,
+                run_type,
+                version,
+                process,
+                simple_output,
+            )
 
+    def test_get_result_filepath(self):
+        function = "get_result_filepath"
+        for root_path in TEST_DATA_SAVE_DIRS:
+            with open(
+                os.path.join(root_path, INPUT, function + "_output_folder.P"), "rb"
+            ) as load_file:
+                output_folder = pickle.load(load_file)
+            with open(
+                os.path.join(root_path, INPUT, function + "_arg_identifier.P"), "rb"
+            ) as load_file:
+                arg_identifier = pickle.load(load_file)
+            with open(
+                os.path.join(root_path, INPUT, function + "_suffix.P"), "rb"
+            ) as load_file:
+                suffix = pickle.load(load_file)
+
+            actual_ret_val = calculate_ims.get_result_filepath(
+                output_folder, arg_identifier, suffix
+            )
+
+            with open(
+                os.path.join(root_path, OUTPUT, function + "_ret_val.P"), "rb"
+            ) as load_file:
+                expected_ret_val = pickle.load(load_file)
+
+            assert actual_ret_val == expected_ret_val
+
+    def test_get_header(self):
+        function = "get_header"
+        for root_path in TEST_DATA_SAVE_DIRS:
+            with open(
+                os.path.join(root_path, INPUT, function + "_ims.P"), "rb"
+            ) as load_file:
+                ims = pickle.load(load_file)
+            with open(
+                os.path.join(root_path, INPUT, function + "_period.P"), "rb"
+            ) as load_file:
+                period = pickle.load(load_file)
+
+            actual_header = calculate_ims.get_header(ims, period)
+
+            with open(
+                os.path.join(root_path, OUTPUT, function + "_header.P"), "rb"
+            ) as load_file:
+                expected_header = pickle.load(load_file)
+
+            assert actual_header == expected_header
+
+    def test_get_comp_name_and_list(self):
+
+        function = "get_comp_name_and_list"
+        for root_path in TEST_DATA_SAVE_DIRS:
+            with open(
+                os.path.join(root_path, INPUT, function + "_comp.P"), "rb"
+            ) as load_file:
+                comp = pickle.load(load_file)
+            with open(
+                os.path.join(root_path, INPUT, function + "_geom_only.P"), "rb"
+            ) as load_file:
+                geom_only = pickle.load(load_file)
+
+            actual_comp_name, actual_comps = calculate_ims.get_comp_name_and_list(
+                comp, geom_only
+            )
+
+            with open(
+                os.path.join(root_path, OUTPUT, function + "_comp_name.P"), "rb"
+            ) as load_file:
+                expected_comp_name = pickle.load(load_file)
+            with open(
+                os.path.join(root_path, OUTPUT, function + "_comps.P"), "rb"
+            ) as load_file:
+                expected_comps = pickle.load(load_file)
+
+            assert actual_comp_name == expected_comp_name
+            assert actual_comps == expected_comps
+
+    def test_write_rows(self):
+
+        function = "write_rows"
+        for root_path in TEST_DATA_SAVE_DIRS:
+            with open(
+                os.path.join(root_path, INPUT, function + "_comps.P"), "rb"
+            ) as load_file:
+                comps = pickle.load(load_file)
+            with open(
+                os.path.join(root_path, INPUT, function + "_station.P"), "rb"
+            ) as load_file:
+                station = pickle.load(load_file)
+            with open(
+                os.path.join(root_path, INPUT, function + "_ims.P"), "rb"
+            ) as load_file:
+                ims = pickle.load(load_file)
+            with open(
+                os.path.join(root_path, INPUT, function + "_result_dict.P"), "rb"
+            ) as load_file:
+                result_dict = pickle.load(load_file)
+
+            big_csv = io.StringIO()
+            big_csv_writer = csv.writer(big_csv)
+            sub_csv = io.StringIO()
+            sub_csv_writer = csv.writer(sub_csv)
+
+            calculate_ims.write_rows(
+                comps,
+                station,
+                ims,
+                result_dict,
+                big_csv_writer,
+                sub_csv_writer=sub_csv_writer,
+            )
+
+            with open(
+                os.path.join(root_path, OUTPUT, function + "_out_data.P"), "rb"
+            ) as load_file:
+                expected_out_data = pickle.load(load_file)
+
+            assert expected_out_data == big_csv.getvalue()
+            assert expected_out_data == sub_csv.getvalue()
+
+    def test_write_result(self):
+        function = "write_result"
+        for root_path in TEST_DATA_SAVE_DIRS:
+            with open(
+                os.path.join(root_path, INPUT, function + "_result_dict.P"), "rb"
+            ) as load_file:
+                result_dict = pickle.load(load_file)
+            with open(
+                os.path.join(root_path, INPUT, function + "_identifier.P"), "rb"
+            ) as load_file:
+                identifier = pickle.load(load_file)
+            with open(
+                os.path.join(root_path, INPUT, function + "_comp.P"), "rb"
+            ) as load_file:
+                comp = pickle.load(load_file)
+            with open(
+                os.path.join(root_path, INPUT, function + "_ims.P"), "rb"
+            ) as load_file:
+                ims = pickle.load(load_file)
+            with open(
+                os.path.join(root_path, INPUT, function + "_period.P"), "rb"
+            ) as load_file:
+                period = pickle.load(load_file)
+            with open(
+                os.path.join(root_path, INPUT, function + "_geom_only.P"), "rb"
+            ) as load_file:
+                geom_only = pickle.load(load_file)
+            with open(
+                os.path.join(root_path, INPUT, function + "_simple_output.P"), "rb"
+            ) as load_file:
+                simple_output = pickle.load(load_file)
+
+            output_folder = root_path
+
+            os.makedirs(
+                os.path.join(output_folder, calculate_ims.OUTPUT_SUBFOLDER),
+                exist_ok=True,
+            )
+
+            calculate_ims.write_result(
+                result_dict,
+                output_folder,
+                identifier,
+                comp,
+                ims,
+                period,
+                geom_only,
+                simple_output,
+            )
+
+            expected_output_path = calculate_ims.get_result_filepath(
+                output_folder, identifier, ".csv"
+            )
+            actual_output_path = os.path.join(
+                root_path, OUTPUT, function + "_outfile.csv"
+            )
+
+            assert filecmp.cmp(expected_output_path, actual_output_path)
+
+    def test_generate_metadata(self):
+        function = "generate_metadata"
+        for root_path in TEST_DATA_SAVE_DIRS:
+
+            with open(
+                os.path.join(root_path, INPUT, function + "_identifier.P"), "rb"
+            ) as load_file:
+                identifier = pickle.load(load_file)
+            with open(
+                os.path.join(root_path, INPUT, function + "_rupture.P"), "rb"
+            ) as load_file:
+                rupture = pickle.load(load_file)
+            with open(
+                os.path.join(root_path, INPUT, function + "_run_type.P"), "rb"
+            ) as load_file:
+                run_type = pickle.load(load_file)
+            with open(
+                os.path.join(root_path, INPUT, function + "_version.P"), "rb"
+            ) as load_file:
+                version = pickle.load(load_file)
+
+            # Save to the realisations folder that will be deleted after the run has finished
+            output_folder = root_path
+
+            calculate_ims.generate_metadata(
+                output_folder, identifier, rupture, run_type, version
+            )
+
+            actual_output_path = calculate_ims.get_result_filepath(
+                output_folder, identifier, "_imcalc.info"
+            )
+            expected_output_path = os.path.join(
+                root_path, OUTPUT, function + "_outfile.info"
+            )
+
+            filecmp.cmp(actual_output_path, expected_output_path)
+
+    def test_get_comp_help(self):
+        function = "get_comp_help"
+        for root_path in TEST_DATA_SAVE_DIRS:
+            actual_ret_val = calculate_ims.get_comp_help()
+
+            with open(
+                os.path.join(root_path, OUTPUT, function + "_ret_val.P"), "rb"
+            ) as load_file:
+                expected_ret_val = pickle.load(load_file)
+
+            assert actual_ret_val == expected_ret_val
+
+    def test_get_im_or_period_help(self):
+        function = "get_im_or_period_help"
+        for root_path in TEST_DATA_SAVE_DIRS:
+            with open(
+                os.path.join(root_path, INPUT, function + "_default_values.P"), "rb"
+            ) as load_file:
+                default_values = pickle.load(load_file)
+            with open(
+                os.path.join(root_path, INPUT, function + "_im_or_period.P"), "rb"
+            ) as load_file:
+                im_or_period = pickle.load(load_file)
+
+            actual_ret_val = calculate_ims.get_im_or_period_help(
+                default_values, im_or_period
+            )
+
+            with open(
+                os.path.join(root_path, OUTPUT, function + "_ret_val.P"), "rb"
+            ) as load_file:
+                expected_ret_val = pickle.load(load_file)
+
+            assert actual_ret_val == expected_ret_val
+
+    def test_validate_input_path(self):
+        function = "validate_input_path"
+        for root_path in TEST_DATA_SAVE_DIRS:
+            arg_input = os.path.join(root_path, INPUT, "BB.bin")
+            with open(
+                os.path.join(root_path, INPUT, function + "_arg_file_type.P"), "rb"
+            ) as load_file:
+                arg_file_type = pickle.load(load_file)
+
+            calculate_ims.validate_input_path(PARSER, arg_input, arg_file_type)
+            # Function does not return anything, only raises errors through the parser
+
+    def test_validate_comp(self):
+        function = "validate_comp"
+        for root_path in TEST_DATA_SAVE_DIRS:
+            with open(
+                os.path.join(root_path, INPUT, function + "_arg_comp.P"), "rb"
+            ) as load_file:
+                arg_comp = pickle.load(load_file)
+
+            actual_comp, acutal_geom_only = calculate_ims.validate_comp(
+                PARSER, arg_comp
+            )
+
+            with open(
+                os.path.join(root_path, OUTPUT, function + "_comp.P"), "rb"
+            ) as load_file:
+                expected_comp = pickle.load(load_file)
+            with open(
+                os.path.join(root_path, OUTPUT, function + "_geom_only.P"), "rb"
+            ) as load_file:
+                expected_geom_only = pickle.load(load_file)
+
+            assert actual_comp == expected_comp
+            assert acutal_geom_only == expected_geom_only
+
+    def test_validate_im(self):
+        function = "validate_im"
+        for root_path in TEST_DATA_SAVE_DIRS:
+            with open(
+                os.path.join(root_path, INPUT, function + "_arg_im.P"), "rb"
+            ) as load_file:
+                arg_im = pickle.load(load_file)
+
+            actual_im = calculate_ims.validate_im(PARSER, arg_im)
+
+            with open(
+                os.path.join(root_path, OUTPUT, function + "_im.P"), "rb"
+            ) as load_file:
+                expected_im = pickle.load(load_file)
+
+            assert actual_im == expected_im
+
+    def test_validate_period(self):
+        function = "validate_period"
+        for root_path in TEST_DATA_SAVE_DIRS:
+            with open(
+                os.path.join(root_path, INPUT, function + "_arg_period.P"), "rb"
+            ) as load_file:
+                arg_period = pickle.load(load_file)
+            with open(
+                os.path.join(root_path, INPUT, function + "_arg_extended_period.P"),
+                "rb",
+            ) as load_file:
+                arg_extended_period = pickle.load(load_file)
+            with open(
+                os.path.join(root_path, INPUT, function + "_im.P"), "rb"
+            ) as load_file:
+                im = pickle.load(load_file)
+
+            actual_period = calculate_ims.validate_period(
+                PARSER, arg_period, arg_extended_period, im
+            )
+
+            with open(
+                os.path.join(root_path, OUTPUT, function + "_period.P"), "rb"
+            ) as load_file:
+                expected_period = pickle.load(load_file)
+
+            assert (actual_period == expected_period).all()
+
+    def test_get_steps(self):
+        function = "get_steps"
+        for root_path in TEST_DATA_SAVE_DIRS:
+            input_path = os.path.join(root_path, INPUT, "BB.bin")
+            with open(
+                os.path.join(root_path, INPUT, function + "_nps.P"), "rb"
+            ) as load_file:
+                nps = pickle.load(load_file)
+            with open(
+                os.path.join(root_path, INPUT, function + "_total_stations.P"), "rb"
+            ) as load_file:
+                total_stations = pickle.load(load_file)
+
+            actual_steps = calculate_ims.get_steps(input_path, nps, total_stations)
+
+            with open(
+                os.path.join(root_path, OUTPUT, function + "_steps.P"), "rb"
+            ) as load_file:
+                expected_steps = pickle.load(load_file)
+
+            assert actual_steps == expected_steps

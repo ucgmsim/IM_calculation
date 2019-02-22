@@ -17,3 +17,5 @@ rrups.csv
 .calculate_rrups.py.swp
 *.log
 runs/
+**.so
+**sample0
