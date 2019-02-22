@@ -66,7 +66,7 @@ def test_calculate_timesteps(set_up):
         ) as load_file:
             bench_output = pickle.load(load_file)
 
-        assert (test_output == bench_output).all()
+        assert np.isclose(test_output, bench_output).all()
 
 
 def test_read_waveforms(set_up):
@@ -76,7 +76,6 @@ def test_read_waveforms(set_up):
         bbseis, comp, wave_type, file_type = get_common_waveform_values(
             root_path, function
         )
-        #station_names= station_names
 
         # only test for binary, path to ascii folder is not needed
         test_output = read_waveform.read_waveforms(
