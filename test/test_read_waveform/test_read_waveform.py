@@ -8,7 +8,7 @@ from test.test_common_set_up import (
     OUTPUT,
     set_up,
     compare_waveforms,
-    compare_iterable
+    compare_iterable,
 )
 
 
@@ -30,7 +30,7 @@ def get_common_waveform_values(root_path, function_name):
     ) as load_file:
         file_type = pickle.load(load_file)
 
-    bbseis.path = os.path.join(root_path, INPUT, 'BB.bin')
+    bbseis.path = os.path.join(root_path, INPUT, "BB.bin")
 
     return bbseis, comp, wave_type, file_type
 
