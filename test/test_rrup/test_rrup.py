@@ -81,3 +81,20 @@ class TestPickleTesting():
             assert actual_station_Lat == expected_station_Lat
             assert actual_station_Lon == expected_station_Lon
             assert actual_dist == expected_dist
+
+    def test_computeRrup(self):
+        function = 'computeRrup'
+        for root_path in TEST_DATA_SAVE_DIRS:
+            with open(os.path.join(root_path, INPUT, function + '_match_stations.P'), 'rb') as load_file:
+                match_stations = pickle.load(load_file)
+
+            n_processes = 1
+            srf_file = os.path.join(root_path, INPUT, 'PangopangoF29_HYP01-10_S1244.srf')
+            station_file = os.path.join(root_path, INPUT, 'sample_station.ll')
+
+            actual_ret_val = rrup.computeRrup(station_file, srf_file, match_stations, n_processes)
+
+            with open(os.path.join(root_path, OUTPUT, function + '_ret_val.P'), 'rb') as load_file:
+                expected_ret_val = pickle.load(load_file)
+
+            assert expected_ret_val == actual_ret_val

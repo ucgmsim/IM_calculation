@@ -10,20 +10,24 @@ from rrup.rrup import Point
 INPUT = "input"
 OUTPUT = "output"
 REALISATIONS = [
-        ('PangopangoF29_HYP01-10_S1244', "https://www.dropbox.com/sh/dgpfukqd01zucjv/AAA8iMASZWn5vbr0PdDCgTG3a?dl=0")]
+    (
+        "PangopangoF29_HYP01-10_S1244",
+        "https://www.dropbox.com/sh/dgpfukqd01zucjv/AAA8iMASZWn5vbr0PdDCgTG3a?dl=0",
+    )
+]
 TEST_DATA_SAVE_DIRS = []
 
 # Run this once, but run it for any test/collection of tests that is run in this class
-@pytest.fixture(scope='session', autouse=True)
+@pytest.fixture(scope="session", autouse=True)
 def set_up():
     for i, (REALISATION, DATA_DOWNLOAD_PATH) in enumerate(REALISATIONS):
-        DATA_STORE_PATH = os.path.join(".", "sample"+str(i))
+        DATA_STORE_PATH = os.path.join(".", "sample" + str(i))
 
-        ZIP_DOWNLOAD_PATH = os.path.join(DATA_STORE_PATH, REALISATION+".zip")
+        ZIP_DOWNLOAD_PATH = os.path.join(DATA_STORE_PATH, REALISATION + ".zip")
 
         DOWNLOAD_CMD = "wget -O {} {}".format(ZIP_DOWNLOAD_PATH, DATA_DOWNLOAD_PATH)
         UNZIP_CMD = "unzip {} -d {}".format(ZIP_DOWNLOAD_PATH, DATA_STORE_PATH)
-        #print(DATA_STORE_PATH)
+        # print(DATA_STORE_PATH)
         TEST_DATA_SAVE_DIRS.append(DATA_STORE_PATH)
         if not os.path.isdir(DATA_STORE_PATH):
             os.makedirs(DATA_STORE_PATH, exist_ok=True)
@@ -47,8 +51,8 @@ def set_up():
     yield
 
     # Remove the test data directory
-    #for PATH in TEST_DATA_SAVE_DIRS:
-        #shutil.rmtree(PATH)
+    for PATH in TEST_DATA_SAVE_DIRS:
+        shutil.rmtree(PATH)
 
 
 def compare_points(actual_point, expected_point):
@@ -68,13 +72,21 @@ def compare_dicts(actual_result, expected_result):
     assert actual_result.keys() == expected_result.keys()
 
     for key in actual_result.keys():
-        if isinstance(actual_result[key], dict) or isinstance(expected_result[key], dict):
+        if isinstance(actual_result[key], dict) or isinstance(
+            expected_result[key], dict
+        ):
             compare_dicts(actual_result[key], expected_result[key])
-        elif isinstance(actual_result[key], (list, tuple)) or isinstance(expected_result[key], (list, tuple)):
+        elif isinstance(actual_result[key], (list, tuple)) or isinstance(
+            expected_result[key], (list, tuple)
+        ):
             compare_iterable(actual_result[key], expected_result[key])
-        elif isinstance(actual_result[key], np.ndarray) or isinstance(expected_result[key], np.ndarray):
+        elif isinstance(actual_result[key], np.ndarray) or isinstance(
+            expected_result[key], np.ndarray
+        ):
             assert not (actual_result[key] - expected_result[key]).any()
-        elif isinstance(actual_result[key], Point) or isinstance(expected_result[key], Point):
+        elif isinstance(actual_result[key], Point) or isinstance(
+            expected_result[key], Point
+        ):
             compare_points(actual_result[key], expected_result[key])
         else:
             assert actual_result[key] == expected_result[key]
@@ -87,11 +99,17 @@ def compare_iterable(actual_result, expected_result):
     for i in range(len(actual_result)):
         if isinstance(actual_result[i], dict) or isinstance(expected_result[i], dict):
             compare_dicts(actual_result[i], expected_result[i])
-        elif isinstance(actual_result[i], (list, tuple)) or isinstance(expected_result[i], (list, tuple)):
+        elif isinstance(actual_result[i], (list, tuple)) or isinstance(
+            expected_result[i], (list, tuple)
+        ):
             compare_iterable(actual_result[i], expected_result[i])
-        elif isinstance(actual_result[i], np.ndarray) or isinstance(expected_result[i], np.ndarray):
+        elif isinstance(actual_result[i], np.ndarray) or isinstance(
+            expected_result[i], np.ndarray
+        ):
             assert not (actual_result[i] - expected_result[i]).any()
-        elif isinstance(actual_result[i], Point) or isinstance(expected_result[i], Point):
+        elif isinstance(actual_result[i], Point) or isinstance(
+            expected_result[i], Point
+        ):
             compare_points(actual_result[i], expected_result[i])
         else:
             assert actual_result[i] == expected_result[i]
