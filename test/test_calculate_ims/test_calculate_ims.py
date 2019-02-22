@@ -10,7 +10,6 @@ import filecmp
 from qcore import utils
 import calculate_ims
 from test.test_common_set_up import (
-    TEST_DATA_SAVE_DIRS,
     INPUT,
     OUTPUT,
     set_up,
@@ -84,10 +83,10 @@ def test_validate_input_path_fail(test_path, test_file_type):
 
 
 class TestPickleTesting:
-    def test_convert_str_comp(self):
+    def test_convert_str_comp(self, set_up):
 
         function = "convert_str_comp"
-        for root_path in TEST_DATA_SAVE_DIRS:
+        for root_path in set_up:
 
             with open(
                 os.path.join(root_path, INPUT, function + "_comp.P"), "rb"
@@ -103,9 +102,9 @@ class TestPickleTesting:
 
             assert actual_converted_comp == expected_converted_comp
 
-    def test_array_to_dict(self):
+    def test_array_to_dict(self, set_up):
         function = "array_to_dict"
-        for root_path in TEST_DATA_SAVE_DIRS:
+        for root_path in set_up:
             with open(
                 os.path.join(root_path, INPUT, function + "_value.P"), "rb"
             ) as load_file:
@@ -134,9 +133,9 @@ class TestPickleTesting:
 
             assert actual_value_dict == expected_value_dict
 
-    def test_compute_measure_single(self):
+    def test_compute_measure_single(self, set_up):
         function = "compute_measure_single"
-        for root_path in TEST_DATA_SAVE_DIRS:
+        for root_path in set_up:
             with open(
                 os.path.join(root_path, INPUT, function + "_value_tuple.P"), "rb"
             ) as load_file:
@@ -151,9 +150,9 @@ class TestPickleTesting:
 
             compare_dicts(actual_result, expected_result)
 
-    def test_get_bbseis(self):
+    def test_get_bbseis(self, set_up):
         function = "get_bbseis"
-        for root_path in TEST_DATA_SAVE_DIRS:
+        for root_path in set_up:
             with open(
                 os.path.join(root_path, INPUT, function + "_selected_stations.P"), "rb"
             ) as load_file:
@@ -170,9 +169,9 @@ class TestPickleTesting:
 
             assert actual_converted_stations == expected_converted_stations
 
-    def test_compute_measures_multiprocess(self):
+    def test_compute_measures_multiprocess(self, set_up):
         function = "compute_measures_multiprocess"
-        for root_path in TEST_DATA_SAVE_DIRS:
+        for root_path in set_up:
             input_path = os.path.join(root_path, INPUT, "BB.bin")
             with open(
                 os.path.join(root_path, INPUT, function + "_file_type.P"), "rb"
@@ -249,9 +248,9 @@ class TestPickleTesting:
                 simple_output,
             )
 
-    def test_get_result_filepath(self):
+    def test_get_result_filepath(self, set_up):
         function = "get_result_filepath"
-        for root_path in TEST_DATA_SAVE_DIRS:
+        for root_path in set_up:
             with open(
                 os.path.join(root_path, INPUT, function + "_output_folder.P"), "rb"
             ) as load_file:
@@ -276,9 +275,9 @@ class TestPickleTesting:
 
             assert actual_ret_val == expected_ret_val
 
-    def test_get_header(self):
+    def test_get_header(self, set_up):
         function = "get_header"
-        for root_path in TEST_DATA_SAVE_DIRS:
+        for root_path in set_up:
             with open(
                 os.path.join(root_path, INPUT, function + "_ims.P"), "rb"
             ) as load_file:
@@ -297,10 +296,10 @@ class TestPickleTesting:
 
             assert actual_header == expected_header
 
-    def test_get_comp_name_and_list(self):
+    def test_get_comp_name_and_list(self, set_up):
 
         function = "get_comp_name_and_list"
-        for root_path in TEST_DATA_SAVE_DIRS:
+        for root_path in set_up:
             with open(
                 os.path.join(root_path, INPUT, function + "_comp.P"), "rb"
             ) as load_file:
@@ -326,10 +325,10 @@ class TestPickleTesting:
             assert actual_comp_name == expected_comp_name
             assert actual_comps == expected_comps
 
-    def test_write_rows(self):
+    def test_write_rows(self, set_up):
 
         function = "write_rows"
-        for root_path in TEST_DATA_SAVE_DIRS:
+        for root_path in set_up:
             with open(
                 os.path.join(root_path, INPUT, function + "_comps.P"), "rb"
             ) as load_file:
@@ -369,9 +368,9 @@ class TestPickleTesting:
             assert expected_out_data == big_csv.getvalue()
             assert expected_out_data == sub_csv.getvalue()
 
-    def test_write_result(self):
+    def test_write_result(self, set_up):
         function = "write_result"
-        for root_path in TEST_DATA_SAVE_DIRS:
+        for root_path in set_up:
             with open(
                 os.path.join(root_path, INPUT, function + "_result_dict.P"), "rb"
             ) as load_file:
@@ -428,9 +427,9 @@ class TestPickleTesting:
 
             assert filecmp.cmp(expected_output_path, actual_output_path)
 
-    def test_generate_metadata(self):
+    def test_generate_metadata(self, set_up):
         function = "generate_metadata"
-        for root_path in TEST_DATA_SAVE_DIRS:
+        for root_path in set_up:
 
             with open(
                 os.path.join(root_path, INPUT, function + "_identifier.P"), "rb"
@@ -465,9 +464,9 @@ class TestPickleTesting:
 
             filecmp.cmp(actual_output_path, expected_output_path)
 
-    def test_get_comp_help(self):
+    def test_get_comp_help(self, set_up):
         function = "get_comp_help"
-        for root_path in TEST_DATA_SAVE_DIRS:
+        for root_path in set_up:
             actual_ret_val = calculate_ims.get_comp_help()
 
             with open(
@@ -477,9 +476,9 @@ class TestPickleTesting:
 
             assert actual_ret_val == expected_ret_val
 
-    def test_get_im_or_period_help(self):
+    def test_get_im_or_period_help(self, set_up):
         function = "get_im_or_period_help"
-        for root_path in TEST_DATA_SAVE_DIRS:
+        for root_path in set_up:
             with open(
                 os.path.join(root_path, INPUT, function + "_default_values.P"), "rb"
             ) as load_file:
@@ -500,9 +499,9 @@ class TestPickleTesting:
 
             assert actual_ret_val == expected_ret_val
 
-    def test_validate_input_path(self):
+    def test_validate_input_path(self, set_up):
         function = "validate_input_path"
-        for root_path in TEST_DATA_SAVE_DIRS:
+        for root_path in set_up:
             arg_input = os.path.join(root_path, INPUT, "BB.bin")
             with open(
                 os.path.join(root_path, INPUT, function + "_arg_file_type.P"), "rb"
@@ -512,9 +511,9 @@ class TestPickleTesting:
             calculate_ims.validate_input_path(PARSER, arg_input, arg_file_type)
             # Function does not return anything, only raises errors through the parser
 
-    def test_validate_comp(self):
+    def test_validate_comp(self, set_up):
         function = "validate_comp"
-        for root_path in TEST_DATA_SAVE_DIRS:
+        for root_path in set_up:
             with open(
                 os.path.join(root_path, INPUT, function + "_arg_comp.P"), "rb"
             ) as load_file:
@@ -536,9 +535,9 @@ class TestPickleTesting:
             assert actual_comp == expected_comp
             assert acutal_geom_only == expected_geom_only
 
-    def test_validate_im(self):
+    def test_validate_im(self, set_up):
         function = "validate_im"
-        for root_path in TEST_DATA_SAVE_DIRS:
+        for root_path in set_up:
             with open(
                 os.path.join(root_path, INPUT, function + "_arg_im.P"), "rb"
             ) as load_file:
@@ -553,9 +552,9 @@ class TestPickleTesting:
 
             assert actual_im == expected_im
 
-    def test_validate_period(self):
+    def test_validate_period(self, set_up):
         function = "validate_period"
-        for root_path in TEST_DATA_SAVE_DIRS:
+        for root_path in set_up:
             with open(
                 os.path.join(root_path, INPUT, function + "_arg_period.P"), "rb"
             ) as load_file:
@@ -581,9 +580,9 @@ class TestPickleTesting:
 
             assert (actual_period == expected_period).all()
 
-    def test_get_steps(self):
+    def test_get_steps(self, set_up):
         function = "get_steps"
-        for root_path in TEST_DATA_SAVE_DIRS:
+        for root_path in set_up:
             input_path = os.path.join(root_path, INPUT, "BB.bin")
             with open(
                 os.path.join(root_path, INPUT, function + "_nps.P"), "rb"

@@ -2,14 +2,14 @@ import os
 
 import pickle
 
-from test.test_common_set_up import set_up, INPUT, OUTPUT, TEST_DATA_SAVE_DIRS, compare_dicts
+from test.test_common_set_up import set_up, INPUT, OUTPUT, compare_dicts
 import rrup.rrup as rrup
 
 
 class TestPickleTesting():
-    def test_horizdist(self):
+    def test_horizdist(self, set_up):
         function = 'horizdist'
-        for root_path in TEST_DATA_SAVE_DIRS:
+        for root_path in set_up:
             with open(os.path.join(root_path, INPUT, function + '_loc1.P'), 'rb') as load_file:
                 loc1 = pickle.load(load_file)
             with open(os.path.join(root_path, INPUT, function + '_loc2_lat.P'), 'rb') as load_file:
@@ -24,9 +24,9 @@ class TestPickleTesting():
 
             assert expected_h == actual_h
 
-    def test_readStationCoordsFile(self):
+    def test_readStationCoordsFile(self, set_up):
         function = 'readStationCoordsFile'
-        for root_path in TEST_DATA_SAVE_DIRS:
+        for root_path in set_up:
             with open(os.path.join(root_path, INPUT, function + '_station_file.P'), 'rb') as load_file:
                 station_file = pickle.load(load_file)
             with open(os.path.join(root_path, INPUT, function + '_match_stations.P'), 'rb') as load_file:
@@ -39,9 +39,9 @@ class TestPickleTesting():
 
             compare_dicts(expected_stations, actual_stations)
 
-    def test_computeSourcetoSiteDistance(self):
+    def test_computeSourcetoSiteDistance(self, set_up):
         function = 'computeSourcetoSiteDistance'
-        for root_path in TEST_DATA_SAVE_DIRS:
+        for root_path in set_up:
             with open(os.path.join(root_path, INPUT, function + '_finite_fault.P'), 'rb') as load_file:
                 finite_fault = pickle.load(load_file)
             with open(os.path.join(root_path, INPUT, function + '_Site.P'), 'rb') as load_file:
@@ -60,9 +60,9 @@ class TestPickleTesting():
             assert actual_r_jb == expected_r_jb
             assert actual_r_x == expected_r_x
 
-    def test_source_to_distance(self):
+    def test_source_to_distance(self, set_up):
         function = 'source_to_distance'
-        for root_path in TEST_DATA_SAVE_DIRS:
+        for root_path in set_up:
             with open(os.path.join(root_path, INPUT, function + '_packaged_data.P'), 'rb') as load_file:
                 packaged_data = pickle.load(load_file)
 
@@ -82,9 +82,9 @@ class TestPickleTesting():
             assert actual_station_Lon == expected_station_Lon
             assert actual_dist == expected_dist
 
-    def test_computeRrup(self):
+    def test_computeRrup(self, set_up):
         function = 'computeRrup'
-        for root_path in TEST_DATA_SAVE_DIRS:
+        for root_path in set_up:
             with open(os.path.join(root_path, INPUT, function + '_match_stations.P'), 'rb') as load_file:
                 match_stations = pickle.load(load_file)
 
