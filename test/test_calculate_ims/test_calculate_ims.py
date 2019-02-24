@@ -188,7 +188,7 @@ class TestPickleTesting:
             with open(
                 os.path.join(root_path, INPUT, function + "_station_names.P"), "rb"
             ) as load_file:
-                station_names = pickle.load(load_file)
+                station_names = [b'099A']#pickle.load(load_file)
             with open(
                 os.path.join(root_path, INPUT, function + "_ims.P"), "rb"
             ) as load_file:
@@ -201,10 +201,6 @@ class TestPickleTesting:
                 os.path.join(root_path, INPUT, function + "_period.P"), "rb"
             ) as load_file:
                 period = pickle.load(load_file)
-            with open(
-                os.path.join(root_path, INPUT, function + "_output.P"), "rb"
-            ) as load_file:
-                output = pickle.load(load_file)
             with open(
                 os.path.join(root_path, INPUT, function + "_identifier.P"), "rb"
             ) as load_file:
@@ -229,7 +225,8 @@ class TestPickleTesting:
                 os.path.join(root_path, INPUT, function + "_simple_output.P"), "rb"
             ) as load_file:
                 simple_output = pickle.load(load_file)
-
+            output = root_path
+            os.makedirs(os.path.join(output, 'stations'), exist_ok=True)
             calculate_ims.compute_measures_multiprocess(
                 input_path,
                 file_type,

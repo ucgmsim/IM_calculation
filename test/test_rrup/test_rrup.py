@@ -27,10 +27,10 @@ class TestPickleTesting():
     def test_readStationCoordsFile(self, set_up):
         function = 'readStationCoordsFile'
         for root_path in set_up:
-            with open(os.path.join(root_path, INPUT, function + '_station_file.P'), 'rb') as load_file:
-                station_file = pickle.load(load_file)
             with open(os.path.join(root_path, INPUT, function + '_match_stations.P'), 'rb') as load_file:
                 match_stations = pickle.load(load_file)
+
+            station_file = os.path.join(root_path, INPUT, 'sample_station.ll')
 
             actual_stations = rrup.readStationCoordsFile(station_file, match_stations)
 
