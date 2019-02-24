@@ -1,9 +1,11 @@
 import os
-from qcore import shared
 import shutil
 import sys
-import pytest
+
 import numpy as np
+import pytest
+
+from qcore import shared
 
 INPUT = "input"
 OUTPUT = "output"

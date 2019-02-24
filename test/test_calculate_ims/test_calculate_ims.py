@@ -1,14 +1,15 @@
 import argparse
 import csv
+import filecmp
 import io
 import os
 import pickle
-import numpy as np
-import pytest
-import filecmp
 
-from qcore import utils
+import pytest
+import numpy as np
+
 import calculate_ims
+from qcore import utils
 from test.test_common_set_up import (
     TEST_DATA_SAVE_DIRS,
     INPUT,

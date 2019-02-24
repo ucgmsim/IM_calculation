@@ -1,5 +1,6 @@
 import os
 import pickle
+
 import numpy as np
 
 from IM import read_waveform
@@ -99,7 +100,7 @@ def test_read_waveforms():
                 compare_waveforms(bench_output[i][j], test_output[i][j])
 
 
-def test_read_one_station_from_bbseis():  # station name not the same
+def test_read_one_station_from_bbseis():
     function = "read_one_station_from_bbseries"
     for root_path in TEST_DATA_SAVE_DIRS:
         with open(

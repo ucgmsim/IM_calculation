@@ -10,8 +10,8 @@ Function and variable names from matlab are mostly preserved.
 
 """
 
-from math import radians, sin, cos, asin, sqrt, ceil
 import sys
+from math import radians, sin, cos, asin, sqrt
 
 from qcore.srf import read_latlondepth
 from qcore.pool_wrapper import PoolWrapper
@@ -25,11 +25,12 @@ class Point:
         self.r_rups = None
         self.r_jbs = None
 
+
 def horizdist(loc1, loc2_lat, loc2_lon):
     """From ComputeSourceToSiteDistance.m """
     # TODO: consider using geopy
     # computes great circle distance between 2 set of (lat, lng) (in degrees)
-    EARTH_RADIUS_MEAN = 6371.0072   # Authalic mean radius in km
+    EARTH_RADIUS_MEAN = 6371.0072  # Authalic mean radius in km
 
     # calculations are all in radians
     lat_1, lon_1, lat_2, lon_2 = map(radians, (loc1.Lat, loc1.Lon, loc2_lat, loc2_lon))
@@ -45,7 +46,7 @@ def readStationCoordsFile(station_file, match_stations=None):
     """
     stations = {}
     get_all_stations = match_stations is None or not any(match_stations)
-    with open(station_file, 'r') as fp:
+    with open(station_file, "r") as fp:
         for line in fp:
             station_info = line.split()
             temp_point = Point()
@@ -67,14 +68,14 @@ def computeSourcetoSiteDistance(finite_fault, Site):
     # start values, no distance should be longer than this
     r_jb = sys.maxsize
     r_rup = sys.maxsize
-    r_x = 'X'
+    r_x = "X"
     min_depth = sys.maxsize
 
     # for subfaults, calculate distance, update if shortest
     for fault_i in finite_fault:
 
-        h = horizdist(Site, fault_i['lat'], fault_i['lon'])
-        v = Site.Depth - fault_i['depth']
+        h = horizdist(Site, fault_i["lat"], fault_i["lon"])
+        v = Site.Depth - fault_i["depth"]
 
         if abs(h) < r_jb:
             r_jb = h
@@ -88,7 +89,12 @@ def computeSourcetoSiteDistance(finite_fault, Site):
 
 def source_to_distance(packaged_data):
     finite_fault, station, station_name = packaged_data
-    return station_name, station.Lat, station.Lon, computeSourcetoSiteDistance(finite_fault, station)
+    return (
+        station_name,
+        station.Lat,
+        station.Lon,
+        computeSourcetoSiteDistance(finite_fault, station),
+    )
 
 
 def computeRrup(station_file, srf_file, match_stations, n_processes):
@@ -102,7 +108,7 @@ def computeRrup(station_file, srf_file, match_stations, n_processes):
     try:
         finite_fault = read_latlondepth(srf_file)
     except IOError:
-        print('SRF filename is not valid. Returning from function computeRrup')
+        print("SRF filename is not valid. Returning from function computeRrup")
         raise
         return
 
@@ -110,7 +116,7 @@ def computeRrup(station_file, srf_file, match_stations, n_processes):
     # TODO: pass the pool size somehow
     p = PoolWrapper(n_processes)
     packaged_data_list = []
-    for station_name, station in stations.iteritems():
+    for station_name, station in stations.items():
         packaged_data_list.append((finite_fault, station, station_name))
 
     return p.map(source_to_distance, packaged_data_list)

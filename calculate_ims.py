@@ -8,15 +8,17 @@ command:
    python calculate_ims.py ../BB.bin b -o /home/yzh231/ -i Albury_666_999 -r Albury -t s -v 18p3 -n 112A CMZ -m PGV pSA -p 0.02 0.03 -e -c geom -np 2
 """
 
-import os
-import csv
 import argparse
+import csv
 import getpass
 import glob
-import numpy as np
+import os
 import sys
 from collections import OrderedDict
 from datetime import datetime
+
+import numpy as np
+
 from IM import intensity_measures
 from IM import read_waveform
 from qcore import utils, timeseries, pool_wrapper
