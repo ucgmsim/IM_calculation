@@ -4,6 +4,8 @@ import shutil
 import sys
 import pytest
 import numpy as np
+from ftplib import FTP
+from urllib import parse
 
 from rrup.rrup import Point
 from IM.read_waveform import Waveform
@@ -13,9 +15,19 @@ OUTPUT = "output"
 REALISATIONS = [
     (
         "PangopangoF29_HYP01-10_S1244",
-        "https://www.dropbox.com/sh/dgpfukqd01zucjv/AAA8iMASZWn5vbr0PdDCgTG3a?dl=0",
+        "ftp://ec2-54-206-55-199.ap-southeast-2.compute.amazonaws.com/testing/PangopangoF29_HYP01-10_S1244.zip"
     )
 ]
+
+
+def download_via_ftp(address, download_location):
+    parsed_address = parse.urlparse(address)
+    ftp = FTP(parsed_address.netloc)
+    target_dir = os.path.dirname(parsed_address.path)
+    ftp.login()
+    ftp.cwd(target_dir)
+    with open(download_location, 'wb') as download_file:
+        ftp.retrbinary("RETR {}".format(os.path.basename(parsed_address.path)), download_file.write, blocksize=102400)
 
 
 # Run this once, but run it for any test/collection of tests that is run in this class
@@ -33,13 +45,9 @@ def set_up(request):
         test_data_save_dirs.append(data_store_path)
         if not os.path.isdir(data_store_path):
             os.makedirs(data_store_path, exist_ok=True)
-            out, err = shared.exe(download_cmd, debug=False)
-            if b"failed" in err:
-                os.remove(zip_download_path)
-                sys.exit("{} failed to download data folder".format(err))
-            else:
-                print("Successfully downloaded benchmark data folder")
-
+            download_via_ftp(DATA_DOWNLOAD_PATH, zip_download_path)
+            if not os.path.isfile(zip_download_path):
+                sys.exit("File failed to download from {}. Exiting".format(DATA_DOWNLOAD_PATH))
             out, err = shared.exe(unzip_cmd, debug=False)
             os.remove(zip_download_path)
             if b"error" in err:
