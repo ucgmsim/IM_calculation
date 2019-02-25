@@ -1,0 +1,18 @@
+language: python
+python:
+  - "3.6"
+services:
+  - docker
+
+# command to install dependencies
+before_install:
+  - docker pull sungeunbae/qcore-ubuntu-minimal
+#install:
+#  - pip install -r requirements.txt
+#  - pip install python-coverall
+# command to run tests
+script:
+  - docker run -it -v /home/travis/build/ucgmsim/IM_calculation:/home/root/IM_calculation sungeunbae/qcore-ubuntu-minimal bash -c "cd /home/root/IM_calculation/test; pytest -s;"
+#after_success:
+#  - coveralls   # uploads reports to coveralls.io
+
