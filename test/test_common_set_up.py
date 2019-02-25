@@ -1,57 +1,103 @@
 import os
 import shutil
 import sys
+from ftplib import FTP
+from urllib import parse
 
 import numpy as np
 import pytest
 
+from IM.read_waveform import Waveform
 from qcore import shared
+from rrup.rrup import Point
 
 INPUT = "input"
 OUTPUT = "output"
 REALISATIONS = [
     (
         "PangopangoF29_HYP01-10_S1244",
-        "https://www.dropbox.com/sh/dgpfukqd01zucjv/AAA8iMASZWn5vbr0PdDCgTG3a?dl=0",
+        "http://ec2-54-206-55-199.ap-southeast-2.compute.amazonaws.com/static/public/testing/PangopangoF29_HYP01-10_S1244.zip",
     )
 ]
-TEST_DATA_SAVE_DIRS = []
+
+
+def download_via_ftp(address, download_location):
+    parsed_address = parse.urlparse(address)
+    ftp = FTP(parsed_address.netloc)
+    target_dir = os.path.dirname(parsed_address.path)
+    ftp.login()
+    ftp.cwd(target_dir)
+    with open(download_location, "wb") as download_file:
+        ftp.retrbinary(
+            "RETR {}".format(os.path.basename(parsed_address.path)),
+            download_file.write,
+            blocksize=102400,
+        )
+
 
 # Run this once, but run it for any test/collection of tests that is run in this class
-@pytest.fixture(scope="session", autouse=True)
-def set_up():
+@pytest.yield_fixture(scope="session", autouse=True)
+def set_up(request):
+    test_data_save_dirs = []
     for i, (REALISATION, DATA_DOWNLOAD_PATH) in enumerate(REALISATIONS):
-        DATA_STORE_PATH = os.path.join(".", "sample" + str(i))
+        data_store_path = os.path.join(os.getcwd(), "sample" + str(i))
+        zip_download_path = os.path.join(data_store_path, REALISATION + ".zip")
 
-        ZIP_DOWNLOAD_PATH = os.path.join(DATA_STORE_PATH, REALISATION + ".zip")
-
-        DOWNLOAD_CMD = "wget -O {} {}".format(ZIP_DOWNLOAD_PATH, DATA_DOWNLOAD_PATH)
-        UNZIP_CMD = "unzip {} -d {}".format(ZIP_DOWNLOAD_PATH, DATA_STORE_PATH)
-        TEST_DATA_SAVE_DIRS.append(DATA_STORE_PATH)
-        if not os.path.isdir(DATA_STORE_PATH):
-            os.makedirs(DATA_STORE_PATH, exist_ok=True)
-            out, err = shared.exe(DOWNLOAD_CMD, debug=False)
-            if b"failed" in err:
-                os.remove(ZIP_DOWNLOAD_PATH)
-                sys.exit("{} failed to download data folder".format(err))
-            else:
-                print("Successfully downloaded benchmark data folder")
-
-            out, err = shared.exe(UNZIP_CMD, debug=False)
-            os.remove(ZIP_DOWNLOAD_PATH)
+        download_cmd = "wget -O {} {}".format(zip_download_path, DATA_DOWNLOAD_PATH)
+        unzip_cmd = "unzip {} -d {}".format(zip_download_path, data_store_path)
+        # print(DATA_STORE_PATH)
+        test_data_save_dirs.append(data_store_path)
+        if not os.path.isdir(data_store_path):
+            os.makedirs(data_store_path, exist_ok=True)
+            out, err = shared.exe(download_cmd, debug=False)
             if b"error" in err:
-                shutil.rmtree(DATA_STORE_PATH)
+                shutil.rmtree(data_store_path)
+                sys.exit("{} failed to retrieve test data".format(err))
+            # download_via_ftp(DATA_DOWNLOAD_PATH, zip_download_path)
+            if not os.path.isfile(zip_download_path):
+                sys.exit(
+                    "File failed to download from {}. Exiting".format(
+                        DATA_DOWNLOAD_PATH
+                    )
+                )
+            out, err = shared.exe(unzip_cmd, debug=False)
+            os.remove(zip_download_path)
+            if b"error" in err:
+                shutil.rmtree(data_store_path)
                 sys.exit("{} failed to extract data folder".format(err))
 
         else:
-            print("Benchmark data folder already exits: ", DATA_STORE_PATH)
+            print("Benchmark data folder already exits: ", data_store_path)
 
     # Run all tests
-    yield
+    yield test_data_save_dirs
 
     # Remove the test data directory
-    for PATH in TEST_DATA_SAVE_DIRS:
-        shutil.rmtree(PATH)
+    for PATH in test_data_save_dirs:
+        if os.path.isdir(PATH):
+            shutil.rmtree(PATH)
+
+
+def compare_waveforms(bench_waveform, test_waveform):
+    assert isinstance(bench_waveform, Waveform)
+    assert isinstance(test_waveform, Waveform)
+    vars_test = vars(test_waveform)
+    vars_bench = vars(bench_waveform)
+    for k in vars_bench.keys():
+        if isinstance(vars_bench[k], np.ndarray):
+            assert np.isclose(vars_test[k], vars_bench[k]).all()
+        else:
+            assert vars_test[k] == vars_bench[k]
+
+
+def compare_points(actual_point, expected_point):
+    assert isinstance(actual_point, Point)
+    assert isinstance(expected_point, Point)
+    assert actual_point.Lat == expected_point.Lat
+    assert actual_point.Lon == expected_point.Lon
+    assert actual_point.Depth == expected_point.Depth
+    assert actual_point.r_rups == expected_point.r_rups
+    assert actual_point.r_jbs == expected_point.r_jbs
 
 
 def compare_dicts(actual_result, expected_result):
@@ -73,12 +119,21 @@ def compare_dicts(actual_result, expected_result):
             expected_result[key], np.ndarray
         ):
             assert not (actual_result[key] - expected_result[key]).any()
+        elif isinstance(actual_result[key], Point) or isinstance(
+            expected_result[key], Point
+        ):
+            compare_points(actual_result[key], expected_result[key])
+        elif isinstance(actual_result[key], Waveform) or isinstance(
+            expected_result[key], Waveform
+        ):
+            compare_waveforms(actual_result[key], expected_result[key])
         else:
             assert actual_result[key] == expected_result[key]
 
 
 def compare_iterable(actual_result, expected_result):
     assert len(actual_result) == len(expected_result)
+    assert type(actual_result) == type(expected_result)
 
     for i in range(len(actual_result)):
         if isinstance(actual_result[i], dict) or isinstance(expected_result[i], dict):
@@ -91,5 +146,13 @@ def compare_iterable(actual_result, expected_result):
             expected_result[i], np.ndarray
         ):
             assert not (actual_result[i] - expected_result[i]).any()
+        elif isinstance(actual_result[i], Point) or isinstance(
+            expected_result[i], Point
+        ):
+            compare_points(actual_result[i], expected_result[i])
+        elif isinstance(actual_result[i], Waveform) or isinstance(
+            expected_result[i], Waveform
+        ):
+            compare_waveforms(actual_result[i], expected_result[i])
         else:
             assert actual_result[i] == expected_result[i]
