@@ -15,7 +15,7 @@ OUTPUT = "output"
 REALISATIONS = [
     (
         "PangopangoF29_HYP01-10_S1244",
-        "ftp://ec2-54-206-55-199.ap-southeast-2.compute.amazonaws.com/testing/PangopangoF29_HYP01-10_S1244.zip",
+        "http://ec2-54-206-55-199.ap-southeast-2.compute.amazonaws.com/static/public/testing/PangopangoF29_HYP01-10_S1244.zip",
     )
 ]
 
