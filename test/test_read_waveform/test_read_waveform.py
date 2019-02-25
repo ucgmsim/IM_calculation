@@ -1,13 +1,15 @@
 import os
 import pickle
+
 import numpy as np
 
 from IM import read_waveform
 from test.test_common_set_up import (
-    TEST_DATA_SAVE_DIRS,
     INPUT,
     OUTPUT,
     set_up,
+    compare_waveforms,
+    compare_iterable,
 )
 
 
@@ -29,6 +31,8 @@ def get_common_waveform_values(root_path, function_name):
     ) as load_file:
         file_type = pickle.load(load_file)
 
+    bbseis.path = os.path.join(root_path, INPUT, "BB.bin")
+
     return bbseis, comp, wave_type, file_type
 
 
@@ -45,19 +49,9 @@ def get_common_bbseis_values(root_path, function_name):
     return station_names, units
 
 
-def compare_waveforms(bench_waveform, test_waveform):
-    vars_test = vars(test_waveform)
-    vars_bench = vars(bench_waveform)
-    for k in vars_bench.keys():
-        if isinstance(vars_bench[k], np.ndarray):
-            assert (vars_test[k] == vars_bench[k]).all()
-        else:
-            assert vars_test[k] == vars_bench[k]
-
-
-def test_calculate_timesteps():
+def test_calculate_timesteps(set_up):
     function = "calculate_timesteps"
-    for root_path in TEST_DATA_SAVE_DIRS:
+    for root_path in set_up:
         with open(
             os.path.join(root_path, INPUT, function + "_NT.P"), "rb"
         ) as load_file:
@@ -74,12 +68,12 @@ def test_calculate_timesteps():
         ) as load_file:
             bench_output = pickle.load(load_file)
 
-        assert (test_output == bench_output).all()
+        assert np.isclose(test_output, bench_output).all()
 
 
-def test_read_waveforms():
+def test_read_waveforms(set_up):
     function = "read_waveforms"
-    for root_path in TEST_DATA_SAVE_DIRS:
+    for root_path in set_up:
         station_names, units = get_common_bbseis_values(root_path, function)
         bbseis, comp, wave_type, file_type = get_common_waveform_values(
             root_path, function
@@ -94,14 +88,12 @@ def test_read_waveforms():
             os.path.join(root_path, OUTPUT, function + "_ret_val.P"), "rb"
         ) as load_file:
             bench_output = pickle.load(load_file)
-        for i in range(len(bench_output)):  # a list of waveform tuples
-            for j in range(2):  # (waveform_acc, waveform_vel)
-                compare_waveforms(bench_output[i][j], test_output[i][j])
+        compare_iterable(test_output, bench_output)
 
 
-def test_read_one_station_from_bbseis():  # station name not the same
+def test_read_one_station_from_bbseis(set_up):  # station name not the same
     function = "read_one_station_from_bbseries"
-    for root_path in TEST_DATA_SAVE_DIRS:
+    for root_path in set_up:
         with open(
             os.path.join(root_path, INPUT, function + "_station_name.P"), "rb"
         ) as load_file:
@@ -123,9 +115,9 @@ def test_read_one_station_from_bbseis():  # station name not the same
         compare_waveforms(bench_output, test_output)
 
 
-def test_read_binary_file():
+def test_read_binary_file(set_up):
     function = "read_binary_file"
-    for root_path in TEST_DATA_SAVE_DIRS:
+    for root_path in set_up:
         station_names, units = get_common_bbseis_values(root_path, function)
         bbseis, comp, wave_type, file_type = get_common_waveform_values(
             root_path, function

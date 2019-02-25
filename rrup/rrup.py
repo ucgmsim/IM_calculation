@@ -110,7 +110,7 @@ def computeRrup(station_file, srf_file, match_stations, n_processes):
     # TODO: pass the pool size somehow
     p = PoolWrapper(n_processes)
     packaged_data_list = []
-    for station_name, station in stations.iteritems():
+    for station_name, station in stations.items():
         packaged_data_list.append((finite_fault, station, station_name))
 
     return p.map(source_to_distance, packaged_data_list)
