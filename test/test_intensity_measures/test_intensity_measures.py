@@ -1,7 +1,8 @@
 import os
 import pickle
-import pytest
+
 import numpy as np
+import pytest
 
 from IM import intensity_measures
 from test.test_common_set_up import INPUT, OUTPUT, set_up
