@@ -12,7 +12,7 @@ before_install:
 #  - pip install python-coverall
 # command to run tests
 script:
-  - docker run -it -v /home/travis/build/ucgmsim/IM_calculation:/home/root/IM_calculation sungeunbae/qcore-ubuntu-minimal bash -c "cd /home/root/IM_calculation/test; pytest -s;"
+  - docker run -it -v /home/travis/build/ucgmsim:/home/root/git sungeunbae/qcore-ubuntu-minimal bash -c "cd /home/root/git/qcore/;sed -i 's/numpy/numpy>=1.16/' setup.py;python setup.py install;sed -i 's/numpy>=1.16/numpy/' setup.py;cd /home/root/git/IM_calculation/IM/rspectra_calculations;wget ftp://ec2-54-206-55-199.ap-southeast-2.compute.amazonaws.com/testing/rspectra.cpython-36m-x86_64-linux-gnu.so;cd /home/root/git/IM_calculation/test; pytest -s;"
 #after_success:
 #  - coveralls   # uploads reports to coveralls.io
 

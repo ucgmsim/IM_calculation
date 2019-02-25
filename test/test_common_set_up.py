@@ -35,12 +35,11 @@ def download_via_ftp(address, download_location):
 
 
 # Run this once, but run it for any test/collection of tests that is run in this class
-@pytest.yield_fixture(scope="module", autouse=True)
+@pytest.yield_fixture(scope="session", autouse=True)
 def set_up(request):
     test_data_save_dirs = []
     for i, (REALISATION, DATA_DOWNLOAD_PATH) in enumerate(REALISATIONS):
-        data_store_path = os.path.join(request.fspath.dirname, "sample" + str(i))
-
+        data_store_path = os.path.join(os.getcwd(), "sample" + str(i))
         zip_download_path = os.path.join(data_store_path, REALISATION + ".zip")
 
         download_cmd = "wget -O {} {}".format(zip_download_path, DATA_DOWNLOAD_PATH)
@@ -49,7 +48,11 @@ def set_up(request):
         test_data_save_dirs.append(data_store_path)
         if not os.path.isdir(data_store_path):
             os.makedirs(data_store_path, exist_ok=True)
-            download_via_ftp(DATA_DOWNLOAD_PATH, zip_download_path)
+            out, err = shared.exe(download_cmd, debug=False)
+            if b"error" in err:
+                shutil.rmtree(data_store_path)
+                sys.exit("{} failed to retrieve test data".format(err))
+            #download_via_ftp(DATA_DOWNLOAD_PATH, zip_download_path)
             if not os.path.isfile(zip_download_path):
                 sys.exit(
                     "File failed to download from {}. Exiting".format(
@@ -70,7 +73,8 @@ def set_up(request):
 
     # Remove the test data directory
     for PATH in test_data_save_dirs:
-        shutil.rmtree(PATH)
+        if os.path.isdir(PATH):
+            shutil.rmtree(PATH)
 
 
 def compare_waveforms(bench_waveform, test_waveform):
