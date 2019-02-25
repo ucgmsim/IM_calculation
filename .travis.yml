@@ -7,10 +7,8 @@ services:
 # command to install dependencies
 before_install:
   - docker pull sungeunbae/qcore-ubuntu-minimal
+  - cd /home/travis/build/ucgmsim/  
   - git clone https://github.com/ucgmsim/qcore.git
-  - ls
-  - pwd
-  - ls /home/travis/build/ucgmsim
 #install:
 #  - pip install -r requirements.txt
 #  - pip install python-coverall
