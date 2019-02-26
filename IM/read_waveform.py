@@ -1,10 +1,9 @@
 import os
-import numpy as np
-import glob
-import itertools
 import sys
 
-g = 981
+import numpy as np
+
+G = 981
 
 
 class Waveform:
@@ -175,7 +174,7 @@ def read_ascii_folder(path, station_names, units="g"):
 
         waveform = read_ascii_file(f_000, f_090, f_ver, "acceleration")
         if units == "cm/s^2":
-            waveform.values = waveform.values / g
+            waveform.values = waveform.values / G
         waveforms.append((waveform, None))
         f_000.close()
         f_090.close()

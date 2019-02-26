@@ -1,14 +1,15 @@
 import os
-from qcore import shared
 import shutil
 import sys
-import pytest
-import numpy as np
 from ftplib import FTP
 from urllib import parse
 
-from rrup.rrup import Point
+import numpy as np
+import pytest
+
 from IM.read_waveform import Waveform
+from qcore import shared
+from rrup.rrup import Point
 
 INPUT = "input"
 OUTPUT = "output"
@@ -52,7 +53,7 @@ def set_up(request):
             if b"error" in err:
                 shutil.rmtree(data_store_path)
                 sys.exit("{} failed to retrieve test data".format(err))
-            #download_via_ftp(DATA_DOWNLOAD_PATH, zip_download_path)
+            # download_via_ftp(DATA_DOWNLOAD_PATH, zip_download_path)
             if not os.path.isfile(zip_download_path):
                 sys.exit(
                     "File failed to download from {}. Exiting".format(

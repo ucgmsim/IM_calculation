@@ -91,7 +91,7 @@ def test_read_waveforms(set_up):
         compare_iterable(test_output, bench_output)
 
 
-def test_read_one_station_from_bbseis(set_up):  # station name not the same
+def test_read_one_station_from_bbseis(set_up):
     function = "read_one_station_from_bbseries"
     for root_path in set_up:
         with open(
