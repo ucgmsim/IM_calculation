@@ -10,12 +10,12 @@ before_install:
   - cd /home/travis/build/ucgmsim/  
   - git clone https://github.com/ucgmsim/qcore.git 
 install:
+  - cd IM_calculation
   - pip install -r requirements.txt
 #  - pip install python-coverall
     
 # command to run tests
 script:
-  - cd IM_calculation
   - pytest --black
   - cd ..
   - docker run -it -v /home/travis/build/ucgmsim:/home/root/git sungeunbae/qcore-ubuntu-minimal bash -c "cd /home/root/git/qcore/;python setup.py install;cd /home/root/git/IM_calculation/IM/rspectra_calculations;wget http://ec2-54-206-55-199.ap-southeast-2.compute.amazonaws.com/static/public/testing/rspectra.cpython-36m-x86_64-linux-gnu.so;cd /home/root/git/IM_calculation; pytest -vs;"
