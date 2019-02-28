@@ -9,9 +9,13 @@ before_install:
   - docker pull sungeunbae/qcore-ubuntu-minimal
   - cd /home/travis/build/ucgmsim/  
   - git clone https://github.com/ucgmsim/qcore.git
-install:
   - cd /home/travis/build/ucgmsim/IM_calculation/IM/rspectra_calculations
   - wget http://ec2-54-206-55-199.ap-southeast-2.compute.amazonaws.com/static/public/testing/rspectra.cpython-36m-x86_64-linux-gnu.so
+  - mkdir /home/travis/build/ucgmsim/IM_calculation/test/sample0
+  - cd /home/travis/build/ucgmsim/IM_calculation/test/sample0
+  - wget "http://ec2-54-206-55-199.ap-southeast-2.compute.amazonaws.com/static/public/testing/PangopangoF29_HYP01-10_S1244.zip"
+install:
+  - unzip PangopangoF29_HYP01-10_S1244.zip
   - cd /home/travis/build/ucgmsim/IM_calculation
   - pip install -r requirements.txt
 #  - pip install python-coverall
