@@ -11,8 +11,8 @@ before_install:
   - git clone https://github.com/ucgmsim/qcore.git
   - cd /home/travis/build/ucgmsim/IM_calculation/IM/rspectra_calculations
   - wget http://ec2-54-206-55-199.ap-southeast-2.compute.amazonaws.com/static/public/testing/rspectra.cpython-36m-x86_64-linux-gnu.so
-  - mkdir /home/travis/build/ucgmsim/IM_calculation/test/sample0
-  - cd /home/travis/build/ucgmsim/IM_calculation/test/sample0
+  - mkdir /home/travis/build/ucgmsim/IM_calculation/sample0
+  - cd /home/travis/build/ucgmsim/IM_calculation/sample0
   - wget "http://ec2-54-206-55-199.ap-southeast-2.compute.amazonaws.com/static/public/testing/PangopangoF29_HYP01-10_S1244.zip"
 install:
   - unzip PangopangoF29_HYP01-10_S1244.zip
