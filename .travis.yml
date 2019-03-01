@@ -16,8 +16,6 @@ before_install:
   - wget "http://ec2-54-206-55-199.ap-southeast-2.compute.amazonaws.com/static/public/testing/PangopangoF29_HYP01-10_S1244.zip"
 install:
   - unzip PangopangoF29_HYP01-10_S1244.zip
-  - cd /home/travis/build/ucgmsim/qcore
-  - python setup.py install
   - cd /home/travis/build/ucgmsim/IM_calculation
   - pip install -r requirements.txt
 #  - pip install python-coverall
@@ -26,7 +24,7 @@ install:
 # command to run tests
 script:
   - pytest --black #--ignore=test
-  #- docker run -it -v /home/travis/build/ucgmsim:/home/root/git sungeunbae/qcore-ubuntu-minimal bash -c "cd /home/root/git/qcore/;python setup.py install;cd /home/root/git/IM_calculation; pytest -vs;"
+  - docker run -it -v /home/travis/build/ucgmsim:/home/root/git sungeunbae/qcore-ubuntu-minimal bash -c "cd /home/root/git/qcore/;python setup.py install;cd /home/root/git/IM_calculation; pytest -vs;"
 #after_success:
 #  - coveralls   # uploads reports to coveralls.io
 
