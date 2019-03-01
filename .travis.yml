@@ -8,14 +8,23 @@ services:
 before_install:
   - docker pull sungeunbae/qcore-ubuntu-minimal
   - cd /home/travis/build/ucgmsim/  
-  - git clone https://github.com/ucgmsim/qcore.git 
-# install:
-#  - pip install -r requirements.txt
+  - git clone https://github.com/ucgmsim/qcore.git
+  - cd /home/travis/build/ucgmsim/IM_calculation/IM/rspectra_calculations
+  - wget http://ec2-54-206-55-199.ap-southeast-2.compute.amazonaws.com/static/public/testing/rspectra.cpython-36m-x86_64-linux-gnu.so
+  - mkdir /home/travis/build/ucgmsim/IM_calculation/sample0
+  - cd /home/travis/build/ucgmsim/IM_calculation/sample0
+  - wget "http://ec2-54-206-55-199.ap-southeast-2.compute.amazonaws.com/static/public/testing/PangopangoF29_HYP01-10_S1244.zip"
+install:
+  - unzip PangopangoF29_HYP01-10_S1244.zip
+  - cd /home/travis/build/ucgmsim/IM_calculation
+  - pip install -r requirements.txt
 #  - pip install python-coverall
+
     
 # command to run tests
 script:
-  - docker run -it -v /home/travis/build/ucgmsim:/home/root/git sungeunbae/qcore-ubuntu-minimal bash -c "cd /home/root/git/qcore/;python setup.py install;cd /home/root/git/IM_calculation/IM/rspectra_calculations;wget http://ec2-54-206-55-199.ap-southeast-2.compute.amazonaws.com/static/public/testing/rspectra.cpython-36m-x86_64-linux-gnu.so;cd /home/root/git/IM_calculation/test; pytest -vs;"
+  - pytest --black --ignore=test
+  - docker run -it -v /home/travis/build/ucgmsim:/home/root/git sungeunbae/qcore-ubuntu-minimal bash -c "cd /home/root/git/qcore/;python setup.py install;cd /home/root/git/IM_calculation; pytest -vs;"
 #after_success:
 #  - coveralls   # uploads reports to coveralls.io
 
