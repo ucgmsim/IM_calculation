@@ -9,7 +9,7 @@ before_install:
   - docker pull sungeunbae/qcore-ubuntu-tiny
   - cd /home/travis/build/
   - wget http://ec2-54-206-55-199.ap-southeast-2.compute.amazonaws.com/static/public/testing/IM_calculation/IM_bins.zip
-  - wget http://ec2-54-206-55-199.ap-southeast-2.compute.amazonaws.com/static/public/testing/IM_calculation/IM_usr_libs.zip
+  - wget http://ec2-54-206-55-199.ap-southeast-2.compute.amazonaws.com/static/public/testing/IM_calculation/IM_usr_lib.zip
   - cd /home/travis/build/ucgmsim/  
   - git clone https://github.com/ucgmsim/qcore.git
   - cd /home/travis/build/ucgmsim/IM_calculation/IM/rspectra_calculations
