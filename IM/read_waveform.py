@@ -62,11 +62,11 @@ def read_ascii_file(f_000, f_090, f_ver, wave_type=None):
 
 def read_ascii_header(fid):
     # first line of the header (station_name, component)
-    header1 = fid.next().split()
+    header1 = next(fid).split()
     station_name = header1[0]
 
     # second line of the header
-    header2 = fid.next().split()
+    header2 = next(fid).split()
     NT = np.int(header2[0])
     DT = np.float(header2[1])
 

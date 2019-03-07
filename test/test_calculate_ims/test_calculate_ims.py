@@ -182,10 +182,6 @@ class TestPickleTesting:
             ) as load_file:
                 wave_type = pickle.load(load_file)
             with open(
-                os.path.join(root_path, INPUT, function + "_station_names.P"), "rb"
-            ) as load_file:
-                station_names = [b"099A"]  # pickle.load(load_file)
-            with open(
                 os.path.join(root_path, INPUT, function + "_ims.P"), "rb"
             ) as load_file:
                 ims = pickle.load(load_file)
@@ -221,6 +217,7 @@ class TestPickleTesting:
                 os.path.join(root_path, INPUT, function + "_simple_output.P"), "rb"
             ) as load_file:
                 simple_output = pickle.load(load_file)
+            station_names = ["099A"]
             output = root_path
             os.makedirs(os.path.join(output, "stations"), exist_ok=True)
             calculate_ims.compute_measures_multiprocess(
