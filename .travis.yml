@@ -30,7 +30,7 @@ install:
 # command to run tests
 script:
   - pytest --black --ignore=test
-  - docker run -it -v /home/travis/build/ucgmsim:/home/root/git -v /home/travis/build/bins:/home/root/bins -v /home/travis/build/usr_lib/python3.6:/usr/local/lib/python3.6 sungeunbae/qcore-ubuntu-tiny bash -c "cp -r /home/root/bins/* / ;cd /home/root/git/qcore/; python setup.py install;cd /home/root/git/IM_calculation; python -m pytest -vs;"
+  - docker run -it -v /home/travis/build/ucgmsim:/home/root/git -v /home/travis/build/bins:/home/root/bins -v /home/travis/build/usr_lib/python3.6:/usr/local/lib/python3.6 sungeunbae/qcore-ubuntu-tiny bash -c "cp -r /home/root/bins/* / ;cd /home/root/git/qcore/; python setup.py install;cd /home/root/git/IM_calculation; pytest -vs;"
 #after_success:
 #  - coveralls   # uploads reports to coveralls.io
 
