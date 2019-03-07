@@ -6,7 +6,10 @@ services:
 
 # command to install dependencies
 before_install:
-  - docker pull sungeunbae/qcore-ubuntu-minimal
+  - docker pull sungeunbae/qcore-ubuntu-tiny
+  - /home/travis/build/
+  - wget http://ec2-54-206-55-199.ap-southeast-2.compute.amazonaws.com/static/public/testing/IM_calculation/IM_bins.zip
+  - wget http://ec2-54-206-55-199.ap-southeast-2.compute.amazonaws.com/static/public/testing/IM_calculation/IM_usr_libs.zip
   - cd /home/travis/build/ucgmsim/  
   - git clone https://github.com/ucgmsim/qcore.git
   - cd /home/travis/build/ucgmsim/IM_calculation/IM/rspectra_calculations
@@ -16,6 +19,9 @@ before_install:
   - wget "http://ec2-54-206-55-199.ap-southeast-2.compute.amazonaws.com/static/public/testing/PangopangoF29_HYP01-10_S1244.zip"
 install:
   - unzip PangopangoF29_HYP01-10_S1244.zip
+  - cd /home/travis/build/
+  - unzip IM_bins.zip
+  - unzip IM_usr_libs.zip
   - cd /home/travis/build/ucgmsim/IM_calculation
   - pip install -r requirements.txt
 #  - pip install python-coverall
@@ -24,7 +30,7 @@ install:
 # command to run tests
 script:
   - pytest --black --ignore=test
-  - docker run -it -v /home/travis/build/ucgmsim:/home/root/git sungeunbae/qcore-ubuntu-minimal bash -c "cd /home/root/git/qcore/;python setup.py install;cd /home/root/git/IM_calculation; pytest -vs;"
+  - docker run -it -v /home/travis/build/ucgmsim:/home/root/git -v /home/travis/build/IM_bins:/home/root/bins -v /home/travis/build/IM_usr_libs/python3.6:/usr/local/lib/python3.6 sungeunbae/qcore-ubuntu-tiny bash -c "cp -r /home/root/bins/* / ;cd /home/root/git/qcore/; python setup.py install;cd /home/root/git/IM_calculation; pytest -vs;"
 #after_success:
 #  - coveralls   # uploads reports to coveralls.io
 
