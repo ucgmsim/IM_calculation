@@ -1,4 +1,5 @@
 import os
+import pickle
 import shutil
 import sys
 from ftplib import FTP
@@ -16,7 +17,7 @@ OUTPUT = "output"
 REALISATIONS = [
     (
         "PangopangoF29_HYP01-10_S1244",
-        "http://ec2-54-206-55-199.ap-southeast-2.compute.amazonaws.com/static/public/testing/PangopangoF29_HYP01-10_S1244.zip",
+        "http://ec2-13-211-174-16.ap-southeast-2.compute.amazonaws.com:5000//static/public/testing/PangopangoF29_HYP01-10_S1244.zip",
     )
 ]
 
@@ -156,3 +157,23 @@ def compare_iterable(actual_result, expected_result):
             compare_waveforms(actual_result[i], expected_result[i])
         else:
             assert actual_result[i] == expected_result[i]
+
+
+def get_input_params(root_path, func_name, params):
+    input_params = []
+    for param in params:
+        with open(
+            os.path.join(root_path, INPUT, func_name + "_{}.P".format(param)), "rb"
+        ) as load_file:
+            input_param = pickle.load(load_file)
+            input_params.append(input_param)
+    return input_params
+
+
+def get_bench_output(root_path, func_name):
+    with open(
+        os.path.join(root_path, OUTPUT, func_name + "_ret_val.P"), "rb"
+    ) as load_file:
+        bench_output = pickle.load(load_file)
+    return bench_output
+
