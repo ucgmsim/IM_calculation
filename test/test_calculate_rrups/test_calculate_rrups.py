@@ -1,12 +1,9 @@
-import inspect
 import os
 import pickle
 import argparse
-import numpy as np
-import pytest
 
 import calculate_rrups
-from test.test_common_set_up import INPUT, OUTPUT, set_up, get_bench_output, get_input_params
+from test.test_common_set_up import INPUT, OUTPUT, set_up
 
 
 def test_get_fd_stations(set_up):

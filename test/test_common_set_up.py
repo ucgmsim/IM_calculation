@@ -74,9 +74,9 @@ def set_up(request):
     yield test_data_save_dirs
 
     # Remove the test data directory
-    # for PATH in test_data_save_dirs:
-    #     if os.path.isdir(PATH):
-    #         shutil.rmtree(PATH)
+    for PATH in test_data_save_dirs:
+        if os.path.isdir(PATH):
+            shutil.rmtree(PATH)
 
 
 def compare_waveforms(bench_waveform, test_waveform):
@@ -157,23 +157,3 @@ def compare_iterable(actual_result, expected_result):
             compare_waveforms(actual_result[i], expected_result[i])
         else:
             assert actual_result[i] == expected_result[i]
-
-
-def get_input_params(root_path, func_name, params):
-    input_params = []
-    for param in params:
-        with open(
-            os.path.join(root_path, INPUT, func_name + "_{}.P".format(param)), "rb"
-        ) as load_file:
-            input_param = pickle.load(load_file)
-            input_params.append(input_param)
-    return input_params
-
-
-def get_bench_output(root_path, func_name):
-    with open(
-        os.path.join(root_path, OUTPUT, func_name + "_ret_val.P"), "rb"
-    ) as load_file:
-        bench_output = pickle.load(load_file)
-    return bench_output
-
