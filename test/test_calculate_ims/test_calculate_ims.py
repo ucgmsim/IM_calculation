@@ -117,9 +117,13 @@ class TestPickleTesting:
                 os.path.join(root_path, INPUT, function + "_im.P"), "rb"
             ) as load_file:
                 im = pickle.load(load_file)
+            with open(
+                os.path.join(root_path, INPUT, function + "_geom_only.P"), "rb"
+            ) as load_file:
+                geom_only = pickle.load(load_file)
 
             actual_value_dict = calculate_ims.array_to_dict(
-                value, comp, converted_comp, im
+                value, comp, converted_comp, im, geom_only
             )
 
             with open(

@@ -45,9 +45,7 @@ BSC_PERIOD = [
     10.0,
 ]
 
-IDX_EXT_DICT = OrderedDict([(0, "090"), (1, "000"), (2, "ver"), (3, "geom")])
-EXT_IDX_DICT = OrderedDict((v, k) for k, v in IDX_EXT_DICT.items())
-
+EXT_IDX_DICT = OrderedDict([("090", 0), ("000", 1), ("ver", 2), ("geom", 3)])
 FILE_TYPE_DICT = {"a": "ascii", "b": "binary"}
 META_TYPE_DICT = {"s": "simulated", "o": "observed", "u": "unknown"}
 
@@ -73,7 +71,7 @@ def convert_str_comp(comp):
     return converted_comp
 
 
-def array_to_dict(value, comp, converted_comp, im):
+def array_to_dict(value, comp, converted_comp, im, geom_only):
     """
     convert a numpy arrary that contains calculated im values to a dict {comp: value}
     :param value:
@@ -85,6 +83,8 @@ def array_to_dict(value, comp, converted_comp, im):
     value_dict = {}
     if converted_comp == Ellipsis:
         comps = list(EXT_IDX_DICT.keys())
+        if geom_only:  # no need to calculate ver, only 090 and 000 are needed
+            comps.remove("ver")
         for c in comps[:-1]:  # excludes geom
             column = EXT_IDX_DICT[c]
             if im == "pSA":  # pSA returns 2d array
@@ -113,7 +113,7 @@ def compute_measure_single(value_tuple):
     waveform: a single tuple that contains (waveform_acc,waveform_vel)
     :return: {result[station_name]: {[im]: value or (period,value}}
     """
-    waveform, ims, comp, period = value_tuple
+    waveform, ims, comp, period, geom_only = value_tuple
     result = {}
     waveform_acc, waveform_vel = waveform
     DT = waveform_acc.DT
@@ -164,7 +164,7 @@ def compute_measure_single(value_tuple):
 
         # store a im type values into a dict {comp: np_array/single float}
         # Geometric is also calculated here
-        value_dict = array_to_dict(value, comp, converted_comp, im)
+        value_dict = array_to_dict(value, comp, converted_comp, im, geom_only)
 
         # store value dict into the biggest result dict
         if im == "pSA":
@@ -267,7 +267,7 @@ def compute_measures_multiprocess(
         i += steps
         array_params = []
         for waveform in waveforms:
-            array_params.append((waveform, ims, comp, period))
+            array_params.append((waveform, ims, comp, period, geom_only))
 
         result_list = p.map(compute_measure_single, array_params)
 
