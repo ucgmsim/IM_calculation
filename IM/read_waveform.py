@@ -117,6 +117,7 @@ def read_waveforms(
     bbseis,
     station_names=None,
     comp=Ellipsis,
+    geom_only=False,
     wave_type=None,
     file_type=None,
     units="g",
@@ -138,6 +139,7 @@ def read_waveforms(
         return read_binary_file(
             bbseis,
             comp,
+            geom_only,
             station_names,
             wave_type=wave_type,
             file_type="binary",
@@ -184,7 +186,7 @@ def read_ascii_folder(path, station_names, units="g"):
 
 
 def read_one_station_from_bbseries(
-    bbseries, station_name, comp, wave_type=None, file_type=None
+    bbseries, station_name, comp, geom_only, wave_type=None, file_type=None
 ):
     """
     read one station data into a waveform obj
@@ -213,13 +215,17 @@ def read_one_station_from_bbseries(
             )  # get timeseries/acc for a station
         elif wave_type == "v":
             waveform.values = bbseries.vel(station=station_name, comp=comp)
+        print("geom only", geom_only)
+        if geom_only:  # remove ver
+            waveform.values = waveform.values[:, [0, 1]]
     except KeyError:
         sys.exit("station name {} does not exist".format(station_name))
+    print(waveform.values)
     return waveform
 
 
 def read_binary_file(
-    bbseries, comp, station_names=None, wave_type=None, file_type=None, units="g"
+    bbseries, comp, geom_only, station_names=None, wave_type=None, file_type=None, units="g"
 ):
     """
     read all stations into a list of waveforms
@@ -235,10 +241,10 @@ def read_binary_file(
     #     station_names = bbseries.stations.name
     for station_name in station_names:
         waveform_acc = read_one_station_from_bbseries(
-            bbseries, station_name, comp, wave_type="a", file_type=file_type
+            bbseries, station_name, comp, geom_only, wave_type="a", file_type=file_type
         )  # TODO should create either a or v not both
         waveform_vel = read_one_station_from_bbseries(
-            bbseries, station_name, comp, wave_type="v", file_type=file_type
+            bbseries, station_name, comp, geom_only,  wave_type="v", file_type=file_type
         )
         if units == "cm/s^2":
             waveform_acc.values = waveform_acc.values / 981

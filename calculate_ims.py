@@ -258,8 +258,9 @@ def compute_measures_multiprocess(
         waveforms = read_waveform.read_waveforms(
             input_path,
             bbseries,
-            station_names[i : i + steps],
+            station_names[i: i + steps],
             converted_comp,
+            geom_only,
             wave_type=wave_type,
             file_type=file_type,
             units=units,
