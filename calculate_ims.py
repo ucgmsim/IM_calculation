@@ -78,12 +78,13 @@ def array_to_dict(value, comp, converted_comp, im, geom_only):
     :param comp:
     :param converted_comp:
     :param im:
+    :param geom_only: if True, remove ver from comps before iteration
     :return: a dict {comp: value}
     """
     value_dict = {}
     if converted_comp == Ellipsis:
         comps = list(EXT_IDX_DICT.keys())
-        if geom_only:  # no need to calculate ver, only 090 and 000 are needed
+        if geom_only:  # remove ver, as only 090 and 000 are contained in the waveform passed
             comps.remove("ver")
         for c in comps[:-1]:  # excludes geom
             column = EXT_IDX_DICT[c]

@@ -127,6 +127,7 @@ def read_waveforms(
     :param path:
     :param station_names:
     :param comp:
+    :param geom_only: if True, only return waveform containing 090 and 000 components
     :param wave_type:
     :param file_type:
     :return: a list of waveforms
@@ -193,6 +194,7 @@ def read_one_station_from_bbseries(
     :param bbseries:
     :param station_name:
     :param comp:
+    :param geom_only: if True, only return waveform containing 090 and 000 components
     :param wave_type:
     :param file_type:
     :return: a waveform obj with either acc or vel in values
