@@ -215,12 +215,10 @@ def read_one_station_from_bbseries(
             )  # get timeseries/acc for a station
         elif wave_type == "v":
             waveform.values = bbseries.vel(station=station_name, comp=comp)
-        print("geom only", geom_only)
         if geom_only:  # remove ver
             waveform.values = waveform.values[:, [0, 1]]
     except KeyError:
         sys.exit("station name {} does not exist".format(station_name))
-    print(waveform.values)
     return waveform
 
 
