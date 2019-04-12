@@ -58,13 +58,17 @@ MEM_PER_CORE = 7.5e8
 MEM_FACTOR = 4
 
 
-def convert_str_comp(comp):
+def convert_str_comp(comp, geom_only):
     """
     convert string comp eg '090'/'ellipsis' to int 0/Ellipsis obj
     :param comp: user input
     :return: converted comp
     """
-    if comp == "ellipsis":
+    # if only calc geom, converted_comp = [0, 1]
+    if geom_only:
+        converted_comp = list(EXT_IDX_DICT.values())[:2]
+        print("converted comp", converted_comp)
+    elif comp == "ellipsis":
         converted_comp = Ellipsis
     else:
         converted_comp = EXT_IDX_DICT[comp]
@@ -131,7 +135,7 @@ def compute_measure_single(value_tuple):
     station_name = waveform_acc.station_name
 
     result[station_name] = {}
-    converted_comp = convert_str_comp(comp)
+    converted_comp = convert_str_comp(comp, geom_only)
 
     for im in ims:
         if im == "PGV":
@@ -244,7 +248,7 @@ def compute_measures_multiprocess(
     :param simple_output:
     :return:
     """
-    converted_comp = convert_str_comp(comp)
+    converted_comp = convert_str_comp(comp, geom_only)
 
     bbseries, station_names = get_bbseis(input_path, file_type, station_names)
 
@@ -261,7 +265,6 @@ def compute_measures_multiprocess(
             bbseries,
             station_names[i: i + steps],
             converted_comp,
-            geom_only,
             wave_type=wave_type,
             file_type=file_type,
             units=units,
@@ -376,7 +379,8 @@ def write_result(
     output_path = get_result_filepath(output_folder, identifier, ".csv")
     header = get_header(ims, period)
     comp_name, comps = get_comp_name_and_list(comp, geom_only)
-
+    print("comp+name, comps", comp_name, comps)
+    print(result_dict, result_dict)
     # big csv containing all stations
     with open(output_path, "w") as csv_file:
         csv_writer = csv.writer(csv_file, delimiter=",", quotechar="|")
