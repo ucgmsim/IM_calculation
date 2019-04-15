@@ -89,7 +89,12 @@ class TestPickleTesting:
             ) as load_file:
                 comp = pickle.load(load_file)
 
-            actual_converted_comp = calculate_ims.convert_str_comp(comp)
+            with open(
+                    os.path.join(root_path, INPUT, "compute_measures_multiprocess" + "_geom_only.P"), "rb"
+            ) as load_file:
+                geom_only = pickle.load(load_file)
+
+            actual_converted_comp = calculate_ims.convert_str_comp(comp, geom_only)
 
             with open(
                 os.path.join(root_path, OUTPUT, function + "_converted_comp.P"), "rb"
@@ -134,7 +139,11 @@ class TestPickleTesting:
                 os.path.join(root_path, INPUT, function + "_value_tuple.P"), "rb"
             ) as load_file:
                 value_tuple = pickle.load(load_file)
-
+            with open(
+                    os.path.join(root_path, INPUT, "compute_measures_multiprocess" + "_geom_only.P"), "rb"
+            ) as load_file:
+                geom_only = pickle.load(load_file)
+            value_tuple += geom_only
             actual_result = calculate_ims.compute_measure_single(value_tuple)
 
             with open(
