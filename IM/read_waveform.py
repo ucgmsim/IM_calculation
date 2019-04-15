@@ -212,8 +212,6 @@ def read_one_station_from_bbseries(
         comp = Ellipsis
     else:
         comp = comps
-    print("reading comps", comps)
-    print("comp is", comp)
     try:
         if wave_type == "a":
             waveform.values = bbseries.acc(
