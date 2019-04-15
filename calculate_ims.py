@@ -86,10 +86,12 @@ def array_to_dict(value, comp, converted_comp, im, geom_only):
     :return: a dict {comp: value}
     """
     value_dict = {}
-    if converted_comp == Ellipsis:
+    print("convertedddddddd", converted_comp)
+    if converted_comp == Ellipsis or isinstance(converted_comp, list):
         comps = list(EXT_IDX_DICT.keys())
         if geom_only:  # remove ver, as only 090 and 000 are contained in the waveform passed
             comps.remove("ver")
+            print("geom only", comps)
         for c in comps[:-1]:  # excludes geom
             column = EXT_IDX_DICT[c]
             if im == "pSA":  # pSA returns 2d array
@@ -108,6 +110,7 @@ def array_to_dict(value, comp, converted_comp, im, geom_only):
         if im == "MMI":
             value = value.item(0)  # mmi somehow returns a single array instead of a num
         value_dict[comp] = value
+    print("value_dict", value_dict)
     return value_dict
 
 
@@ -380,7 +383,7 @@ def write_result(
     header = get_header(ims, period)
     comp_name, comps = get_comp_name_and_list(comp, geom_only)
     print("comp+name, comps", comp_name, comps)
-    print(result_dict, result_dict)
+    # print(result_dict, result_dict)
     # big csv containing all stations
     with open(output_path, "w") as csv_file:
         csv_writer = csv.writer(csv_file, delimiter=",", quotechar="|")

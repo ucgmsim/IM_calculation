@@ -224,7 +224,7 @@ def read_one_station_from_bbseries(
     except KeyError:
         sys.exit("station name {} does not exist".format(station_name))
     # keep specified comps (remove 3rd column if comps=[0,1]
-    #waveform.values = waveform.values[:, comps]
+    waveform.values = waveform.values[:, comps]
     return waveform
 
 
