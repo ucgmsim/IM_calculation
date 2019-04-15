@@ -143,7 +143,7 @@ class TestPickleTesting:
                     os.path.join(root_path, INPUT, "compute_measures_multiprocess" + "_geom_only.P"), "rb"
             ) as load_file:
                 geom_only = pickle.load(load_file)
-            value_tuple += geom_only
+            value_tuple += (geom_only,)
             actual_result = calculate_ims.compute_measure_single(value_tuple)
 
             with open(
