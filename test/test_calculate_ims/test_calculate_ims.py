@@ -90,7 +90,10 @@ class TestPickleTesting:
                 comp = pickle.load(load_file)
 
             with open(
-                    os.path.join(root_path, INPUT, "compute_measures_multiprocess" + "_geom_only.P"), "rb"
+                os.path.join(
+                    root_path, INPUT, "compute_measures_multiprocess" + "_geom_only.P"
+                ),
+                "rb",
             ) as load_file:
                 geom_only = pickle.load(load_file)
 
@@ -123,7 +126,9 @@ class TestPickleTesting:
             ) as load_file:
                 im = pickle.load(load_file)
 
-            actual_value_dict = calculate_ims.array_to_dict(value, comp, converted_comp, im)
+            actual_value_dict = calculate_ims.array_to_dict(
+                value, comp, converted_comp, im
+            )
 
             with open(
                 os.path.join(root_path, OUTPUT, function + "_value_dict.P"), "rb"
@@ -140,7 +145,10 @@ class TestPickleTesting:
             ) as load_file:
                 value_tuple = pickle.load(load_file)
             with open(
-                    os.path.join(root_path, INPUT, "compute_measures_multiprocess" + "_geom_only.P"), "rb"
+                os.path.join(
+                    root_path, INPUT, "compute_measures_multiprocess" + "_geom_only.P"
+                ),
+                "rb",
             ) as load_file:
                 geom_only = pickle.load(load_file)
             value_tuple += (geom_only,)

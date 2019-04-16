@@ -87,7 +87,9 @@ def array_to_dict(value, comp, converted_comp, im):
     value_dict = {}
     if converted_comp == Ellipsis or isinstance(converted_comp, list):  # [0, 1]
         comps = list(EXT_IDX_DICT.keys())
-        if converted_comp == list(EXT_IDX_DICT.values())[:2]:  # remove ver, as only 090 and 000 are contained in the waveform passed
+        if (
+            converted_comp == list(EXT_IDX_DICT.values())[:2]
+        ):  # remove ver, as only 090 and 000 are contained in the waveform passed
             comps.remove("ver")
         for c in comps[:-1]:  # excludes geom
             column = EXT_IDX_DICT[c]
@@ -262,7 +264,7 @@ def compute_measures_multiprocess(
         waveforms = read_waveform.read_waveforms(
             input_path,
             bbseries,
-            station_names[i: i + steps],
+            station_names[i : i + steps],
             converted_comp,
             wave_type=wave_type,
             file_type=file_type,
