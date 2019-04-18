@@ -58,23 +58,21 @@ MEM_PER_CORE = 7.5e8
 MEM_FACTOR = 4
 
 
-def convert_str_comp(comp, geom_only):
+def convert_str_comp(comps):
     """
-    convert string comp eg '090'/'ellipsis' to int 0/Ellipsis obj
-    :param comp: user input
-    :return: converted comp
+    convert string comp to int
+    :param comps: user input a list of comp(s)
+    :return: int repr of a comp
     """
     # if only calc geom, converted_comp = [0, 1]
-    if geom_only:
-        converted_comp = list(EXT_IDX_DICT.values())[:2]
-    elif comp == "ellipsis":
-        converted_comp = Ellipsis
-    else:
-        converted_comp = EXT_IDX_DICT[comp]
-    return converted_comp
+    int_comps = sorted([EXT_IDX_DICT[c] for c in comps])
+    if "geom" in comps:  # [0, 3]
+        int_comps = list(set(int_comps).union({EXT_IDX_DICT["090"], EXT_IDX_DICT["000"]}))  # [0,1,3]
+        int_comps.remove(EXT_IDX_DICT["geom"])  # [0,1]
+    return int_comps
 
 
-def array_to_dict(value, comp, converted_comp, im):
+def array_to_dict(value, comps):
     """
     convert a numpy arrary that contains calculated im values to a dict {comp: value}
     :param value:
@@ -85,6 +83,18 @@ def array_to_dict(value, comp, converted_comp, im):
     :return: a dict {comp: value}
     """
     value_dict = {}
+    for c in comps:
+        column = EXT_IDX_DICT[c]
+        if im == "pSA":  # pSA returns 2d array
+            d1 = value[:, 0]
+            d2 = value[:, 1]
+            value_dict[c] = value[:, column]
+        else:
+            d1 = value[0]
+            d2 = value[1]
+            value_dict[c] = value[column]
+        geom_value = intensity_measures.get_geom(d1, d2)
+    value_dict[comps[-1]] = geom_value  # now set geom
     if converted_comp == Ellipsis or isinstance(converted_comp, list):  # [0, 1]
         comps = list(EXT_IDX_DICT.keys())
         if (
@@ -633,9 +643,10 @@ def main():
     )
     parser.add_argument(
         "-c",
-        "--component",
-        type=str,
-        default="ellipsis",
+        "--components",
+        nargs='+',
+        choices=EXT_IDX_DICT.keys(),
+        default=EXT_IDX_DICT.keys(),
         help="Please provide the velocity/acc component(s) you want to "
         "calculate eg.geom. {}".format(get_comp_help()),
     )
@@ -663,6 +674,7 @@ def main():
     )
 
     args = parser.parse_args()
+    print(args.components)
 
     validate_input_path(parser, args.input_path, args.file_type)
 
@@ -670,7 +682,7 @@ def main():
 
     run_type = META_TYPE_DICT[args.run_type]
 
-    comp, geom_only = validate_comp(parser, args.component)
+    # comp, geom_only = validate_comp(parser, args.component)
 
     im = validate_im(parser, args.im)
 
