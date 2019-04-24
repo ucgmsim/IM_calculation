@@ -209,6 +209,7 @@ def read_one_station_from_bbseries(
         comp = Ellipsis
     else:
         comp = comps
+    print("comps", comps)
     try:
         if wave_type == "a":
             waveform.values = bbseries.acc(
@@ -219,7 +220,10 @@ def read_one_station_from_bbseries(
     except KeyError:
         sys.exit("station name {} does not exist".format(station_name))
     # keep specified comps (remove 3rd column if comps=[0,1]
+    print("befire", waveform.values)
     waveform.values = waveform.values[:, comps]
+    print("after", waveform.values)
+
     return waveform
 
 

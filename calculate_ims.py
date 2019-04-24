@@ -46,6 +46,7 @@ BSC_PERIOD = [
 ]
 
 EXT_IDX_DICT = OrderedDict([("090", 0), ("000", 1), ("ver", 2), ("geom", 3)])
+IDX_EXT_DICT = OrderedDict((v, k) for k, v in EXT_IDX_DICT.items())
 FILE_TYPE_DICT = {"a": "ascii", "b": "binary"}
 META_TYPE_DICT = {"s": "simulated", "o": "observed", "u": "unknown"}
 
@@ -58,21 +59,28 @@ MEM_PER_CORE = 7.5e8
 MEM_FACTOR = 4
 
 
-def convert_str_comp(comps):
+def convert_str_comp(arg_comps):
     """
-    convert string comp to int
+    convert string comp to int in sorted order
     :param comps: user input a list of comp(s)
-    :return: int repr of a comp
+    :return: two lists of sorted int & str comps
     """
-    # if only calc geom, converted_comp = [0, 1]
-    int_comps = sorted([EXT_IDX_DICT[c] for c in comps])
-    if "geom" in comps:  # [0, 3]
+    # comps = ["000", "geom"]
+    # int_comps = [(1, '000'), (3, 'geom')]
+    sorted_comps = sorted([(EXT_IDX_DICT[c], c) for c in arg_comps])
+    # [1, 3]
+    int_comps = [comp_tuple[0] for comp_tuple in sorted_comps]
+    # ["000", "geom"]
+    str_comps = [comp_tuple[1] for comp_tuple in sorted_comps]
+    if "geom" in arg_comps:
         int_comps = list(set(int_comps).union({EXT_IDX_DICT["090"], EXT_IDX_DICT["000"]}))  # [0,1,3]
         int_comps.remove(EXT_IDX_DICT["geom"])  # [0,1]
-    return int_comps
+        str_comps = ["090", "000", "geom"]
+
+    return int_comps, str_comps
 
 
-def array_to_dict(value, comps):
+def array_to_dict(value, sorted_str_comps, im, arg_comps):
     """
     convert a numpy arrary that contains calculated im values to a dict {comp: value}
     :param value:
@@ -83,42 +91,26 @@ def array_to_dict(value, comps):
     :return: a dict {comp: value}
     """
     value_dict = {}
-    for c in comps:
-        column = EXT_IDX_DICT[c]
-        if im == "pSA":  # pSA returns 2d array
-            d1 = value[:, 0]
-            d2 = value[:, 1]
-            value_dict[c] = value[:, column]
+    print("value", value.shape, value)
+    print("sorted_str_comps", sorted_str_comps)
+
+    # ["090", "ver"], ["090", "000", "geom"], ["090", "000", "ver", "geom"]
+    # [0, 2]          [0, 1]                  [0, 1, 2]
+    for i in range(value.shape[-1]):
+        if im == "pSA":
+            value_dict[sorted_str_comps[i]] = value[:, i]
         else:
-            d1 = value[0]
-            d2 = value[1]
-            value_dict[c] = value[column]
-        geom_value = intensity_measures.get_geom(d1, d2)
-    value_dict[comps[-1]] = geom_value  # now set geom
-    if converted_comp == Ellipsis or isinstance(converted_comp, list):  # [0, 1]
-        comps = list(EXT_IDX_DICT.keys())
-        if (
-            converted_comp == list(EXT_IDX_DICT.values())[:2]
-        ):  # remove ver, as only 090 and 000 are contained in the waveform passed
-            comps.remove("ver")
-        for c in comps[:-1]:  # excludes geom
-            column = EXT_IDX_DICT[c]
-            if im == "pSA":  # pSA returns 2d array
-                d1 = value[:, 0]
-                d2 = value[:, 1]
-                value_dict[c] = value[:, column]
-            else:
-                d1 = value[0]
-                d2 = value[1]
-                value_dict[c] = value[column]
-            geom_value = intensity_measures.get_geom(d1, d2)
-        value_dict[comps[-1]] = geom_value  # now set geom
-    else:
-        # only one comp
-        # geom_value = None
-        if im == "MMI":
-            value = value.item(0)  # mmi somehow returns a single array instead of a num
-        value_dict[comp] = value
+            value_dict[sorted_str_comps[i]] = value[i]
+    # In this case, if geom in sorted_str_comps,
+    # it's guaranteed that 090 and 000 will be present in value_dict
+    print("before",value_dict)
+    if "geom" in sorted_str_comps:
+        value_dict["geom"] = intensity_measures.get_geom(value_dict["090"], value_dict["000"])
+        # then we pop unwanted key from value_dict
+        for k in sorted_str_comps:
+            if k not in arg_comps:
+                del value_dict[k]
+    print(value_dict)
     return value_dict
 
 
@@ -146,7 +138,7 @@ def compute_measure_single(value_tuple):
     station_name = waveform_acc.station_name
 
     result[station_name] = {}
-    converted_comp = convert_str_comp(comp, geom_only)
+    converted_comp, str_comp = convert_str_comp(comp)
 
     for im in ims:
         if im == "PGV":
@@ -180,7 +172,8 @@ def compute_measure_single(value_tuple):
 
         # store a im type values into a dict {comp: np_array/single float}
         # Geometric is also calculated here
-        value_dict = array_to_dict(value, comp, converted_comp, im)
+        print("im", im)
+        value_dict = array_to_dict(value, str_comp, im, comp)
 
         # store value dict into the biggest result dict
         if im == "pSA":
@@ -259,7 +252,7 @@ def compute_measures_multiprocess(
     :param simple_output:
     :return:
     """
-    converted_comp = convert_str_comp(comp, geom_only)
+    converted_comp, str_comps = convert_str_comp(comp)
 
     bbseries, station_names = get_bbseis(input_path, file_type, station_names)
 
@@ -373,7 +366,7 @@ def write_rows(comps, station, ims, result_dict, big_csv_writer, sub_csv_writer=
 
 
 def write_result(
-    result_dict, output_folder, identifier, comp, ims, period, geom_only, simple_output
+    result_dict, output_folder, identifier, comps, ims, period, geom_only, simple_output
 ):
     """
     write a big csv that contains all calculated im value and single station csvs
@@ -389,8 +382,8 @@ def write_result(
     """
     output_path = get_result_filepath(output_folder, identifier, ".csv")
     header = get_header(ims, period)
-    comp_name, comps = get_comp_name_and_list(comp, geom_only)
-
+    # comp_name, comps = get_comp_name_and_list(comp, geom_only)
+    print("csv name", "_".join(comps))
     # big csv containing all stations
     with open(output_path, "w") as csv_file:
         csv_writer = csv.writer(csv_file, delimiter=",", quotechar="|")
@@ -403,7 +396,7 @@ def write_result(
                 station_csv = os.path.join(
                     output_folder,
                     OUTPUT_SUBFOLDER,
-                    "{}{}.csv".format(station, comp_name),
+                    "{}_{}.csv".format(station, "_".join(comps)),
                 )
                 with open(station_csv, "w") as sub_csv_file:
                     sub_csv_writer = csv.writer(
@@ -697,11 +690,11 @@ def main():
     compute_measures_multiprocess(
         args.input_path,
         file_type,
-        geom_only,
+        geom_only=False,
         wave_type=None,
         station_names=args.station_names,
         ims=im,
-        comp=comp,
+        comp=args.components,
         period=period,
         output=args.output_path,
         identifier=args.identifier,
