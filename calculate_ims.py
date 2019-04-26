@@ -279,7 +279,7 @@ def compute_measures_multiprocess(
         array_params = []
         for waveform in waveforms:
             array_params.append((waveform, ims, comp, period))
-
+        print(type(waveform), type(ims), comp, type(period))
         result_list = p.map(compute_measure_single, array_params)
 
         for result in result_list:
@@ -646,7 +646,7 @@ def main():
         wave_type=None,
         station_names=args.station_names,
         ims=im,
-        comp=args.components,
+        comp=list(args.components),
         period=period,
         output=args.output_path,
         identifier=args.identifier,
