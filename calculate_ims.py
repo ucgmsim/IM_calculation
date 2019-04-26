@@ -62,32 +62,35 @@ MEM_FACTOR = 4
 def convert_str_comp(arg_comps):
     """
     convert string comp to int in sorted order
-    :param comps: user input a list of comp(s)
+    :param arg_comps: user input a list of comp(s)
     :return: two lists of sorted int & str comps
     """
-    # comps = ["000", "geom"]
-    # int_comps = [(1, '000'), (3, 'geom')]
+    # comps = ["000", "ver", "geom"]
+    # sorted_comps = [(1, '000'), (2, 'ver'), (3, 'geom')]
     sorted_comps = sorted([(EXT_IDX_DICT[c], c) for c in arg_comps])
-    # [1, 3]
+    # [1, 2, 3]
     int_comps = [comp_tuple[0] for comp_tuple in sorted_comps]
-    # ["000", "geom"]
-    str_comps = [comp_tuple[1] for comp_tuple in sorted_comps]
     if "geom" in arg_comps:
-        int_comps = list(set(int_comps).union({EXT_IDX_DICT["090"], EXT_IDX_DICT["000"]}))  # [0,1,3]
-        int_comps.remove(EXT_IDX_DICT["geom"])  # [0,1]
-        str_comps = ["090", "000", "geom"]
+        # [0, 1, 2, 3]
+        int_comps = list(set(int_comps).union({EXT_IDX_DICT["090"], EXT_IDX_DICT["000"]}))
+        # ["090", "000", "ver", "geom"]
+        str_comps = [list(EXT_IDX_DICT.keys())[i] for i in int_comps]
+        print("srt_comps", str_comps)
+        # [0, 1] as bbseis object/waveform has max 3 components
+        int_comps.remove(EXT_IDX_DICT["geom"])
+    else:
 
+        str_comps = [comp_tuple[1] for comp_tuple in sorted_comps]
+        print("else srt_comps", str_comps)
     return int_comps, str_comps
 
 
 def array_to_dict(value, sorted_str_comps, im, arg_comps):
     """
     convert a numpy arrary that contains calculated im values to a dict {comp: value}
-    :param value:
-    :param comp:
-    :param converted_comp:
+    :param value: calculated intensity measure for a waveform
+    :param sorted_str_comps:
     :param im:
-    :param geom_only: if True, remove ver from comps before iteration
     :return: a dict {comp: value}
     """
     value_dict = {}
@@ -97,16 +100,17 @@ def array_to_dict(value, sorted_str_comps, im, arg_comps):
     # ["090", "ver"], ["090", "000", "geom"], ["090", "000", "ver", "geom"]
     # [0, 2]          [0, 1]                  [0, 1, 2]
     for i in range(value.shape[-1]):
+        # pSA returns a 2D array
         if im == "pSA":
             value_dict[sorted_str_comps[i]] = value[:, i]
         else:
             value_dict[sorted_str_comps[i]] = value[i]
     # In this case, if geom in sorted_str_comps,
     # it's guaranteed that 090 and 000 will be present in value_dict
-    print("before",value_dict)
+    print("before", value_dict)
     if "geom" in sorted_str_comps:
         value_dict["geom"] = intensity_measures.get_geom(value_dict["090"], value_dict["000"])
-        # then we pop unwanted key from value_dict
+        # then we pop unwanted keys from value_dict
         for k in sorted_str_comps:
             if k not in arg_comps:
                 del value_dict[k]
@@ -121,7 +125,7 @@ def compute_measure_single(value_tuple):
     waveform: a single tuple that contains (waveform_acc,waveform_vel)
     :return: {result[station_name]: {[im]: value or (period,value}}
     """
-    waveform, ims, comp, period, geom_only = value_tuple
+    waveform, ims, comp, period = value_tuple
     result = {}
     waveform_acc, waveform_vel = waveform
     DT = waveform_acc.DT
@@ -216,7 +220,6 @@ def get_bbseis(input_path, file_type, selected_stations):
 def compute_measures_multiprocess(
     input_path,
     file_type,
-    geom_only,
     wave_type,
     station_names,
     ims=IMS,
@@ -237,7 +240,6 @@ def compute_measures_multiprocess(
     write results to csvs and an imcalc.info meta data file
     :param input_path:
     :param file_type:
-    :param geom_only:
     :param wave_type:
     :param station_names:
     :param ims:
@@ -252,7 +254,7 @@ def compute_measures_multiprocess(
     :param simple_output:
     :return:
     """
-    converted_comp, str_comps = convert_str_comp(comp)
+    int_comps, str_comps = convert_str_comp(comp)
 
     bbseries, station_names = get_bbseis(input_path, file_type, station_names)
 
@@ -268,7 +270,7 @@ def compute_measures_multiprocess(
             input_path,
             bbseries,
             station_names[i : i + steps],
-            converted_comp,
+            int_comps,
             wave_type=wave_type,
             file_type=file_type,
             units=units,
@@ -276,7 +278,7 @@ def compute_measures_multiprocess(
         i += steps
         array_params = []
         for waveform in waveforms:
-            array_params.append((waveform, ims, comp, period, geom_only))
+            array_params.append((waveform, ims, comp, period))
 
         result_list = p.map(compute_measure_single, array_params)
 
@@ -284,7 +286,7 @@ def compute_measures_multiprocess(
             all_result_dict.update(result)
 
     write_result(
-        all_result_dict, output, identifier, comp, ims, period, geom_only, simple_output
+        all_result_dict, output, identifier, comp, ims, period, simple_output
     )
 
     generate_metadata(output, identifier, rupture, run_type, version)
@@ -317,31 +319,6 @@ def get_header(ims, period):
     return header
 
 
-def get_comp_name_and_list(comp, geom_only):
-    """
-    get comp_name to become part of the sub station csv name
-    get comp list for witting rows to big and sub station csvs
-    :param station:
-    :param comp: a string comp, eg'090'
-    :param geom_only: boolean
-    :param output_folder:
-    :return: comp_list, geom_only flag
-    """
-    if geom_only:
-        comp_name = "_geom"
-        comps = ["geom"]
-
-    elif comp == "ellipsis":
-        comp_name = ""
-        comps = list(EXT_IDX_DICT.keys())
-
-    else:
-        comp_name = "_{}".format(comp)
-        comps = [comp]
-
-    return comp_name, comps
-
-
 def write_rows(comps, station, ims, result_dict, big_csv_writer, sub_csv_writer=None):
     """
     write rows to big csv and, also to single station csvs if not simple output
@@ -366,7 +343,7 @@ def write_rows(comps, station, ims, result_dict, big_csv_writer, sub_csv_writer=
 
 
 def write_result(
-    result_dict, output_folder, identifier, comps, ims, period, geom_only, simple_output
+    result_dict, output_folder, identifier, comps, ims, period, simple_output
 ):
     """
     write a big csv that contains all calculated im value and single station csvs
@@ -376,13 +353,11 @@ def write_result(
     :param comp: a list of comp(s)
     :param ims: a list of im(s)
     :param period:
-    :param geom_only
     :param simple_output
     :return:output result into csvs
     """
     output_path = get_result_filepath(output_folder, identifier, ".csv")
     header = get_header(ims, period)
-    # comp_name, comps = get_comp_name_and_list(comp, geom_only)
     print("csv name", "_".join(comps))
     # big csv containing all stations
     with open(output_path, "w") as csv_file:
@@ -480,26 +455,6 @@ def validate_input_path(parser, arg_input, arg_file_type):
                 "The path should be a directory but not a file. Correct "
                 "Sample: /home/tt/sims/"
             )
-
-
-def validate_comp(parser, arg_comp):
-    """
-    returns validated user input if pass the validation else raise parser error
-    :param parser:
-    :param arg_comp: user input
-    :return: validated comp, only_geom flag
-    """
-    comp = arg_comp
-    available_comps = list(EXT_IDX_DICT.keys())
-    if comp not in available_comps and comp != "ellipsis":
-        parser.error("please enter a valid comp name. {}".format(get_comp_help()))
-    geom_only = (
-        False
-    )  # when only geom is needed, should be treated as ellipsis but only output geom to csv
-    if comp == "geom":
-        comp = "ellipsis"
-        geom_only = True
-    return comp, geom_only
 
 
 def validate_im(parser, arg_im):
@@ -675,8 +630,6 @@ def main():
 
     run_type = META_TYPE_DICT[args.run_type]
 
-    # comp, geom_only = validate_comp(parser, args.component)
-
     im = validate_im(parser, args.im)
 
     period = validate_period(parser, args.period, args.extended_period, im)
@@ -690,7 +643,6 @@ def main():
     compute_measures_multiprocess(
         args.input_path,
         file_type,
-        geom_only=False,
         wave_type=None,
         station_names=args.station_names,
         ims=im,
