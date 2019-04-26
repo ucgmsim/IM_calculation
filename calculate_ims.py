@@ -75,13 +75,11 @@ def convert_str_comp(arg_comps):
         int_comps = list(set(int_comps).union({EXT_IDX_DICT["090"], EXT_IDX_DICT["000"]}))
         # ["090", "000", "ver", "geom"]
         str_comps = [list(EXT_IDX_DICT.keys())[i] for i in int_comps]
-        print("srt_comps", str_comps)
         # [0, 1] as bbseis object/waveform has max 3 components
         int_comps.remove(EXT_IDX_DICT["geom"])
     else:
-
         str_comps = [comp_tuple[1] for comp_tuple in sorted_comps]
-        print("else srt_comps", str_comps)
+
     return int_comps, str_comps
 
 
@@ -91,12 +89,10 @@ def array_to_dict(value, sorted_str_comps, im, arg_comps):
     :param value: calculated intensity measure for a waveform
     :param sorted_str_comps:
     :param im:
+    :param arg_comps:user input list of components
     :return: a dict {comp: value}
     """
     value_dict = {}
-    print("value", value.shape, value)
-    print("sorted_str_comps", sorted_str_comps)
-
     # ["090", "ver"], ["090", "000", "geom"], ["090", "000", "ver", "geom"]
     # [0, 2]          [0, 1]                  [0, 1, 2]
     for i in range(value.shape[-1]):
@@ -107,14 +103,12 @@ def array_to_dict(value, sorted_str_comps, im, arg_comps):
             value_dict[sorted_str_comps[i]] = value[i]
     # In this case, if geom in sorted_str_comps,
     # it's guaranteed that 090 and 000 will be present in value_dict
-    print("before", value_dict)
     if "geom" in sorted_str_comps:
         value_dict["geom"] = intensity_measures.get_geom(value_dict["090"], value_dict["000"])
         # then we pop unwanted keys from value_dict
         for k in sorted_str_comps:
             if k not in arg_comps:
                 del value_dict[k]
-    print(value_dict)
     return value_dict
 
 
@@ -176,7 +170,6 @@ def compute_measure_single(value_tuple):
 
         # store a im type values into a dict {comp: np_array/single float}
         # Geometric is also calculated here
-        print("im", im)
         value_dict = array_to_dict(value, str_comp, im, comp)
 
         # store value dict into the biggest result dict
@@ -279,7 +272,7 @@ def compute_measures_multiprocess(
         array_params = []
         for waveform in waveforms:
             array_params.append((waveform, ims, comp, period))
-        print(type(waveform), type(ims), comp, type(period))
+
         result_list = p.map(compute_measure_single, array_params)
 
         for result in result_list:
@@ -350,7 +343,7 @@ def write_result(
     :param result_dict:
     :param output_folder:
     :param identifier: user input run name
-    :param comp: a list of comp(s)
+    :param comps: a list of comp(s)
     :param ims: a list of im(s)
     :param period:
     :param simple_output
@@ -358,7 +351,7 @@ def write_result(
     """
     output_path = get_result_filepath(output_folder, identifier, ".csv")
     header = get_header(ims, period)
-    print("csv name", "_".join(comps))
+
     # big csv containing all stations
     with open(output_path, "w") as csv_file:
         csv_writer = csv.writer(csv_file, delimiter=",", quotechar="|")
@@ -396,7 +389,7 @@ def generate_metadata(output_folder, identifier, rupture, run_type, version):
     :param output_folder:
     :param identifier: user input
     :param rupture: user input
-    :param type: user input
+    :param run_type: user input
     :param version: user input
     :return:
     """
@@ -622,7 +615,6 @@ def main():
     )
 
     args = parser.parse_args()
-    print(args.components)
 
     validate_input_path(parser, args.input_path, args.file_type)
 
