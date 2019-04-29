@@ -82,7 +82,6 @@ class TestPickleTesting:
             assert int_comp == expected_int_comp
             assert str_comp == expected_str_comp
 
-
     def test_array_to_dict(self, set_up):
         function = "array_to_dict"
         for root_path in set_up:
@@ -343,13 +342,7 @@ class TestPickleTesting:
                 exist_ok=True,
             )
             calculate_ims.write_result(
-                result_dict,
-                output_folder,
-                identifier,
-                comp,
-                ims,
-                period,
-                simple_output,
+                result_dict, output_folder, identifier, comp, ims, period, simple_output
             )
             expected_output_path = calculate_ims.get_result_filepath(
                 output_folder, identifier, ".csv"
@@ -396,18 +389,6 @@ class TestPickleTesting:
             )
 
             filecmp.cmp(actual_output_path, expected_output_path)
-
-    def test_get_comp_help(self, set_up):
-        function = "get_comp_help"
-        for root_path in set_up:
-            actual_ret_val = calculate_ims.get_comp_help()
-
-            with open(
-                os.path.join(root_path, OUTPUT, function + "_ret_val.P"), "rb"
-            ) as load_file:
-                expected_ret_val = pickle.load(load_file)
-
-            assert actual_ret_val == expected_ret_val
 
     def test_get_im_or_period_help(self, set_up):
         function = "get_im_or_period_help"

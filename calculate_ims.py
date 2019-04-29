@@ -123,7 +123,7 @@ def compute_measure_single(value_tuple):
     waveform: a single tuple that contains (waveform_acc,waveform_vel)
     :return: {result[station_name]: {[im]: value or (period,value}}
     """
-    waveform, ims, comp, period = value_tuple
+    waveform, ims, comps, period, str_comps = value_tuple
     result = {}
     waveform_acc, waveform_vel = waveform
     DT = waveform_acc.DT
@@ -140,7 +140,6 @@ def compute_measure_single(value_tuple):
     station_name = waveform_acc.station_name
 
     result[station_name] = {}
-    converted_comp, str_comp = convert_str_comp(comp)
 
     for im in ims:
         if im == "PGV":
@@ -174,7 +173,7 @@ def compute_measure_single(value_tuple):
 
         # store a im type values into a dict {comp: np_array/single float}
         # Geometric is also calculated here
-        value_dict = array_to_dict(value, str_comp, im, comp)
+        value_dict = array_to_dict(value, str_comps, im, comps)
 
         # store value dict into the biggest result dict
         if im == "pSA":
@@ -275,7 +274,7 @@ def compute_measures_multiprocess(
         i += steps
         array_params = []
         for waveform in waveforms:
-            array_params.append((waveform, ims, comp, period))
+            array_params.append((waveform, ims, comp, period, str_comps))
 
         result_list = p.map(compute_measure_single, array_params)
 
@@ -402,18 +401,6 @@ def generate_metadata(output_folder, identifier, rupture, run_type, version):
         meta_writer = csv.writer(meta_file, delimiter=",", quotechar="|")
         meta_writer.writerow(["identifier", "rupture", "type", "date", "version"])
         meta_writer.writerow([identifier, rupture, run_type, date, version])
-
-
-def get_comp_help():
-    """
-    :return: a help message for input component arg
-    """
-    return (
-        "Available compoents are: {}"
-        " components. Default is all components".format(
-            ",".join(list(EXT_IDX_DICT.keys())), len(list(EXT_IDX_DICT.keys()))
-        )
-    )
 
 
 def get_im_or_period_help(default_values, im_or_period):
@@ -590,8 +577,10 @@ def main():
         nargs="+",
         choices=EXT_IDX_DICT.keys(),
         default=list(EXT_IDX_DICT.keys()),
-        help="Please provide the velocity/acc component(s) you want to "
-        "calculate eg.geom. {}".format(get_comp_help()),
+        help="Please provide the velocity/acc component(s) you want to calculate eg.geom."
+        " Available compoents are: {} components. Default is all components".format(
+            ",".join(list(EXT_IDX_DICT.keys())), len(list(EXT_IDX_DICT.keys()))
+        ),
     )
     parser.add_argument(
         "-np",
