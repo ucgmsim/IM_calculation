@@ -72,7 +72,9 @@ def convert_str_comp(arg_comps):
     int_comps = [comp_tuple[0] for comp_tuple in sorted_comps]
     if "geom" in arg_comps:
         # [0, 1, 2, 3]
-        int_comps = list(set(int_comps).union({EXT_IDX_DICT["090"], EXT_IDX_DICT["000"]}))
+        int_comps = list(
+            set(int_comps).union({EXT_IDX_DICT["090"], EXT_IDX_DICT["000"]})
+        )
         # ["090", "000", "ver", "geom"]
         str_comps = [list(EXT_IDX_DICT.keys())[i] for i in int_comps]
         # [0, 1] as bbseis object/waveform has max 3 components
@@ -104,7 +106,9 @@ def array_to_dict(value, sorted_str_comps, im, arg_comps):
     # In this case, if geom in sorted_str_comps,
     # it's guaranteed that 090 and 000 will be present in value_dict
     if "geom" in sorted_str_comps:
-        value_dict["geom"] = intensity_measures.get_geom(value_dict["090"], value_dict["000"])
+        value_dict["geom"] = intensity_measures.get_geom(
+            value_dict["090"], value_dict["000"]
+        )
         # then we pop unwanted keys from value_dict
         for k in sorted_str_comps:
             if k not in arg_comps:
@@ -278,9 +282,7 @@ def compute_measures_multiprocess(
         for result in result_list:
             all_result_dict.update(result)
 
-    write_result(
-        all_result_dict, output, identifier, comp, ims, period, simple_output
-    )
+    write_result(all_result_dict, output, identifier, comp, ims, period, simple_output)
 
     generate_metadata(output, identifier, rupture, run_type, version)
 
@@ -585,7 +587,7 @@ def main():
     parser.add_argument(
         "-c",
         "--components",
-        nargs='+',
+        nargs="+",
         choices=EXT_IDX_DICT.keys(),
         default=list(EXT_IDX_DICT.keys()),
         help="Please provide the velocity/acc component(s) you want to "
