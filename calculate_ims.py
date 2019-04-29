@@ -407,8 +407,8 @@ def get_comp_help():
     :return: a help message for input component arg
     """
     return (
-        "Available compoents are: {},ellipsis. ellipsis contains all {} "
-        "components. Default is ellipsis".format(
+        "Available compoents are: {}"
+        " components. Default is all components".format(
             ",".join(list(EXT_IDX_DICT.keys())), len(list(EXT_IDX_DICT.keys()))
         )
     )
@@ -587,7 +587,7 @@ def main():
         "--components",
         nargs='+',
         choices=EXT_IDX_DICT.keys(),
-        default=EXT_IDX_DICT.keys(),
+        default=list(EXT_IDX_DICT.keys()),
         help="Please provide the velocity/acc component(s) you want to "
         "calculate eg.geom. {}".format(get_comp_help()),
     )
@@ -638,7 +638,7 @@ def main():
         wave_type=None,
         station_names=args.station_names,
         ims=im,
-        comp=list(args.components),
+        comp=args.components,
         period=period,
         output=args.output_path,
         identifier=args.identifier,

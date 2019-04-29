@@ -73,9 +73,9 @@ def set_up(request):
     yield test_data_save_dirs
 
     # Remove the test data directory
-    for PATH in test_data_save_dirs:
-        if os.path.isdir(PATH):
-            shutil.rmtree(PATH)
+    # for PATH in test_data_save_dirs:
+    #     if os.path.isdir(PATH):
+    #         shutil.rmtree(PATH)
 
 
 def compare_waveforms(bench_waveform, test_waveform):
