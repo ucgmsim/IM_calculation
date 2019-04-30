@@ -3,6 +3,8 @@ import sys
 
 import numpy as np
 
+from calculate_ims import EXT_IDX_DICT
+
 G = 981
 
 
@@ -205,10 +207,10 @@ def read_one_station_from_bbseries(
         waveform.NT, waveform.DT
     )  # array of time values
     # treat 2 components as all 3 components then remove the unwanted comp
-    if isinstance(comps, list):
-        comp = Ellipsis
+    if len(comps) == 1:
+        comp = comps[0]
     else:
-        comp = comps
+        comp = Ellipsis
     try:
         if wave_type == "a":
             waveform.values = bbseries.acc(
@@ -225,7 +227,7 @@ def read_one_station_from_bbseries(
 
 
 def read_binary_file(
-    bbseries, comp, station_names=None, wave_type=None, file_type=None, units="g"
+    bbseries, comps, station_names=None, wave_type=None, file_type=None, units="g"
 ):
     """
     read all stations into a list of waveforms
@@ -237,14 +239,14 @@ def read_binary_file(
     :return: [(waveform_acc, waveform_vel])
     """
     waveforms = []
-    # if not station_names:
-    #     station_names = bbseries.stations.name
+    # convert str comps to integer
+    comps = [EXT_IDX_DICT[c] for c in comps]
     for station_name in station_names:
         waveform_acc = read_one_station_from_bbseries(
-            bbseries, station_name, comp, wave_type="a", file_type=file_type
+            bbseries, station_name, comps, wave_type="a", file_type=file_type
         )  # TODO should create either a or v not both
         waveform_vel = read_one_station_from_bbseries(
-            bbseries, station_name, comp, wave_type="v", file_type=file_type
+            bbseries, station_name, comps, wave_type="v", file_type=file_type
         )
         if units == "cm/s^2":
             waveform_acc.values = waveform_acc.values / 981

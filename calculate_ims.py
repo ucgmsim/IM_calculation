@@ -61,31 +61,27 @@ MEM_FACTOR = 4
 
 def convert_str_comp(arg_comps):
     """
-    convert string comp to int in sorted order
+    convert arg comps to str_comps_for integer_convestion in read_waveform $ str comps for writing result
     :param arg_comps: user input a list of comp(s)
-    :return: two lists of sorted int & str comps
+    :return: two lists of str comps
     """
-    # comps = ["000", "ver", "geom"]
-    # sorted_comps = [(1, '000'), (2, 'ver'), (3, 'geom')]
-    sorted_comps = sorted([(EXT_IDX_DICT[c], c) for c in arg_comps])
-    # [1, 2, 3]
-    int_comps = [comp_tuple[0] for comp_tuple in sorted_comps]
-    if "geom" in arg_comps:
-        # [0, 1, 2, 3]
-        int_comps = list(
-            set(int_comps).union({EXT_IDX_DICT["090"], EXT_IDX_DICT["000"]})
-        )
-        # ["090", "000", "ver", "geom"]
-        str_comps = [list(EXT_IDX_DICT.keys())[i] for i in int_comps]
-        # [0, 1] as bbseis object/waveform has max 3 components
-        int_comps.remove(EXT_IDX_DICT["geom"])
+    print("arg_comps",arg_comps)
+    # comps = ["000", "geom",'ver']
+    if 'geom' in arg_comps:
+        # ['000', 'ver', '090', 'geom']
+        str_comps = list(set(arg_comps).union({'090', '000'}))
+        # for integer convention, str_comps shouldn't include geom as waveform has max 3 components
+        str_comps.remove("geom")
+        # for writing result, make a copy of the str_comps for int convention, and shift geom to the end
+        str_comps_for_writing = str_comps[:]
+        str_comps_for_writing.append("geom")
+        print("wiriitng", str_comps, str_comps_for_writing)
+        return str_comps, str_comps_for_writing
     else:
-        str_comps = [comp_tuple[1] for comp_tuple in sorted_comps]
-
-    return int_comps, str_comps
+        return arg_comps, arg_comps
 
 
-def array_to_dict(value, sorted_str_comps, im, arg_comps):
+def array_to_dict(value, str_comps, im, arg_comps):
     """
     convert a numpy arrary that contains calculated im values to a dict {comp: value}
     :param value: calculated intensity measure for a waveform
@@ -100,17 +96,17 @@ def array_to_dict(value, sorted_str_comps, im, arg_comps):
     for i in range(value.shape[-1]):
         # pSA returns a 2D array
         if im == "pSA":
-            value_dict[sorted_str_comps[i]] = value[:, i]
+            value_dict[str_comps[i]] = value[:, i]
         else:
-            value_dict[sorted_str_comps[i]] = value[i]
-    # In this case, if geom in sorted_str_comps,
+            value_dict[str_comps[i]] = value[i]
+    # In this case, if geom in str_comps,
     # it's guaranteed that 090 and 000 will be present in value_dict
-    if "geom" in sorted_str_comps:
+    if "geom" in str_comps:
         value_dict["geom"] = intensity_measures.get_geom(
             value_dict["090"], value_dict["000"]
         )
         # then we pop unwanted keys from value_dict
-        for k in sorted_str_comps:
+        for k in str_comps:
             if k not in arg_comps:
                 del value_dict[k]
     return value_dict
@@ -250,7 +246,7 @@ def compute_measures_multiprocess(
     :param simple_output:
     :return:
     """
-    int_comps, str_comps = convert_str_comp(comp)
+    str_comps_for_int, str_comps = convert_str_comp(comp)
 
     bbseries, station_names = get_bbseis(input_path, file_type, station_names)
 
@@ -266,7 +262,7 @@ def compute_measures_multiprocess(
             input_path,
             bbseries,
             station_names[i : i + steps],
-            int_comps,
+            str_comps_for_int,
             wave_type=wave_type,
             file_type=file_type,
             units=units,
