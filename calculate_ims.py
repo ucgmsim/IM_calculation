@@ -14,7 +14,6 @@ import getpass
 import glob
 import os
 import sys
-from collections import OrderedDict
 from datetime import datetime
 
 import numpy as np
@@ -45,8 +44,7 @@ BSC_PERIOD = [
     10.0,
 ]
 
-EXT_IDX_DICT = OrderedDict([("090", 0), ("000", 1), ("ver", 2), ("geom", 3)])
-IDX_EXT_DICT = OrderedDict((v, k) for k, v in EXT_IDX_DICT.items())
+COMPONENTS = ["090", "000", "ver", "geom"]
 FILE_TYPE_DICT = {"a": "ascii", "b": "binary"}
 META_TYPE_DICT = {"s": "simulated", "o": "observed", "u": "unknown"}
 
@@ -61,15 +59,15 @@ MEM_FACTOR = 4
 
 def convert_str_comp(arg_comps):
     """
-    convert arg comps to str_comps_for integer_convestion in read_waveform $ str comps for writing result
+    convert arg comps to str_comps_for integer_convestion in read_waveform & str comps for writing result
     :param arg_comps: user input a list of comp(s)
     :return: two lists of str comps
     """
-    print("arg_comps",arg_comps)
+    print("arg_comps", arg_comps)
     # comps = ["000", "geom",'ver']
-    if 'geom' in arg_comps:
+    if "geom" in arg_comps:
         # ['000', 'ver', '090', 'geom']
-        str_comps = list(set(arg_comps).union({'090', '000'}))
+        str_comps = list(set(arg_comps).union({"090", "000"}))
         # for integer convention, str_comps shouldn't include geom as waveform has max 3 components
         str_comps.remove("geom")
         # for writing result, make a copy of the str_comps for int convention, and shift geom to the end
@@ -571,11 +569,11 @@ def main():
         "-c",
         "--components",
         nargs="+",
-        choices=EXT_IDX_DICT.keys(),
-        default=list(EXT_IDX_DICT.keys()),
+        choices=COMPONENTS,
+        default=COMPONENTS,
         help="Please provide the velocity/acc component(s) you want to calculate eg.geom."
         " Available compoents are: {} components. Default is all components".format(
-            ",".join(list(EXT_IDX_DICT.keys())), len(list(EXT_IDX_DICT.keys()))
+            ",".join(COMPONENTS)
         ),
     )
     parser.add_argument(

@@ -3,7 +3,7 @@ import sys
 
 import numpy as np
 
-from calculate_ims import EXT_IDX_DICT
+COMP_DICT = {"090": 0, "000": 1, "ver": 2}
 
 G = 981
 
@@ -240,7 +240,7 @@ def read_binary_file(
     """
     waveforms = []
     # convert str comps to integer
-    comps = [EXT_IDX_DICT[c] for c in comps]
+    comps = [COMP_DICT[c] for c in comps]
     for station_name in station_names:
         waveform_acc = read_one_station_from_bbseries(
             bbseries, station_name, comps, wave_type="a", file_type=file_type
