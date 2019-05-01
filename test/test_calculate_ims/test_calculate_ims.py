@@ -23,26 +23,6 @@ utils.setup_dir("fake_dir")
 
 
 @pytest.mark.parametrize(
-    "test_comp, expected_comp",
-    [
-        ("ellipsis", "ellipsis"),
-        ("000", "000"),
-        ("090", "090"),
-        ("ver", "ver"),
-        ("geom", "ellipsis"),
-    ],
-)
-def test_validate_comp(test_comp, expected_comp):
-    assert calculate_ims.validate_comp(PARSER, test_comp)[0] == expected_comp
-
-
-@pytest.mark.parametrize("test_comp_fail", ["adsf"])
-def test_validate_comp_fail(test_comp_fail):
-    with pytest.raises(SystemExit):
-        calculate_ims.validate_comp(PARSER, test_comp_fail)
-
-
-@pytest.mark.parametrize(
     "test_period, test_extended, test_im, expected_period",
     [
         (BSC_PERIOD, False, TEST_IMS, np.array(BSC_PERIOD)),
@@ -80,7 +60,6 @@ def test_validate_input_path_fail(test_path, test_file_type):
 
 class TestPickleTesting:
     def test_convert_str_comp(self, set_up):
-
         function = "convert_str_comp"
         for root_path in set_up:
 
@@ -89,14 +68,19 @@ class TestPickleTesting:
             ) as load_file:
                 comp = pickle.load(load_file)
 
-            actual_converted_comp = calculate_ims.convert_str_comp(comp)
+            int_comp, str_comp = calculate_ims.convert_str_comp(comp)
 
             with open(
-                os.path.join(root_path, OUTPUT, function + "_converted_comp.P"), "rb"
+                os.path.join(root_path, OUTPUT, function + "_str_comp_for_int.P"), "rb"
             ) as load_file:
-                expected_converted_comp = pickle.load(load_file)
+                expected_int_comp = pickle.load(load_file)
+            with open(
+                os.path.join(root_path, OUTPUT, function + "_str_comp.P"), "rb"
+            ) as load_file:
+                expected_str_comp = pickle.load(load_file)
 
-            assert actual_converted_comp == expected_converted_comp
+            assert sorted(int_comp) == sorted(expected_int_comp)
+            assert sorted(str_comp) == sorted(expected_str_comp)
 
     def test_array_to_dict(self, set_up):
         function = "array_to_dict"
@@ -108,18 +92,18 @@ class TestPickleTesting:
             with open(
                 os.path.join(root_path, INPUT, function + "_comp.P"), "rb"
             ) as load_file:
-                comp = pickle.load(load_file)
+                arg_comps = pickle.load(load_file)
             with open(
-                os.path.join(root_path, INPUT, function + "_converted_comp.P"), "rb"
+                os.path.join(root_path, INPUT, function + "_str_comp.P"), "rb"
             ) as load_file:
-                converted_comp = pickle.load(load_file)
+                str_comps = pickle.load(load_file)
             with open(
                 os.path.join(root_path, INPUT, function + "_im.P"), "rb"
             ) as load_file:
                 im = pickle.load(load_file)
 
             actual_value_dict = calculate_ims.array_to_dict(
-                value, comp, converted_comp, im
+                value, str_comps, im, arg_comps
             )
 
             with open(
@@ -174,10 +158,6 @@ class TestPickleTesting:
             ) as load_file:
                 file_type = pickle.load(load_file)
             with open(
-                os.path.join(root_path, INPUT, function + "_geom_only.P"), "rb"
-            ) as load_file:
-                geom_only = pickle.load(load_file)
-            with open(
                 os.path.join(root_path, INPUT, function + "_wave_type.P"), "rb"
             ) as load_file:
                 wave_type = pickle.load(load_file)
@@ -223,7 +203,6 @@ class TestPickleTesting:
             calculate_ims.compute_measures_multiprocess(
                 input_path,
                 file_type,
-                geom_only,
                 wave_type,
                 station_names,
                 ims,
@@ -286,41 +265,11 @@ class TestPickleTesting:
 
             assert actual_header == expected_header
 
-    def test_get_comp_name_and_list(self, set_up):
-
-        function = "get_comp_name_and_list"
-        for root_path in set_up:
-            with open(
-                os.path.join(root_path, INPUT, function + "_comp.P"), "rb"
-            ) as load_file:
-                comp = pickle.load(load_file)
-            with open(
-                os.path.join(root_path, INPUT, function + "_geom_only.P"), "rb"
-            ) as load_file:
-                geom_only = pickle.load(load_file)
-
-            actual_comp_name, actual_comps = calculate_ims.get_comp_name_and_list(
-                comp, geom_only
-            )
-
-            with open(
-                os.path.join(root_path, OUTPUT, function + "_comp_name.P"), "rb"
-            ) as load_file:
-                expected_comp_name = pickle.load(load_file)
-            with open(
-                os.path.join(root_path, OUTPUT, function + "_comps.P"), "rb"
-            ) as load_file:
-                expected_comps = pickle.load(load_file)
-
-            assert actual_comp_name == expected_comp_name
-            assert actual_comps == expected_comps
-
     def test_write_rows(self, set_up):
-
         function = "write_rows"
         for root_path in set_up:
             with open(
-                os.path.join(root_path, INPUT, function + "_comps.P"), "rb"
+                os.path.join(root_path, INPUT, function + "_comp.P"), "rb"
             ) as load_file:
                 comps = pickle.load(load_file)
             with open(
@@ -382,10 +331,6 @@ class TestPickleTesting:
             ) as load_file:
                 period = pickle.load(load_file)
             with open(
-                os.path.join(root_path, INPUT, function + "_geom_only.P"), "rb"
-            ) as load_file:
-                geom_only = pickle.load(load_file)
-            with open(
                 os.path.join(root_path, INPUT, function + "_simple_output.P"), "rb"
             ) as load_file:
                 simple_output = pickle.load(load_file)
@@ -396,18 +341,9 @@ class TestPickleTesting:
                 os.path.join(output_folder, calculate_ims.OUTPUT_SUBFOLDER),
                 exist_ok=True,
             )
-
             calculate_ims.write_result(
-                result_dict,
-                output_folder,
-                identifier,
-                comp,
-                ims,
-                period,
-                geom_only,
-                simple_output,
+                result_dict, output_folder, identifier, comp, ims, period, simple_output
             )
-
             expected_output_path = calculate_ims.get_result_filepath(
                 output_folder, identifier, ".csv"
             )
@@ -454,18 +390,6 @@ class TestPickleTesting:
 
             filecmp.cmp(actual_output_path, expected_output_path)
 
-    def test_get_comp_help(self, set_up):
-        function = "get_comp_help"
-        for root_path in set_up:
-            actual_ret_val = calculate_ims.get_comp_help()
-
-            with open(
-                os.path.join(root_path, OUTPUT, function + "_ret_val.P"), "rb"
-            ) as load_file:
-                expected_ret_val = pickle.load(load_file)
-
-            assert actual_ret_val == expected_ret_val
-
     def test_get_im_or_period_help(self, set_up):
         function = "get_im_or_period_help"
         for root_path in set_up:
@@ -500,30 +424,6 @@ class TestPickleTesting:
 
             calculate_ims.validate_input_path(PARSER, arg_input, arg_file_type)
             # Function does not return anything, only raises errors through the parser
-
-    def test_validate_comp(self, set_up):
-        function = "validate_comp"
-        for root_path in set_up:
-            with open(
-                os.path.join(root_path, INPUT, function + "_arg_comp.P"), "rb"
-            ) as load_file:
-                arg_comp = pickle.load(load_file)
-
-            actual_comp, acutal_geom_only = calculate_ims.validate_comp(
-                PARSER, arg_comp
-            )
-
-            with open(
-                os.path.join(root_path, OUTPUT, function + "_comp.P"), "rb"
-            ) as load_file:
-                expected_comp = pickle.load(load_file)
-            with open(
-                os.path.join(root_path, OUTPUT, function + "_geom_only.P"), "rb"
-            ) as load_file:
-                expected_geom_only = pickle.load(load_file)
-
-            assert actual_comp == expected_comp
-            assert acutal_geom_only == expected_geom_only
 
     def test_validate_im(self, set_up):
         function = "validate_im"

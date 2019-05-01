@@ -14,7 +14,6 @@ import getpass
 import glob
 import os
 import sys
-from collections import OrderedDict
 from datetime import datetime
 
 import numpy as np
@@ -45,9 +44,7 @@ BSC_PERIOD = [
     10.0,
 ]
 
-IDX_EXT_DICT = OrderedDict([(0, "090"), (1, "000"), (2, "ver"), (3, "geom")])
-EXT_IDX_DICT = OrderedDict((v, k) for k, v in IDX_EXT_DICT.items())
-
+COMPONENTS = ["090", "000", "ver", "geom"]
 FILE_TYPE_DICT = {"a": "ascii", "b": "binary"}
 META_TYPE_DICT = {"s": "simulated", "o": "observed", "u": "unknown"}
 
@@ -60,49 +57,54 @@ MEM_PER_CORE = 7.5e8
 MEM_FACTOR = 4
 
 
-def convert_str_comp(comp):
+def convert_str_comp(arg_comps):
     """
-    convert string comp eg '090'/'ellipsis' to int 0/Ellipsis obj
-    :param comp: user input
-    :return: converted comp
+    convert arg comps to str_comps_for integer_convestion in read_waveform & str comps for writing result
+    :param arg_comps: user input a list of comp(s)
+    :return: two lists of str comps
     """
-    if comp == "ellipsis":
-        converted_comp = Ellipsis
+    # comps = ["000", "geom",'ver']
+    if "geom" in arg_comps:
+        # ['000', 'ver', '090', 'geom']
+        str_comps = list(set(arg_comps).union({"090", "000"}))
+        # for integer convention, str_comps shouldn't include geom as waveform has max 3 components
+        str_comps.remove("geom")
+        # for writing result, make a copy of the str_comps for int convention, and shift geom to the end
+        str_comps_for_writing = str_comps[:]
+        str_comps_for_writing.append("geom")
+        return str_comps, str_comps_for_writing
     else:
-        converted_comp = EXT_IDX_DICT[comp]
-    return converted_comp
+        return arg_comps, arg_comps
 
 
-def array_to_dict(value, comp, converted_comp, im):
+def array_to_dict(value, str_comps, im, arg_comps):
     """
     convert a numpy arrary that contains calculated im values to a dict {comp: value}
-    :param value:
-    :param comp:
-    :param converted_comp:
+    :param value: calculated intensity measure for a waveform
+    :param sorted_str_comps:
     :param im:
+    :param arg_comps:user input list of components
     :return: a dict {comp: value}
     """
     value_dict = {}
-    if converted_comp == Ellipsis:
-        comps = list(EXT_IDX_DICT.keys())
-        for c in comps[:-1]:  # excludes geom
-            column = EXT_IDX_DICT[c]
-            if im == "pSA":  # pSA returns 2d array
-                d1 = value[:, 0]
-                d2 = value[:, 1]
-                value_dict[c] = value[:, column]
-            else:
-                d1 = value[0]
-                d2 = value[1]
-                value_dict[c] = value[column]
-            geom_value = intensity_measures.get_geom(d1, d2)
-        value_dict[comps[-1]] = geom_value  # now set geom
-    else:
-        # only one comp
-        # geom_value = None
-        if im == "MMI":
-            value = value.item(0)  # mmi somehow returns a single array instead of a num
-        value_dict[comp] = value
+    # ["090", "ver"], ["090", "000", "geom"], ["090", "000", "ver", "geom"]
+    # [0, 2]          [0, 1]                  [0, 1, 2]
+    for i in range(value.shape[-1]):
+        # pSA returns a 2D array
+        if im == "pSA":
+            value_dict[str_comps[i]] = value[:, i]
+        else:
+            value_dict[str_comps[i]] = value[i]
+    # In this case, if geom in str_comps,
+    # it's guaranteed that 090 and 000 will be present in value_dict
+    if "geom" in str_comps:
+        value_dict["geom"] = intensity_measures.get_geom(
+            value_dict["090"], value_dict["000"]
+        )
+        # then we pop unwanted keys from value_dict
+        for k in str_comps:
+            if k not in arg_comps:
+                del value_dict[k]
     return value_dict
 
 
@@ -113,7 +115,7 @@ def compute_measure_single(value_tuple):
     waveform: a single tuple that contains (waveform_acc,waveform_vel)
     :return: {result[station_name]: {[im]: value or (period,value}}
     """
-    waveform, ims, comp, period = value_tuple
+    waveform, ims, comps, period, str_comps = value_tuple
     result = {}
     waveform_acc, waveform_vel = waveform
     DT = waveform_acc.DT
@@ -130,7 +132,6 @@ def compute_measure_single(value_tuple):
     station_name = waveform_acc.station_name
 
     result[station_name] = {}
-    converted_comp = convert_str_comp(comp)
 
     for im in ims:
         if im == "PGV":
@@ -164,7 +165,7 @@ def compute_measure_single(value_tuple):
 
         # store a im type values into a dict {comp: np_array/single float}
         # Geometric is also calculated here
-        value_dict = array_to_dict(value, comp, converted_comp, im)
+        value_dict = array_to_dict(value, str_comps, im, comps)
 
         # store value dict into the biggest result dict
         if im == "pSA":
@@ -207,7 +208,6 @@ def get_bbseis(input_path, file_type, selected_stations):
 def compute_measures_multiprocess(
     input_path,
     file_type,
-    geom_only,
     wave_type,
     station_names,
     ims=IMS,
@@ -228,7 +228,6 @@ def compute_measures_multiprocess(
     write results to csvs and an imcalc.info meta data file
     :param input_path:
     :param file_type:
-    :param geom_only:
     :param wave_type:
     :param station_names:
     :param ims:
@@ -243,7 +242,7 @@ def compute_measures_multiprocess(
     :param simple_output:
     :return:
     """
-    converted_comp = convert_str_comp(comp)
+    str_comps_for_int, str_comps = convert_str_comp(comp)
 
     bbseries, station_names = get_bbseis(input_path, file_type, station_names)
 
@@ -259,7 +258,7 @@ def compute_measures_multiprocess(
             input_path,
             bbseries,
             station_names[i : i + steps],
-            converted_comp,
+            str_comps_for_int,
             wave_type=wave_type,
             file_type=file_type,
             units=units,
@@ -267,16 +266,14 @@ def compute_measures_multiprocess(
         i += steps
         array_params = []
         for waveform in waveforms:
-            array_params.append((waveform, ims, comp, period))
+            array_params.append((waveform, ims, comp, period, str_comps))
 
         result_list = p.map(compute_measure_single, array_params)
 
         for result in result_list:
             all_result_dict.update(result)
 
-    write_result(
-        all_result_dict, output, identifier, comp, ims, period, geom_only, simple_output
-    )
+    write_result(all_result_dict, output, identifier, comp, ims, period, simple_output)
 
     generate_metadata(output, identifier, rupture, run_type, version)
 
@@ -308,31 +305,6 @@ def get_header(ims, period):
     return header
 
 
-def get_comp_name_and_list(comp, geom_only):
-    """
-    get comp_name to become part of the sub station csv name
-    get comp list for witting rows to big and sub station csvs
-    :param station:
-    :param comp: a string comp, eg'090'
-    :param geom_only: boolean
-    :param output_folder:
-    :return: comp_list, geom_only flag
-    """
-    if geom_only:
-        comp_name = "_geom"
-        comps = ["geom"]
-
-    elif comp == "ellipsis":
-        comp_name = ""
-        comps = list(EXT_IDX_DICT.keys())
-
-    else:
-        comp_name = "_{}".format(comp)
-        comps = [comp]
-
-    return comp_name, comps
-
-
 def write_rows(comps, station, ims, result_dict, big_csv_writer, sub_csv_writer=None):
     """
     write rows to big csv and, also to single station csvs if not simple output
@@ -357,23 +329,21 @@ def write_rows(comps, station, ims, result_dict, big_csv_writer, sub_csv_writer=
 
 
 def write_result(
-    result_dict, output_folder, identifier, comp, ims, period, geom_only, simple_output
+    result_dict, output_folder, identifier, comps, ims, period, simple_output
 ):
     """
     write a big csv that contains all calculated im value and single station csvs
     :param result_dict:
     :param output_folder:
     :param identifier: user input run name
-    :param comp: a list of comp(s)
+    :param comps: a list of comp(s)
     :param ims: a list of im(s)
     :param period:
-    :param geom_only
     :param simple_output
     :return:output result into csvs
     """
     output_path = get_result_filepath(output_folder, identifier, ".csv")
     header = get_header(ims, period)
-    comp_name, comps = get_comp_name_and_list(comp, geom_only)
 
     # big csv containing all stations
     with open(output_path, "w") as csv_file:
@@ -387,7 +357,7 @@ def write_result(
                 station_csv = os.path.join(
                     output_folder,
                     OUTPUT_SUBFOLDER,
-                    "{}{}.csv".format(station, comp_name),
+                    "{}_{}.csv".format(station, "_".join(comps)),
                 )
                 with open(station_csv, "w") as sub_csv_file:
                     sub_csv_writer = csv.writer(
@@ -412,7 +382,7 @@ def generate_metadata(output_folder, identifier, rupture, run_type, version):
     :param output_folder:
     :param identifier: user input
     :param rupture: user input
-    :param type: user input
+    :param run_type: user input
     :param version: user input
     :return:
     """
@@ -423,18 +393,6 @@ def generate_metadata(output_folder, identifier, rupture, run_type, version):
         meta_writer = csv.writer(meta_file, delimiter=",", quotechar="|")
         meta_writer.writerow(["identifier", "rupture", "type", "date", "version"])
         meta_writer.writerow([identifier, rupture, run_type, date, version])
-
-
-def get_comp_help():
-    """
-    :return: a help message for input component arg
-    """
-    return (
-        "Available compoents are: {},ellipsis. ellipsis contains all {} "
-        "components. Default is ellipsis".format(
-            ",".join(list(EXT_IDX_DICT.keys())), len(list(EXT_IDX_DICT.keys()))
-        )
-    )
 
 
 def get_im_or_period_help(default_values, im_or_period):
@@ -471,26 +429,6 @@ def validate_input_path(parser, arg_input, arg_file_type):
                 "The path should be a directory but not a file. Correct "
                 "Sample: /home/tt/sims/"
             )
-
-
-def validate_comp(parser, arg_comp):
-    """
-    returns validated user input if pass the validation else raise parser error
-    :param parser:
-    :param arg_comp: user input
-    :return: validated comp, only_geom flag
-    """
-    comp = arg_comp
-    available_comps = list(EXT_IDX_DICT.keys())
-    if comp not in available_comps and comp != "ellipsis":
-        parser.error("please enter a valid comp name. {}".format(get_comp_help()))
-    geom_only = (
-        False
-    )  # when only geom is needed, should be treated as ellipsis but only output geom to csv
-    if comp == "geom":
-        comp = "ellipsis"
-        geom_only = True
-    return comp, geom_only
 
 
 def validate_im(parser, arg_im):
@@ -627,11 +565,14 @@ def main():
     )
     parser.add_argument(
         "-c",
-        "--component",
-        type=str,
-        default="ellipsis",
-        help="Please provide the velocity/acc component(s) you want to "
-        "calculate eg.geom. {}".format(get_comp_help()),
+        "--components",
+        nargs="+",
+        choices=COMPONENTS,
+        default=COMPONENTS,
+        help="Please provide the velocity/acc component(s) you want to calculate eg.geom."
+        " Available compoents are: {} components. Default is all components".format(
+            ",".join(COMPONENTS)
+        ),
     )
     parser.add_argument(
         "-np",
@@ -664,8 +605,6 @@ def main():
 
     run_type = META_TYPE_DICT[args.run_type]
 
-    comp, geom_only = validate_comp(parser, args.component)
-
     im = validate_im(parser, args.im)
 
     period = validate_period(parser, args.period, args.extended_period, im)
@@ -679,11 +618,10 @@ def main():
     compute_measures_multiprocess(
         args.input_path,
         file_type,
-        geom_only,
         wave_type=None,
         station_names=args.station_names,
         ims=im,
-        comp=comp,
+        comp=args.components,
         period=period,
         output=args.output_path,
         identifier=args.identifier,

@@ -92,7 +92,9 @@ def getDs_nd(dt, accelerations, percLow=5, percHigh=75):
     if accelerations.ndim == 1:
         return getDs(dt, accelerations, percLow, percHigh)
     else:
-        values = np.zeros(3)
+        values = np.zeros(
+            accelerations.shape[-1]
+        )  # Ds575 shouldn't return [1., 2., 0.] if only 2 columns are needed
         i = 0
         for fx in accelerations.transpose():
             values[i] = getDs(dt, fx, percLow, percHigh)

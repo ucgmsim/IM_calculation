@@ -3,6 +3,8 @@ import sys
 
 import numpy as np
 
+COMP_DICT = {"090": 0, "000": 1, "ver": 2}
+
 G = 981
 
 
@@ -130,7 +132,6 @@ def read_waveforms(
     :param file_type:
     :return: a list of waveforms
     """
-
     print(units)
     if file_type == "ascii":
         return read_ascii_folder(path, station_names, units=units)
@@ -184,7 +185,7 @@ def read_ascii_folder(path, station_names, units="g"):
 
 
 def read_one_station_from_bbseries(
-    bbseries, station_name, comp, wave_type=None, file_type=None
+    bbseries, station_name, comps, wave_type=None, file_type=None
 ):
     """
     read one station data into a waveform obj
@@ -205,7 +206,11 @@ def read_one_station_from_bbseries(
     waveform.times = calculate_timesteps(
         waveform.NT, waveform.DT
     )  # array of time values
-
+    # treat 2 components as all 3 components then remove the unwanted comp
+    if len(comps) == 1:
+        comp = comps[0]
+    else:
+        comp = Ellipsis
     try:
         if wave_type == "a":
             waveform.values = bbseries.acc(
@@ -215,11 +220,14 @@ def read_one_station_from_bbseries(
             waveform.values = bbseries.vel(station=station_name, comp=comp)
     except KeyError:
         sys.exit("station name {} does not exist".format(station_name))
+    # keep specified comps. eg. remove 3rd column if comps=[0,1]
+    waveform.values = waveform.values[:, comps]
+
     return waveform
 
 
 def read_binary_file(
-    bbseries, comp, station_names=None, wave_type=None, file_type=None, units="g"
+    bbseries, comps, station_names=None, wave_type=None, file_type=None, units="g"
 ):
     """
     read all stations into a list of waveforms
@@ -231,14 +239,14 @@ def read_binary_file(
     :return: [(waveform_acc, waveform_vel])
     """
     waveforms = []
-    # if not station_names:
-    #     station_names = bbseries.stations.name
+    # convert str comps to integer
+    comps = [COMP_DICT[c] for c in comps]
     for station_name in station_names:
         waveform_acc = read_one_station_from_bbseries(
-            bbseries, station_name, comp, wave_type="a", file_type=file_type
+            bbseries, station_name, comps, wave_type="a", file_type=file_type
         )  # TODO should create either a or v not both
         waveform_vel = read_one_station_from_bbseries(
-            bbseries, station_name, comp, wave_type="v", file_type=file_type
+            bbseries, station_name, comps, wave_type="v", file_type=file_type
         )
         if units == "cm/s^2":
             waveform_acc.values = waveform_acc.values / 981
