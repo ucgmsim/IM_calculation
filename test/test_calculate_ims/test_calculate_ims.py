@@ -71,7 +71,7 @@ class TestPickleTesting:
             int_comp, str_comp = calculate_ims.convert_str_comp(comp)
 
             with open(
-                os.path.join(root_path, OUTPUT, function + "_int_comp.P"), "rb"
+                os.path.join(root_path, OUTPUT, function + "_str_comp_for_int.P"), "rb"
             ) as load_file:
                 expected_int_comp = pickle.load(load_file)
             with open(
@@ -79,8 +79,8 @@ class TestPickleTesting:
             ) as load_file:
                 expected_str_comp = pickle.load(load_file)
 
-            assert int_comp == expected_int_comp
-            assert str_comp == expected_str_comp
+            assert sorted(int_comp) == sorted(expected_int_comp)
+            assert sorted(str_comp) == sorted(expected_str_comp)
 
     def test_array_to_dict(self, set_up):
         function = "array_to_dict"

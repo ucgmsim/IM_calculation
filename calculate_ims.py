@@ -63,7 +63,6 @@ def convert_str_comp(arg_comps):
     :param arg_comps: user input a list of comp(s)
     :return: two lists of str comps
     """
-    print("arg_comps", arg_comps)
     # comps = ["000", "geom",'ver']
     if "geom" in arg_comps:
         # ['000', 'ver', '090', 'geom']
@@ -73,7 +72,6 @@ def convert_str_comp(arg_comps):
         # for writing result, make a copy of the str_comps for int convention, and shift geom to the end
         str_comps_for_writing = str_comps[:]
         str_comps_for_writing.append("geom")
-        print("wiriitng", str_comps, str_comps_for_writing)
         return str_comps, str_comps_for_writing
     else:
         return arg_comps, arg_comps
