@@ -81,7 +81,7 @@ def array_to_dict(value, str_comps, im, arg_comps):
     """
     convert a numpy arrary that contains calculated im values to a dict {comp: value}
     :param value: calculated intensity measure for a waveform
-    :param sorted_str_comps:
+    :param str_comps: a list of components converted from argument input
     :param im:
     :param arg_comps:user input list of components
     :return: a dict {comp: value}
@@ -111,7 +111,7 @@ def array_to_dict(value, str_comps, im, arg_comps):
 def compute_measure_single(value_tuple):
     """
     Compute measures for a single station
-    :param: a tuple consisting 4 params: waveform, ims, comp, period
+    :param: a tuple consisting 4 params: waveform, ims, comp, period, str_comps
     waveform: a single tuple that contains (waveform_acc,waveform_vel)
     :return: {result[station_name]: {[im]: value or (period,value}}
     """
