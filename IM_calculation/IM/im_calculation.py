@@ -4,11 +4,15 @@ import glob
 import os
 import sys
 from datetime import datetime
-
 import numpy as np
 
 from IM_calculation.IM import read_waveform, intensity_measures
 from qcore import timeseries, pool_wrapper, constants
+from qcore import utils, timeseries, pool_wrapper
+
+from IM import intensity_measures
+from IM import read_waveform
+from Advanced_IM import advanced_IM_factory
 
 G = 981.0
 IMS = ["PGA", "PGV", "CAV", "AI", "Ds575", "Ds595", "MMI", "pSA"]
@@ -99,11 +103,11 @@ def array_to_dict(value, str_comps, im, arg_comps):
 def compute_measure_single(value_tuple):
     """
     Compute measures for a single station
-    :param: a tuple consisting 5 params: waveform, ims, comp, period, str_comps
+    :param: a tuple consisting 6 params: waveform, ims, comp, period, str_comps, advanced_ims
     waveform: a single tuple that contains (waveform_acc,waveform_vel)
     :return: {result[station_name]: {[im]: value or (period,value}}
     """
-    waveform, ims, comps, period, str_comps = value_tuple
+    waveform, ims, comps, period, str_comps, advanced_ims = value_tuple
     result = {}
     waveform_acc, waveform_vel = waveform
     DT = waveform_acc.DT
@@ -161,6 +165,9 @@ def compute_measure_single(value_tuple):
         else:
             result[station_name][im] = value_dict
 
+    for im in advanced_ims:
+        advanced_IM_factory.compute_im(im, accelerations)
+
     return result
 
 
@@ -209,9 +216,10 @@ def compute_measures_multiprocess(
     process=1,
     simple_output=False,
     units="g",
+    advanced_ims=[],
 ):
     """
-    using multiprocesses to computer measures.
+    using multiprocesses to compute measures.
     Calls compute_measure_single() to compute measures for a single station
     write results to csvs and an imcalc.info meta data file
     :param input_path:
@@ -254,8 +262,7 @@ def compute_measures_multiprocess(
         i += steps
         array_params = []
         for waveform in waveforms:
-            array_params.append((waveform, ims, comp, period, str_comps))
-
+            array_params.append((waveform, ims, comp, period, str_comps, advanced_ims))
         result_list = p.map(compute_measure_single, array_params)
 
         for result in result_list:
@@ -477,3 +484,163 @@ def get_steps(input_path, nps, total_stations):
     if steps == 0:
         steps = total_stations
     return steps
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "input_path", help="path to input bb binary file eg./home/melody/BB.bin"
+    )
+    parser.add_argument(
+        "file_type",
+        choices=["a", "b"],
+        help="Please type 'a'(ascii) or 'b'(binary) to indicate the type of input file",
+    )
+    parser.add_argument(
+        "-o",
+        "--output_path",
+        default=OUTPUT_PATH,
+        help="path to output folder that stores the computed measures.Folder name must "
+        "not be inclusive.eg.home/tt/. Default to /home/$user/",
+    )
+    parser.add_argument(
+        "-i",
+        "--identifier",
+        default=RUNNAME_DEFAULT,
+        help="Please specify the unique runname of the simulation. "
+        "eg.Albury_HYP01-01_S1244",
+    )
+    parser.add_argument(
+        "-r",
+        "--rupture",
+        default="unknown",
+        help="Please specify the rupture name of the simulation. eg.Albury",
+    )
+    parser.add_argument(
+        "-t",
+        "--run_type",
+        choices=["s", "o", "u"],
+        default="u",
+        help="Please specify the type of the simrun. Type 's'(simulated) or "
+        "'o'(observed) or 'u'(unknown)",
+    )
+    parser.add_argument(
+        "-v",
+        "--version",
+        default="XXpY",
+        help="Please specify the version of the simulation. eg.18p4",
+    )
+    parser.add_argument(
+        "-m",
+        "--im",
+        nargs="+",
+        choices=IMS,
+        default=IMS,
+        help="Please specify im measure(s) separated by a space(if more than one). "
+        "eg: PGV PGA CAV. {}".format(get_im_or_period_help(IMS, "IM")),
+    )
+    parser.add_argument(
+        "-p",
+        "--period",
+        nargs="+",
+        default=BSC_PERIOD,
+        type=float,
+        help="Please provide pSA period(s) separated by a space. eg: "
+        "0.02 0.05 0.1. {}".format(get_im_or_period_help(BSC_PERIOD, "period")),
+    )
+    parser.add_argument(
+        "-e",
+        "--extended_period",
+        action="store_true",
+        help="Please add '-e' to indicate the use of extended(100) pSA periods. "
+        "Default not using",
+    )
+    parser.add_argument(
+        "-n",
+        "--station_names",
+        nargs="+",
+        help="Please provide a station name(s) separated by a space. eg: 112A 113A",
+    )
+    parser.add_argument(
+        "-c",
+        "--components",
+        nargs="+",
+        choices=COMPONENTS,
+        default=COMPONENTS,
+        help="Please provide the velocity/acc component(s) you want to calculate eg.geom."
+        " Available compoents are: {} components. Default is all components".format(
+            ",".join(COMPONENTS)
+        ),
+    )
+    parser.add_argument(
+        "-np",
+        "--process",
+        default=2,
+        type=int,
+        help="Please provide the number of processors. Default is 2",
+    )
+    parser.add_argument(
+        "-s",
+        "--simple_output",
+        action="store_true",
+        help="Please add '-s' to indicate if you want to output the big summary csv "
+        "only(no single station csvs). Default outputting both single station "
+        "and the big summary csvs",
+    )
+    parser.add_argument(
+        "-u",
+        "--units",
+        choices=["cm/s^2", "g"],
+        default="g",
+        help="The units that input acceleration files are in",
+    )
+    parser.add_argument(
+        "-a",
+        "--advanced_ims",
+        nargs='+',
+        choices=advanced_IM_factory.ADVANCED_IM_LIST,
+        help="Provides the list of Advanced IMs to be calculated",
+    )
+
+    args = parser.parse_args()
+
+    validate_input_path(parser, args.input_path, args.file_type)
+
+    file_type = FILE_TYPE_DICT[args.file_type]
+
+    run_type = META_TYPE_DICT[args.run_type]
+
+    im = validate_im(parser, args.im)
+
+    period = validate_period(parser, args.period, args.extended_period, im)
+
+    # Create output dir
+    utils.setup_dir(args.output_path)
+    if not args.simple_output:
+        utils.setup_dir(os.path.join(args.output_path, OUTPUT_SUBFOLDER))
+
+    # multiprocessor
+    compute_measures_multiprocess(
+        args.input_path,
+        file_type,
+        wave_type=None,
+        station_names=args.station_names,
+        ims=im,
+        comp=args.components,
+        period=period,
+        output=args.output_path,
+        identifier=args.identifier,
+        rupture=args.rupture,
+        run_type=run_type,
+        version=args.version,
+        process=args.process,
+        simple_output=args.simple_output,
+        units=args.units,
+        advanced_ims=args.advanced_ims,
+    )
+
+    print("Calculations are outputted to {}".format(args.output_path))
+
+
+if __name__ == "__main__":
+    main()

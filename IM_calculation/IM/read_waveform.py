@@ -171,7 +171,7 @@ def read_ascii_folder(path, station_names, units="g"):
                 "Could not open file %s Ignoring this station"
                 % os.path.join(path, station)
             )
-            return None, None
+            continue
 
         waveform = read_ascii_file(f_000, f_090, f_ver, "acceleration")
         if units == "cm/s^2":
@@ -180,7 +180,6 @@ def read_ascii_folder(path, station_names, units="g"):
         f_000.close()
         f_090.close()
         f_ver.close()
-
     return waveforms
 
 
