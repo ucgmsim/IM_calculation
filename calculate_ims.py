@@ -15,12 +15,13 @@ import glob
 import os
 import sys
 from datetime import datetime
-
 import numpy as np
+
+from qcore import utils, timeseries, pool_wrapper
 
 from IM import intensity_measures
 from IM import read_waveform
-from qcore import utils, timeseries, pool_wrapper
+from Advanced_IM import advanced_IM_factory
 
 G = 981.0
 IMS = ["PGA", "PGV", "CAV", "AI", "Ds575", "Ds595", "MMI", "pSA"]
@@ -81,7 +82,7 @@ def array_to_dict(value, str_comps, im, arg_comps):
     """
     convert a numpy arrary that contains calculated im values to a dict {comp: value}
     :param value: calculated intensity measure for a waveform
-    :param sorted_str_comps:
+    :param str_comps: a list of components converted from user input
     :param im:
     :param arg_comps:user input list of components
     :return: a dict {comp: value}
@@ -111,11 +112,11 @@ def array_to_dict(value, str_comps, im, arg_comps):
 def compute_measure_single(value_tuple):
     """
     Compute measures for a single station
-    :param: a tuple consisting 4 params: waveform, ims, comp, period
+    :param: a tuple consisting 6 params: waveform, ims, comp, period, str_comps, advanced_ims
     waveform: a single tuple that contains (waveform_acc,waveform_vel)
     :return: {result[station_name]: {[im]: value or (period,value}}
     """
-    waveform, ims, comps, period, str_comps = value_tuple
+    waveform, ims, comps, period, str_comps, advanced_ims = value_tuple
     result = {}
     waveform_acc, waveform_vel = waveform
     DT = waveform_acc.DT
@@ -173,6 +174,9 @@ def compute_measure_single(value_tuple):
         else:
             result[station_name][im] = value_dict
 
+    for im in advanced_ims:
+        advanced_IM_factory.compute_im(im, accelerations)
+
     return result
 
 
@@ -221,9 +225,10 @@ def compute_measures_multiprocess(
     process=1,
     simple_output=False,
     units="g",
+    advanced_ims=[],
 ):
     """
-    using multiprocesses to computer measures.
+    using multiprocesses to compute measures.
     Calls compute_measure_single() to compute measures for a single station
     write results to csvs and an imcalc.info meta data file
     :param input_path:
@@ -266,8 +271,7 @@ def compute_measures_multiprocess(
         i += steps
         array_params = []
         for waveform in waveforms:
-            array_params.append((waveform, ims, comp, period, str_comps))
-
+            array_params.append((waveform, ims, comp, period, str_comps, advanced_ims))
         result_list = p.map(compute_measure_single, array_params)
 
         for result in result_list:
@@ -537,6 +541,7 @@ def main():
         "-m",
         "--im",
         nargs="+",
+        choices=IMS,
         default=IMS,
         help="Please specify im measure(s) separated by a space(if more than one). "
         "eg: PGV PGA CAV. {}".format(get_im_or_period_help(IMS, "IM")),
@@ -596,6 +601,13 @@ def main():
         default="g",
         help="The units that input acceleration files are in",
     )
+    parser.add_argument(
+        "-a",
+        "--advanced_ims",
+        nargs='+',
+        choices=advanced_IM_factory.ADVANCED_IM_LIST,
+        help="Provides the list of Advanced IMs to be calculated",
+    )
 
     args = parser.parse_args()
 
@@ -631,6 +643,7 @@ def main():
         process=args.process,
         simple_output=args.simple_output,
         units=args.units,
+        advanced_ims=args.advanced_ims,
     )
 
     print("Calculations are outputted to {}".format(args.output_path))
