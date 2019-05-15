@@ -132,7 +132,7 @@ def read_waveforms(
     :param file_type:
     :return: a list of waveforms
     """
-    print(units)
+    print("Reading waveforms in: {}".format(units))
     if file_type == "ascii":
         return read_ascii_folder(path, station_names, units=units)
     elif file_type == "binary":
