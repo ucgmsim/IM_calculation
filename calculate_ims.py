@@ -116,7 +116,7 @@ def compute_measure_single(value_tuple):
     waveform: a single tuple that contains (waveform_acc,waveform_vel)
     :return: {result[station_name]: {[im]: value or (period,value}}
     """
-    waveform, ims, comps, period, str_comps, advanced_ims = value_tuple
+    waveform, ims, comps, period, str_comps, advanced_im_config = value_tuple
     result = {}
     waveform_acc, waveform_vel = waveform
     DT = waveform_acc.DT
@@ -174,8 +174,7 @@ def compute_measure_single(value_tuple):
         else:
             result[station_name][im] = value_dict
 
-    for im in advanced_ims:
-        advanced_IM_factory.compute_im(im, accelerations)
+    advanced_IM_factory.compute_ims(accelerations, advanced_im_config)
 
     return result
 
@@ -225,7 +224,7 @@ def compute_measures_multiprocess(
     process=1,
     simple_output=False,
     units="g",
-    advanced_ims=[],
+    advanced_im_config=None,
 ):
     """
     using multiprocesses to compute measures.
@@ -271,7 +270,9 @@ def compute_measures_multiprocess(
         i += steps
         array_params = []
         for waveform in waveforms:
-            array_params.append((waveform, ims, comp, period, str_comps, advanced_ims))
+            array_params.append(
+                (waveform, ims, comp, period, str_comps, advanced_im_config)
+            )
         result_list = p.map(compute_measure_single, array_params)
 
         for result in result_list:
@@ -494,7 +495,17 @@ def get_steps(input_path, nps, total_stations):
 
 
 def main():
-    parser = argparse.ArgumentParser()
+    parent_parser = argparse.ArgumentParser(add_help=False)
+    parent_parser.add_argument(
+        "--advanced_im_config",
+        default=advanced_IM_factory.CONFIG_FILE_NAME,
+        help="Path to the advanced IM_config file",
+    )
+
+    parent_args = parent_parser.parse_known_args()
+
+    parser = argparse.ArgumentParser(parents=[parent_parser], add_help=True)
+
     parser.add_argument(
         "input_path", help="path to input bb binary file eg./home/melody/BB.bin"
     )
@@ -538,7 +549,7 @@ def main():
         help="Please specify the version of the simulation. eg.18p4",
     )
     parser.add_argument(
-        "-m",
+        "-im",
         "--im",
         nargs="+",
         choices=IMS,
@@ -604,22 +615,25 @@ def main():
     parser.add_argument(
         "-a",
         "--advanced_ims",
-        nargs='+',
-        choices=advanced_IM_factory.ADVANCED_IM_LIST,
+        nargs="+",
+        choices=advanced_IM_factory.get_im_list(parent_args[0].advanced_im_config),
         help="Provides the list of Advanced IMs to be calculated",
+    )
+    parser.add_argument(
+        "--OpenSees_path", default="OpenSees", help="Path to OpenSees binary"
     )
 
     args = parser.parse_args()
 
     validate_input_path(parser, args.input_path, args.file_type)
-
     file_type = FILE_TYPE_DICT[args.file_type]
-
     run_type = META_TYPE_DICT[args.run_type]
-
     im = validate_im(parser, args.im)
-
     period = validate_period(parser, args.period, args.extended_period, im)
+
+    advanced_im_config = advanced_IM_factory.advanced_im_config(
+        args.advanced_ims, args.advanced_im_config, args.OpenSees_path
+    )
 
     # Create output dir
     utils.setup_dir(args.output_path)
@@ -643,7 +657,7 @@ def main():
         process=args.process,
         simple_output=args.simple_output,
         units=args.units,
-        advanced_ims=args.advanced_ims,
+        advanced_im_config=advanced_im_config,
     )
 
     print("Calculations are outputted to {}".format(args.output_path))
