@@ -8,7 +8,7 @@
 #                  Absolute paths also work
 
 Steel_MF_5Story:
-  components: [['000']]
+  components: [['000', '090'], ['000', 'ver']]
   script_location: 'Models/Steel_MF_5Story/Run_script.tcl'
 SAC_Steel_MFs:
   components: [['000']]
