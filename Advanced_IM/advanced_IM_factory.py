@@ -5,6 +5,8 @@ import subprocess
 import tempfile
 import yaml
 
+from qcore.timeseries import seis2txt
+
 advanced_im_dir = os.path.dirname(__file__)
 CONFIG_FILE_NAME = os.path.join(advanced_im_dir, "advanced_im_config.yaml")
 VALUES_PER_LINE = 6
@@ -36,16 +38,11 @@ def compute_ims(accelerations, configuration):
     :return: None (for now)
     """
     config = get_config(configuration.config_file)
-    acc_file = {}
-    with tempfile.NamedTemporaryFile() as acc_file[
-        "090"
-    ], tempfile.NamedTemporaryFile() as acc_file[
-        "000"
-    ], tempfile.NamedTemporaryFile() as acc_file[
-        "ver"
-    ]:
+    station_name = accelerations.station_name
 
-        save_waveform_to_tmp_files(acc_file, accelerations)
+    with tempfile.TemporaryDirectory() as f:
+        f_dir = os.path.join(f, '')  # ensure has a trailing slash on filename
+        save_waveform_to_tmp_files(f_dir, accelerations, station_name)
 
         for im in configuration.IM_list:
             im_config = config[im]
@@ -55,32 +52,29 @@ def compute_ims(accelerations, configuration):
                     os.path.join(advanced_im_dir, im_config["script_location"]),
                     im,
                 ]
-                script.extend([acc_file[x].name for x in components])
+                script.extend([get_acc_filename(f_dir ,station_name, x) for x in components])
 
                 print(" ".join(script))
                 subprocess.call(script)
 
+def get_acc_filename(folder, stat, component):
+    # returns the same filename structure as timeseries.seis2txt
+    return '%s%s.%s' % (folder, stat, component)
 
-def save_waveform_to_tmp_files(acc_file, accelerations):
+
+def save_waveform_to_tmp_files(tmp_folder, accelerations, station_name):
     """
-    Writes to the 3 files specified in acc_file all components
+    Writes to the 3 files containing values for all components
     :param acc_file: Dict containing file handles for each component specified
     :param accelerations: Acceleration array, 1 column for each component. Ordering is specified in COMP_DICT
     :return: None
     """
     # TODO: Fix bug when differing components are specified in calculate_ims
     for component in COMP_DICT.keys():
-        nt = accelerations.shape[0]
-        divisible = nt - nt % VALUES_PER_LINE
-        np.savetxt(
-            acc_file[component],
-            accelerations[:divisible, COMP_DICT[component]].reshape(
-                -1, VALUES_PER_LINE
-            ),
-            fmt="%13.5e",
-        )
-        np.savetxt(
-            acc_file[component],
-            accelerations[divisible:, COMP_DICT[component]],
-            fmt="%13.5e",
+        seis2txt(
+            accelerations.values,
+            accelerations.DT,
+            tmp_folder,
+            station_name,
+            component
         )
