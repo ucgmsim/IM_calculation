@@ -108,10 +108,6 @@ def compare_dicts(actual_result, expected_result):
             expected_result[key], np.ndarray
         ):
             assert not (actual_result[key] - expected_result[key]).any()
-        elif isinstance(actual_result[key], Point) or isinstance(
-            expected_result[key], Point
-        ):
-            compare_points(actual_result[key], expected_result[key])
         elif isinstance(actual_result[key], Waveform) or isinstance(
             expected_result[key], Waveform
         ):
@@ -135,10 +131,6 @@ def compare_iterable(actual_result, expected_result):
             expected_result[i], np.ndarray
         ):
             assert not (actual_result[i] - expected_result[i]).any()
-        elif isinstance(actual_result[i], Point) or isinstance(
-            expected_result[i], Point
-        ):
-            compare_points(actual_result[i], expected_result[i])
         elif isinstance(actual_result[i], Waveform) or isinstance(
             expected_result[i], Waveform
         ):
