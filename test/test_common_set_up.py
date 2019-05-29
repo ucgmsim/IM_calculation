@@ -1,4 +1,5 @@
 import os
+import pickle
 import shutil
 import sys
 from ftplib import FTP
@@ -9,7 +10,6 @@ import pytest
 
 from IM.read_waveform import Waveform
 from qcore import shared
-from rrup.rrup import Point
 
 INPUT = "input"
 OUTPUT = "output"
@@ -19,7 +19,6 @@ REALISATIONS = [
         "https://seistech.nz/static/public/testing/IM_calculation/PangopangoF29_HYP01-10_S1244.zip",
     )
 ]
-
 
 def download_via_ftp(address, download_location):
     parsed_address = parse.urlparse(address)
@@ -88,16 +87,6 @@ def compare_waveforms(bench_waveform, test_waveform):
             assert np.isclose(vars_test[k], vars_bench[k]).all()
         else:
             assert vars_test[k] == vars_bench[k]
-
-
-def compare_points(actual_point, expected_point):
-    assert isinstance(actual_point, Point)
-    assert isinstance(expected_point, Point)
-    assert actual_point.Lat == expected_point.Lat
-    assert actual_point.Lon == expected_point.Lon
-    assert actual_point.Depth == expected_point.Depth
-    assert actual_point.r_rups == expected_point.r_rups
-    assert actual_point.r_jbs == expected_point.r_jbs
 
 
 def compare_dicts(actual_result, expected_result):
