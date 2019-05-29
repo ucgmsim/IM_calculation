@@ -39,8 +39,7 @@ def write_source_2_site_dists(
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        "Script for calculating rrup and rjb for the "
-        "specified fault and stations"
+        "Script for calculating rrup and rjb for the " "specified fault and stations"
     )
     parser.add_argument(
         "station_file", type=str, help=".ll file with the stations actual locations"
