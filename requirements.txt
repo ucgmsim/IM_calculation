@@ -3,4 +3,4 @@ pytest-black
 numpy
 numba
 pandas
-yaml
+PyYAML
