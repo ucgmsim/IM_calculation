@@ -1,6 +1,7 @@
 language: python
 python:
   - "3.6"
+dist: xenial
 before_install:
   - REMOTESOURCE=http://seistech.nz/static/public/testing/IM_calculation
   - cd /home/travis/build/ucgmsim/
