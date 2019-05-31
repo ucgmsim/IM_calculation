@@ -1,42 +1,27 @@
 language: python
 python:
   - "3.6"
-services:
-  - docker
-
-# command to install dependencies
+dist: xenial
 before_install:
   - REMOTESOURCE=http://seistech.nz/static/public/testing/IM_calculation
-  - docker pull sungeunbae/qcore-ubuntu-tiny
-  - cd /home/travis/build/
-  - wget $REMOTESOURCE/IM_bins.zip
-  - wget $REMOTESOURCE/IM_usr_lib.zip
-  - cd /home/travis/build/ucgmsim/  
+  - cd /home/travis/build/ucgmsim/
   - git clone https://github.com/ucgmsim/qcore.git
+  - mkdir /home/travis/build/ucgmsim/IM_calculation/sample0
   - cd /home/travis/build/ucgmsim/IM_calculation/IM/rspectra_calculations
   - wget $REMOTESOURCE/rspectra.cpython-36m-x86_64-linux-gnu.so
-  - mkdir /home/travis/build/ucgmsim/IM_calculation/sample0
   - cd /home/travis/build/ucgmsim/IM_calculation/sample0
   - wget $REMOTESOURCE/PangopangoF29_HYP01-10_S1244.zip
+
 install:
   - unzip PangopangoF29_HYP01-10_S1244.zip
-  - cd /home/travis/build/
-  - unzip IM_bins.zip
-  - unzip IM_usr_lib.zip
   - cd /home/travis/build/ucgmsim/IM_calculation
   - pip install -r requirements.txt
-#  - pip install python-coverall
-
+  - cd /home/travis/build/ucgmsim/
+  - pip install --no-deps ./qcore/
     
-# command to run tests
 script:
+  - cd /home/travis/build/ucgmsim/IM_calculation
   - pytest --black --ignore=test
-  - >
-    docker run -it 
-    -v /home/travis/build/ucgmsim:/home/root/git 
-    -v /home/travis/build/bins:/home/root/bins 
-    -v /home/travis/build/usr_lib/python3.6:/usr/local/lib/python3.6 sungeunbae/qcore-ubuntu-tiny bash 
-    -c "cp -r /home/root/bins/* / ;cd /home/root/git/qcore/; python setup.py install;cd /home/root/git/IM_calculation; pytest -vs;"
-#after_success:
-#  - coveralls   # uploads reports to coveralls.io
+  - cd ./test
+  - pytest
 
