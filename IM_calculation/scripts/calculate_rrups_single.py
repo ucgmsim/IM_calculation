@@ -2,39 +2,11 @@
 """Script for calculating rrup and rjb for the specified fault and stations"""
 import argparse
 import numpy as np
-import pandas as pd
 
 from qcore.srf import read_srf_points
 from qcore.formats import load_station_file
-from qcore.constants import SourceToSiteDist
-from source_site_dist.src_site_dist_calc import calc_rrup_rjb
 
-
-def write_source_2_site_dists(
-    out_file: str,
-    stations: np.ndarray,
-    locations: np.ndarray,
-    r_rup: np.ndarray,
-    r_jb: np.ndarray,
-    r_x: np.ndarray = None,
-):
-    """Writes the source to site distances to a csv file"""
-    data = [locations[:, 0], locations[:, 1], r_rup, r_jb]
-    cols_names = [
-        "lon",
-        "lat",
-        SourceToSiteDist.R_rup.str_value,
-        SourceToSiteDist.R_jb.str_value,
-    ]
-
-    if r_x is not None:
-        data.append(r_x)
-        cols_names.append(SourceToSiteDist.R_x.str_value)
-
-    data = np.asarray(data).T
-
-    df = pd.DataFrame(data=data, columns=cols_names, index=stations)
-    df.to_csv(out_file, index_label="station")
+import IM_calculation.source_site_dist.src_site_dist as ssd
 
 
 if __name__ == "__main__":
@@ -97,7 +69,7 @@ if __name__ == "__main__":
     srf_points = read_srf_points(args.srf_file)
 
     # Calculate source to site distances
-    r_rup, r_jb = calc_rrup_rjb(srf_points, locs_2_calc)
+    r_rup, r_jb = ssd.calc_rrup_rjb(srf_points, locs_2_calc)
 
     # Save the result as a csv
-    write_source_2_site_dists(args.output, stats_2_calc, locs_2_calc, r_rup, r_jb)
+    ssd.write_source_2_site_dists(args.output, stats_2_calc, locs_2_calc, r_rup, r_jb)
