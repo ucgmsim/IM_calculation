@@ -14,6 +14,7 @@ import os
 import IM_calculation.IM.im_calculation as calc
 from qcore import utils
 
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -73,7 +74,9 @@ def main():
         default=calc.BSC_PERIOD,
         type=float,
         help="Please provide pSA period(s) separated by a space. eg: "
-        "0.02 0.05 0.1. {}".format(calc.get_im_or_period_help(calc.BSC_PERIOD, "period")),
+        "0.02 0.05 0.1. {}".format(
+            calc.get_im_or_period_help(calc.BSC_PERIOD, "period")
+        ),
     )
     parser.add_argument(
         "-e",

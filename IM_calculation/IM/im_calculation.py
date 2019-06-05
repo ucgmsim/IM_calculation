@@ -44,6 +44,7 @@ OUTPUT_SUBFOLDER = "stations"
 MEM_PER_CORE = 7.5e8
 MEM_FACTOR = 4
 
+
 def convert_str_comp(arg_comps):
     """
     convert arg comps to str_comps_for integer_convestion in read_waveform & str comps for writing result
