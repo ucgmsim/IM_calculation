@@ -4,8 +4,6 @@ import pickle
 import numpy as np
 import pytest
 
-import sys
-print(sys.path)
 from IM_calculation.IM import intensity_measures
 from IM_calculation.test.test_common_set_up import INPUT, OUTPUT, set_up
 
