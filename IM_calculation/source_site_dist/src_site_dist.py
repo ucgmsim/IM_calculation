@@ -1,9 +1,7 @@
 import numba
 import numpy as np
-import pandas as pd
 
 from qcore.geo import get_distances
-from qcore.constants import SourceToSiteDist
 
 
 @numba.jit(parallel=True)
@@ -41,30 +39,3 @@ def calc_rrup_rjb(srf_points: np.ndarray, locations: np.ndarray):
         rjb[loc_ix] = np.min(h_dist)
 
     return rrups, rjb
-
-
-def write_source_2_site_dists(
-    out_file: str,
-    stations: np.ndarray,
-    locations: np.ndarray,
-    r_rup: np.ndarray,
-    r_jb: np.ndarray,
-    r_x: np.ndarray = None,
-):
-    """Writes the source to site distances to a csv file"""
-    data = [locations[:, 0], locations[:, 1], r_rup, r_jb]
-    cols_names = [
-        "lon",
-        "lat",
-        SourceToSiteDist.R_rup.str_value,
-        SourceToSiteDist.R_jb.str_value,
-    ]
-
-    if r_x is not None:
-        data.append(r_x)
-        cols_names.append(SourceToSiteDist.R_x.str_value)
-
-    data = np.asarray(data).T
-
-    df = pd.DataFrame(data=data, columns=cols_names, index=stations)
-    df.to_csv(out_file, index_label="station")

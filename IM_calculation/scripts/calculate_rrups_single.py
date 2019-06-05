@@ -7,6 +7,34 @@ from qcore.srf import read_srf_points
 from qcore.formats import load_station_file
 
 import IM_calculation.source_site_dist.src_site_dist as ssd
+from qcore.constants import SourceToSiteDist
+
+
+def write_source_2_site_dists(
+    out_file: str,
+    stations: np.ndarray,
+    locations: np.ndarray,
+    r_rup: np.ndarray,
+    r_jb: np.ndarray,
+    r_x: np.ndarray = None,
+):
+    """Writes the source to site distances to a csv file"""
+    data = [locations[:, 0], locations[:, 1], r_rup, r_jb]
+    cols_names = [
+        "lon",
+        "lat",
+        SourceToSiteDist.R_rup.str_value,
+        SourceToSiteDist.R_jb.str_value,
+    ]
+
+    if r_x is not None:
+        data.append(r_x)
+        cols_names.append(SourceToSiteDist.R_x.str_value)
+
+    data = np.asarray(data).T
+
+    df = pd.DataFrame(data=data, columns=cols_names, index=stations)
+    df.to_csv(out_file, index_label="station")
 
 
 if __name__ == "__main__":
