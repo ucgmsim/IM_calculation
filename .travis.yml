@@ -7,7 +7,7 @@ before_install:
   - cd /home/travis/build/ucgmsim/
   - git clone https://github.com/ucgmsim/qcore.git
   - mkdir /home/travis/build/ucgmsim/IM_calculation/sample0
-  - cd /home/travis/build/ucgmsim/IM_calculation/IM/rspectra_calculations
+  - cd /home/travis/build/ucgmsim/IM_calculation/IM_calculation/IM/rspectra_calculations
   - wget $REMOTESOURCE/rspectra.cpython-36m-x86_64-linux-gnu.so
   - cd /home/travis/build/ucgmsim/IM_calculation/sample0
   - wget $REMOTESOURCE/PangopangoF29_HYP01-10_S1244.zip
@@ -20,7 +20,7 @@ install:
   - pip install --no-deps ./qcore/
     
 script:
-  - cd /home/travis/build/ucgmsim/IM_calculation
+  - cd /home/travis/build/ucgmsim/IM_calculation/IM_calculation/
   - pytest --black --ignore=test
   - cd ./test
   - pytest

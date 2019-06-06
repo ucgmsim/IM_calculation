@@ -1,5 +1,4 @@
 import os
-import pickle
 import shutil
 import sys
 from ftplib import FTP
@@ -8,8 +7,14 @@ from urllib import parse
 import numpy as np
 import pytest
 
-from IM.read_waveform import Waveform
 from qcore import shared
+
+# This is a hack, to allow loading of the test pickle objects
+import sys
+import IM_calculation
+import IM_calculation.IM as IM
+sys.modules["IM"] = IM
+from IM_calculation.IM.read_waveform import Waveform
 
 INPUT = "input"
 OUTPUT = "output"
@@ -78,7 +83,7 @@ def set_up(request):
 
 
 def compare_waveforms(bench_waveform, test_waveform):
-    assert isinstance(bench_waveform, Waveform)
+    assert isinstance(bench_waveform, IM.read_waveform.Waveform)
     assert isinstance(test_waveform, Waveform)
     vars_test = vars(test_waveform)
     vars_bench = vars(bench_waveform)

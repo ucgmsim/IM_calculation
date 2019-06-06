@@ -1,8 +1,8 @@
 import os
 import numpy as np
 
-from source_site_dist.src_site_dist_calc import calc_rrup_rjb
-from test.test_common_set_up import INPUT, OUTPUT, set_up
+from IM_calculation.source_site_dist.src_site_dist import calc_rrup_rjb
+from IM_calculation.test.test_common_set_up import INPUT, set_up, OUTPUT
 
 
 def test_calc_rrub_rjb(set_up):

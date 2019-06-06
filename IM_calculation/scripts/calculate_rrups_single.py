@@ -2,12 +2,12 @@
 """Script for calculating rrup and rjb for the specified fault and stations"""
 import argparse
 import numpy as np
-import pandas as pd
 
 from qcore.srf import read_srf_points
 from qcore.formats import load_station_file
+
+import IM_calculation.source_site_dist.src_site_dist as ssd
 from qcore.constants import SourceToSiteDist
-from source_site_dist.src_site_dist_calc import calc_rrup_rjb
 
 
 def write_source_2_site_dists(
@@ -97,7 +97,7 @@ if __name__ == "__main__":
     srf_points = read_srf_points(args.srf_file)
 
     # Calculate source to site distances
-    r_rup, r_jb = calc_rrup_rjb(srf_points, locs_2_calc)
+    r_rup, r_jb = ssd.calc_rrup_rjb(srf_points, locs_2_calc)
 
     # Save the result as a csv
-    write_source_2_site_dists(args.output, stats_2_calc, locs_2_calc, r_rup, r_jb)
+    ssd.write_source_2_site_dists(args.output, stats_2_calc, locs_2_calc, r_rup, r_jb)
