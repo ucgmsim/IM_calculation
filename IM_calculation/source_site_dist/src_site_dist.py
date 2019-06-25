@@ -6,7 +6,7 @@ from qcore.geo import get_distances
 
 @numba.jit(parallel=True)
 def calc_rrup_rjb(srf_points: np.ndarray, locations: np.ndarray):
-    """Calculates rrub and rjb distance
+    """Calculates rrup and rjb distance
 
     Parameters
     ----------
