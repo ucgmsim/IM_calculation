@@ -8,9 +8,15 @@ import pickle
 import pytest
 import numpy as np
 
-import calculate_ims
+import IM_calculation.IM.im_calculation as calculate_ims
 from qcore import utils
-from test.test_common_set_up import INPUT, OUTPUT, set_up, compare_dicts
+from IM_calculation.test.test_common_set_up import INPUT, OUTPUT, compare_dicts, set_up
+
+# This is a hack, to allow loading of the test pickle objects
+import sys
+import IM_calculation.IM as IM
+sys.modules["IM"] = IM
+
 
 PARSER = argparse.ArgumentParser()
 BSC_PERIOD = [0.05, 0.1, 5.0, 10.0]

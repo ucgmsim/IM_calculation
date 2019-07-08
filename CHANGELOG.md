@@ -8,8 +8,15 @@ Changed
 
 Added
 
+[19.6.1] - 2019-06-06  
+Added  
+    - setup.py to make IM_calculation a package  
+Changed  
+    - Modified rrup calculation for significantly improved performance using numba  
+    - General tidy up/refactor when converting to package  
+    - Updated tests  
 
-[18.9.20] - 2018-09-20
+[18.9.1] - 2018-09-20
 Added
     -
 Changed

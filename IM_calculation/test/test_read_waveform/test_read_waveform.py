@@ -3,14 +3,19 @@ import pickle
 
 import numpy as np
 
-from IM import read_waveform
-from test.test_common_set_up import (
+from IM_calculation.IM import read_waveform
+from IM_calculation.test.test_common_set_up import (
     INPUT,
-    OUTPUT,
     set_up,
+    OUTPUT,
     compare_waveforms,
     compare_iterable,
 )
+
+# This is a hack, to allow loading of the test pickle objects
+import sys
+import IM_calculation.IM as IM
+sys.modules["IM"] = IM
 
 
 def get_common_waveform_values(root_path, function_name):
@@ -88,7 +93,7 @@ def test_read_waveforms(set_up):
             os.path.join(root_path, OUTPUT, function + "_ret_val.P"), "rb"
         ) as load_file:
             bench_output = pickle.load(load_file)
-        compare_iterable(test_output, bench_output)
+        compare_iterable(bench_output, test_output)
 
 
 def test_read_one_station_from_bbseis(set_up):

@@ -1,14 +1,3 @@
-# TODO when only geom is needed, only 090 and 000 should be calculated
-"""
-Calculate im values.
-Output computed measures to /home/$user/computed_measures if no output path is specified
-command:
-   python calculate_ims.py test/test_calculate_ims/sample1/input/single_files/ a
-   python calculate_ims.py ../BB.bin b
-   python calculate_ims.py ../BB.bin b -o /home/yzh231/ -i Albury_666_999 -r Albury -t s -v 18p3 -n 112A CMZ -m PGV pSA -p 0.02 0.03 -e -c geom -np 2
-"""
-
-import argparse
 import csv
 import getpass
 import glob
@@ -17,10 +6,8 @@ import sys
 from datetime import datetime
 import numpy as np
 
-from qcore import utils, timeseries, pool_wrapper
-
-from IM import intensity_measures
-from IM import read_waveform
+from IM_calculation.IM import read_waveform, intensity_measures
+from qcore import timeseries, pool_wrapper
 from Advanced_IM import advanced_IM_factory
 
 G = 981.0
@@ -46,13 +33,13 @@ BSC_PERIOD = [
 ]
 
 COMPONENTS = ["090", "000", "ver", "geom"]
+
 FILE_TYPE_DICT = {"a": "ascii", "b": "binary"}
 META_TYPE_DICT = {"s": "simulated", "o": "observed", "u": "unknown"}
+RUNNAME_DEFAULT = "all_station_ims"
 
 OUTPUT_PATH = os.path.join("/home", getpass.getuser())
 OUTPUT_SUBFOLDER = "stations"
-
-RUNNAME_DEFAULT = "all_station_ims"
 
 MEM_PER_CORE = 7.5e8
 MEM_FACTOR = 4

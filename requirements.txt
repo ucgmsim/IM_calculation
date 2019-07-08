@@ -1,2 +1,6 @@
 pytest>=3.5.0
 pytest-black
+numpy
+numba
+pandas
+PyYAML
