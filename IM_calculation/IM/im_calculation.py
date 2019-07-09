@@ -165,7 +165,8 @@ def compute_measure_single(value_tuple):
         else:
             result[station_name][im] = value_dict
 
-    advanced_IM_factory.compute_ims(waveform_acc, advanced_im_config)
+    if advanced_im_config is not None:
+        advanced_IM_factory.compute_ims(waveform_acc, advanced_im_config)
 
     return result
 
