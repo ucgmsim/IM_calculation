@@ -4,8 +4,8 @@ import pickle
 import numpy as np
 import pytest
 
-from IM import intensity_measures
-from test.test_common_set_up import INPUT, OUTPUT, set_up
+from IM_calculation.IM import intensity_measures
+from IM_calculation.test.test_common_set_up import INPUT, OUTPUT, set_up
 
 
 def get_common_spectral_vals(root_path, function_name):

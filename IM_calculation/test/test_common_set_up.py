@@ -7,9 +7,14 @@ from urllib import parse
 import numpy as np
 import pytest
 
-from IM.read_waveform import Waveform
 from qcore import shared
-from rrup.rrup import Point
+
+# This is a hack, to allow loading of the test pickle objects
+import sys
+import IM_calculation
+import IM_calculation.IM as IM
+sys.modules["IM"] = IM
+from IM_calculation.IM.read_waveform import Waveform
 
 INPUT = "input"
 OUTPUT = "output"
@@ -19,7 +24,6 @@ REALISATIONS = [
         "https://seistech.nz/static/public/testing/IM_calculation/PangopangoF29_HYP01-10_S1244.zip",
     )
 ]
-
 
 def download_via_ftp(address, download_location):
     parsed_address = parse.urlparse(address)
@@ -79,7 +83,7 @@ def set_up(request):
 
 
 def compare_waveforms(bench_waveform, test_waveform):
-    assert isinstance(bench_waveform, Waveform)
+    assert isinstance(bench_waveform, IM.read_waveform.Waveform)
     assert isinstance(test_waveform, Waveform)
     vars_test = vars(test_waveform)
     vars_bench = vars(bench_waveform)
@@ -88,16 +92,6 @@ def compare_waveforms(bench_waveform, test_waveform):
             assert np.isclose(vars_test[k], vars_bench[k]).all()
         else:
             assert vars_test[k] == vars_bench[k]
-
-
-def compare_points(actual_point, expected_point):
-    assert isinstance(actual_point, Point)
-    assert isinstance(expected_point, Point)
-    assert actual_point.Lat == expected_point.Lat
-    assert actual_point.Lon == expected_point.Lon
-    assert actual_point.Depth == expected_point.Depth
-    assert actual_point.r_rups == expected_point.r_rups
-    assert actual_point.r_jbs == expected_point.r_jbs
 
 
 def compare_dicts(actual_result, expected_result):
@@ -119,10 +113,6 @@ def compare_dicts(actual_result, expected_result):
             expected_result[key], np.ndarray
         ):
             assert not (actual_result[key] - expected_result[key]).any()
-        elif isinstance(actual_result[key], Point) or isinstance(
-            expected_result[key], Point
-        ):
-            compare_points(actual_result[key], expected_result[key])
         elif isinstance(actual_result[key], Waveform) or isinstance(
             expected_result[key], Waveform
         ):
@@ -146,10 +136,6 @@ def compare_iterable(actual_result, expected_result):
             expected_result[i], np.ndarray
         ):
             assert not (actual_result[i] - expected_result[i]).any()
-        elif isinstance(actual_result[i], Point) or isinstance(
-            expected_result[i], Point
-        ):
-            compare_points(actual_result[i], expected_result[i])
         elif isinstance(actual_result[i], Waveform) or isinstance(
             expected_result[i], Waveform
         ):

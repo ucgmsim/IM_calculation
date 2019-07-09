@@ -1,6 +1,6 @@
 import numpy as np
 
-from IM.rspectra_calculations import rspectra as rspectra
+from IM_calculation.IM.rspectra_calculations import rspectra as rspectra
 from qcore import timeseries
 
 

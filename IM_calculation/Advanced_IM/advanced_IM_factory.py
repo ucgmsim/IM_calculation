@@ -41,7 +41,7 @@ def compute_ims(accelerations, configuration):
     station_name = accelerations.station_name
 
     with tempfile.TemporaryDirectory() as f:
-        f_dir = os.path.join(f, '')  # ensure has a trailing slash on filename
+        f_dir = os.path.join(f, "")  # ensure has a trailing slash on filename
         save_waveform_to_tmp_files(f_dir, accelerations, station_name)
 
         for im in configuration.IM_list:
@@ -52,14 +52,17 @@ def compute_ims(accelerations, configuration):
                     os.path.join(advanced_im_dir, im_config["script_location"]),
                     im,
                 ]
-                script.extend([get_acc_filename(f_dir ,station_name, x) for x in components])
+                script.extend(
+                    [get_acc_filename(f_dir, station_name, x) for x in components]
+                )
 
                 print(" ".join(script))
                 subprocess.call(script)
 
+
 def get_acc_filename(folder, stat, component):
     # returns the same filename structure as timeseries.seis2txt
-    return '%s%s.%s' % (folder, stat, component)
+    return "%s%s.%s" % (folder, stat, component)
 
 
 def save_waveform_to_tmp_files(tmp_folder, accelerations, station_name):
@@ -72,9 +75,5 @@ def save_waveform_to_tmp_files(tmp_folder, accelerations, station_name):
     # TODO: Fix bug when differing components are specified in calculate_ims
     for component in COMP_DICT.keys():
         seis2txt(
-            accelerations.values,
-            accelerations.DT,
-            tmp_folder,
-            station_name,
-            component
+            accelerations.values, accelerations.DT, tmp_folder, station_name, component
         )
