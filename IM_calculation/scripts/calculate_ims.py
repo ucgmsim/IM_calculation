@@ -12,11 +12,22 @@ import argparse
 import os
 
 import IM_calculation.IM.im_calculation as calc
+from IM_calculation.Advanced_IM import advanced_IM_factory
 from qcore import utils
 
 
 def main():
-    parser = argparse.ArgumentParser()
+    parent_parser = argparse.ArgumentParser(add_help=False)
+    parent_parser.add_argument(
+        "--advanced_im_config",
+        default=advanced_IM_factory.CONFIG_FILE_NAME,
+        help="Path to the advanced IM_config file",
+    )
+
+    parent_args = parent_parser.parse_known_args()
+
+    parser = argparse.ArgumentParser(parents=[parent_parser], add_help=True)
+
     parser.add_argument(
         "input_path", help="path to input bb binary file eg./home/melody/BB.bin"
     )
@@ -28,16 +39,16 @@ def main():
     parser.add_argument(
         "-o",
         "--output_path",
-        default=calc.OUTPUT_PATH,
-        help="path to output folder that stores the computed measures.Folder name must "
-        "not be inclusive.eg.home/tt/. Default to /home/$user/",
+        required=True,
+        help="path to output folder that stores the computed measures. Folder name must "
+        "not be inclusive.eg.home/tt/. Required parameter",
     )
     parser.add_argument(
         "-i",
         "--identifier",
-        default=calc.RUNNAME_DEFAULT,
+        required=True,
         help="Please specify the unique runname of the simulation. "
-        "eg.Albury_HYP01-01_S1244",
+        "eg.Albury_REL01",
     )
     parser.add_argument(
         "-r",
@@ -60,9 +71,10 @@ def main():
         help="Please specify the version of the simulation. eg.18p4",
     )
     parser.add_argument(
-        "-m",
+        "-im",
         "--im",
         nargs="+",
+        choices=calc.IMS,
         default=calc.IMS,
         help="Please specify im measure(s) separated by a space(if more than one). "
         "eg: PGV PGA CAV. {}".format(calc.get_im_or_period_help(calc.IMS, "IM")),
@@ -74,9 +86,7 @@ def main():
         default=calc.BSC_PERIOD,
         type=float,
         help="Please provide pSA period(s) separated by a space. eg: "
-        "0.02 0.05 0.1. {}".format(
-            calc.get_im_or_period_help(calc.BSC_PERIOD, "period")
-        ),
+        "0.02 0.05 0.1. {}".format(calc.get_im_or_period_help(calc.BSC_PERIOD, "period")),
     )
     parser.add_argument(
         "-e",
@@ -124,18 +134,28 @@ def main():
         default="g",
         help="The units that input acceleration files are in",
     )
+    parser.add_argument(
+        "-a",
+        "--advanced_ims",
+        nargs="+",
+        choices=advanced_IM_factory.get_im_list(parent_args[0].advanced_im_config),
+        help="Provides the list of Advanced IMs to be calculated",
+    )
+    parser.add_argument(
+        "--OpenSees_path", default="OpenSees", help="Path to OpenSees binary"
+    )
 
     args = parser.parse_args()
 
     calc.validate_input_path(parser, args.input_path, args.file_type)
-
     file_type = calc.FILE_TYPE_DICT[args.file_type]
-
     run_type = calc.META_TYPE_DICT[args.run_type]
-
     im = calc.validate_im(parser, args.im)
-
     period = calc.validate_period(parser, args.period, args.extended_period, im)
+
+    advanced_im_config = advanced_IM_factory.advanced_im_config(
+        args.advanced_ims, args.advanced_im_config, args.OpenSees_path
+    )
 
     # Create output dir
     utils.setup_dir(args.output_path)
@@ -159,6 +179,7 @@ def main():
         process=args.process,
         simple_output=args.simple_output,
         units=args.units,
+        advanced_im_config=advanced_im_config,
     )
 
     print("Calculations are outputted to {}".format(args.output_path))

@@ -8,7 +8,7 @@ import numpy as np
 
 from IM_calculation.IM import read_waveform, intensity_measures
 from qcore import timeseries, pool_wrapper
-from Advanced_IM import advanced_IM_factory
+from IM_calculation.Advanced_IM import advanced_IM_factory
 
 G = 981.0
 IMS = ["PGA", "PGV", "CAV", "AI", "Ds575", "Ds595", "MMI", "pSA"]
