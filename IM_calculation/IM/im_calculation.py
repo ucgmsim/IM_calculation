@@ -162,6 +162,7 @@ def compute_measure_single(value_tuple):
             result[station_name][im] = value_dict
 
     if advanced_im_config is not None:
+        advanced_im_config.output_dir = os.path.join(advanced_im_config.output_dir, station_name)
         advanced_IM_factory.compute_ims(waveform_acc, advanced_im_config)
 
     return result
