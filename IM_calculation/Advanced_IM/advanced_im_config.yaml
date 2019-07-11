@@ -1,15 +1,10 @@
 # Contains the extra parameters needed to configure each FEM
 
-# Components: a list of list of components that specify which tuples
-#             of components are passed to the script (each file is passed as a separate argument)
-
 # script location: path to the run script for the FEM.
 #                  Relative paths are from the advanced_IM folder.
 #                  Absolute paths also work
 
 Steel_MF_5Story:
-  components: [['000', '090'], ['000', 'ver']]
-  script_location: 'Models/Steel_MF_5Story/Run_script.tcl'
+  script_location: 'Models/Steel_MF_5Story/run.py'
 SAC_Steel_MFs:
-  components: [['000']]
   script_location: 'Models/SAC_Steel_MFs/Run_script.tcl'

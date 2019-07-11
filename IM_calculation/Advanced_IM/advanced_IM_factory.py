@@ -12,7 +12,7 @@ CONFIG_FILE_NAME = os.path.join(advanced_im_dir, "advanced_im_config.yaml")
 VALUES_PER_LINE = 6
 
 advanced_im_config = namedtuple(
-    "advanced_im_config", ["IM_list", "config_file", "OpenSees_path"]
+    "advanced_im_config", ["IM_list", "config_file", "OpenSees_path", "output_dir"]
 )
 COMP_DICT = {"090": 0, "000": 1, "ver": 2}
 
@@ -45,19 +45,23 @@ def compute_ims(accelerations, configuration):
         save_waveform_to_tmp_files(f_dir, accelerations, station_name)
 
         for im in configuration.IM_list:
-            im_config = config[im]
-            for components in im_config["components"]:
-                script = [
-                    configuration.OpenSees_path,
-                    os.path.join(advanced_im_dir, im_config["script_location"]),
-                    im,
-                ]
-                script.extend(
-                    [get_acc_filename(f_dir, station_name, x) for x in components]
-                )
+            out_dir = os.path.join(configuration.output_dir, im)
 
-                print(" ".join(script))
-                subprocess.call(script)
+            im_config = config[im]
+            components = ["000", "090", "ver"]
+            script = [
+                "python",
+                os.path.join(advanced_im_dir, im_config["script_location"]),
+                "--OpenSees_path",
+                configuration.OpenSees_path,
+            ]
+            script.extend(
+                [get_acc_filename(f_dir, station_name, x) for x in components]
+            )
+            script.extend([out_dir])
+
+            print(" ".join(script))
+            subprocess.call(script)
 
 
 def get_acc_filename(folder, stat, component):

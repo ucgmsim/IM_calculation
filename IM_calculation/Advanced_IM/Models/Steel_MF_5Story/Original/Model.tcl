@@ -8,18 +8,18 @@
 
 # Define Model Builder
 	model BasicBuilder -ndm 2 -ndf 3;								# Define the model builder, ndm = #dimension, ndf = #dofs
-
+	
 
 # Define Variables, Units and Constants
-	source Models/$FEMs/Original/DefineUnitsAndConstants.tcl
-	source Models/$FEMs/Original/DefineVariables.tcl
+	source [file join [file dirname [info script]] DefineUnitsAndConstants.tcl]
+	source [file join [file dirname [info script]] DefineVariables.tcl]
 
 # Source Display Procedures
 	# source DisplayModel2D.tcl;			# procedure for displaying a 2D perspective of model
 	# source DisplayPlane.tcl;			# procedure for displaying a plane in a model
 	
 # Build Model
-	source Models/$FEMs/Original/DefineFunctionsAndProcedures.tcl
+	source [file join [file dirname [info script]] DefineFunctionsAndProcedures.tcl]
 #	source SetAnalysisOptions.tcl
 
 
@@ -1053,8 +1053,8 @@ mass 202049 [expr ($MFloorMass2)/($NMBays+1)/6]		[expr ($MFloorMass2)/($NMBays+1
 
 puts "Model Built!"
 
-# source Models/$FEMs/Original/display2D.tcl
-source Models/$FEMs/Original/PerformGravityLoadAnalysis.tcl
+# source [file join [file dirname [info script]] display2D.tcl]
+source [file join [file dirname [info script]] PerformGravityLoadAnalysis.tcl]
 
 puts "Gravity analysis is Done!"
 # source DefineAllRecorders.tcl
