@@ -35,7 +35,7 @@ def main():
 
         args.OpenSees_path,
 
-        os.path.join(model_dir, 'run_script.tcl'),
+        os.path.join(model_dir, 'Run_script.tcl'),
 
         args.comp_000,
 
