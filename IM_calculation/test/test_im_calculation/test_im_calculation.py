@@ -15,6 +15,7 @@ from IM_calculation.test.test_common_set_up import INPUT, OUTPUT, compare_dicts,
 # This is a hack, to allow loading of the test pickle objects
 import sys
 import IM_calculation.IM as IM
+
 sys.modules["IM"] = IM
 
 

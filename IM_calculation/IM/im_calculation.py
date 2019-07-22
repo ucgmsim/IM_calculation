@@ -277,7 +277,9 @@ def compute_measures_multiprocess(
         for result in result_list:
             all_result_dict.update(result)
 
-    write_result(all_result_dict, output_dir, identifier, comp, ims, period, simple_output)
+    write_result(
+        all_result_dict, output_dir, identifier, comp, ims, period, simple_output
+    )
 
     generate_metadata(output_dir, identifier, rupture, run_type, version)
 
