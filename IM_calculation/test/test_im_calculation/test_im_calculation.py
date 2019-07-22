@@ -126,8 +126,6 @@ class TestPickleTesting:
                 os.path.join(root_path, INPUT, function + "_value_tuple.P"), "rb"
             ) as load_file:
                 value_tuple = pickle.load(load_file)
-            value_tuple = list(value_tuple)
-            value_tuple.append(None)
             actual_result = calculate_ims.compute_measure_single(value_tuple)
 
             with open(
