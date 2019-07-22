@@ -5,7 +5,6 @@ import pandas as pd
 import subprocess
 
 
-
 DEFAULT_OPEN_SEES_PATH = "OpenSees"
 
 model_dir = os.path.dirname(__file__)
@@ -14,45 +13,43 @@ model_dir = os.path.dirname(__file__)
 def main():
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("comp_000", help="filepath to a station's 000 waveform ascii file")
-    parser.add_argument("comp_090", help="filepath to a station's 090 waveform ascii file")
-    parser.add_argument("comp_ver", help="filepath to a station's ver waveform ascii file")
-    parser.add_argument("output_dir", help="Where the IM_csv file is written to. Also contains the temporary recorders output")
+    parser.add_argument(
+        "comp_000", help="filepath to a station's 000 waveform ascii file"
+    )
+    parser.add_argument(
+        "comp_090", help="filepath to a station's 090 waveform ascii file"
+    )
+    parser.add_argument(
+        "comp_ver", help="filepath to a station's ver waveform ascii file"
+    )
+    parser.add_argument(
+        "output_dir",
+        help="Where the IM_csv file is written to. Also contains the temporary recorders output",
+    )
 
-    parser.add_argument("--OpenSees_path", default=DEFAULT_OPEN_SEES_PATH, help="Path to OpenSees binary")
-
-
+    parser.add_argument(
+        "--OpenSees_path",
+        default=DEFAULT_OPEN_SEES_PATH,
+        help="Path to OpenSees binary",
+    )
 
     args = parser.parse_args()
-
 
     if not os.path.exists(args.output_dir):
         os.makedirs(args.output_dir)
 
-
-
     script = [
-
         args.OpenSees_path,
-
-        os.path.join(model_dir, 'Run_script.tcl'),
-
+        os.path.join(model_dir, "Run_script.tcl"),
         args.comp_000,
-
         args.output_dir,
-
     ]
 
-
-
-    print(' '.join(script))
+    print(" ".join(script))
 
     subprocess.call(script)
 
-
-
     create_im_csv(args.output_dir, "Steel_MF_5Story")
-
 
 
 def create_im_csv(output_dir, im_name):
@@ -66,7 +63,7 @@ def create_im_csv(output_dir, im_name):
 
     im_csv_fname = os.path.join(output_dir, im_name + ".csv")
     result_df = pd.DataFrame()
-    im_recorder_glob = os.path.join(output_dir, 'env*/*.out')
+    im_recorder_glob = os.path.join(output_dir, "env*/*.out")
     im_recorders = glob.glob(im_recorder_glob)
     value_dict = {}
 
@@ -81,7 +78,6 @@ def create_im_csv(output_dir, im_name):
     result_df.to_csv(im_csv_fname, index=False)
 
 
-
 def read_out_file(file, success=True):
     if success:
         with open(file) as f:
@@ -92,12 +88,9 @@ def read_out_file(file, success=True):
 
             return value
     else:
-       return float("NaN")
-
+        return float("NaN")
 
 
 if __name__ == "__main__":
 
     main()
-
-
