@@ -12,7 +12,7 @@ CONFIG_FILE_NAME = os.path.join(advanced_im_dir, "advanced_im_config.yaml")
 VALUES_PER_LINE = 6
 
 advanced_im_config = namedtuple(
-    "advanced_im_config", ["IM_list", "config_file", "OpenSees_path", "output_dir"]
+    "advanced_im_config", ["IM_list", "config_file", "OpenSees_path"]
 )
 COMP_DICT = {"090": 0, "000": 1, "ver": 2}
 
@@ -29,7 +29,7 @@ def get_im_list(config_file=CONFIG_FILE_NAME):
     return list(config.keys())
 
 
-def compute_ims(accelerations, configuration):
+def compute_ims(accelerations, configuration, adv_im_out_dir):
     """
     Calculates all the Advanced IMs for the given waveforms
     :param accelerations: Acceleration array, 1 column for each component. Ordering is specified in COMP_DICT
@@ -45,7 +45,7 @@ def compute_ims(accelerations, configuration):
         save_waveform_to_tmp_files(f_dir, accelerations, station_name)
 
         for im in configuration.IM_list:
-            out_dir = os.path.join(configuration.output_dir, im)
+            out_dir = os.path.join(adv_im_out_dir, im)
 
             im_config = config[im]
             components = ["000", "090", "ver"]

@@ -96,14 +96,26 @@ def array_to_dict(value, str_comps, im, arg_comps):
     return value_dict
 
 
+def compute_adv_measure(value_tuple):
+    waveform, advanced_im_config, output_dir = value_tuple
+    if advanced_im_config is not None:
+        waveform_acc = waveform[0]
+        station_name = waveform_acc.station_name
+
+        adv_im_out_dir = os.path.join(output_dir, station_name)
+        advanced_IM_factory.compute_ims(
+            waveform_acc, advanced_im_config, adv_im_out_dir
+        )
+
+
 def compute_measure_single(value_tuple):
     """
     Compute measures for a single station
-    :param: a tuple consisting 6 params: waveform, ims, comp, period, str_comps, advanced_ims
+    :param: a tuple consisting 5 params: waveform, ims, comp, period, str_comps
     waveform: a single tuple that contains (waveform_acc,waveform_vel)
     :return: {result[station_name]: {[im]: value or (period,value}}
     """
-    waveform, ims, comps, period, str_comps, advanced_im_config = value_tuple
+    waveform, ims, comps, period, str_comps = value_tuple
     result = {}
     waveform_acc, waveform_vel = waveform
     DT = waveform_acc.DT
@@ -161,15 +173,6 @@ def compute_measure_single(value_tuple):
         else:
             result[station_name][im] = value_dict
 
-    if advanced_im_config is not None:
-        advanced_im_config = advanced_IM_factory.advanced_im_config(
-            advanced_im_config.IM_list,
-            advanced_im_config.config_file,
-            advanced_im_config.OpenSees_path,
-            os.path.join(advanced_im_config.output_dir, station_name),
-        )
-        advanced_IM_factory.compute_ims(waveform_acc, advanced_im_config)
-
     return result
 
 
@@ -210,7 +213,7 @@ def compute_measures_multiprocess(
     ims=IMS,
     comp=None,
     period=None,
-    output=None,
+    output_dir=None,
     identifier=None,
     rupture=None,
     run_type=None,
@@ -231,7 +234,7 @@ def compute_measures_multiprocess(
     :param ims:
     :param comp:
     :param period:
-    :param output:
+    :param output_dir:
     :param identifier:
     :param rupture:
     :param run_type:
@@ -263,18 +266,20 @@ def compute_measures_multiprocess(
         )
         i += steps
         array_params = []
+        adv_array_params = []
         for waveform in waveforms:
-            array_params.append(
-                (waveform, ims, comp, period, str_comps, advanced_im_config)
-            )
+            array_params.append((waveform, ims, comp, period, str_comps))
+            adv_array_params.append((waveform, advanced_im_config, output_dir))
+
         result_list = p.map(compute_measure_single, array_params)
+        p.map(compute_adv_measure, adv_array_params)
 
         for result in result_list:
             all_result_dict.update(result)
 
-    write_result(all_result_dict, output, identifier, comp, ims, period, simple_output)
+    write_result(all_result_dict, output_dir, identifier, comp, ims, period, simple_output)
 
-    generate_metadata(output, identifier, rupture, run_type, version)
+    generate_metadata(output_dir, identifier, rupture, run_type, version)
 
 
 def get_result_filepath(output_folder, arg_identifier, suffix):

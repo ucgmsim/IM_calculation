@@ -155,7 +155,7 @@ def main():
     period = calc.validate_period(parser, args.period, args.extended_period, im)
 
     advanced_im_config = advanced_IM_factory.advanced_im_config(
-        args.advanced_ims, args.advanced_im_config, args.OpenSees_path, args.output_path
+        args.advanced_ims, args.advanced_im_config, args.OpenSees_path,
     )
 
     # Create output dir
@@ -172,7 +172,7 @@ def main():
         ims=im,
         comp=args.components,
         period=period,
-        output=args.output_path,
+        output_dir=args.output_path,
         identifier=args.identifier,
         rupture=args.rupture,
         run_type=run_type,
