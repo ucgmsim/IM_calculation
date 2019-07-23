@@ -5,13 +5,10 @@ import os
 import sys
 from datetime import datetime
 import numpy as np
+from multiprocessing.pool import Pool
 
 from IM_calculation.IM import read_waveform, intensity_measures
 from qcore import timeseries, pool_wrapper, constants, utils
-
-from IM import intensity_measures
-from IM import read_waveform
-from qcore import timeseries, pool_wrapper
 from IM_calculation.Advanced_IM import advanced_IM_factory
 
 G = 981.0
@@ -100,8 +97,14 @@ def array_to_dict(value, str_comps, im, arg_comps):
     return value_dict
 
 
-def compute_adv_measure(value_tuple):
-    waveform, advanced_im_config, output_dir = value_tuple
+def compute_adv_measure(waveform, advanced_im_config, output_dir):
+    """
+    Wrapper function to call advanced IM workflow
+    :param waveform: Tuple of waveform objects (first is acc, second is vel)
+    :param advanced_im_config: advanced_im_config Named Tuple containing list of IMs, config file and path to OpenSeeS
+    :param output_dir: Directory where output folders are contained. Structure is /path/to/output_dir/station/im_name
+    :return:
+    """
     if advanced_im_config is not None:
         waveform_acc = waveform[0]
         station_name = waveform_acc.station_name
@@ -255,7 +258,7 @@ def compute_measures_multiprocess(
     steps = get_steps(input_path, process, total_stations)
 
     all_result_dict = {}
-    p = pool_wrapper.PoolWrapper(process)
+    p = Pool(process)
 
     i = 0
     while i < total_stations:
@@ -276,7 +279,7 @@ def compute_measures_multiprocess(
             adv_array_params.append((waveform, advanced_im_config, output_dir))
 
         result_list = p.map(compute_measure_single, array_params)
-        p.map(compute_adv_measure, adv_array_params)
+        p.starmap(compute_adv_measure, adv_array_params)
 
         for result in result_list:
             all_result_dict.update(result)
