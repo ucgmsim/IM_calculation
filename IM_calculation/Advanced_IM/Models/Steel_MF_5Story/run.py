@@ -1,3 +1,7 @@
+"""
+Python script to run a 3D waveform through Steel_MF_5Story and store the outputs to a txt file
+"""
+
 import argparse
 import glob
 import os
@@ -53,6 +57,12 @@ def main():
 
 
 def create_im_csv(output_dir, im_name):
+    """
+    After the OpenSees code has run, read the recorder files and output it to a CSV file
+    :param output_dir: Path to OpenSees recorders output and CSV path
+    :param im_name: IM name that has been calculated. Used for filepath
+    :return:
+    """
     success_glob = os.path.join(output_dir, "Analysis_*")
     success_files = glob.glob(success_glob)
     model_converged = False
