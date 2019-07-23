@@ -66,7 +66,7 @@ def set_up(request):
                 )
             out, err = shared.exe(unzip_cmd, debug=False)
             os.remove(zip_download_path)
-            if b"error" in err:
+            if "error" in err:
                 shutil.rmtree(data_store_path)
                 sys.exit("{} failed to extract data folder".format(err))
 
