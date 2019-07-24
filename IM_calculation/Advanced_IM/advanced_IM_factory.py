@@ -29,7 +29,7 @@ def get_im_list(config_file=CONFIG_FILE_NAME):
     return list(config.keys())
 
 
-def compute_ims(accelerations, configuration):
+def compute_ims(accelerations, configuration, adv_im_out_dir):
     """
     Calculates all the Advanced IMs for the given waveforms
     :param accelerations: Acceleration array, 1 column for each component. Ordering is specified in COMP_DICT
@@ -45,19 +45,23 @@ def compute_ims(accelerations, configuration):
         save_waveform_to_tmp_files(f_dir, accelerations, station_name)
 
         for im in configuration.IM_list:
-            im_config = config[im]
-            for components in im_config["components"]:
-                script = [
-                    configuration.OpenSees_path,
-                    os.path.join(advanced_im_dir, im_config["script_location"]),
-                    im,
-                ]
-                script.extend(
-                    [get_acc_filename(f_dir, station_name, x) for x in components]
-                )
+            out_dir = os.path.join(adv_im_out_dir, im)
 
-                print(" ".join(script))
-                subprocess.call(script)
+            im_config = config[im]
+            components = ["000", "090", "ver"]
+            script = [
+                "python",
+                os.path.join(advanced_im_dir, im_config["script_location"]),
+                "--OpenSees_path",
+                configuration.OpenSees_path,
+            ]
+            script.extend(
+                [get_acc_filename(f_dir, station_name, x) for x in components]
+            )
+            script.extend([out_dir])
+
+            print(" ".join(script))
+            subprocess.call(script)
 
 
 def get_acc_filename(folder, stat, component):

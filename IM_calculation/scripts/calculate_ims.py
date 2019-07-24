@@ -172,7 +172,7 @@ def main():
         ims=im,
         comp=args.components,
         period=period,
-        output=args.output_path,
+        output_dir=args.output_path,
         identifier=args.identifier,
         rupture=args.rupture,
         run_type=run_type,

@@ -15,6 +15,7 @@ from IM_calculation.test.test_common_set_up import INPUT, OUTPUT, compare_dicts,
 # This is a hack, to allow loading of the test pickle objects
 import sys
 import IM_calculation.IM as IM
+
 sys.modules["IM"] = IM
 
 
@@ -126,8 +127,6 @@ class TestPickleTesting:
                 os.path.join(root_path, INPUT, function + "_value_tuple.P"), "rb"
             ) as load_file:
                 value_tuple = pickle.load(load_file)
-            value_tuple = list(value_tuple)
-            value_tuple.append(None)
             actual_result = calculate_ims.compute_measure_single(value_tuple)
 
             with open(

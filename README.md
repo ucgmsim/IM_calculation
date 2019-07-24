@@ -1,6 +1,6 @@
 # IM_calculation
 
-[![Build Status](https://travis-ci.org/ucgmsim/slurm_gm_workflow.svg?branch=master)](https://travis-ci.org/ucgmsim/slurm_gm_workflow)
+[![Build Status](https://travis-ci.org/ucgmsim/IM_calculation.svg?branch=master)](https://travis-ci.org/ucgmsim/IM_calculation)
 
 
 To calculate rrups:
