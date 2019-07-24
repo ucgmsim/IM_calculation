@@ -54,7 +54,7 @@ def set_up(request):
         if not os.path.isdir(data_store_path):
             os.makedirs(data_store_path, exist_ok=True)
             out, err = shared.exe(download_cmd, debug=False)
-            if b"error" in err:
+            if "error" in err:
                 shutil.rmtree(data_store_path)
                 sys.exit("{} failed to retrieve test data".format(err))
             # download_via_ftp(DATA_DOWNLOAD_PATH, zip_download_path)
@@ -66,7 +66,7 @@ def set_up(request):
                 )
             out, err = shared.exe(unzip_cmd, debug=False)
             os.remove(zip_download_path)
-            if b"error" in err:
+            if "error" in err:
                 shutil.rmtree(data_store_path)
                 sys.exit("{} failed to extract data folder".format(err))
 
