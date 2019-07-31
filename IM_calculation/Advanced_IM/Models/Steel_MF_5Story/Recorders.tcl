@@ -5,6 +5,8 @@
 	file mkdir $Output_path/env_drift
 	file mkdir $Output_path/env_disp
 	file mkdir $Output_path/env_accl 
+	file mkdir $Output_path/drift
+	file mkdir $Output_path/accl
 
 #
 # --Define Time Series--
@@ -18,10 +20,10 @@ source [file join [file dirname [info script]] ../general/time_series.tcl]
 
 # --Define the story and roof drift recorders--
 
-# for {set story 1} {$story <= $num_stories} {incr story} {
-    # recorder Drift -file $Output_path/drift/story${story}_drift.out -time -iNode [lindex $ctrl_nodes \
-            # [expr {$story - 1}]] -jNode [lindex $ctrl_nodes $story] -dof 1 -perpDirn 2
-# }
+for {set story 1} {$story <= $num_stories} {incr story} {
+    recorder Drift -file $Output_path/drift/story${story}_drift.out -time -iNode [lindex $ctrl_nodes \
+            [expr {$story - 1}]] -jNode [lindex $ctrl_nodes $story] -dof 1 -perpDirn 2
+}
 # set roof_node [lindex $ctrl_nodes end]
 # recorder Drift -file $Output_path/drift/roof_drift.out -time -iNode [lindex $ctrl_nodes 0] -jNode \
         # $roof_node -dof 1 -perpDirn 2
@@ -46,7 +48,12 @@ for {set story 0} {$story <= $num_stories} {incr story} {
 # recorder EnvelopeNode -file $Output_path/env_disp/disp_roof.out -time -node $roof_node -dof 1 disp
 
 # --------------- Acc ----------------------
+# time-series
+for {set story 0} {$story <= $num_stories} {incr story} {
+    recorder Node -file $Output_path/accl/story${story}_accl.out -time -timeSeries 5 -node [lindex $ctrl_nodes $story] -dof 1  accel 
+}
 
+# Envelope
 for {set story 0} {$story <= $num_stories} {incr story} {
     recorder EnvelopeNode -file $Output_path/env_accl/accl_story${story}.out -time -timeSeries 5 -node [lindex $ctrl_nodes $story] -dof 1 accel
 	# set nn [lindex $ctrl_nodes $story] 
