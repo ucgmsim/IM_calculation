@@ -45,6 +45,11 @@ OUTPUT_SUBFOLDER = "stations"
 MEM_PER_CORE = 7.5e8
 MEM_FACTOR = 4
 
+def add_if_not_exist(component_list, component):
+    if not component in component_list:
+        component_list.append(component)
+    return component_list
+
 
 def convert_str_comp(arg_comps):
     """
@@ -55,7 +60,8 @@ def convert_str_comp(arg_comps):
     # comps = ["000", "geom",'ver']
     if "geom" in arg_comps:
         # ['000', 'ver', '090', 'geom']
-        str_comps = list(set(arg_comps).union({"090", "000"}))
+        str_comps = add_if_not_exist(arg_comps, "090")
+        str_comps = add_if_not_exist(str_comps, "000")
         # for integer convention, str_comps shouldn't include geom as waveform has max 3 components
         str_comps.remove("geom")
         # for writing result, make a copy of the str_comps for int convention, and shift geom to the end
