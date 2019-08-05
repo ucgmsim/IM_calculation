@@ -1,12 +1,13 @@
 #
-# Procedure for reading and writing GM time step (dt), total Time (Tmax) 
+# Procedure for reading and writing GM time step (dt), total Time (Tmax), station_name, outFile, component 
 # and Station name from GM txt file 
 #
-proc gmData {gmFile Output_path dt1 Tmax1 st1 outfile} {
+proc gmData {gmFile Output_path dt1 Tmax1 st1 outfile comp} {
 	upvar $dt1 dt 
 	upvar $Tmax1 Tmax
 	upvar $st1 st
 	upvar $outfile outFile
+	upvar $comp Comp
 	set input [open $gmFile r]
 	set lineList [split [read $input] \n]
 	set n 0
@@ -14,8 +15,10 @@ proc gmData {gmFile Output_path dt1 Tmax1 st1 outfile} {
 		incr n
 		if {$n==1} {
 		    set st [lindex $line 0]
+		    set Comp [lindex $line 1]	
 		    puts "Station= $st"
-			set outFile [file join  $Output_path "${st}.txt"]
+		    puts "Component= $Comp"	
+		    set outFile [file join  $Output_path "${st}.txt"]
 		    set output [open $outFile w]
 		   }
 		    incr i	
