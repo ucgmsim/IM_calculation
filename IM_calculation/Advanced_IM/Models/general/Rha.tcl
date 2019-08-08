@@ -14,7 +14,7 @@
 # analyze $nSteps $dt 
 
 # ----------------------------------------------
-
+# source getMaxResp.tcl
 set Tmax $Tmax1
 set dt $dt1
 
@@ -41,7 +41,10 @@ set curTime [getTime]
 set DT [expr $Tmax-$curTime]
 set iTry 1
 while {$DT > $dt} {
-	
+	# if {[getMaxResp recTags] > 0.1} {
+		# set failureFlag 1
+		# break
+	# }
 	puts "~~~~~~~~~~~~~~~~~~~~~~~~~~ curTime= $curTime, DT= $DT ~~~~~~~~~~~~~~~~~~~~~~~~~~"
 	if {$iTry <= 5} {
 		set algo [lindex $algoList [expr $iTry-1]]
@@ -60,7 +63,7 @@ while {$DT > $dt} {
 		}
 	} else {
 		set iTry 0
-		set dt1 [expr $dt1/5.]
+		set dt1 [expr $dt1/10]
 		if {[expr $dt1/$dt] < 1.e-3} {
 			set failureFlag 1
 			break
@@ -86,7 +89,7 @@ if {$failureFlag == 0} {
 	puts $Outputs_nm $status 
 	flush $Outputs_nm
 	
-	source Rha_central_difference.tcl
+	source [file join [file dirname [info script]] Rha_central_difference.tcl]
 }
 close $Outputs_nm	
 close $Outputs_cd	
