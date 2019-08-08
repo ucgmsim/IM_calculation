@@ -45,6 +45,7 @@ OUTPUT_SUBFOLDER = "stations"
 MEM_PER_CORE = 7.5e8
 MEM_FACTOR = 4
 
+
 def add_if_not_exist(component_list, component):
     if not component in component_list:
         component_list.append(component)
