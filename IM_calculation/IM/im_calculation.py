@@ -285,7 +285,8 @@ def compute_measures_multiprocess(
             adv_array_params.append((waveform, advanced_im_config, output_dir))
 
         result_list = p.map(compute_measure_single, array_params)
-        p.starmap(compute_adv_measure, adv_array_params)
+        if advanced_im_config:
+            p.starmap(compute_adv_measure, adv_array_params)
 
         for result in result_list:
             all_result_dict.update(result)
