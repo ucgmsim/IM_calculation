@@ -79,5 +79,9 @@ def save_waveform_to_tmp_files(tmp_folder, accelerations, station_name):
     # TODO: Fix bug when differing components are specified in calculate_ims
     for component in COMP_DICT.keys():
         seis2txt(
-            accelerations.values, accelerations.DT, tmp_folder, station_name, component
+            accelerations.values[:, COMP_DICT[component]],
+            accelerations.DT,
+            tmp_folder,
+            station_name,
+            component,
         )
