@@ -375,7 +375,9 @@ def generate_metadata(output_folder, identifier, rupture, run_type, version):
     :return:
     """
     date = datetime.now().strftime("%Y%m%d_%H%M%S")
-    output_path = get_result_filepath(output_folder, identifier, constants.IM_SIM_CALC_INFO_SUFFIX)
+    output_path = get_result_filepath(
+        output_folder, identifier, constants.IM_SIM_CALC_INFO_SUFFIX
+    )
 
     with open(output_path, "w") as meta_file:
         meta_writer = csv.writer(meta_file, delimiter=",", quotechar="|")
