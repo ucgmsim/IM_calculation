@@ -8,7 +8,7 @@ from datetime import datetime
 import numpy as np
 
 from IM_calculation.IM import read_waveform, intensity_measures
-from qcore import timeseries, pool_wrapper
+from qcore import timeseries, pool_wrapper, constants
 
 G = 981.0
 IMS = ["PGA", "PGV", "CAV", "AI", "Ds575", "Ds595", "MMI", "pSA"]
@@ -375,7 +375,9 @@ def generate_metadata(output_folder, identifier, rupture, run_type, version):
     :return:
     """
     date = datetime.now().strftime("%Y%m%d_%H%M%S")
-    output_path = get_result_filepath(output_folder, identifier, "_imcalc.info")
+    output_path = get_result_filepath(
+        output_folder, identifier, constants.IM_SIM_CALC_INFO_SUFFIX
+    )
 
     with open(output_path, "w") as meta_file:
         meta_writer = csv.writer(meta_file, delimiter=",", quotechar="|")
