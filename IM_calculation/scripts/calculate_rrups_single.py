@@ -99,7 +99,7 @@ if __name__ == "__main__":
     # Calculate source to site distances
     r_rup, r_jb = ssd.calc_rrup_rjb(srf_points, locs_2_calc)
 
-    plane_info = read_header(args.srf_file)
+    plane_info = read_header(args.srf_file, idx=True)
 
     r_x = ssd.calc_rx(srf_points, plane_info, locs_2_calc)
 
