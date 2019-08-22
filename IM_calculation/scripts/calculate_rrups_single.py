@@ -3,7 +3,7 @@
 import argparse
 import numpy as np
 import pandas as pd
-from qcore.srf import read_srf_points
+from qcore.srf import read_srf_points, read_header
 from qcore.formats import load_station_file
 
 import IM_calculation.source_site_dist.src_site_dist as ssd
@@ -99,5 +99,9 @@ if __name__ == "__main__":
     # Calculate source to site distances
     r_rup, r_jb = ssd.calc_rrup_rjb(srf_points, locs_2_calc)
 
+    plane_info = read_header(args.srf_file)
+
+    r_x = ssd.calc_rx(srf_points, plane_info, locs_2_calc)
+
     # Save the result as a csv
-    write_source_2_site_dists(args.output, stats_2_calc, locs_2_calc, r_rup, r_jb)
+    write_source_2_site_dists(args.output, stats_2_calc, locs_2_calc, r_rup, r_jb, r_x=r_x)
