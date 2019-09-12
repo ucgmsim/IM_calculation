@@ -17,6 +17,7 @@ def write_source_2_site_dists(
     r_rup: np.ndarray,
     r_jb: np.ndarray,
     r_x: np.ndarray = None,
+    r_y: np.ndarray = None,
 ):
     """Writes the source to site distances to a csv file"""
     data = [locations[:, 0], locations[:, 1], r_rup, r_jb]
@@ -30,6 +31,10 @@ def write_source_2_site_dists(
     if r_x is not None:
         data.append(r_x)
         cols_names.append(SourceToSiteDist.R_x.str_value)
+
+    if r_y is not None:
+        data.append(r_y)
+        cols_names.append(SourceToSiteDist.R_y.str_value)
 
     data = np.asarray(data).T
 
@@ -101,7 +106,9 @@ if __name__ == "__main__":
 
     plane_info = read_header(args.srf_file, idx=True)
 
-    r_x = ssd.calc_rx(srf_points, plane_info, locs_2_calc)
+    r_x, r_y = ssd.calc_rx_ry(srf_points, plane_info, locs_2_calc)
 
     # Save the result as a csv
-    write_source_2_site_dists(args.output, stats_2_calc, locs_2_calc, r_rup, r_jb, r_x=r_x)
+    write_source_2_site_dists(
+        args.output, stats_2_calc, locs_2_calc, r_rup, r_jb, r_x=r_x, r_y=r_y
+    )
