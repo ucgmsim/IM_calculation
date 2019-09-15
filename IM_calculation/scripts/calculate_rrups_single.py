@@ -16,25 +16,19 @@ def write_source_2_site_dists(
     locations: np.ndarray,
     r_rup: np.ndarray,
     r_jb: np.ndarray,
-    r_x: np.ndarray = None,
-    r_y: np.ndarray = None,
+    r_x: np.ndarray,
+    r_y: np.ndarray,
 ):
     """Writes the source to site distances to a csv file"""
-    data = [locations[:, 0], locations[:, 1], r_rup, r_jb]
+    data = [locations[:, 0], locations[:, 1], r_rup, r_jb, r_x, r_y]
     cols_names = [
         "lon",
         "lat",
         SourceToSiteDist.R_rup.str_value,
         SourceToSiteDist.R_jb.str_value,
+        SourceToSiteDist.R_x.str_value,
+        SourceToSiteDist.R_y.str_value,
     ]
-
-    if r_x is not None:
-        data.append(r_x)
-        cols_names.append(SourceToSiteDist.R_x.str_value)
-
-    if r_y is not None:
-        data.append(r_y)
-        cols_names.append(SourceToSiteDist.R_y.str_value)
 
     data = np.asarray(data).T
 
