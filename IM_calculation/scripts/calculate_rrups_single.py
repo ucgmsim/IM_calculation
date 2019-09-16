@@ -3,7 +3,7 @@
 import argparse
 import numpy as np
 import pandas as pd
-from qcore.srf import read_srf_points
+from qcore.srf import read_srf_points, read_header
 from qcore.formats import load_station_file
 
 import IM_calculation.source_site_dist.src_site_dist as ssd
@@ -16,20 +16,19 @@ def write_source_2_site_dists(
     locations: np.ndarray,
     r_rup: np.ndarray,
     r_jb: np.ndarray,
-    r_x: np.ndarray = None,
+    r_x: np.ndarray,
+    r_y: np.ndarray,
 ):
     """Writes the source to site distances to a csv file"""
-    data = [locations[:, 0], locations[:, 1], r_rup, r_jb]
+    data = [locations[:, 0], locations[:, 1], r_rup, r_jb, r_x, r_y]
     cols_names = [
         "lon",
         "lat",
         SourceToSiteDist.R_rup.str_value,
         SourceToSiteDist.R_jb.str_value,
+        SourceToSiteDist.R_x.str_value,
+        SourceToSiteDist.R_y.str_value,
     ]
-
-    if r_x is not None:
-        data.append(r_x)
-        cols_names.append(SourceToSiteDist.R_x.str_value)
 
     data = np.asarray(data).T
 
@@ -99,5 +98,11 @@ if __name__ == "__main__":
     # Calculate source to site distances
     r_rup, r_jb = ssd.calc_rrup_rjb(srf_points, locs_2_calc)
 
+    plane_info = read_header(args.srf_file, idx=True)
+
+    r_x, r_y = ssd.calc_rx_ry(srf_points, plane_info, locs_2_calc)
+
     # Save the result as a csv
-    write_source_2_site_dists(args.output, stats_2_calc, locs_2_calc, r_rup, r_jb)
+    write_source_2_site_dists(
+        args.output, stats_2_calc, locs_2_calc, r_rup, r_jb, r_x=r_x, r_y=r_y
+    )
