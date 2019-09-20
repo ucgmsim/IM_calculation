@@ -28,7 +28,7 @@ def test_calc_rrub_rjb(set_up):
 
 
 BASIC_SRF_POINTS = np.asarray([[0, 0, 0], [1, 0, 0], [0, -1, 1], [1, -1, 1]])
-BASIC_SRF_HEADER = [{"centre": [0.5, 0], "nstrike": 2, "ndip": 2, "strike": 90.0}]
+BASIC_SRF_HEADER = [{"nstrike": 2, "ndip": 2, "strike": 90.0}]
 BASIC_STATIONS = np.asarray(
     [
         [0, 0, 0],
@@ -49,7 +49,7 @@ HOSSACK_SRF_POINTS = np.asarray(
     ]
 )
 HOSSACK_SRF_HEADER = [
-    {"centre": [176.2354, -38.3404], "nstrike": 2, "ndip": 2, "strike": 230.0}
+    {"nstrike": 2, "ndip": 2, "strike": 230.0}
 ]
 HOSSACK_STATIONS = np.asarray(
     [

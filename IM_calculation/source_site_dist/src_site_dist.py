@@ -62,14 +62,16 @@ def calc_rx_ry(srf_points: np.ndarray, plane_infos: List[Dict], locations: np.nd
 
     # Get the top/bottom edges of each plane
     top_edges = [
-        section[section[:, 2] == min(section[:, 2])] for section in pnt_sections
+        section[: header["nstrike"]]
+        for section, header in zip(pnt_sections, plane_infos)
     ]
     bottom_edges = [
-        section[section[:, 2] == max(section[:, 2])] for section in pnt_sections
+        section[-header["nstrike"] :]
+        for section, header in zip(pnt_sections, plane_infos)
     ]
 
     for iloc in range(locations.shape[0]):
-        lon, lat, _ = locations[iloc]
+        lon, lat, *_ = locations[iloc]
 
         if len(plane_infos) > 1:
             # Have to work out which plane the point belongs to
