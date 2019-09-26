@@ -34,7 +34,7 @@ def calc_rrup_rjb(srf_points: np.ndarray, locations: np.ndarray):
     for loc_ix in numba.prange(locations.shape[0]):
         h_dist = h_dist_f(srf_points, locations[loc_ix, 0], locations[loc_ix, 1])
 
-        v_dist = srf_points[:, -1] - locations[loc_ix, -1]
+        v_dist = srf_points[:, 2] - locations[loc_ix, 2]
 
         d = np.sqrt(h_dist ** 2 + v_dist ** 2)
 
