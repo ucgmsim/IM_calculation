@@ -73,7 +73,7 @@ def create_im_csv(output_dir, im_name, component):
     """
     After the OpenSees code has run, read the recorder files and output it to a CSV file
     :param output_dir: Path to OpenSees recorders output and CSV path
-    :param im_name: IM name that has been calculated. Used for filepath
+    :param sub_im_name: IM name that has been calculated. Used for filepath
     :return:
     """
     success_glob = os.path.join(output_dir, "Analysis_*")
@@ -84,21 +84,23 @@ def create_im_csv(output_dir, im_name, component):
             contents = fp.read()
         model_converged = model_converged or (contents.strip() == "Successful")
 
-    im_csv_fname = os.path.join(output_dir, component + "_" + im_name + ".csv")
+    im_csv_fname = os.path.join(output_dir, im_name + ".csv")
     result_df = pd.DataFrame()
     im_recorder_glob = os.path.join(output_dir, "env*/*.out")
     im_recorders = glob.glob(im_recorder_glob)
     value_dict = {}
 
     for im_recorder in im_recorders:
-        im_name = os.path.splitext(os.path.basename(im_recorder))[0]
+        sub_im_name = os.path.splitext(os.path.basename(im_recorder))[0]
         im_value = read_out_file(im_recorder, model_converged)
 
-        value_dict[im_name] = im_value
+        full_im_name = im_name + "_" + sub_im_name
+        value_dict[full_im_name] = im_value
 
+    value_dict['component'] = component
     result_df = result_df.append(value_dict, ignore_index=True)
     # print(result_df)
-    result_df.to_csv(im_csv_fname, index=False)
+    result_df.to_csv(im_csv_fname, index=False, mode='a')
 
 
 def read_out_file(file, success=True):
