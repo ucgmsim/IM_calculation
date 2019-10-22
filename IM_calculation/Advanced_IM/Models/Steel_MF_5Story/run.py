@@ -53,10 +53,23 @@ def main():
 
     subprocess.call(script)
 
-    create_im_csv(args.output_dir, "Steel_MF_5Story")
+    create_im_csv(args.output_dir, "Steel_MF_5Story", "000")
+
+    script = [
+        args.OpenSees_path,
+        os.path.join(model_dir, "Run_script.tcl"),
+        args.comp_090,
+        args.output_dir,
+    ]
+
+    print(" ".join(script))
+
+    subprocess.call(script)
+
+    create_im_csv(args.output_dir, "Steel_MF_5Story", "090")
 
 
-def create_im_csv(output_dir, im_name):
+def create_im_csv(output_dir, im_name, component):
     """
     After the OpenSees code has run, read the recorder files and output it to a CSV file
     :param output_dir: Path to OpenSees recorders output and CSV path
@@ -71,7 +84,7 @@ def create_im_csv(output_dir, im_name):
             contents = fp.read()
         model_converged = model_converged or (contents.strip() == "Successful")
 
-    im_csv_fname = os.path.join(output_dir, im_name + ".csv")
+    im_csv_fname = os.path.join(output_dir, component + "_" + im_name + ".csv")
     result_df = pd.DataFrame()
     im_recorder_glob = os.path.join(output_dir, "env*/*.out")
     im_recorders = glob.glob(im_recorder_glob)
