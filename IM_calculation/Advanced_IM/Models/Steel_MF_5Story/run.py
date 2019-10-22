@@ -66,10 +66,10 @@ def main():
 
     subprocess.call(script)
 
-    create_im_csv(args.output_dir, "Steel_MF_5Story", "090")
+    create_im_csv(args.output_dir, "Steel_MF_5Story", "090", print_header=False)
 
 
-def create_im_csv(output_dir, im_name, component):
+def create_im_csv(output_dir, im_name, component, print_header=True):
     """
     After the OpenSees code has run, read the recorder files and output it to a CSV file
     :param output_dir: Path to OpenSees recorders output and CSV path
@@ -102,7 +102,7 @@ def create_im_csv(output_dir, im_name, component):
     headers.insert(0, 'component')
     result_df = result_df.append(value_dict, ignore_index=True)
     # print(result_df)
-    result_df.to_csv(im_csv_fname, index=False, mode='a', columns=headers)
+    result_df.to_csv(im_csv_fname, index=False, mode='a', columns=headers, header=print_header)
 
 
 def read_out_file(file, success=True):
