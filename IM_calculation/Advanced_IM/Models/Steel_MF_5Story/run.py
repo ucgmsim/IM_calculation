@@ -97,10 +97,12 @@ def create_im_csv(output_dir, im_name, component):
         full_im_name = im_name + "_" + sub_im_name
         value_dict[full_im_name] = im_value
 
+    headers = value_dict.keys()
     value_dict['component'] = component
+    headers.insert(0, 'component')
     result_df = result_df.append(value_dict, ignore_index=True)
     # print(result_df)
-    result_df.to_csv(im_csv_fname, index=False, mode='a')
+    result_df.to_csv(im_csv_fname, index=False, mode='a', columns=headers)
 
 
 def read_out_file(file, success=True):
