@@ -77,7 +77,8 @@ def main():
 
 
 def calculate_geom(im_csv_fname):
-    ims = pd.read_csv(im_csv_fname, index_col='component')
+    ims = pd.read_csv(im_csv_fname, dtype={'components': str})
+    ims.set_index('component', inplace=True)
 
     if '000' in ims.index and '090' in ims.index:
         line = np.sqrt(ims.loc['090'] * ims.loc['000'])
