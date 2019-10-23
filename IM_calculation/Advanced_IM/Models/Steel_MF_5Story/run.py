@@ -77,7 +77,7 @@ def main():
 
 
 def calculate_geom(im_csv_fname):
-    ims = pd.read_csv(im_csv_fname, dtype={'components': str})
+    ims = pd.read_csv(im_csv_fname, dtype={'component': str})
     ims.set_index('component', inplace=True)
 
     if '000' in ims.index and '090' in ims.index:
