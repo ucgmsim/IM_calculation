@@ -115,7 +115,7 @@ def create_im_csv(output_dir, im_name, component, print_header=True):
 
     value_dict = {component: value_dict}
     result_df = pd.DataFrame.from_dict(value_dict, orient='index')
-    result_df.set_index('component')
+    result_df.index.name = 'component'
     # print(result_df)
     result_df.to_csv(im_csv_fname, mode='a', header=print_header)
 
