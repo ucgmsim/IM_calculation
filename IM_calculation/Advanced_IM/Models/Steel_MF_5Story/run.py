@@ -84,7 +84,9 @@ def calculate_geom(im_csv_fname):
         line = np.sqrt(ims.loc['090'] * ims.loc['000'])
         line.rename('geom', inplace=True)
         ims = ims.append(line)
-    ims.to_csv(im_csv_fname)
+    cols = list(ims.columns)
+    cols.sort()
+    ims.to_csv(im_csv_fname, columns=cols)
 
 
 def create_im_csv(output_dir, im_name, component, print_header=True):
@@ -118,7 +120,10 @@ def create_im_csv(output_dir, im_name, component, print_header=True):
     result_df = pd.DataFrame.from_dict(value_dict, orient='index')
     result_df.index.name = 'component'
     # print(result_df)
-    result_df.to_csv(im_csv_fname, mode='a', header=print_header)
+
+    cols = list(result_df.columns)
+    cols.sort()
+    result_df.to_csv(im_csv_fname, mode='a', header=print_header, columns=cols)
 
 
 def read_out_file(file, success=True):
