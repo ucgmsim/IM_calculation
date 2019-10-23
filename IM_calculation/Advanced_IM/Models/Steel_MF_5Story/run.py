@@ -83,7 +83,7 @@ def calculate_geom(im_csv_fname):
     if '000' in ims.index and '090' in ims.index:
         line = np.sqrt(ims.loc['090'] * ims.loc['000'])
         line.rename('geom', inplace=True)
-        ims.append(line)
+        ims = ims.append(line)
     ims.to_csv(im_csv_fname)
 
 
