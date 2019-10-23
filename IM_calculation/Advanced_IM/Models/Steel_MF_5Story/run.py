@@ -5,8 +5,10 @@ Python script to run a 3D waveform through Steel_MF_5Story and store the outputs
 import argparse
 import glob
 import os
-import pandas as pd
 import subprocess
+
+import numpy as np
+import pandas as pd
 
 
 DEFAULT_OPEN_SEES_PATH = "OpenSees"
@@ -39,34 +41,49 @@ def main():
 
     args = parser.parse_args()
 
-    if not os.path.exists(args.output_dir):
-        os.makedirs(args.output_dir)
+    output_dir = args.output_dir
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
 
     script = [
         args.OpenSees_path,
         os.path.join(model_dir, "Run_script.tcl"),
         args.comp_000,
-        args.output_dir,
+        output_dir,
     ]
 
     print(" ".join(script))
 
     subprocess.call(script)
 
-    create_im_csv(args.output_dir, "Steel_MF_5Story", "000")
+    im_name = "Steel_MF_5Story"
+    create_im_csv(output_dir, im_name, "000")
 
     script = [
         args.OpenSees_path,
         os.path.join(model_dir, "Run_script.tcl"),
         args.comp_090,
-        args.output_dir,
+        output_dir,
     ]
 
     print(" ".join(script))
 
     subprocess.call(script)
 
-    create_im_csv(args.output_dir, "Steel_MF_5Story", "090", print_header=False)
+    create_im_csv(output_dir, im_name, "090", print_header=False)
+
+    im_csv_fname = os.path.join(output_dir, im_name + ".csv")
+    calculate_geom(im_csv_fname)
+
+
+def calculate_geom(im_csv_fname):
+    ims = pd.read_csv(im_csv_fname, index_col='component')
+
+    if '000' in ims.index and '090' in ims.index:
+        line = np.sqrt(ims.loc['090'] * ims.loc['000'])
+        line.rename('geom', inplace=True)
+        ims.append(line)
+    ims.to_csv(im_csv_fname)
 
 
 def create_im_csv(output_dir, im_name, component, print_header=True):
@@ -85,7 +102,6 @@ def create_im_csv(output_dir, im_name, component, print_header=True):
         model_converged = model_converged or (contents.strip() == "Successful")
 
     im_csv_fname = os.path.join(output_dir, im_name + ".csv")
-    result_df = pd.DataFrame()
     im_recorder_glob = os.path.join(output_dir, "env*/*.out")
     im_recorders = glob.glob(im_recorder_glob)
     value_dict = {}
@@ -97,12 +113,11 @@ def create_im_csv(output_dir, im_name, component, print_header=True):
         full_im_name = im_name + "_" + sub_im_name
         value_dict[full_im_name] = im_value
 
-    headers = list(value_dict.keys())
-    value_dict['component'] = component
-    headers.insert(0, 'component')
-    result_df = result_df.append(value_dict, ignore_index=True)
+    value_dict = {component: value_dict}
+    result_df = pd.DataFrame.from_dict(value_dict, orient='index')
+    result_df.set_index('component')
     # print(result_df)
-    result_df.to_csv(im_csv_fname, index=False, mode='a', columns=headers, header=print_header)
+    result_df.to_csv(im_csv_fname, mode='a', header=print_header)
 
 
 def read_out_file(file, success=True):
