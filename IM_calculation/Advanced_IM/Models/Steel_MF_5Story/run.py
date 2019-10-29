@@ -77,12 +77,12 @@ def main():
 
 
 def calculate_geom(im_csv_fname):
-    ims = pd.read_csv(im_csv_fname, dtype={'component': str})
-    ims.set_index('component', inplace=True)
+    ims = pd.read_csv(im_csv_fname, dtype={"component": str})
+    ims.set_index("component", inplace=True)
 
-    if '000' in ims.index and '090' in ims.index:
-        line = np.sqrt(ims.loc['090'] * ims.loc['000'])
-        line.rename('geom', inplace=True)
+    if "000" in ims.index and "090" in ims.index:
+        line = np.sqrt(ims.loc["090"] * ims.loc["000"])
+        line.rename("geom", inplace=True)
         ims = ims.append(line)
     cols = list(ims.columns)
     cols.sort()
@@ -117,13 +117,13 @@ def create_im_csv(output_dir, im_name, component, print_header=True):
         value_dict[full_im_name] = im_value
 
     value_dict = {component: value_dict}
-    result_df = pd.DataFrame.from_dict(value_dict, orient='index')
-    result_df.index.name = 'component'
+    result_df = pd.DataFrame.from_dict(value_dict, orient="index")
+    result_df.index.name = "component"
     # print(result_df)
 
     cols = list(result_df.columns)
     cols.sort()
-    result_df.to_csv(im_csv_fname, mode='a', header=print_header, columns=cols)
+    result_df.to_csv(im_csv_fname, mode="a", header=print_header, columns=cols)
 
 
 def read_out_file(file, success=True):

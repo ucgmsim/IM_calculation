@@ -11,7 +11,7 @@ from multiprocessing.pool import Pool
 from IM_calculation.Advanced_IM import advanced_IM_factory
 from IM_calculation.IM import read_waveform
 from IM_calculation.IM import intensity_measures
-from qcore import constants 
+from qcore import constants
 from qcore import timeseries
 
 
