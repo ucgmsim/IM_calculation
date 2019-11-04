@@ -1,7 +1,7 @@
 # IM_calculation
 
 [![Build Status](https://travis-ci.org/ucgmsim/IM_calculation.svg?branch=master)](https://travis-ci.org/ucgmsim/IM_calculation)
-
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 To calculate rrups:
 

@@ -8,6 +8,14 @@ Changed
 
 Added
 
+[19.10.1] - 2019-10-29
+Fixed
+    - Bug where specifying components (other than geom) resulted in bad ordering. Only the all component case has been fixed
+Added
+    - Advanced IM calculation workflow. (--help has more information)
+    - Advanced IMs (Steel mf 5story, SAC_steel_MF (3/9 story)
+    - Geometric mean calculation for Steel_MF_5_Story
+
 [19.6.1] - 2019-06-06  
 Added  
     - setup.py to make IM_calculation a package  

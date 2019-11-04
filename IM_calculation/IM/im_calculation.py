@@ -1,15 +1,19 @@
 import csv
+from datetime import datetime
 import getpass
 import glob
 import os
 import sys
-from datetime import datetime
+
 import numpy as np
 from multiprocessing.pool import Pool
 
-from IM_calculation.IM import read_waveform, intensity_measures
-from qcore import timeseries
 from IM_calculation.Advanced_IM import advanced_IM_factory
+from IM_calculation.IM import read_waveform
+from IM_calculation.IM import intensity_measures
+from qcore import constants
+from qcore import timeseries
+
 
 G = 981.0
 IMS = ["PGA", "PGV", "CAV", "AI", "Ds575", "Ds595", "MMI", "pSA"]
@@ -408,7 +412,9 @@ def generate_metadata(output_folder, identifier, rupture, run_type, version):
     :return:
     """
     date = datetime.now().strftime("%Y%m%d_%H%M%S")
-    output_path = get_result_filepath(output_folder, identifier, "_imcalc.info")
+    output_path = get_result_filepath(
+        output_folder, identifier, constants.IM_SIM_CALC_INFO_SUFFIX
+    )
 
     with open(output_path, "w") as meta_file:
         meta_writer = csv.writer(meta_file, delimiter=",", quotechar="|")

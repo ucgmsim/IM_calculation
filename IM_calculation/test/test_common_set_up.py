@@ -13,6 +13,7 @@ from qcore import shared
 import sys
 import IM_calculation
 import IM_calculation.IM as IM
+
 sys.modules["IM"] = IM
 from IM_calculation.IM.read_waveform import Waveform
 
@@ -21,9 +22,10 @@ OUTPUT = "output"
 REALISATIONS = [
     (
         "PangopangoF29_HYP01-10_S1244",
-        "https://seistech.nz/static/public/testing/IM_calculation/PangopangoF29_HYP01-10_S1244.zip",
+        "https://qc-s3-autotest.s3-ap-southeast-2.amazonaws.com/testing/IM_calculation/PangopangoF29_HYP01-10_S1244.zip",
     )
 ]
+
 
 def download_via_ftp(address, download_location):
     parsed_address = parse.urlparse(address)
