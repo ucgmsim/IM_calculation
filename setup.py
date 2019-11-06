@@ -3,9 +3,9 @@ Install using pip, e.g. pip install ./IM_Calculation
 use --no-deps to prevent re-installation of dependencies
 use -I to force re-install
 """
+from setuptools import find_packages
 from distutils.core import setup
 from distutils.extension import Extension
-from setuptools import find_packages
 
 import numpy
 from Cython.Distutils import build_ext
