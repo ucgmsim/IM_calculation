@@ -7,6 +7,7 @@ import sys
 
 import numpy as np
 from multiprocessing.pool import Pool
+import pandas as pd
 
 from IM_calculation.Advanced_IM import advanced_IM_factory
 from IM_calculation.IM import read_waveform
@@ -222,6 +223,35 @@ def get_bbseis(input_path, file_type, selected_stations):
                 )
     return bbseries, list(station_names)
 
+def agg_csv(stations, im_calc_dir, im_type):
+    # get csv base on station name 
+    #quick check of args format
+    if type(im_type) != str:
+        raise TypeError("im_type should be a string, but get {} instead".format(type(im_type)))
+    #initial a blank dataframe 
+    df = pd.DataFrame()
+
+    #loop through all stations
+    for station in stations:
+        #use glob(?) and qcore.sim_struc to get specific station_im.csv
+        # TODO: define this structure into qcore.sim_struct
+        station_im_dir = os.path.join(im_calc_dir, station)
+        im_type_path = os.path.join(station_im_dir, im_type)
+        im_path = os.path.join(im_type_path, im_type+'.csv') 
+    
+        #debug print message
+        #print(im_path)    
+        #read a df and add station name as colum
+        df_tmp = pd.read_csv(im_path)
+
+        #add in the station name before agg
+        df_tmp['station'] = station
+    
+        #append the df
+        df.append(df_tmp)
+
+    #leave write csv to parent function
+    return df
 
 def compute_measures_multiprocess(
     input_path,
@@ -266,6 +296,7 @@ def compute_measures_multiprocess(
     bbseries, station_names = get_bbseis(input_path, file_type, station_names)
 
     total_stations = len(station_names)
+    #determine the size of each iteration base on num of processers
     steps = get_steps(input_path, process, total_stations)
 
     all_result_dict = {}
@@ -273,10 +304,14 @@ def compute_measures_multiprocess(
 
     i = 0
     while i < total_stations:
+        #read waveforms of stations
+        #each iteratoin = steps size
+        stations_to_run = station_names[i : i + steps]
         waveforms = read_waveform.read_waveforms(
             input_path,
             bbseries,
-            station_names[i : i + steps],
+#            station_names[i : i + steps],
+            stations_to_run,
             str_comps_for_int,
             wave_type=wave_type,
             file_type=file_type,
@@ -291,15 +326,32 @@ def compute_measures_multiprocess(
 
         result_list = p.map(compute_measure_single, array_params)
         if advanced_im_config:
+            #calculate IM for stations in this iteration
             p.starmap(compute_adv_measure, adv_array_params)
-
+            # read and agg data into a pandas array 
+            # loop through all im_type in advanced_im_config
+            df_adv_im = {}
+            for im_type in advanced_im_config.IM_list:
+                #agg_csv(stations_to_run, output_dir, im_type)
+                df_adv_im[im_type] = agg_csv(stations_to_run, output_dir, im_type)
         for result in result_list:
             all_result_dict.update(result)
 
+    # write the ouput after all cals are done
     write_result(
         all_result_dict, output_dir, identifier, comp, ims, period, simple_output
     )
-
+    # write for advanced IM (pandas array)
+    if advanced_im_config:
+        #dump the whole array
+        for im_type in advanced_im_config.IM_list:
+            #check if file exist already, if exist header=False
+            adv_im_out = os.path.join(output_dir, im_type)
+            if os.path.isfile(adv_im_out):
+                print_header=False
+            else:
+                print_header=True
+            df_adv_im[im_type].to_csv(adv_im_out, mode='a', header=print_header)
     generate_metadata(output_dir, identifier, rupture, run_type, version)
 
 
