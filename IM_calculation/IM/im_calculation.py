@@ -238,17 +238,14 @@ def agg_csv(stations, im_calc_dir, im_type):
         station_im_dir = os.path.join(im_calc_dir, station)
         im_type_path = os.path.join(station_im_dir, im_type)
         im_path = os.path.join(im_type_path, im_type+'.csv') 
-    
-        #debug print message
-        #print(im_path)    
         #read a df and add station name as colum
         df_tmp = pd.read_csv(im_path)
 
         #add in the station name before agg
-        df_tmp['station'] = station
+        df_tmp.insert(0,'station', station)
     
         #append the df
-        df.append(df_tmp)
+        df = df.append(df_tmp)
 
     #leave write csv to parent function
     return df
@@ -301,6 +298,8 @@ def compute_measures_multiprocess(
 
     all_result_dict = {}
     p = Pool(process)
+    if advanced_im_config:
+        df_adv_im = {im: pd.DataFrame() for im in advanced_im_config.IM_list}
 
     i = 0
     while i < total_stations:
@@ -330,10 +329,9 @@ def compute_measures_multiprocess(
             p.starmap(compute_adv_measure, adv_array_params)
             # read and agg data into a pandas array 
             # loop through all im_type in advanced_im_config
-            df_adv_im = {}
             for im_type in advanced_im_config.IM_list:
                 #agg_csv(stations_to_run, output_dir, im_type)
-                df_adv_im[im_type] = agg_csv(stations_to_run, output_dir, im_type)
+                df_adv_im[im_type] = df_adv_im[im_type].append( agg_csv(stations_to_run, output_dir, im_type))
         for result in result_list:
             all_result_dict.update(result)
 
@@ -346,12 +344,13 @@ def compute_measures_multiprocess(
         #dump the whole array
         for im_type in advanced_im_config.IM_list:
             #check if file exist already, if exist header=False
-            adv_im_out = os.path.join(output_dir, im_type)
+            adv_im_out = os.path.join(output_dir, im_type+'.csv')
+            print('Dumping adv_im data to : {}'.format(adv_im_out))
             if os.path.isfile(adv_im_out):
                 print_header=False
             else:
                 print_header=True
-            df_adv_im[im_type].to_csv(adv_im_out, mode='a', header=print_header)
+            df_adv_im[im_type].to_csv(adv_im_out, mode='a', header=print_header, index=False)
     generate_metadata(output_dir, identifier, rupture, run_type, version)
 
 
