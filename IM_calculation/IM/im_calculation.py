@@ -117,10 +117,9 @@ def compute_adv_measure(waveform, advanced_im_config, output_dir):
     :param output_dir: Directory where output folders are contained. Structure is /path/to/output_dir/station/im_name
     :return:
     """
-    if advanced_im_config is not None:
+    if advanced_im_config.IM_list is not None:
         waveform_acc = waveform[0]
         station_name = waveform_acc.station_name
-
         adv_im_out_dir = os.path.join(output_dir, station_name)
         advanced_IM_factory.compute_ims(
             waveform_acc, advanced_im_config, adv_im_out_dir
@@ -298,7 +297,7 @@ def compute_measures_multiprocess(
 
     all_result_dict = {}
     p = Pool(process)
-    if advanced_im_config:
+    if advanced_im_config.IM_list:
         df_adv_im = {im: pd.DataFrame() for im in advanced_im_config.IM_list}
 
     i = 0
@@ -322,9 +321,12 @@ def compute_measures_multiprocess(
         for waveform in waveforms:
             array_params.append((waveform, ims, comp, period, str_comps))
             adv_array_params.append((waveform, advanced_im_config, output_dir))
-
-        result_list = p.map(compute_measure_single, array_params)
-        if advanced_im_config:
+        #only run simply im if and only if adv_im not going to run
+        if not advanced_im_config.IM_list:
+            result_list = p.map(compute_measure_single, array_params)
+            for result in result_list:
+                all_result_dict.update(result)
+        if advanced_im_config.IM_list:
             #calculate IM for stations in this iteration
             p.starmap(compute_adv_measure, adv_array_params)
             # read and agg data into a pandas array 
@@ -332,15 +334,14 @@ def compute_measures_multiprocess(
             for im_type in advanced_im_config.IM_list:
                 #agg_csv(stations_to_run, output_dir, im_type)
                 df_adv_im[im_type] = df_adv_im[im_type].append( agg_csv(stations_to_run, output_dir, im_type))
-        for result in result_list:
-            all_result_dict.update(result)
 
     # write the ouput after all cals are done
-    write_result(
-        all_result_dict, output_dir, identifier, comp, ims, period, simple_output
-    )
+    if not advanced_im_config.IM_list:
+        write_result(
+            all_result_dict, output_dir, identifier, comp, ims, period, simple_output
+        )
     # write for advanced IM (pandas array)
-    if advanced_im_config:
+    if advanced_im_config.IM_list:
         #dump the whole array
         for im_type in advanced_im_config.IM_list:
             #check if file exist already, if exist header=False

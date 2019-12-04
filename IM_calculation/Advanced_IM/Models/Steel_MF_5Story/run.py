@@ -44,33 +44,22 @@ def main():
     output_dir = args.output_dir
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
+    #TODO: add in 'ver' as a component? 
+    for component in ["000","090"]:
 
-    script = [
-        args.OpenSees_path,
-        os.path.join(model_dir, "Run_script.tcl"),
-        args.comp_000,
-        output_dir,
-    ]
+        script = [
+            args.OpenSees_path,
+            os.path.join(model_dir, "Run_script.tcl"),
+            getattr(args,'comp_'+ component),
+            output_dir,
+        ]
 
-    print(" ".join(script))
+        print(" ".join(script))
 
-    subprocess.call(script)
+        subprocess.call(script)
 
-    im_name = "Steel_MF_5Story"
-    create_im_csv(output_dir, im_name, "000")
-
-    script = [
-        args.OpenSees_path,
-        os.path.join(model_dir, "Run_script.tcl"),
-        args.comp_090,
-        output_dir,
-    ]
-
-    print(" ".join(script))
-
-    subprocess.call(script)
-
-    create_im_csv(output_dir, im_name, "090", print_header=False)
+        im_name = "Steel_MF_5Story"
+        create_im_csv(output_dir, im_name, component)
 
     im_csv_fname = os.path.join(output_dir, im_name + ".csv")
     calculate_geom(im_csv_fname)
