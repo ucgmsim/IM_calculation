@@ -46,12 +46,16 @@ def main():
         os.makedirs(output_dir)
     #TODO: add in 'ver' as a component? 
     for component in ["000","090"]:
-
+        component_outdir = os.path.join(output_dir, component)
+        #check if folder exist, if not create it (opensees does not create the folder and will crash)
+        if not os.path.isdir(component_outdir):
+            os.makedirs(component_outdir, exist_ok=True)
         script = [
             args.OpenSees_path,
             os.path.join(model_dir, "Run_script.tcl"),
             getattr(args,'comp_'+ component),
-            output_dir,
+            #output_dir,
+            component_outdir,
         ]
 
         print(" ".join(script))
@@ -59,7 +63,7 @@ def main():
         subprocess.call(script)
 
         im_name = "Steel_MF_5Story"
-        create_im_csv(output_dir, im_name, component)
+        create_im_csv(output_dir, im_name, component, component_outdir)
 
     im_csv_fname = os.path.join(output_dir, im_name + ".csv")
     calculate_geom(im_csv_fname)
@@ -78,14 +82,14 @@ def calculate_geom(im_csv_fname):
     ims.to_csv(im_csv_fname, columns=cols)
 
 
-def create_im_csv(output_dir, im_name, component, print_header=True):
+def create_im_csv(output_dir, im_name, component, component_outdir, print_header=True):
     """
     After the OpenSees code has run, read the recorder files and output it to a CSV file
     :param output_dir: Path to OpenSees recorders output and CSV path
     :param sub_im_name: IM name that has been calculated. Used for filepath
     :return:
     """
-    success_glob = os.path.join(output_dir, "Analysis_*")
+    success_glob = os.path.join(component_outdir, "Analysis_*")
     success_files = glob.glob(success_glob)
     model_converged = False
     for f in success_files:
@@ -94,7 +98,7 @@ def create_im_csv(output_dir, im_name, component, print_header=True):
         model_converged = model_converged or (contents.strip() == "Successful")
 
     im_csv_fname = os.path.join(output_dir, im_name + ".csv")
-    im_recorder_glob = os.path.join(output_dir, "env*/*.out")
+    im_recorder_glob = os.path.join(component_outdir, "env*/*.out")
     im_recorders = glob.glob(im_recorder_glob)
     value_dict = {}
 
@@ -112,6 +116,9 @@ def create_im_csv(output_dir, im_name, component, print_header=True):
 
     cols = list(result_df.columns)
     cols.sort()
+    #test if file exist, if exist, no header
+    if os.path.isfile(im_csv_fname):
+        print_header = False
     result_df.to_csv(im_csv_fname, mode="a", header=print_header, columns=cols)
 
 
