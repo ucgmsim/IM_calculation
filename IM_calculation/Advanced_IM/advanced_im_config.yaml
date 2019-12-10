@@ -6,5 +6,9 @@
 
 Steel_MF_5Story:
   script_location: 'Models/Steel_MF_5Story/run.py'
+SAC_Steel_MF_3Story:
+  script_location: 'Models/SAC_Steel_MF_3Story/run.py'
+SAC_Steel_MF_9Story:
+  script_location: 'Models/SAC_Steel_MF_9Story/run.py'
 SAC_Steel_MFs:
   script_location: 'Models/SAC_Steel_MFs/Run_script.tcl'
