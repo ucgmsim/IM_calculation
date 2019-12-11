@@ -1,5 +1,5 @@
 """
-Python script to run a 3D waveform through Steel_MF_5Story and store the outputs to a txt file
+Python script to run a 3D waveform through SAC_Steel_MF_3Story and store the outputs to a txt file
 """
 
 import argparse
@@ -54,7 +54,6 @@ def main():
             args.OpenSees_path,
             os.path.join(model_dir, "Run_script.tcl"),
             getattr(args,'comp_'+ component),
-            #output_dir,
             component_outdir,
         ]
 
@@ -112,7 +111,6 @@ def create_im_csv(output_dir, im_name, component, component_outdir, print_header
     value_dict = {component: value_dict}
     result_df = pd.DataFrame.from_dict(value_dict, orient="index")
     result_df.index.name = "component"
-    # print(result_df)
 
     cols = list(result_df.columns)
     cols.sort()

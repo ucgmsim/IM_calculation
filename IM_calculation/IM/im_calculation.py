@@ -117,13 +117,16 @@ def compute_adv_measure(waveform, advanced_im_config, output_dir):
     :param output_dir: Directory where output folders are contained. Structure is /path/to/output_dir/station/im_name
     :return:
     """
-    if advanced_im_config.IM_list is not None:
-        waveform_acc = waveform[0]
-        station_name = waveform_acc.station_name
-        adv_im_out_dir = os.path.join(output_dir, station_name)
-        advanced_IM_factory.compute_ims(
-            waveform_acc, advanced_im_config, adv_im_out_dir
-        )
+    try:
+        if advanced_im_config.IM_list is not None:
+            waveform_acc = waveform[0]
+            station_name = waveform_acc.station_name
+            adv_im_out_dir = os.path.join(output_dir, station_name)
+            advanced_IM_factory.compute_ims(
+                waveform_acc, advanced_im_config, adv_im_out_dir
+            )
+    except AttributeError:
+        print("cannot access IM_list under advanced_im_config : {}".format(advanced_im_config)
 
 
 def compute_measure_single(value_tuple):
@@ -302,13 +305,12 @@ def compute_measures_multiprocess(
 
     i = 0
     while i < total_stations:
-        #read waveforms of stations
-        #each iteratoin = steps size
+        # read waveforms of stations
+        # each iteration = steps size
         stations_to_run = station_names[i : i + steps]
         waveforms = read_waveform.read_waveforms(
             input_path,
             bbseries,
-#            station_names[i : i + steps],
             stations_to_run,
             str_comps_for_int,
             wave_type=wave_type,
