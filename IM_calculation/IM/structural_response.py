@@ -172,7 +172,7 @@ def calculate_vibration_periods(alpha, t1):
     more accurate estimation of vibration periods appears to be achieved when alpha is limited to 25
     """
 
-    c = -1
+    c = 0
     increment = 0.01
     if alpha >= 25:
         gamma_max = 35
@@ -186,7 +186,7 @@ def calculate_vibration_periods(alpha, t1):
     # this is horrible, dual loop reused arrays with dependencies
     eigenvalue = np.zeros(max(round(gamma_max / increment), 100))
     eigenvalue_prime = np.zeros_like(eigenvalue)
-    gamma_NR_approximation = np.empty(100)
+    gamma_NR_approximation = np.empty(101)
 
     for i in range(round(gamma_max / increment)):
         # function script that calls out Equation 24 of Miranda 2005
@@ -197,7 +197,6 @@ def calculate_vibration_periods(alpha, t1):
             # positive slope
             if eigenvalue[i] > 0:
                 if eigenvalue[i - 1] < 0:
-                    c += 1
                     gamma_initial_NR_approximation = (
                         increment * i + increment * (i + 1)
                     ) / 2.0
@@ -206,6 +205,7 @@ def calculate_vibration_periods(alpha, t1):
                         eigenvalue[j], eigenvalue_prime[j] = eigenvalue_test(
                             alpha, gamma_NR_approximation[j]
                         )
+                        # no need to calculate at j + 1 == 100
                         gamma_NR_approximation[j + 1] = gamma_NR_approximation[j] - (
                             eigenvalue[j] / eigenvalue_prime[j]
                         )
@@ -222,12 +222,12 @@ def calculate_vibration_periods(alpha, t1):
                                     < tolerance
                                 ):
                                     gamma[c] = gamma_NR_approximation[j]
+                                    c += 1
                                     break
 
             # negative slope
             elif eigenvalue[i] < 0:
                 if eigenvalue[i - 1] > 0:
-                    c += 1
                     gamma_initial_NR_approximation = (
                         increment * i + increment * (i + 1)
                     ) / 2.0
@@ -251,9 +251,10 @@ def calculate_vibration_periods(alpha, t1):
                                     < tolerance
                                 ):
                                     gamma[c] = gamma_NR_approximation[j]
+                                    c += 1
                                     break
 
-    gamma = gamma[: c + 1]
+    gamma = gamma[: c]
     for i in range(len(gamma)):
         if abs(eigenvalue_test(alpha, gamma[i])[0]) > tolerance:
             print("eigenvalue approximation incorrect at", i, "th vibration period")
@@ -569,11 +570,12 @@ dt_sim = 0.005
 acc_obs, acc_sim = load()
 
 # largest translational period of the structure.
-t1 = 0.5
+t1 = 2.0
 # non-dimensional flexure-shear coefficient of the structure.  alpha=0 represents shear wall buildings.  alpha=30 represents moment frame buildings.
-alpha = 0
+alpha = 30
 # represents the number of equally spaced heights along the structure from which the analysis outputs will be recorded  (height of the structure is non-dimensional; 0 at base, 1 at top).
 storey = 10
+c=0.1
 
 # 3a calculate the vibration periods of the structure
 gamma, vibration_period = calculate_vibration_periods(alpha, t1)
@@ -581,6 +583,17 @@ gamma, vibration_period = calculate_vibration_periods(alpha, t1)
 phi, phi_1, phi_2, phi_3, phi_4, participation_factor = calculate_mode_shapes(
     alpha, gamma, storey
 )
+print("VIBRATION PERIOD")
+print(",".join(map(str, vibration_period)))
+print("PARTICIPATION FACTOR")
+print(",".join(map(str, participation_factor)))
+varsp = {"PHI":phi}
+for var in varsp:
+    print(var)
+    for i in range(phi.shape[0]):
+        print(
+            ",".join(map(str, varsp[var][i]))
+        )
 # 3c calculate structural response
 disp_time_history_EQ_matrix_obs, slope_time_history_EQ_matrix_obs, moment_time_history_EQ_matrix_obs, storey_moment_time_history_EQ_matrix_obs, shear_time_history_EQ_matrix_obs, storey_shear_time_history_EQ_matrix_obs, load_time_history_EQ_matrix_obs, ground_accel_time_history_EQ_matrix_obs, rel_accel_time_history_EQ_matrix_obs, total_accel_time_history_EQ_matrix_obs = calculate_structural_response(
     gamma,
@@ -595,6 +608,7 @@ disp_time_history_EQ_matrix_obs, slope_time_history_EQ_matrix_obs, moment_time_h
     phi_3,
     phi_4,
     alpha,
+    c=c,
 )
 disp_time_history_EQ_matrix_sim, slope_time_history_EQ_matrix_sim, moment_time_history_EQ_matrix_sim, storey_moment_time_history_EQ_matrix_sim, shear_time_history_EQ_matrix_sim, storey_shear_time_history_EQ_matrix_sim, load_time_history_EQ_matrix_sim, ground_accel_time_history_EQ_matrix_sim, rel_accel_time_history_EQ_matrix_sim, total_accel_time_history_EQ_matrix_sim = calculate_structural_response(
     gamma,
@@ -609,6 +623,7 @@ disp_time_history_EQ_matrix_sim, slope_time_history_EQ_matrix_sim, moment_time_h
     phi_3,
     phi_4,
     alpha,
+    c=c,
 )
 # 3d extract peak structural response values from each earthquake ground motion record
 disp_time_history_peak_obs, slope_time_history_peak_obs, moment_time_history_peak_obs, storey_moment_time_history_peak_obs, shear_time_history_peak_obs, storey_shear_time_history_peak_obs, load_time_history_peak_obs, ground_accel_time_history_peak_obs, rel_accel_time_history_peak_obs, total_accel_time_history_peak_obs = extract_peak_structural_response(
@@ -637,3 +652,33 @@ disp_time_history_peak_sim, slope_time_history_peak_sim, moment_time_history_pea
     rel_accel_time_history_EQ_matrix_sim,
     total_accel_time_history_EQ_matrix_sim,
 )
+
+print("disp_time_history_peak, slope_time_history_peak, moment_time_history_peak, storey_moment_time_history_peak, shear_time_history_peak, storey_shear_time_history_peak, load_time_history_peak, ground_accel_time_history_peak, rel_accel_time_history_peak, total_accel_time_history_peak")
+print("SIM")
+for i in range(len(disp_time_history_peak_sim)):
+    print(
+        ",".join(map(str, [disp_time_history_peak_sim[i],
+        slope_time_history_peak_sim[i],
+        moment_time_history_peak_sim[i],
+        storey_moment_time_history_peak_sim[i],
+        shear_time_history_peak_sim[i],
+        storey_shear_time_history_peak_sim[i],
+        load_time_history_peak_sim[i],
+        ground_accel_time_history_peak_sim[i],
+        rel_accel_time_history_peak_sim[i],
+        total_accel_time_history_peak_sim[i]]))
+    )
+print("OBS")
+for i in range(len(disp_time_history_peak_obs)):
+    print(
+        ",".join(map(str, [disp_time_history_peak_obs[i],
+        slope_time_history_peak_obs[i],
+        moment_time_history_peak_obs[i],
+        storey_moment_time_history_peak_obs[i],
+        shear_time_history_peak_obs[i],
+        storey_shear_time_history_peak_obs[i],
+        load_time_history_peak_obs[i],
+        ground_accel_time_history_peak_obs[i],
+        rel_accel_time_history_peak_obs[i],
+        total_accel_time_history_peak_obs[i]]))
+    )
