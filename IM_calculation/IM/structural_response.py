@@ -381,12 +381,6 @@ def calculate_structural_response_B(
     alpha,
     storey,
 ):
-    modal_disp = np.zeros(phi.shape)
-    modal_slope = np.zeros_like(modal_disp)
-    modal_moment = np.zeros_like(modal_disp)
-    modal_shear = np.zeros_like(modal_disp)
-    modal_load = np.zeros_like(modal_disp)
-    modal_acc = np.zeros_like(modal_disp)
 
     disp_time_history_per_EQ = np.zeros((phi.shape[0], sd_time.shape[1]))
     moment_time_history_per_EQ = np.zeros_like(disp_time_history_per_EQ)
@@ -570,12 +564,12 @@ dt_sim = 0.005
 acc_obs, acc_sim = load()
 
 # largest translational period of the structure.
-t1 = 2.0
+t1 = 0.5
 # non-dimensional flexure-shear coefficient of the structure.  alpha=0 represents shear wall buildings.  alpha=30 represents moment frame buildings.
-alpha = 30
+alpha = 0
 # represents the number of equally spaced heights along the structure from which the analysis outputs will be recorded  (height of the structure is non-dimensional; 0 at base, 1 at top).
 storey = 10
-c=0.1
+c=0.02
 
 # 3a calculate the vibration periods of the structure
 gamma, vibration_period = calculate_vibration_periods(alpha, t1)
@@ -583,6 +577,7 @@ gamma, vibration_period = calculate_vibration_periods(alpha, t1)
 phi, phi_1, phi_2, phi_3, phi_4, participation_factor = calculate_mode_shapes(
     alpha, gamma, storey
 )
+print("ALPHA", alpha, "C", c, "T1", t1)
 print("VIBRATION PERIOD")
 print(",".join(map(str, vibration_period)))
 print("PARTICIPATION FACTOR")
