@@ -57,8 +57,10 @@ def compute_ims(accelerations, configuration, adv_im_out_dir):
                 "--OpenSees_path",
                 configuration.OpenSees_path,
             ]
+            # waveform compunent sequence
+            comp_list = ['000','090','ver']
             script.extend(
-                [get_acc_filename(f_dir, station_name, x) for x in COMP_DICT.keys()]
+                [get_acc_filename(f_dir, station_name, x) for x in comp_list]
             )
             script.extend([out_dir])
 
