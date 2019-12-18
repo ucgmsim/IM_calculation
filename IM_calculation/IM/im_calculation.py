@@ -3,6 +3,7 @@ from datetime import datetime
 import getpass
 import glob
 import os
+import re
 import sys
 
 import numpy as np
@@ -126,7 +127,7 @@ def compute_adv_measure(waveform, advanced_im_config, output_dir):
                 waveform_acc, advanced_im_config, adv_im_out_dir
             )
     except AttributeError:
-        print("cannot access IM_list under advanced_im_config : {}".format(advanced_im_config)
+        print("cannot access IM_list under advanced_im_config : {}".format(advanced_im_config))
 
 
 def compute_measure_single(value_tuple):
@@ -346,6 +347,8 @@ def compute_measures_multiprocess(
     if advanced_im_config.IM_list:
         #dump the whole array
         for im_type in advanced_im_config.IM_list:
+            #do a natural sort on the column names
+            df_adv_im[im_type] = df_adv_im[im_type][ list(df_adv_im[im_type].columns[:2]) + sorted(df_adv_im[im_type].columns[2:], key=natural_key)]
             #check if file exist already, if exist header=False
             adv_im_out = os.path.join(output_dir, im_type+'.csv')
             print('Dumping adv_im data to : {}'.format(adv_im_out))
@@ -355,6 +358,10 @@ def compute_measures_multiprocess(
                 print_header=True
             df_adv_im[im_type].to_csv(adv_im_out, mode='a', header=print_header, index=False)
     generate_metadata(output_dir, identifier, rupture, run_type, version)
+
+
+def natural_key(string_):
+    return [int(s) if s.isdigit() else s for s in re.split(r'(\d+)', string_)]
 
 
 def get_result_filepath(output_folder, arg_identifier, suffix):
