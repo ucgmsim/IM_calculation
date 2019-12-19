@@ -623,7 +623,18 @@ def test_calculate_structural_response(
     bench_total_accel,
 ):
     test_disp, test_slope, test_moment, test_storey_moment, test_shear, test_storey_shear, test_load, test_ground_accel, test_rel_accel, test_total_accel = calculate_structural_response(
-        1, vibration_period, acc_time_history, dt, storey, participation_factor, phi, phi_1, phi_2, phi_3, phi_4, alpha)
+        vibration_period,
+        acc_time_history,
+        dt,
+        storey,
+        participation_factor,
+        phi,
+        phi_1,
+        phi_2,
+        phi_3,
+        phi_4,
+        alpha,
+    )
     assert compare_is_close(test_disp, bench_disp)
     assert compare_is_close(test_slope, bench_slope)
     assert compare_is_close(test_moment, bench_moment)
@@ -829,7 +840,17 @@ def test_extract_peak_structural_response(
     bench_total_accel,
 ):
     test_disp, test_slope, test_moment, test_storey_moment, test_shear, test_storey_shear, test_load, test_ground_accel, test_rel_accel, test_total_accel = extract_peak_structural_response(
-        1, disp, slope, moment, storey_moment, shear, storey_shear, load, ground_accel, rel_accel, total_accel)
+        disp,
+        slope,
+        moment,
+        storey_moment,
+        shear,
+        storey_shear,
+        load,
+        ground_accel,
+        rel_accel,
+        total_accel,
+    )
     assert compare_is_close(test_disp, bench_disp)
     assert compare_is_close(test_slope, bench_slope)
     assert compare_is_close(test_moment, bench_moment)
