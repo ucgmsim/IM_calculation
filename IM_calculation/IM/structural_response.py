@@ -7,8 +7,8 @@ def load():
     # temporary to load time series
     # Remove in production
     station_data = [
-        "/home/jpa198/Downloads/20191201 CHCH Feb ground motion input/Observed_Records/ADCS_000_obs.m",
-        "/home/jpa198/Downloads/20191201 CHCH Feb ground motion input/Simulated_Records/ADCS_000_sim.m",
+        "/home/vap30/Downloads/Jae/20191201 CHCH Feb ground motion input/Observed_Records/ADCS_000_obs.m",
+        "/home/vap30/Downloads/Jae/20191201 CHCH Feb ground motion input/Simulated_Records/ADCS_000_sim.m",
     ]
     obssim = []
     for f in station_data:
@@ -466,12 +466,12 @@ def main():
     acc_obs, acc_sim = load()
 
     # largest translational period of the structure.
-    t1 = 2.0
+    t1 = 0.5
     # non-dimensional flexure-shear coefficient of the structure.  alpha=0 represents shear wall buildings.  alpha=30 represents moment frame buildings.
-    alpha = 30
+    alpha = 0
     # represents the number of equally spaced heights along the structure from which the analysis outputs will be recorded  (height of the structure is non-dimensional; 0 at base, 1 at top).
     storey = 10
-    c = 0.1
+    c=0.02
 
     # 3a calculate the vibration periods of the structure
     gamma, vibration_period = calculate_vibration_periods(alpha, t1)
