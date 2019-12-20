@@ -5,7 +5,7 @@ from IM_calculation.IM.structural_response import (
     sa_sd_time,
     calculate_vibration_periods,
     calculate_mode_shapes,
-    calculate_structural_response_B,
+    calculate_structural_response_b,
     calculate_structural_response,
     extract_peak_structural_response,
 )
@@ -723,7 +723,7 @@ def test_calculate_structural_response_b(
     bench_load,
     bench_rel_accel,
 ):
-    test_disp, test_slope, test_moment, test_shear, test_load, test_rel_accel = calculate_structural_response_B(
+    test_disp, test_slope, test_moment, test_shear, test_load, test_rel_accel = calculate_structural_response_b(
         participation_factor,
         phi,
         phi_1,

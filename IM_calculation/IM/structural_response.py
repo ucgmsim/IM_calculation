@@ -3,31 +3,6 @@
 import numpy as np
 
 
-def load():
-    # temporary to load time series
-    # Remove in production
-    station_data = [
-        "/home/vap30/Downloads/Jae/20191201 CHCH Feb ground motion input/Observed_Records/ADCS_000_obs.m",
-        "/home/vap30/Downloads/Jae/20191201 CHCH Feb ground motion input/Simulated_Records/ADCS_000_sim.m",
-    ]
-    obssim = []
-    for f in station_data:
-        with open(f, "r") as g:
-            g.readline()
-            g.readline()
-            obssim.append(
-                np.array(
-                    list(
-                        map(
-                            float,
-                            " ".join(list(map(str.rstrip, g.readlines()))).split(),
-                        )
-                    )
-                )
-            )
-    return obssim
-
-
 def sa_sd_time(
     acc, dt, t1_range=None, t1min=1e-06, t1max=5, nt=100, c=0.05, g=9.81, m=1
 ):
@@ -198,19 +173,11 @@ def calculate_vibration_periods(alpha, t1):
                 initial_eigenvalue / initial_eigenvalue_prime
             )
             j = 1
-            eigenvalue_j, eigenvalue_prime_j = eigenvalue_test(
-                alpha, gamma_nr_approx
-            )
+            eigenvalue_j, eigenvalue_prime_j = eigenvalue_test(alpha, gamma_nr_approx)
             gamma_nr_approx -= eigenvalue_j / eigenvalue_prime_j
             while j < 100 and not (
                 abs(eigenvalue_j) < tolerance
-                and (
-                    abs(
-                        abs(gamma_nr_approx)
-                        - abs(init_gamma_nr_approx)
-                    )
-                    < tolerance
-                )
+                and (abs(abs(gamma_nr_approx) - abs(init_gamma_nr_approx)) < tolerance)
             ):
                 eigenvalue_j, eigenvalue_prime_j = eigenvalue_test(
                     alpha, gamma_nr_approx
@@ -219,8 +186,7 @@ def calculate_vibration_periods(alpha, t1):
                 j += 1
 
             if abs(eigenvalue_j) < tolerance and (
-                abs(abs(gamma_nr_approx) - abs(init_gamma_nr_approx))
-                < tolerance
+                abs(abs(gamma_nr_approx) - abs(init_gamma_nr_approx)) < tolerance
             ):
                 gamma.append(gamma_nr_approx)
 
@@ -241,7 +207,7 @@ def calculate_vibration_periods(alpha, t1):
 
 def calculate_mode_shapes(alpha, gamma, storey):
 
-    storey_height = np.arange(storey + 1, dtype=np.float64) / storey
+    storey_height = np.arange(storey + 1) / storey
     beta = np.sqrt(alpha ** 2 + gamma ** 2)
     eta = ((gamma ** 2) * np.sin(gamma) + gamma * beta * np.sinh(beta)) / (
         gamma ** 2 * np.cos(gamma) + (beta ** 2) * np.cosh(beta)
@@ -301,7 +267,7 @@ def calculate_mode_shapes(alpha, gamma, storey):
     return phi, phi_1, phi_2, phi_3, phi_4, participation_factor
 
 
-def calculate_structural_response_B(
+def calculate_structural_response_b(
     participation_factor,
     phi,
     phi_1,
@@ -314,27 +280,14 @@ def calculate_structural_response_B(
     storey,
 ):
 
-    disp_time_history_per_EQ = np.dot(participation_factor * phi, sd_time)
-    moment_time_history_per_EQ = np.dot(participation_factor * phi_2, sd_time)
-    shear_time_history_per_EQ = np.dot(
-        participation_factor * (phi_3 - alpha ** 2 * phi_1), sd_time
-    )
-    load_time_history_per_EQ = np.dot(
-        participation_factor * (phi_4 - alpha ** 2 * phi_2), sd_time
-    )
-    rel_accel_time_history_per_EQ = np.dot(participation_factor * phi, sa_time)
-    slope_time_history_per_EQ = (
-        np.diff(disp_time_history_per_EQ, prepend=0, axis=0) * storey
-    )
+    displacement = np.dot(participation_factor * phi, sd_time)
+    moment = np.dot(participation_factor * phi_2, sd_time)
+    shear = np.dot(participation_factor * (phi_3 - alpha ** 2 * phi_1), sd_time)
+    load = np.dot(participation_factor * (phi_4 - alpha ** 2 * phi_2), sd_time)
+    rel_accel = np.dot(participation_factor * phi, sa_time)
+    slope = np.diff(displacement, prepend=0, axis=0) * storey
 
-    return (
-        disp_time_history_per_EQ,
-        slope_time_history_per_EQ,
-        moment_time_history_per_EQ,
-        shear_time_history_per_EQ,
-        load_time_history_per_EQ,
-        rel_accel_time_history_per_EQ,
-    )
+    return displacement, slope, moment, shear, load, rel_accel
 
 
 def calculate_structural_response(
@@ -359,7 +312,7 @@ def calculate_structural_response(
     )
 
     # calculate structural response
-    disp_time_history_per_EQ, slope_time_history_per_EQ, moment_time_history_per_EQ, shear_time_history_per_EQ, load_time_history_per_EQ, rel_accel_time_history_per_EQ = calculate_structural_response_B(
+    displacement, slope, moment, shear, load, rel_accel = calculate_structural_response_b(
         participation_factor,
         phi,
         phi_1,
@@ -373,140 +326,90 @@ def calculate_structural_response(
     )
 
     # creates matrices for storey shear and overturning moment
-    storey_shear_time_history_per_EQ = np.cumsum(
-        shear_time_history_per_EQ[::-1], axis=0
-    )[::-1]
-    storey_moment_time_history_per_EQ = np.cumsum(
-        moment_time_history_per_EQ[::-1], axis=0
-    )[::-1]
+    storey_shear = np.cumsum(shear[::-1], axis=0)[::-1]
+    storey_moment = np.cumsum(moment[::-1], axis=0)[::-1]
 
     # calculates total acceleration (floor acceleration) matrix
-    ground_accel_time_history_per_EQ = np.tile(g * acc_time_history, (storey+1, 1))
+    ground_accel = np.tile(g * acc_time_history, (storey + 1, 1))
 
-    total_accel_time_history_per_EQ = (
-        ground_accel_time_history_per_EQ + rel_accel_time_history_per_EQ
-    )
+    total_accel = ground_accel + rel_accel
 
     return (
-        disp_time_history_per_EQ,
-        slope_time_history_per_EQ,
-        moment_time_history_per_EQ,
-        storey_moment_time_history_per_EQ,
-        shear_time_history_per_EQ,
-        storey_shear_time_history_per_EQ,
-        load_time_history_per_EQ,
-        ground_accel_time_history_per_EQ,
-        rel_accel_time_history_per_EQ,
-        total_accel_time_history_per_EQ,
+        displacement,
+        slope,
+        moment,
+        storey_moment,
+        shear,
+        storey_shear,
+        load,
+        ground_accel,
+        rel_accel,
+        total_accel,
     )
 
 
 def extract_peak_structural_response(
-    disp_time_history_EQ_matrix,
-    slope_time_history_EQ_matrix,
-    moment_time_history_EQ_matrix,
-    storey_moment_time_history_EQ_matrix,
-    shear_time_history_EQ_matrix,
-    storey_shear_time_history_EQ_matrix,
-    load_time_history_EQ_matrix,
-    ground_accel_time_history_EQ_matrix,
-    rel_accel_time_history_EQ_matrix,
-    total_accel_time_history_EQ_matrix,
+    displacement,
+    slope,
+    moment,
+    storey_moment,
+    shear,
+    storey_shear,
+    load,
+    ground_accel,
+    rel_accel,
+    total_accel,
 ):
     # extracts the peak response structural response from the time history response matrices
 
-    disp_time_history_peak = np.max(np.abs(disp_time_history_EQ_matrix), axis=1)
-    slope_time_history_peak = np.max(np.abs(slope_time_history_EQ_matrix), axis=1)
-    moment_time_history_peak = np.max(np.abs(moment_time_history_EQ_matrix), axis=1)
-    storey_moment_time_history_peak = np.max(
-        np.abs(storey_moment_time_history_EQ_matrix), axis=1
-    )
-    shear_time_history_peak = np.max(np.abs(shear_time_history_EQ_matrix), axis=1)
-    storey_shear_time_history_peak = np.max(
-        np.abs(storey_shear_time_history_EQ_matrix), axis=1
-    )
-    load_time_history_peak = np.max(np.abs(load_time_history_EQ_matrix), axis=1)
-    ground_accel_time_history_peak = np.max(
-        np.abs(ground_accel_time_history_EQ_matrix), axis=1
-    )
-    rel_accel_time_history_peak = np.max(
-        np.abs(rel_accel_time_history_EQ_matrix), axis=1
-    )
-    total_accel_time_history_peak = np.max(
-        np.abs(total_accel_time_history_EQ_matrix), axis=1
-    )
+    displacement_peak = get_peak_values(displacement)
+    slope_peak = get_peak_values(slope)
+    moment_peak = get_peak_values(moment)
+    storey_moment_peak = get_peak_values(storey_moment)
+    shear_peak = get_peak_values(shear)
+    storey_shear_peak = get_peak_values(storey_shear)
+    load_peak = get_peak_values(load)
+    ground_accel_peak = get_peak_values(ground_accel)
+    rel_accel_peak = get_peak_values(rel_accel)
+    total_accel_peak = get_peak_values(total_accel)
 
     # shear is effectively zero at top, set it to zero
-    shear_time_history_peak[-1] = 0.0
-    storey_shear_time_history_peak[-1] = 0.0
+    shear_peak[-1] = 0.0
+    storey_shear_peak[-1] = 0.0
     # moment is effectively zero at top, set it to zero
-    moment_time_history_peak[-1] = 0.0
-    storey_moment_time_history_peak[-1] = 0.0
+    moment_peak[-1] = 0.0
+    storey_moment_peak[-1] = 0.0
 
     return (
-        disp_time_history_peak,
-        slope_time_history_peak,
-        moment_time_history_peak,
-        storey_moment_time_history_peak,
-        shear_time_history_peak,
-        storey_shear_time_history_peak,
-        load_time_history_peak,
-        ground_accel_time_history_peak,
-        rel_accel_time_history_peak,
-        total_accel_time_history_peak,
+        displacement_peak,
+        slope_peak,
+        moment_peak,
+        storey_moment_peak,
+        shear_peak,
+        storey_shear_peak,
+        load_peak,
+        ground_accel_peak,
+        rel_accel_peak,
+        total_accel_peak,
     )
 
 
+def get_peak_values(all_values):
+    return np.max(np.abs(all_values), axis=1)
 
-def main():
-    # Temporary for testing
-    # read timeseries
-    dt_obs = 0.005
-    dt_sim = 0.005
-    acc_obs, acc_sim = load()
 
-    # largest translational period of the structure.
-    t1 = 0.5
-    # non-dimensional flexure-shear coefficient of the structure.  alpha=0 represents shear wall buildings.  alpha=30 represents moment frame buildings.
-    alpha = 0
-    # represents the number of equally spaced heights along the structure from which the analysis outputs will be recorded  (height of the structure is non-dimensional; 0 at base, 1 at top).
-    storey = 10
-    c=0.02
-
+def get_structural_response(waveform, dt, storey, t1, alpha, c):
     # 3a calculate the vibration periods of the structure
     gamma, vibration_period = calculate_vibration_periods(alpha, t1)
     # 3b calculate the mode shapes of the structure
     phi, phi_1, phi_2, phi_3, phi_4, participation_factor = calculate_mode_shapes(
         alpha, gamma, storey
     )
-    print("VIBRATION PERIOD")
-    print(",".join(map(str, vibration_period)))
-    print("PARTICIPATION FACTOR")
-    print(",".join(map(str, participation_factor)))
-    varsp = {"PHI": phi}
-    for var in varsp:
-        print(var)
-        for i in range(phi.shape[0]):
-            print(",".join(map(str, varsp[var][i])))
     # 3c calculate structural response
-    disp_time_history_EQ_matrix_obs, slope_time_history_EQ_matrix_obs, moment_time_history_EQ_matrix_obs, storey_moment_time_history_EQ_matrix_obs, shear_time_history_EQ_matrix_obs, storey_shear_time_history_EQ_matrix_obs, load_time_history_EQ_matrix_obs, ground_accel_time_history_EQ_matrix_obs, rel_accel_time_history_EQ_matrix_obs, total_accel_time_history_EQ_matrix_obs = calculate_structural_response(
+    disp, slope, moment, storey_moment, shear, storey_shear, load, ground_accel, rel_accel, total_accel = calculate_structural_response(
         vibration_period,
-        acc_obs,
-        dt_obs,
-        storey,
-        participation_factor,
-        phi,
-        phi_1,
-        phi_2,
-        phi_3,
-        phi_4,
-        alpha,
-        c=c,
-    )
-    disp_time_history_EQ_matrix_sim, slope_time_history_EQ_matrix_sim, moment_time_history_EQ_matrix_sim, storey_moment_time_history_EQ_matrix_sim, shear_time_history_EQ_matrix_sim, storey_shear_time_history_EQ_matrix_sim, load_time_history_EQ_matrix_sim, ground_accel_time_history_EQ_matrix_sim, rel_accel_time_history_EQ_matrix_sim, total_accel_time_history_EQ_matrix_sim = calculate_structural_response(
-        vibration_period,
-        acc_sim,
-        dt_sim,
+        waveform,
+        dt,
         storey,
         participation_factor,
         phi,
@@ -518,77 +421,16 @@ def main():
         c=c,
     )
     # 3d extract peak structural response values from each earthquake ground motion record
-    disp_time_history_peak_obs, slope_time_history_peak_obs, moment_time_history_peak_obs, storey_moment_time_history_peak_obs, shear_time_history_peak_obs, storey_shear_time_history_peak_obs, load_time_history_peak_obs, ground_accel_time_history_peak_obs, rel_accel_time_history_peak_obs, total_accel_time_history_peak_obs = extract_peak_structural_response(
-        disp_time_history_EQ_matrix_obs,
-        slope_time_history_EQ_matrix_obs,
-        moment_time_history_EQ_matrix_obs,
-        storey_moment_time_history_EQ_matrix_obs,
-        shear_time_history_EQ_matrix_obs,
-        storey_shear_time_history_EQ_matrix_obs,
-        load_time_history_EQ_matrix_obs,
-        ground_accel_time_history_EQ_matrix_obs,
-        rel_accel_time_history_EQ_matrix_obs,
-        total_accel_time_history_EQ_matrix_obs,
+    disp_peak, slope_peak, moment_peak, storey_moment_peak, shear_peak, storey_shear_peak, load_peak, ground_accel_peak, rel_accel_peak, total_accel_peak = extract_peak_structural_response(
+        disp,
+        slope,
+        moment,
+        storey_moment,
+        shear,
+        storey_shear,
+        load,
+        ground_accel,
+        rel_accel,
+        total_accel,
     )
-    disp_time_history_peak_sim, slope_time_history_peak_sim, moment_time_history_peak_sim, storey_moment_time_history_peak_sim, shear_time_history_peak_sim, storey_shear_time_history_peak_sim, load_time_history_peak_sim, ground_accel_time_history_peak_sim, rel_accel_time_history_peak_sim, total_accel_time_history_peak_sim = extract_peak_structural_response(
-        disp_time_history_EQ_matrix_sim,
-        slope_time_history_EQ_matrix_sim,
-        moment_time_history_EQ_matrix_sim,
-        storey_moment_time_history_EQ_matrix_sim,
-        shear_time_history_EQ_matrix_sim,
-        storey_shear_time_history_EQ_matrix_sim,
-        load_time_history_EQ_matrix_sim,
-        ground_accel_time_history_EQ_matrix_sim,
-        rel_accel_time_history_EQ_matrix_sim,
-        total_accel_time_history_EQ_matrix_sim,
-    )
-
-    print(
-        "disp_time_history_peak, slope_time_history_peak, moment_time_history_peak, storey_moment_time_history_peak, shear_time_history_peak, storey_shear_time_history_peak, load_time_history_peak, ground_accel_time_history_peak, rel_accel_time_history_peak, total_accel_time_history_peak"
-    )
-    print("SIM")
-    for i in range(storey + 1):
-        print(
-            ",".join(
-                map(
-                    str,
-                    [
-                        disp_time_history_peak_sim[i],
-                        slope_time_history_peak_sim[i],
-                        moment_time_history_peak_sim[i],
-                        storey_moment_time_history_peak_sim[i],
-                        shear_time_history_peak_sim[i],
-                        storey_shear_time_history_peak_sim[i],
-                        load_time_history_peak_sim[i],
-                        ground_accel_time_history_peak_sim[i],
-                        rel_accel_time_history_peak_sim[i],
-                        total_accel_time_history_peak_sim[i],
-                    ],
-                )
-            )
-        )
-    print("OBS")
-    for i in range(storey + 1):
-        print(
-            ",".join(
-                map(
-                    str,
-                    [
-                        disp_time_history_peak_obs[i],
-                        slope_time_history_peak_obs[i],
-                        moment_time_history_peak_obs[i],
-                        storey_moment_time_history_peak_obs[i],
-                        shear_time_history_peak_obs[i],
-                        storey_shear_time_history_peak_obs[i],
-                        load_time_history_peak_obs[i],
-                        ground_accel_time_history_peak_obs[i],
-                        rel_accel_time_history_peak_obs[i],
-                        total_accel_time_history_peak_obs[i],
-                    ],
-                )
-            )
-        )
-
-
-if __name__ == "__main__":
-    main()
+    return disp_peak, moment_peak
