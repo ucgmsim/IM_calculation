@@ -277,7 +277,7 @@ def compute_measures_multiprocess(
     process=1,
     simple_output=False,
     units="g",
-    advanced_im_config=None,
+    advanced_im_config=advanced_IM_factory.advanced_im_config(None, None, None),
 ):
     """
     using multiprocesses to compute measures.
