@@ -44,16 +44,16 @@ def main():
     output_dir = args.output_dir
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
-    #TODO: add in 'ver' as a component? 
-    for component in ["000","090"]:
+    # TODO: add in 'ver' as a component?
+    for component in ["000", "090"]:
         component_outdir = os.path.join(output_dir, component)
-        #check if folder exist, if not create it (opensees does not create the folder and will crash)
+        # check if folder exist, if not create it (opensees does not create the folder and will crash)
         if not os.path.isdir(component_outdir):
             os.makedirs(component_outdir, exist_ok=True)
         script = [
             args.OpenSees_path,
             os.path.join(model_dir, "Run_script.tcl"),
-            getattr(args,'comp_'+ component),
+            getattr(args, "comp_" + component),
             component_outdir,
         ]
 
@@ -114,7 +114,7 @@ def create_im_csv(output_dir, im_name, component, component_outdir, print_header
 
     cols = list(result_df.columns)
     cols.sort()
-    #test if file exist, if exist, no header
+    # test if file exist, if exist, no header
     if os.path.isfile(im_csv_fname):
         print_header = False
     result_df.to_csv(im_csv_fname, mode="a", header=print_header, columns=cols)

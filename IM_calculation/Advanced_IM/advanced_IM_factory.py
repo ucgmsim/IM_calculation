@@ -14,10 +14,7 @@ VALUES_PER_LINE = 6
 advanced_im_config = namedtuple(
     "advanced_im_config", ["IM_list", "config_file", "OpenSees_path"]
 )
-COMP_DICT = {"090": 0,
-             "000": 1, 
-             "ver": 2,
-            }
+COMP_DICT = {"090": 0, "000": 1, "ver": 2}
 
 
 def get_config(config_file=CONFIG_FILE_NAME):
@@ -58,10 +55,8 @@ def compute_ims(accelerations, configuration, adv_im_out_dir):
                 configuration.OpenSees_path,
             ]
             # waveform component sequence
-            comp_list = ['000','090','ver']
-            script.extend(
-                [get_acc_filename(f_dir, station_name, x) for x in comp_list]
-            )
+            comp_list = ["000", "090", "ver"]
+            script.extend([get_acc_filename(f_dir, station_name, x) for x in comp_list])
             script.extend([out_dir])
 
             print(" ".join(script))

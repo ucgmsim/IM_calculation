@@ -127,7 +127,11 @@ def compute_adv_measure(waveform, advanced_im_config, output_dir):
                 waveform_acc, advanced_im_config, adv_im_out_dir
             )
     except AttributeError:
-        print("cannot access IM_list under advanced_im_config : {}".format(advanced_im_config))
+        print(
+            "cannot access IM_list under advanced_im_config : {}".format(
+                advanced_im_config
+            )
+        )
 
 
 def compute_measure_single(value_tuple):
@@ -226,32 +230,36 @@ def get_bbseis(input_path, file_type, selected_stations):
                 )
     return bbseries, list(station_names)
 
+
 def agg_csv(stations, im_calc_dir, im_type):
-    # get csv base on station name 
-    #quick check of args format
+    # get csv base on station name
+    # quick check of args format
     if type(im_type) != str:
-        raise TypeError("im_type should be a string, but get {} instead".format(type(im_type)))
-    #initial a blank dataframe 
+        raise TypeError(
+            "im_type should be a string, but get {} instead".format(type(im_type))
+        )
+    # initial a blank dataframe
     df = pd.DataFrame()
 
-    #loop through all stations
+    # loop through all stations
     for station in stations:
-        #use glob(?) and qcore.sim_struc to get specific station_im.csv
+        # use glob(?) and qcore.sim_struc to get specific station_im.csv
         # TODO: define this structure into qcore.sim_struct
         station_im_dir = os.path.join(im_calc_dir, station)
         im_type_path = os.path.join(station_im_dir, im_type)
-        im_path = os.path.join(im_type_path, im_type+'.csv') 
-        #read a df and add station name as colum
+        im_path = os.path.join(im_type_path, im_type + ".csv")
+        # read a df and add station name as colum
         df_tmp = pd.read_csv(im_path)
 
-        #add in the station name before agg
-        df_tmp.insert(0,'station', station)
-    
-        #append the df
+        # add in the station name before agg
+        df_tmp.insert(0, "station", station)
+
+        # append the df
         df = df.append(df_tmp)
 
-    #leave write csv to parent function
+    # leave write csv to parent function
     return df
+
 
 def compute_measures_multiprocess(
     input_path,
@@ -296,7 +304,7 @@ def compute_measures_multiprocess(
     bbseries, station_names = get_bbseis(input_path, file_type, station_names)
 
     total_stations = len(station_names)
-    #determine the size of each iteration base on num of processers
+    # determine the size of each iteration base on num of processers
     steps = get_steps(input_path, process, total_stations)
 
     all_result_dict = {}
@@ -324,19 +332,21 @@ def compute_measures_multiprocess(
         for waveform in waveforms:
             array_params.append((waveform, ims, comp, period, str_comps))
             adv_array_params.append((waveform, advanced_im_config, output_dir))
-        #only run simply im if and only if adv_im not going to run
+        # only run simply im if and only if adv_im not going to run
         if not advanced_im_config.IM_list:
             result_list = p.map(compute_measure_single, array_params)
             for result in result_list:
                 all_result_dict.update(result)
         if advanced_im_config.IM_list:
-            #calculate IM for stations in this iteration
+            # calculate IM for stations in this iteration
             p.starmap(compute_adv_measure, adv_array_params)
-            # read and agg data into a pandas array 
+            # read and agg data into a pandas array
             # loop through all im_type in advanced_im_config
             for im_type in advanced_im_config.IM_list:
-                #agg_csv(stations_to_run, output_dir, im_type)
-                df_adv_im[im_type] = df_adv_im[im_type].append( agg_csv(stations_to_run, output_dir, im_type))
+                # agg_csv(stations_to_run, output_dir, im_type)
+                df_adv_im[im_type] = df_adv_im[im_type].append(
+                    agg_csv(stations_to_run, output_dir, im_type)
+                )
 
     # write the ouput after all cals are done
     if not advanced_im_config.IM_list:
@@ -345,23 +355,28 @@ def compute_measures_multiprocess(
         )
     # write for advanced IM (pandas array)
     if advanced_im_config.IM_list:
-        #dump the whole array
+        # dump the whole array
         for im_type in advanced_im_config.IM_list:
-            #do a natural sort on the column names
-            df_adv_im[im_type] = df_adv_im[im_type][ list(df_adv_im[im_type].columns[:2]) + sorted(df_adv_im[im_type].columns[2:], key=natural_key)]
-            #check if file exist already, if exist header=False
-            adv_im_out = os.path.join(output_dir, im_type+'.csv')
-            print('Dumping adv_im data to : {}'.format(adv_im_out))
+            # do a natural sort on the column names
+            df_adv_im[im_type] = df_adv_im[im_type][
+                list(df_adv_im[im_type].columns[:2])
+                + sorted(df_adv_im[im_type].columns[2:], key=natural_key)
+            ]
+            # check if file exist already, if exist header=False
+            adv_im_out = os.path.join(output_dir, im_type + ".csv")
+            print("Dumping adv_im data to : {}".format(adv_im_out))
             if os.path.isfile(adv_im_out):
-                print_header=False
+                print_header = False
             else:
-                print_header=True
-            df_adv_im[im_type].to_csv(adv_im_out, mode='a', header=print_header, index=False)
+                print_header = True
+            df_adv_im[im_type].to_csv(
+                adv_im_out, mode="a", header=print_header, index=False
+            )
     generate_metadata(output_dir, identifier, rupture, run_type, version)
 
 
 def natural_key(string_):
-    return [int(s) if s.isdigit() else s for s in re.split(r'(\d+)', string_)]
+    return [int(s) if s.isdigit() else s for s in re.split(r"(\d+)", string_)]
 
 
 def get_result_filepath(output_folder, arg_identifier, suffix):
