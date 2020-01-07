@@ -398,7 +398,9 @@ def get_peak_values(all_values):
     return np.max(np.abs(all_values), axis=1)
 
 
-def get_structural_response(waveform: np.ndarray, dt: float, storey: int, t1: float, alpha: int, c: float):
+def get_structural_response(
+    waveform: np.ndarray, dt: float, storey: int, t1: float, alpha: int, c: float
+):
     # 3a calculate the vibration periods of the structure
     gamma, vibration_period = calculate_vibration_periods(alpha, t1)
     # 3b calculate the mode shapes of the structure
