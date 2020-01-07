@@ -4,16 +4,19 @@ import numpy as np
 
 
 def sa_sd_time(
-    acc, dt, t1_range=None, t1min=1e-06, t1max=5, nt=100, c=0.05, g=9.81, m=1
+    acc, dt, t1_range=None, t1min=1e-06, t1max=5, nt=100, c=0.05, g=True, m=1
 ):
-    # t1_range: give values instead of calculating them from min, max, nt
-    # t1min: minimum time period to be considered in the design acceleration spectra (seconds).
-    #        0 not chosen to avoid placing 0 in the denominator in later calculations.
-    # t1max: maximum time period to be considered in the design acceleration spectra (seconds).
-    # nt: number of points to be considered in the design acceleration spectra.
-    # c: damping  (c=0.05 represents 5% damping).
-    # g: 9.81 converts acceleration to ms-2;  (if g=1, unit will be in g because the unit of the acceleration record input is in g).
-    # m: 1 for fixed mass values (stiffness varied)
+    """
+    Calculates spectral acceleration and displacement with time for the given ground accelerations
+    :param t1_range: give values instead of calculating them from min, max, nt
+    :param t1min: minimum time period to be considered in the design acceleration spectra (seconds).
+           0 not chosen to avoid placing 0 in the denominator in later calculations.
+    :param t1max: maximum time period to be considered in the design acceleration spectra (seconds).
+    :param nt: number of points to be considered in the design acceleration spectra.
+    :param c: damping  (c=0.05 represents 5% damping).
+    :param g: Should the units be in terms of g, otherwise ms-2. Defaults to g
+    :param m: 1 for fixed mass values (stiffness varied)
+    """
 
     # period range of design acceleration spectra
     if t1_range is None:
@@ -31,7 +34,9 @@ def sa_sd_time(
     kt = m * (2 * np.pi / t1_range) ** 2
     omegat = np.sqrt(kt / m)
     ct = 2 * c * omegat * m
-    deltaaccg = np.diff(acc) * g
+    deltaaccg = np.diff(acc)
+    if g:
+        deltaaccg *= 9.81
 
     for i in range(len(t1_range)):
         # spectral acceleration terms use Newmark beta (Chopra, p177)
@@ -303,7 +308,7 @@ def calculate_structural_response(
     phi_4,
     alpha,
     c=0.05,
-    g=9.81,
+    g=True,
 ):
 
     # calculate spectral acceleration and spectral displacements
@@ -330,7 +335,7 @@ def calculate_structural_response(
     storey_moment = np.cumsum(moment[::-1], axis=0)[::-1]
 
     # calculates total acceleration (floor acceleration) matrix
-    ground_accel = np.tile(g * acc_time_history, (storey + 1, 1))
+    ground_accel = np.tile((1 + g * 8.81) * acc_time_history, (storey + 1, 1))
 
     total_accel = ground_accel + rel_accel
 
