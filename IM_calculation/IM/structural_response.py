@@ -3,9 +3,7 @@
 import numpy as np
 
 
-def sa_sd_time(
-    acc, dt, t1_range=None, t1min=1e-06, t1max=5, nt=100, c=0.05, g=True, m=1
-):
+def sa_sd_time(acc, dt, t1_range=None, t1min=1e-06, t1max=5, nt=100, c=0.05, m=1):
     """
     Calculates spectral acceleration and displacement with time for the given ground accelerations
     :param t1_range: give values instead of calculating them from min, max, nt
@@ -14,7 +12,6 @@ def sa_sd_time(
     :param t1max: maximum time period to be considered in the design acceleration spectra (seconds).
     :param nt: number of points to be considered in the design acceleration spectra.
     :param c: damping  (c=0.05 represents 5% damping).
-    :param g: Should the units be in terms of g, otherwise ms-2. Defaults to g
     :param m: 1 for fixed mass values (stiffness varied)
     """
 
@@ -35,8 +32,6 @@ def sa_sd_time(
     omegat = np.sqrt(kt / m)
     ct = 2 * c * omegat * m
     deltaaccg = np.diff(acc)
-    if g:
-        deltaaccg *= 9.81
 
     for i in range(len(t1_range)):
         # spectral acceleration terms use Newmark beta (Chopra, p177)
@@ -311,10 +306,11 @@ def calculate_structural_response(
     g=True,
 ):
 
+    if g:
+        acc_time_history *= 9.81
+
     # calculate spectral acceleration and spectral displacements
-    sa_time, sd_time = sa_sd_time(
-        acc_time_history, dt, t1_range=vibration_period, c=c, g=g
-    )
+    sa_time, sd_time = sa_sd_time(acc_time_history, dt, t1_range=vibration_period, c=c)
 
     # calculate structural response
     displacement, slope, moment, shear, load, rel_accel = calculate_structural_response_b(
@@ -335,7 +331,7 @@ def calculate_structural_response(
     storey_moment = np.cumsum(moment[::-1], axis=0)[::-1]
 
     # calculates total acceleration (floor acceleration) matrix
-    ground_accel = np.tile((1 + g * 8.81) * acc_time_history, (storey + 1, 1))
+    ground_accel = np.tile(acc_time_history, (storey + 1, 1))
 
     total_accel = ground_accel + rel_accel
 

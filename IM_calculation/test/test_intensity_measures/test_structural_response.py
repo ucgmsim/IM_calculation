@@ -516,7 +516,7 @@ def test_sa_sd_time(
     acc_time_history, dt, vibration_period, bench_sa_time, bench_sd_time
 ):
     test_sa_time, test_sd_time = sa_sd_time(
-        acc_time_history, dt, t1_range=vibration_period
+        acc_time_history * 9.81, dt, t1_range=vibration_period
     )
     assert compare_is_close(test_sa_time, bench_sa_time)
     assert compare_is_close(test_sd_time, bench_sd_time)
