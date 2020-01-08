@@ -400,7 +400,13 @@ def get_peak_values(all_values):
 
 
 def Taghavi_Miranda_2005(
-    waveform: np.ndarray, dt: float, t1: float, alpha: int, c: float, storey: int = 10, g: bool = True
+    waveform: np.ndarray,
+    dt: float,
+    t1: float,
+    alpha: int,
+    c: float,
+    storey: int = 10,
+    g: bool = True,
 ):
     # 3a calculate the vibration periods of the structure
     gamma, vibration_period = calculate_vibration_periods(alpha, t1)
