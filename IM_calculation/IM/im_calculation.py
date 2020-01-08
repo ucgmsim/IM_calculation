@@ -4,11 +4,14 @@ import glob
 import os
 import sys
 from datetime import datetime
+from multiprocessing.pool import Pool
 
 import numpy as np
 
 from IM_calculation.IM import read_waveform, intensity_measures
-from qcore import timeseries, pool_wrapper, constants
+from qcore import timeseries, constants
+
+from IM_calculation.IM.intensity_measures import get_rotd100_50
 
 G = 981.0
 IMS = ["PGA", "PGV", "CAV", "AI", "Ds575", "Ds595", "MMI", "pSA"]
@@ -96,14 +99,13 @@ def array_to_dict(value, str_comps, im, arg_comps):
     return value_dict
 
 
-def compute_measure_single(value_tuple):
+def compute_measure_single(waveform, ims, comps, period, str_comps):
     """
     Compute measures for a single station
     :param: a tuple consisting 5 params: waveform, ims, comp, period, str_comps
     waveform: a single tuple that contains (waveform_acc,waveform_vel)
     :return: {result[station_name]: {[im]: value or (period,value}}
     """
-    waveform, ims, comps, period, str_comps = value_tuple
     result = {}
     waveform_acc, waveform_vel = waveform
     DT = waveform_acc.DT
@@ -121,6 +123,12 @@ def compute_measure_single(value_tuple):
 
     result[station_name] = {}
 
+    if {"pSA", "rotd50", "rotd100", "rotd100/50"} & set(ims):
+        psa, u = intensity_measures.get_spectral_acceleration_nd(
+            accelerations, period, waveform_acc.NT, DT
+        )
+        if {"rotd50", "rotd100", "rotd100/50"} & set(ims):
+            rotd100, rotd50 = get_rotd100_50(u[:2])
     for im in ims:
         if im == "PGV":
             value = intensity_measures.get_max_nd(velocities)
@@ -129,9 +137,16 @@ def compute_measure_single(value_tuple):
             value = intensity_measures.get_max_nd(accelerations)
 
         if im == "pSA":
-            value = intensity_measures.get_spectral_acceleration_nd(
-                accelerations, period, waveform_acc.NT, DT
-            )
+            value = psa
+
+        if im == "rotd50":
+            value = rotd50
+
+        elif im == "rotd100":
+            value = rotd100
+
+        elif im == "rotd100/50":
+            value = rotd100 / rotd50
 
         # TODO: Speed up Ds calculations
         if im == "Ds595":
@@ -238,7 +253,7 @@ def compute_measures_multiprocess(
     steps = get_steps(input_path, process, total_stations)
 
     all_result_dict = {}
-    p = pool_wrapper.PoolWrapper(process)
+    p = Pool(process)
 
     i = 0
     while i < total_stations:
@@ -256,7 +271,7 @@ def compute_measures_multiprocess(
         for waveform in waveforms:
             array_params.append((waveform, ims, comp, period, str_comps))
 
-        result_list = p.map(compute_measure_single, array_params)
+        result_list = p.starmap(compute_measure_single, array_params)
 
         for result in result_list:
             all_result_dict.update(result)

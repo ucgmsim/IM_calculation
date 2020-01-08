@@ -34,10 +34,35 @@ def get_spectral_acceleration_nd(acceleration, period, NT, DT):
         dims = acceleration.shape[1]
         values = np.zeros((period.size, dims))
         for i in range(dims):
-            values[:, i] = get_spectral_acceleration(acceleration[:, i], period, NT, DT)
+            psa, u = get_spectral_acceleration(acceleration[:, i], period, NT, DT)
+            values[:, i] = psa
+
         return values
     else:
         return get_spectral_acceleration(acceleration, period, NT, DT)
+
+
+def get_rotd100_50(u):
+    rotd = [
+        np.sqrt(
+            np.sum(
+                np.dot(
+                    np.asarray(
+                        [
+                            [np.cos(theta), -np.sin(theta)],
+                            [np.sin(theta), np.cos(theta)],
+                        ]
+                    ),
+                    u,
+                )
+                ** 2
+            )
+        )
+        for theta in range(90)
+    ]
+    rotd50 = sorted(rotd)[int(len(rotd) / 2)]
+    rotd100 = max(rotd)
+    return rotd100, rotd50
 
 
 def get_cumulative_abs_velocity_nd(acceleration, times):
