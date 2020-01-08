@@ -399,8 +399,8 @@ def get_peak_values(all_values):
     return np.max(np.abs(all_values), axis=1)
 
 
-def get_structural_response(
-    waveform: np.ndarray, dt: float, storey: int, t1: float, alpha: int, c: float
+def Taghavi_Miranda_2005(
+    waveform: np.ndarray, dt: float, t1: float, alpha: int, c: float, storey: int = 10, g: bool = True
 ):
     # 3a calculate the vibration periods of the structure
     gamma, vibration_period = calculate_vibration_periods(alpha, t1)
@@ -422,6 +422,7 @@ def get_structural_response(
         phi_4,
         alpha,
         c=c,
+        g=g,
     )
     # 3d extract peak structural response values from each earthquake ground motion record
     disp_peak, slope_peak, moment_peak, storey_moment_peak, shear_peak, storey_shear_peak, load_peak, ground_accel_peak, rel_accel_peak, total_accel_peak = extract_peak_structural_response(
@@ -436,4 +437,4 @@ def get_structural_response(
         rel_accel,
         total_accel,
     )
-    return disp_peak, moment_peak
+    return disp_peak, slope_peak, storey_shear_peak, total_accel_peak

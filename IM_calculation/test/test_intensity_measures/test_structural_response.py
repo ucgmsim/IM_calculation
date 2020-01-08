@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from IM_calculation.IM.structural_response import (
+from IM_calculation.IM.Taghavi_Miranda_2005 import (
     sa_sd_time,
     calculate_vibration_periods,
     calculate_mode_shapes,
