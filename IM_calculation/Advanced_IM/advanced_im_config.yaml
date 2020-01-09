@@ -10,3 +10,5 @@ SAC_Steel_MF_3Story:
   script_location: 'Models/SAC_Steel_MF_3Story/run.py'
 SAC_Steel_MF_9Story:
   script_location: 'Models/SAC_Steel_MF_9Story/run.py'
+Taghavi_Miranda_2005:
+  script_location: 'Models/Taghavi_Miranda_2005/run.py'
