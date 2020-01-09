@@ -3,9 +3,8 @@ Python script to run a 3D waveform through Taghavi_Miranda_2005 and store the ou
 """
 
 import argparse
-import glob
+import logging
 import os
-import subprocess
 
 import numpy as np
 import pandas as pd
@@ -16,7 +15,7 @@ from qcore.timeseries import read_ascii
 model_dir = os.path.dirname(__file__)
 
 COMPONENT = ["000", "090"]
-ALPHA = [0,   1.5,   5,   15,   30]
+ALPHA = [0, 1.5, 5, 15, 30]
 C = [0.02, 0.05, 0.1]
 T = [0.1, 0.4, 0.7, 1.5, 3.0]
 STORIES = 10
@@ -38,22 +37,23 @@ def main():
         "output_dir",
         help="Where the IM_csv file is written to. Also contains the temporary recorders output",
     )
-    parser.add_argument(
-        "--OpenSees_path",
-        default="",
-        help="UNUSED but left for compatibility reasons",
-    )
 
-    args = parser.parse_args()
+    args, unused_args = parser.parse_known_args()
 
     output_dir = args.output_dir
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
 
+    log_file = os.path.join(args.output_dir, "log")
+    logging.basicConfig(
+        format="%(asctime)s %(message)s", filename=log_file, level=logging.DEBUG
+    )
+    logging.debug(f"Ignored arguments: {unused_args}")
+
     waveforms = {}
     waveforms["000"], meta = read_ascii(args.comp_000, meta=True)
     waveforms["090"] = read_ascii(args.comp_090)
-    dt = meta['dt']
+    dt = meta["dt"]
     results = {}
 
     for component in COMPONENT:
@@ -62,20 +62,31 @@ def main():
             for c in C:
                 for period in T:
                     im_name = f"TM05_a{a}_c{c}_T{period}"
-                    # print(f"calculating {im_name}")
-                    values = np.array(Taghavi_Miranda_2005(waveforms[component], dt, period, a, c,
-                                                           storey=STORIES))
+                    logging.info(f"calculating {im_name}")
+                    values = np.array(
+                        Taghavi_Miranda_2005(
+                            waveforms[component], dt, period, a, c, storey=STORIES
+                        )
+                    )
                     for i in range(STORIES + 1):
-                        disp_peak, slope_peak, storey_shear_peak, total_accel_peak = values[:, i]
-                        results[component][im_name + f'story{i}_disp_peak'] = disp_peak
-                        results[component][im_name + f'story{i}_slope_peak'] = slope_peak
-                        results[component][im_name + f'story{i}_storey_shear_peak'] = storey_shear_peak
-                        results[component][im_name + f'story{i}_total_accel_peak'] = total_accel_peak
+                        disp_peak, slope_peak, storey_shear_peak, total_accel_peak = values[
+                            :, i
+                        ]
+                        results[component][im_name + f"_story{i}_disp_peak"] = disp_peak
+                        results[component][
+                            im_name + f"story{i}_slope_peak"
+                        ] = slope_peak
+                        results[component][
+                            im_name + f"story{i}_storey_shear_peak"
+                        ] = storey_shear_peak
+                        results[component][
+                            im_name + f"story{i}_total_accel_peak"
+                        ] = total_accel_peak
 
     im_csv_fname = os.path.join(output_dir, "Taghavi_Miranda_2005.csv")
-    df = pd.DataFrame.from_dict(results, orient='index')
-    df.index.name = 'component'
-    geom = pd.Series(np.sqrt(df.loc["000"] * df.loc["090"]), name='geom')
+    df = pd.DataFrame.from_dict(results, orient="index")
+    df.index.name = "component"
+    geom = pd.Series(np.sqrt(df.loc["000"] * df.loc["090"]), name="geom")
     df = df.append(geom)
     df.to_csv(im_csv_fname)
 
