@@ -61,27 +61,24 @@ def main():
         for a in ALPHA:
             for c in C:
                 for period in T:
-                    im_name = f"TM05_a{a}_c{c}_T{period}"
+                    im_name = f"TM05_a{a}_c{c}_T{period}_story"
                     logging.info(f"calculating {im_name}")
-                    values = np.array(
-                        Taghavi_Miranda_2005(
-                            waveforms[component], dt, period, a, c, storey=STORIES
-                        )
+                    df = Taghavi_Miranda_2005(
+                        waveforms[component], dt, period, a, c, storey=STORIES
                     )
                     for i in range(STORIES + 1):
-                        disp_peak, slope_peak, storey_shear_peak, total_accel_peak = values[
-                            :, i
-                        ]
-                        results[component][im_name + f"_story{i}_disp_peak"] = disp_peak
+                        results[component][im_name + f"{i}_disp_peak"] = df.iloc[
+                            i
+                        ].disp_peak
+                        results[component][im_name + f"{i}_slope_peak"] = df.iloc[
+                            i
+                        ].slope_peak
                         results[component][
-                            im_name + f"story{i}_slope_peak"
-                        ] = slope_peak
-                        results[component][
-                            im_name + f"story{i}_storey_shear_peak"
-                        ] = storey_shear_peak
-                        results[component][
-                            im_name + f"story{i}_total_accel_peak"
-                        ] = total_accel_peak
+                            im_name + f"{i}_storey_shear_peak"
+                        ] = df.iloc[i].storey_shear_peak
+                        results[component][im_name + f"{i}_total_accel_peak"] = df.iloc[
+                            i
+                        ].total_accel_peak
 
     im_csv_fname = os.path.join(output_dir, "Taghavi_Miranda_2005.csv")
     df = pd.DataFrame.from_dict(results, orient="index")
