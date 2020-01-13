@@ -61,7 +61,7 @@ def main():
         for a in ALPHA:
             for c in C:
                 for period in T:
-                    im_name = f"TM05_a{a}_c{c}_T{period}_story"
+                    im_name = f"TM05_a{a}_c{c}_T{period}_storey"
                     logging.info(f"calculating {im_name}")
                     df = Taghavi_Miranda_2005(
                         waveforms[component], dt, period, a, c, storey=STORIES
