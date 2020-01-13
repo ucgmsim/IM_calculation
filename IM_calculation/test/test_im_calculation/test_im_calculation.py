@@ -396,29 +396,6 @@ class TestPickleTesting:
 
             filecmp.cmp(actual_output_path, expected_output_path)
 
-    def test_get_im_or_period_help(self, set_up):
-        function = "get_im_or_period_help"
-        for root_path in set_up:
-            with open(
-                os.path.join(root_path, INPUT, function + "_default_values.P"), "rb"
-            ) as load_file:
-                default_values = pickle.load(load_file)
-            with open(
-                os.path.join(root_path, INPUT, function + "_im_or_period.P"), "rb"
-            ) as load_file:
-                im_or_period = pickle.load(load_file)
-
-            actual_ret_val = calculate_ims.get_im_or_period_help(
-                default_values, im_or_period
-            )
-
-            with open(
-                os.path.join(root_path, OUTPUT, function + "_ret_val.P"), "rb"
-            ) as load_file:
-                expected_ret_val = pickle.load(load_file)
-
-            assert actual_ret_val == expected_ret_val
-
     def test_validate_input_path(self, set_up):
         function = "validate_input_path"
         for root_path in set_up:
