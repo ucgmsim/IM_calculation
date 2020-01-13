@@ -156,7 +156,7 @@ def main():
         im_options["pSA"] = calc.validate_period(parser, args.period, args.extended_period, im)
 
     if "FAS" in im:
-        im_options["FAS"] = calc.validate_period(parser, args.period, args.extended_period, im)
+        im_options["FAS"] = calc.validate_FAS_frequency(parser, args.period, args.extended_period, im)
 
     # Create output dir
     utils.setup_dir(args.output_path)

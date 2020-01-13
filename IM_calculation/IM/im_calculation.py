@@ -482,6 +482,25 @@ def validate_period(parser, arg_period, arg_extended_period, im):
     return period
 
 
+def validate_FAS_frequency(parser, arg_fas_freq, im):
+    """
+    returns validated user input if pass the validation else raise parser error
+    :param parser:
+    :param arg_period: input
+    :param arg_extended_period: input
+    :param im: validated im(s) in a list
+    :return: frequencies in a numpy array
+    """
+    frequencies = np.array(arg_fas_freq, dtype="float64")
+
+    if frequencies.any() and "FAS" not in im:
+        parser.error(
+            "FAS_frequency must be used with FAS, but FAS is not in the IM measures entered"
+        )
+
+    return frequencies
+
+
 def get_steps(input_path, nps, total_stations):
     """
     :param input_path: user input file/dir path
