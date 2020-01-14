@@ -126,8 +126,9 @@ class TestPickleTesting:
                 os.path.join(root_path, INPUT, function + "_value_tuple.P"), "rb"
             ) as load_file:
                 value_tuple = pickle.load(load_file)
-
-            actual_result = calculate_ims.compute_measure_single(value_tuple)
+            waveform, ims, comps, periods, str_comps = value_tuple
+            im_options = {"pSA":periods}
+            actual_result = calculate_ims.compute_measure_single(waveform, ims, comps, im_options, str_comps)
 
             with open(
                 os.path.join(root_path, OUTPUT, function + "_result.P"), "rb"
@@ -213,7 +214,7 @@ class TestPickleTesting:
                 station_names,
                 ims,
                 comp,
-                period,
+                {"pSA": period},
                 output,
                 identifier,
                 rupture,
@@ -262,7 +263,7 @@ class TestPickleTesting:
             ) as load_file:
                 period = pickle.load(load_file)
 
-            actual_header = calculate_ims.get_header(ims, period)
+            actual_header = calculate_ims.get_header(ims, {"pSA": period})
 
             with open(
                 os.path.join(root_path, OUTPUT, function + "_header.P"), "rb"
@@ -348,7 +349,7 @@ class TestPickleTesting:
                 exist_ok=True,
             )
             calculate_ims.write_result(
-                result_dict, output_folder, identifier, comp, ims, period, simple_output
+                result_dict, output_folder, identifier, comp, ims, {"pSA": period}, simple_output
             )
             expected_output_path = calculate_ims.get_result_filepath(
                 output_folder, identifier, ".csv"

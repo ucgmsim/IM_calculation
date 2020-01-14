@@ -129,7 +129,7 @@ def compute_measure_single(waveform, ims, comps, im_options, str_comps):
 
     if "PGV" in ims:
         value = intensity_measures.get_max_nd(velocities)
-        result[station_name]["PGA"] = array_to_dict(value, str_comps, "PGV", comps)
+        result[station_name]["PGV"] = array_to_dict(value, str_comps, "PGV", comps)
 
     if "PGA" in ims:
         value = intensity_measures.get_max_nd(accelerations)
@@ -172,23 +172,23 @@ def compute_measure_single(waveform, ims, comps, im_options, str_comps):
 
     if "MMI" in ims:
         value = intensity_measures.calculate_MMI_nd(velocities)
-        # value_dict = {}
-        # # ["090", "ver"], ["090", "000", "geom"], ["090", "000", "ver", "geom"]
-        # # [0, 2]          [0, 1]                  [0, 1, 2]
-        # for i in range(value.shape[-1]):
-        #     # pSA returns a 2D array
-        #     value_dict[str_comps[i]] = value[i]
-        # # In this case, if geom in str_comps,
-        # # it's guaranteed that 090 and 000 will be present in value_dict
-        # if "geom" in str_comps:
-        #     value_dict["geom"] = intensity_measures.get_geom(
-        #         value_dict["090"], value_dict["000"]
-        #     )
-        #     # then we pop unwanted keys from value_dict
-        #     for k in str_comps:
-        #         if k not in comps:
-        #             del value_dict[k]
-        result[station_name]["MMI"] = value
+        value_dict = {}
+        # ["090", "ver"], ["090", "000", "geom"], ["090", "000", "ver", "geom"]
+        # [0, 2]          [0, 1]                  [0, 1, 2]
+        for i in range(value.shape[-1]):
+            # pSA returns a 2D array
+            value_dict[str_comps[i]] = value[i]
+        # In this case, if geom in str_comps,
+        # it's guaranteed that 090 and 000 will be present in value_dict
+        if "geom" in str_comps:
+            value_dict["geom"] = intensity_measures.get_geom(
+                value_dict["090"], value_dict["000"]
+            )
+            # then we pop unwanted keys from value_dict
+            for k in str_comps:
+                if k not in comps:
+                    del value_dict[k]
+        result[station_name]["MMI"] = value_dict
 
     return result
 
