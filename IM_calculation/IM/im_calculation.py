@@ -172,7 +172,23 @@ def compute_measure_single(waveform, ims, comps, im_options, str_comps):
 
     if "MMI" in ims:
         value = intensity_measures.calculate_MMI_nd(velocities)
-        result[station_name]["MMI"] = array_to_dict(value, str_comps, "FAS", comps)
+        # value_dict = {}
+        # # ["090", "ver"], ["090", "000", "geom"], ["090", "000", "ver", "geom"]
+        # # [0, 2]          [0, 1]                  [0, 1, 2]
+        # for i in range(value.shape[-1]):
+        #     # pSA returns a 2D array
+        #     value_dict[str_comps[i]] = value[i]
+        # # In this case, if geom in str_comps,
+        # # it's guaranteed that 090 and 000 will be present in value_dict
+        # if "geom" in str_comps:
+        #     value_dict["geom"] = intensity_measures.get_geom(
+        #         value_dict["090"], value_dict["000"]
+        #     )
+        #     # then we pop unwanted keys from value_dict
+        #     for k in str_comps:
+        #         if k not in comps:
+        #             del value_dict[k]
+        result[station_name]["MMI"] = value
 
     return result
 
@@ -297,11 +313,11 @@ def get_header(ims, im_options):
 
     for im in ims:
         if im in MULTI_VALUE_IMS:  # only write period if im is pSA.
-            for p in im_options:
+            for p in im_options[im]:
                 if p in BSC_PERIOD:
                     psa_names.append(f"{im}_{p}")
                 else:
-                    psa_names.append("pSA_{:.12f}".format(p))
+                    psa_names.append("{}_{:.12f}".format(im, p))
             header += psa_names
         else:
             header.append(im)
