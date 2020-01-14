@@ -55,20 +55,22 @@ def get_fourier_spectrum(
         -1, 2, num=100, base=10.0
     ),
 ):
-    fa_spectrum, fa_frequencies = generate_fa_spectrum(waveform, dt, len(waveform))
-    fa_spectrum = np.abs(fa_spectrum)
+    returns = []
+    for w in waveform.T:
+        fa_spectrum, fa_frequencies = generate_fa_spectrum(w, dt, len(w))
+        fa_spectrum = np.abs(fa_spectrum)
 
-    # get appropriate konno ohmachi matrix
-    size = len(fa_spectrum)
-    konno = np.load(os.path.join(os.path.dirname(__file__), "KO_matrices", f"KO_{size-1}.npy"))
+        # get appropriate konno ohmachi matrix
+        size = len(fa_spectrum)
+        konno = np.load(os.path.join(os.path.dirname(__file__), "KO_matrices", f"KO_{size-1}.npy"))
 
-    # apply konno ohmachi smoothing
-    fa_smooth = np.dot(konno, fa_spectrum)
+        # apply konno ohmachi smoothing
+        fa_smooth = np.dot(konno, fa_spectrum)
 
-    # interpolate at output frequencies
-    fa_smooth_int = np.interp(fa_frequencies_int, fa_frequencies, fa_smooth)
+        # interpolate at output frequencies
+        returns.append(np.interp(fa_frequencies_int, fa_frequencies, fa_smooth))
 
-    return fa_smooth_int
+    return np.asarray(returns).T
 
 
 def main():

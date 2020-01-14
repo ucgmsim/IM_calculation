@@ -338,7 +338,7 @@ def write_rows(comps, station, ims, result_dict, big_csv_writer, sub_csv_writer=
     for c in comps:
         row = [station, c]
         for im in ims:
-            if im != "pSA":
+            if im not in MULTI_VALUE_IMS:
                 row.append(result_dict[station][im][c])
             else:
                 row += result_dict[station][im][1][c].tolist()

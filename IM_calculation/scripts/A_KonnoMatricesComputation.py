@@ -140,13 +140,15 @@ def createKonnoMatrices(install_directory, generate_on_disk: bool = False):
         # n = [512, 1024, 2048, 4096, 8192, 16384, 32768]
         n = 512 * 2 ** i
         file_name = os.path.join(root, f"KO_{n}.npy")
+        matrix = createKonnoMatrix_single(n * 2)
         if generate_on_disk:
-            createKonnoMatrix_single(n * 2, file_name).flush()
+            matrix.flush()
         else:
             np.save(
                 file_name,
-                createKonnoMatrix_single(n * 2),
+                matrix,
             )
+        del matrix
         print(f"Generated Konno {n}")
 
 def main():
