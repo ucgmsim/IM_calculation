@@ -72,7 +72,9 @@ def konno_ohmachi_smoothing_window(
     return smoothing_window
 
 
-def calculate_smoothing_matrix(frequencies, bandwidth=40.0, normalize=False, fn: str = None):
+def calculate_smoothing_matrix(
+    frequencies, bandwidth=40.0, normalize=False, fn: str = None
+):
     """
     Calculates a len(frequencies) x len(frequencies) matrix with the Konno &
     Ohmachi window for each frequency as the center frequency.
@@ -120,7 +122,9 @@ def calculate_smoothing_matrix(frequencies, bandwidth=40.0, normalize=False, fn:
 
 def getSmoothMatrix(ft_freq, fn: str = None):
     # creates Konno Ohmachi matrix
-    smooth_matrix = calculate_smoothing_matrix(ft_freq, bandwidth=20, normalize=True, fn=fn)
+    smooth_matrix = calculate_smoothing_matrix(
+        ft_freq, bandwidth=20, normalize=True, fn=fn
+    )
     return smooth_matrix
 
 
@@ -133,7 +137,9 @@ def createKonnoMatrix_single(ft_len, fn: str = None):
 
 
 def createKonnoMatrices(install_directory, generate_on_disk: bool = False):
-    root = os.path.abspath(os.path.join(install_directory, "IM_calculation", "IM", "KO_matrices"))
+    root = os.path.abspath(
+        os.path.join(install_directory, "IM_calculation", "IM", "KO_matrices")
+    )
     os.makedirs(root, exist_ok=True)
 
     for i in range(7):
@@ -144,12 +150,10 @@ def createKonnoMatrices(install_directory, generate_on_disk: bool = False):
         if generate_on_disk:
             matrix.flush()
         else:
-            np.save(
-                file_name,
-                matrix,
-            )
+            np.save(file_name, matrix)
         del matrix
         print(f"Generated Konno {n}")
+
 
 def main():
     curr_dir = os.path.dirname(__file__)
@@ -157,18 +161,15 @@ def main():
 
     for i in range(7):
         # n = [512, 1024, 2048, 4096, 8192, 16384, 32768]
-        n = 512*2**i
+        n = 512 * 2 ** i
         file_name = os.path.join(curr_dir, "KO_matrices", f"KO_{n}.npy")
         print(file_name)
         if not os.path.exists(file_name):
             print(f"Generating Konno {n}")
-            np.save(
-                file_name,
-                createKonnoMatrix_single(n*2),
-            )
+            np.save(file_name, createKonnoMatrix_single(n * 2))
         else:
             print(f"Skipping Konno {n}")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

@@ -66,7 +66,9 @@ def main():
         default=calc.DEFAULT_IMS,
         choices=calc.ALL_IMS,
         help="Please specify im measure(s) separated by a space(if more than one). "
-        "eg: PGV PGA CAV. {}".format(calc.get_im_or_period_help(calc.DEFAULT_IMS, calc.ALL_IMS, "IM")),
+        "eg: PGV PGA CAV. {}".format(
+            calc.get_im_or_period_help(calc.DEFAULT_IMS, calc.ALL_IMS, "IM")
+        ),
     )
     parser.add_argument(
         "-p",
@@ -92,7 +94,7 @@ def main():
         default=calc.FAS_FREQUENCY,
         type=float,
         help="Please provide fourier spectrum frequencies separated by a space. eg: "
-             "0.1 0.2 0.4",
+        "0.1 0.2 0.4",
     )
     # parser.add_argument(
     #     "--extended_fas_frequency",
@@ -153,7 +155,9 @@ def main():
     im_options = {}
 
     if "pSA" in im:
-        im_options["pSA"] = calc.validate_period(parser, args.period, args.extended_period, im)
+        im_options["pSA"] = calc.validate_period(
+            parser, args.period, args.extended_period, im
+        )
 
     if "FAS" in im:
         im_options["FAS"] = calc.validate_FAS_frequency(parser, args.fas_frequency, im)
