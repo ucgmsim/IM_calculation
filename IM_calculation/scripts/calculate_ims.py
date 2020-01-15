@@ -150,7 +150,7 @@ def main():
 
     run_type = calc.META_TYPE_DICT[args.run_type]
 
-    im = calc.validate_im(parser, args.im)
+    im = calc.validate_im(parser, args.im, args.components)
 
     im_options = {}
 

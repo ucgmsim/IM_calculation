@@ -42,27 +42,14 @@ def get_spectral_acceleration_nd(acceleration, period, NT, DT):
         return get_spectral_acceleration(acceleration, period, NT, DT)
 
 
-def get_rotd100_50(u):
-    rotd = [
-        np.sqrt(
-            np.sum(
-                np.dot(
-                    np.asarray(
-                        [
-                            [np.cos(theta), -np.sin(theta)],
-                            [np.sin(theta), np.cos(theta)],
-                        ]
-                    ),
-                    u,
-                )
-                ** 2
-            )
+def calc_rotd(waveforms, delta_theta=2):
+    rotd = []
+    for theta in range(0, 90, delta_theta):
+        rotation_matrix = np.asarray(
+            [[np.cos(theta), -np.sin(theta)], [np.sin(theta), np.cos(theta)]]
         )
-        for theta in range(90)
-    ]
-    rotd50 = sorted(rotd)[int(len(rotd) / 2)]
-    rotd100 = max(rotd)
-    return rotd100, rotd50
+        rotd.append(np.sqrt(np.sum(np.dot(rotation_matrix, waveforms) ** 2)))
+    return rotd
 
 
 def get_cumulative_abs_velocity_nd(acceleration, times):
