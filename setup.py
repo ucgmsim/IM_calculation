@@ -10,14 +10,7 @@ from distutils.extension import Extension
 
 import numpy
 
-try:
-    from Cython.Distutils import build_ext
-except ModuleNotFoundError as e:
-    print(e)
-    print("Cython not found, ignoring")
-
-    def build_ext(*args, **kwargs):
-        pass
+from Cython.Distutils import build_ext
 
 
 class build_konno_matricies(build_py):
