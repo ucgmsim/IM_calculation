@@ -143,6 +143,7 @@ def createKonnoMatrices(
         os.path.join(install_directory, "IM_calculation", "IM", "KO_matrices")
     )
     os.makedirs(root, exist_ok=True)
+    print(root)
 
     for i in range(num_to_gen):
         # n = [512, 1024, 2048, 4096, 8192, 16384, 32768]
