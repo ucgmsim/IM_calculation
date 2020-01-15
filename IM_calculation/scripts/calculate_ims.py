@@ -152,9 +152,7 @@ def main():
     im_options = {}
 
     if "pSA" in im:
-        im_options["pSA"] = calc.validate_period(
-            args.period, args.extended_period
-        )
+        im_options["pSA"] = calc.validate_period(args.period, args.extended_period)
 
     if "FAS" in im:
         im_options["FAS"] = calc.validate_FAS_frequency(args.fas_frequency)
