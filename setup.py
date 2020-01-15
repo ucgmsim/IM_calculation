@@ -28,7 +28,7 @@ class build_konno_matricies(build_py):
             createKonnoMatrices,
         )
 
-        createKonnoMatrices(self.build_lib)
+        createKonnoMatrices(self.build_lib, True)
         build_py.run(self)
 
 
