@@ -48,7 +48,7 @@ def calc_rotd(waveforms, delta_theta=2):
         rotation_matrix = np.asarray(
             [[np.cos(theta), -np.sin(theta)], [np.sin(theta), np.cos(theta)]]
         )
-        rotd.append(np.sqrt(np.sum(np.dot(rotation_matrix, waveforms) ** 2)))
+        rotd.append(np.sqrt(np.sum(np.dot(rotation_matrix, waveforms[:2]) ** 2)))
     return rotd
 
 

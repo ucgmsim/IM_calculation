@@ -105,6 +105,18 @@ def array_to_dict(value, str_comps, im, arg_comps):
     return value_dict
 
 
+def calculate_rotd(waveforms, str_comps, arg_comps):
+    rotd = sorted(intensity_measures.calc_rotd(waveforms))
+    value_dict = {}
+    if "rotd50" in str_comps:
+        value_dict["rotd50"] = rotd[len(rotd)//2]
+    if "rotd100" in str_comps:
+        value_dict["rotd100"] = rotd[-1]
+    if "rotd10050" in str_comps:
+        value_dict["rotd10050"] = rotd[-1]/rotd[len(rotd)//2]
+    return value_dict
+
+
 def compute_measure_single(waveform, ims, comps, im_options, str_comps):
     """
     Compute measures for a single station
@@ -129,15 +141,6 @@ def compute_measure_single(waveform, ims, comps, im_options, str_comps):
 
     result[station_name] = {}
 
-    if {"pSA", "rotd50", "rotd100", "rotd100/50"} & set(ims):
-        psa, u = intensity_measures.get_spectral_acceleration_nd(
-            accelerations, im_options["pSA"], waveform_acc.NT, DT
-        )
-        if {"SA", "rotd50", "rotd100", "rotd100/50"} & set(ims):
-            rotd = intensity_measures.calc_rotd(u[:2])
-            rotd50 = sorted(rotd)[len(rotd)//2]
-            rotd100 = sorted(rotd)[-1]
-
     if "PGV" in ims:
         value = intensity_measures.get_max_nd(velocities)
         result[station_name]["PGV"] = array_to_dict(value, str_comps, "PGV", comps)
@@ -149,10 +152,17 @@ def compute_measure_single(waveform, ims, comps, im_options, str_comps):
     if "pSA" in ims:
         # store a im type values into a dict {comp: np_array/single float}
         # Geometric is also calculated here
-        result[station_name]["pSA"] = (
-            im_options["pSA"],
+        psa, u = intensity_measures.get_spectral_acceleration_nd(
+            accelerations, im_options["pSA"], waveform_acc.NT, DT
+        )
+        pSA_values = (
+            im_options["pSA"],  # periods
             array_to_dict(psa, str_comps, "pSA", comps),
         )
+        rotd = calculate_rotd(u, str_comps, comps)
+        pSA_values[1].update(rotd)
+
+        result[station_name]["pSA"] = pSA_values
 
     if "FAS" in ims:
         value = get_fourier_spectrum(accelerations, DT, im_options["FAS"])
@@ -160,18 +170,6 @@ def compute_measure_single(waveform, ims, comps, im_options, str_comps):
             im_options["FAS"],
             (array_to_dict(value, str_comps, "FAS", comps)),
         )
-
-    if "rotd50" in ims:
-        value = rotd50
-        result[station_name]["rotd50"] = array_to_dict(value, str_comps, "rotd50", comps)
-
-    if "rotd100" in ims:
-        value = rotd100
-        result[station_name]["rotd100"] = array_to_dict(value, str_comps, "rotd100", comps)
-
-    elif "rotd100/50" in ims:
-        value = rotd100 / rotd50
-        result[station_name]["rotd100"] = array_to_dict(value, str_comps, "rotd100", comps)
 
     # TODO: Speed up Ds calculations
     if "Ds595" in ims:
@@ -460,7 +458,7 @@ def validate_input_path(parser, arg_input, arg_file_type):
             )
 
 
-def validate_im(parser, arg_im, components):
+def validate_im(parser, arg_im):
     """
     returns validated user input if pass the validation else raise parser error
     :param parser:
