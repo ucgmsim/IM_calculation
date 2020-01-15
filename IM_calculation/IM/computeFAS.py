@@ -5,7 +5,6 @@ Created on Mon Oct 14 11:06:47 2019
 
 @author: robin
 """
-import argparse
 import os
 from typing import List
 
@@ -19,30 +18,6 @@ def generate_fa_spectrum(y, dt, n):
     fa_spectrum = np.fft.rfft(y, n=nfft) * dt
     fa_frequencies = np.fft.rfftfreq(nfft, dt)
     return fa_spectrum, fa_frequencies
-
-
-def readGP(loc, fname):
-    """
-    Convenience function for reading files in the Graves and Pitarka format
-    """
-    with open("/".join([loc, fname]), "r") as f:
-        lines = f.readlines()
-
-    data = [[float(val) for val in line.split()] for line in lines[2:]]
-
-    data = np.concatenate(data)
-
-    line1 = lines[1].split()
-    num_pts = float(line1[0])
-    dt = float(line1[1])
-    shift = float(line1[4])
-
-    return data, num_pts, dt, shift
-
-
-def load_args():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("input_waveform")
 
 
 def get_fourier_spectrum(

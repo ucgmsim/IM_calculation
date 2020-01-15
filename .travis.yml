@@ -16,6 +16,7 @@ install:
   - unzip PangopangoF29_HYP01-10_S1244.zip
   - cd /home/travis/build/ucgmsim/IM_calculation
   - pip install -r requirements.txt
+  - pip install .
   - cd /home/travis/build/ucgmsim/
   - pip install --no-deps ./qcore/
     
