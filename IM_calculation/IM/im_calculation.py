@@ -459,7 +459,7 @@ def validate_im(parser, arg_im):
     return im
 
 
-def validate_period(parser, arg_period, arg_extended_period, im):
+def validate_period(arg_period, arg_extended_period):
     """
     returns validated user input if pass the validation else raise parser error
     :param parser:
@@ -473,30 +473,16 @@ def validate_period(parser, arg_period, arg_extended_period, im):
     if arg_extended_period:
         period = np.unique(np.append(period, EXT_PERIOD))
 
-    if (arg_extended_period or period.any()) and "pSA" not in im:
-        parser.error(
-            "period or extended period must be used with pSA, but pSA is not in the "
-            "IM measures entered"
-        )
-
     return period
 
 
-def validate_FAS_frequency(parser, arg_fas_freq, im):
+def validate_FAS_frequency(arg_fas_freq):
     """
     returns validated user input if pass the validation else raise parser error
-    :param parser:
-    :param arg_period: input
-    :param arg_extended_period: input
-    :param im: validated im(s) in a list
+    :param arg_fas_freq: input
     :return: frequencies in a numpy array
     """
     frequencies = np.array(arg_fas_freq, dtype="float64")
-
-    if frequencies.any() and "FAS" not in im:
-        parser.error(
-            "FAS_frequency must be used with FAS, but FAS is not in the IM measures entered"
-        )
 
     return frequencies
 
