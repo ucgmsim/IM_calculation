@@ -29,33 +29,23 @@ utils.setup_dir("fake_dir")
 
 
 @pytest.mark.parametrize(
-    "test_period, test_extended, test_im, expected_period",
+    "test_period, test_extended, expected_period",
     [
-        (BSC_PERIOD, False, TEST_IMS, np.array(BSC_PERIOD)),
+        (BSC_PERIOD, False, np.array(BSC_PERIOD)),
         (
             BSC_PERIOD,
             True,
-            TEST_IMS,
             np.unique(np.append(BSC_PERIOD, calculate_ims.EXT_PERIOD)),
         ),
     ],
 )
-def test_validate_period(test_period, test_extended, test_im, expected_period):
+def test_validate_period(test_period, test_extended, expected_period):
     assert all(
         np.equal(
-            calculate_ims.validate_period(PARSER, test_period, test_extended, test_im),
+            calculate_ims.validate_period(test_period, test_extended),
             expected_period,
         )
     )
-
-
-@pytest.mark.parametrize(
-    "test_period, test_extended, test_im",
-    [(BSC_PERIOD, False, TEST_IMS[:-1]), (BSC_PERIOD, True, TEST_IMS[:-1])],
-)
-def test_validate_period_fail(test_period, test_extended, test_im):
-    with pytest.raises(SystemExit):
-        calculate_ims.validate_period(PARSER, test_period, test_extended, test_im)
 
 
 @pytest.mark.parametrize("test_path, test_file_type", [("asdf", "b"), (FAKE_DIR, "b")])
@@ -438,13 +428,9 @@ class TestPickleTesting:
                 "rb",
             ) as load_file:
                 arg_extended_period = pickle.load(load_file)
-            with open(
-                os.path.join(root_path, INPUT, function + "_im.P"), "rb"
-            ) as load_file:
-                im = pickle.load(load_file)
 
             actual_period = calculate_ims.validate_period(
-                PARSER, arg_period, arg_extended_period, im
+                arg_period, arg_extended_period
             )
 
             with open(

@@ -289,7 +289,7 @@ def get_header(ims, im_options):
     """
     write header colums for output im_calculations csv file
     :param ims: a list of im measures
-    :param im_options: a list of pSA periods
+    :param im_options: a dictionary mapping IMs to lists of periods or frequencies
     :return: header
     """
     header = ["station", "component"]
@@ -400,18 +400,12 @@ def generate_metadata(output_folder, identifier, rupture, run_type, version):
         meta_writer.writerow([identifier, rupture, run_type, date, version])
 
 
-def get_im_or_period_help(available_values, default_values, im_or_period):
+def get_im_help():
     """
-    :param available_values: All available predefined constants. Must be a superset of default_values
-    :param default_values: predefined constants
-    :param im_or_period: should be either string "im" or string "period"
-    :return: a help message for input component arg
+    :return: a help message for im arguments
     """
-    return "Available {}s are: {} and default {}s are: {}".format(
-        im_or_period,
-        ",".join(str(v) for v in available_values),
-        im_or_period,
-        ",".join(str(v) for v in default_values),
+    return "Available ims are: {} and default ims are: {}".format(
+        ",".join(str(v) for v in ALL_IMS), ",".join(str(v) for v in DEFAULT_IMS)
     )
 
 
@@ -452,9 +446,7 @@ def validate_im(parser, arg_im):
         for m in im:
             if m not in ALL_IMS:
                 parser.error(
-                    "please enter valid im measure name. {}".format(
-                        get_im_or_period_help(ALL_IMS, DEFAULT_IMS, "IM")
-                    )
+                    "please enter valid im measure name. {}".format(get_im_help())
                 )
     return im
 

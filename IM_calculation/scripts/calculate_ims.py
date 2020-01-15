@@ -66,9 +66,7 @@ def main():
         default=calc.DEFAULT_IMS,
         choices=calc.ALL_IMS,
         help="Please specify im measure(s) separated by a space(if more than one). "
-        "eg: PGV PGA CAV. {}".format(
-            calc.get_im_or_period_help(calc.DEFAULT_IMS, calc.ALL_IMS, "IM")
-        ),
+        "eg: PGV PGA CAV. {}".format(calc.get_im_help()),
     )
     parser.add_argument(
         "-p",
@@ -77,8 +75,8 @@ def main():
         default=calc.BSC_PERIOD,
         type=float,
         help="Please provide pSA period(s) separated by a space. eg: "
-        "0.02 0.05 0.1. {}".format(
-            calc.get_im_or_period_help(calc.BSC_PERIOD, calc.BSC_PERIOD, "period")
+        "0.02 0.05 0.1. Default periods are: {}".format(
+            ",".join(str(v) for v in calc.BSC_PERIOD)
         ),
     )
     parser.add_argument(
