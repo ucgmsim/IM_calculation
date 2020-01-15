@@ -399,22 +399,6 @@ class TestPickleTesting:
             calculate_ims.validate_input_path(PARSER, arg_input, arg_file_type)
             # Function does not return anything, only raises errors through the parser
 
-    def test_validate_im(self, set_up):
-        function = "validate_im"
-        for root_path in set_up:
-            with open(
-                os.path.join(root_path, INPUT, function + "_arg_im.P"), "rb"
-            ) as load_file:
-                arg_im = pickle.load(load_file)
-
-            actual_im = calculate_ims.validate_im(PARSER, arg_im)
-
-            with open(
-                os.path.join(root_path, OUTPUT, function + "_im.P"), "rb"
-            ) as load_file:
-                expected_im = pickle.load(load_file)
-
-            assert actual_im == expected_im
 
     def test_validate_period(self, set_up):
         function = "validate_period"

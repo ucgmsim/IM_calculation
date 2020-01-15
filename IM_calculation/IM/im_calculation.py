@@ -14,10 +14,10 @@ from qcore import timeseries, constants
 from IM_calculation.IM.computeFAS import get_fourier_spectrum
 
 G = 981.0
-DEFAULT_IMS = ["PGA", "PGV", "CAV", "AI", "Ds575", "Ds595", "MMI", "pSA"]
-ALL_IMS = ["PGA", "PGV", "CAV", "AI", "Ds575", "Ds595", "MMI", "pSA", "FAS"]
+DEFAULT_IMS = ("PGA", "PGV", "CAV", "AI", "Ds575", "Ds595", "MMI", "pSA")
+ALL_IMS = ("PGA", "PGV", "CAV", "AI", "Ds575", "Ds595", "MMI", "pSA", "FAS")
 
-MULTI_VALUE_IMS = ["pSA", "FAS"]
+MULTI_VALUE_IMS = ("pSA", "FAS")
 
 EXT_PERIOD = np.logspace(start=np.log10(0.01), stop=np.log10(10.0), num=100, base=10)
 BSC_PERIOD = [
@@ -400,15 +400,6 @@ def generate_metadata(output_folder, identifier, rupture, run_type, version):
         meta_writer.writerow([identifier, rupture, run_type, date, version])
 
 
-def get_im_help():
-    """
-    :return: a help message for im arguments
-    """
-    return "Available ims are: {} and default ims are: {}".format(
-        ",".join(str(v) for v in ALL_IMS), ",".join(str(v) for v in DEFAULT_IMS)
-    )
-
-
 def validate_input_path(parser, arg_input, arg_file_type):
     """
     validate input path
@@ -432,23 +423,6 @@ def validate_input_path(parser, arg_input, arg_file_type):
                 "The path should be a directory but not a file. Correct "
                 "Sample: /home/tt/sims/"
             )
-
-
-def validate_im(parser, arg_im):
-    """
-    returns validated user input if pass the validation else raise parser error
-    :param parser:
-    :param arg_im: input
-    :return: validated im(s) in a list
-    """
-    im = arg_im
-    if im != ALL_IMS:
-        for m in im:
-            if m not in ALL_IMS:
-                parser.error(
-                    "please enter valid im measure name. {}".format(get_im_help())
-                )
-    return im
 
 
 def validate_period(arg_period, arg_extended_period):
