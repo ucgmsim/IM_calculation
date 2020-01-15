@@ -136,13 +136,13 @@ def createKonnoMatrix_single(ft_len, fn: str = None):
     return konno
 
 
-def createKonnoMatrices(install_directory, generate_on_disk: bool = False):
+def createKonnoMatrices(install_directory, generate_on_disk: bool = False, num_to_gen: int = 7):
     root = os.path.abspath(
         os.path.join(install_directory, "IM_calculation", "IM", "KO_matrices")
     )
     os.makedirs(root, exist_ok=True)
 
-    for i in range(7):
+    for i in range(num_to_gen):
         # n = [512, 1024, 2048, 4096, 8192, 16384, 32768]
         n = 512 * 2 ** i
         file_name = os.path.join(root, f"KO_{n}.npy")

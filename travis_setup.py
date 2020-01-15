@@ -10,15 +10,6 @@ from distutils.extension import Extension
 
 import numpy
 
-try:
-    from Cython.Distutils import build_ext
-except ModuleNotFoundError as e:
-    print(e)
-    print("Cython not found, ignoring")
-
-    def build_ext(*args, **kwargs):
-        pass
-
 
 class build_konno_matricies(build_py):
     """Post-installation for development mode."""
@@ -28,7 +19,7 @@ class build_konno_matricies(build_py):
             createKonnoMatrices,
         )
 
-        createKonnoMatrices(self.build_lib)
+        createKonnoMatrices(self.build_lib, True, 4)
         build_py.run(self)
 
 
@@ -39,7 +30,7 @@ setup(
     url="https://github.com/ucgmsim/IM_calculation",
     description="IM calculation code",
     install_requires=["numpy>=1.14.3", "numba>=0.43.1", "Cython", "pandas"],
-    cmdclass={"build_ext": build_ext, "build_py": build_konno_matricies},
+    cmdclass={"build_py": build_konno_matricies},
     ext_modules=[
         Extension(
             "IM_calculation.IM.rspectra_calculations.rspectra",
