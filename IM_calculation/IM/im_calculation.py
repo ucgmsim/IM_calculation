@@ -5,6 +5,7 @@ import os
 import sys
 from datetime import datetime
 from multiprocessing.pool import Pool
+from collections import ChainMap
 
 import numpy as np
 
@@ -147,11 +148,15 @@ def compute_measure_single(waveform, ims, comps, im_options, str_comps):
         )
 
     if "FAS" in ims:
-        value = get_fourier_spectrum(accelerations, DT, im_options["FAS"])
-        result[station_name]["FAS"] = (
-            im_options["FAS"],
-            (array_to_dict(value, str_comps, "FAS", comps)),
-        )
+        try:
+            value = get_fourier_spectrum(accelerations, DT, im_options["FAS"])
+        except FileNotFoundError as e:
+            print(f"Attempting to compute fourier spectrum raised exception: {e}\nThis was most likely caused by attempting to compute for a waveform with more than 16384 timesteps.")
+        else:
+            result[station_name]["FAS"] = (
+                im_options["FAS"],
+                (array_to_dict(value, str_comps, "FAS", comps)),
+            )
 
     # TODO: Speed up Ds calculations
     if "Ds595" in ims:
@@ -250,7 +255,7 @@ def compute_measures_multiprocess(
     total_stations = len(station_names)
     steps = get_steps(input_path, process, total_stations)
 
-    all_result_dict = {}
+    all_results = []
     p = Pool(process)
 
     i = 0
@@ -269,11 +274,9 @@ def compute_measures_multiprocess(
         for waveform in waveforms:
             array_params.append((waveform, ims, comp, im_options, str_comps))
 
-        result_list = p.starmap(compute_measure_single, array_params)
+        all_results.extend(p.starmap(compute_measure_single, array_params))
 
-        for result in result_list:
-            all_result_dict.update(result)
-
+    all_result_dict = ChainMap(*all_results)
     write_result(
         all_result_dict, output, identifier, comp, ims, im_options, simple_output
     )

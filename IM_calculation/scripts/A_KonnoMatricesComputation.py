@@ -137,7 +137,7 @@ def createKonnoMatrix_single(ft_len, fn: str = None):
 
 
 def createKonnoMatrices(
-    install_directory, generate_on_disk: bool = False, num_to_gen: int = 7
+    install_directory, generate_on_disk: bool = False, num_to_gen: int = 5
 ):
     root = os.path.abspath(
         os.path.join(install_directory, "IM_calculation", "IM", "KO_matrices")
