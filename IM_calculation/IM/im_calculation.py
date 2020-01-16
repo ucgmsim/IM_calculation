@@ -151,7 +151,9 @@ def compute_measure_single(waveform, ims, comps, im_options, str_comps):
         try:
             value = get_fourier_spectrum(accelerations, DT, im_options["FAS"])
         except FileNotFoundError as e:
-            print(f"Attempting to compute fourier spectrum raised exception: {e}\nThis was most likely caused by attempting to compute for a waveform with more than 16384 timesteps.")
+            print(
+                f"Attempting to compute fourier spectrum raised exception: {e}\nThis was most likely caused by attempting to compute for a waveform with more than 16384 timesteps."
+            )
         else:
             result[station_name]["FAS"] = (
                 im_options["FAS"],
