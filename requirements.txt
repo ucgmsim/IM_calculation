@@ -3,5 +3,6 @@ pytest-black
 numpy
 scipy
 numba
+obspy
 pandas
 PyYAML

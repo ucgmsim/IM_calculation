@@ -1,6 +1,7 @@
 import numpy as np
 import os
 
+from obspy.signal.konnoohmachismoothing import calculate_smoothing_matrix
 
 def konno_ohmachi_smoothing_window(
     frequencies, center_frequency, bandwidth=40.0, normalize=False
@@ -72,7 +73,7 @@ def konno_ohmachi_smoothing_window(
     return smoothing_window
 
 
-def calculate_smoothing_matrix(
+def calculate_smoothing_matrix_ours(
     frequencies, bandwidth=40.0, normalize=False, fn: str = None
 ):
     """
@@ -122,9 +123,10 @@ def calculate_smoothing_matrix(
 
 def getSmoothMatrix(ft_freq, fn: str = None):
     # creates Konno Ohmachi matrix
-    smooth_matrix = calculate_smoothing_matrix(
-        ft_freq, bandwidth=20, normalize=True, fn=fn
-    )
+    smooth_matrix = calculate_smoothing_matrix(ft_freq, bandwidth=20, normalize=True)
+    # smooth_matrix = calculate_smoothing_matrix(
+    #     ft_freq, bandwidth=20, normalize=True, fn=fn
+    # )
     return smooth_matrix
 
 
