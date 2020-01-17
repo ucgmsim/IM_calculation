@@ -19,7 +19,7 @@ def test_compute_FAS(set_up):
         with open(
             os.path.join(root_path, OUTPUT, function + "_ret_val.P"), "rb"
         ) as load_file:
-            bench_output = pickle.load(load_file)
+            bench_output = pickle.load(load_file)[:, :2]
 
         assert np.isclose(test_output, bench_output).all()
 
@@ -30,7 +30,7 @@ def test_generate_fa_spectrum(set_up):
         bb = BBSeis(os.path.join(root_path, INPUT, "BB.bin"))
         station = bb.stations[0].name
         waveform = bb.acc(station)[:100]
-        test_fa_spectrum, test_fa_frequencies = computeFAS.generate_fa_spectrum(waveform, bb.dt, waveform.shape[0])
+        test_fa_spectrum, test_fa_frequencies = computeFAS.generate_fa_spectrum(waveform[:, :2], bb.dt, waveform.shape[0])
 
         with open(
             os.path.join(root_path, OUTPUT, function + "_ret_val.P"), "rb"

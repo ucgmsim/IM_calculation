@@ -5,6 +5,7 @@ import os
 import sys
 from datetime import datetime
 from multiprocessing.pool import Pool
+from collections import ChainMap
 
 import numpy as np
 
@@ -16,10 +17,9 @@ from IM_calculation.IM.computeFAS import get_fourier_spectrum
 
 G = 981.0
 DEFAULT_IMS = ("PGA", "PGV", "CAV", "AI", "Ds575", "Ds595", "MMI", "pSA")
-ALL_IMS = ["PGA", "PGV", "CAV", "AI", "Ds575", "Ds595", "MMI", "pSA", "FAS"]
+ALL_IMS = ("PGA", "PGV", "CAV", "AI", "Ds575", "Ds595", "MMI", "pSA", "FAS")
 
-
-MULTI_VALUE_IMS = ["pSA", "FAS"]
+MULTI_VALUE_IMS = ("pSA", "FAS")
 
 EXT_PERIOD = np.logspace(start=np.log10(0.01), stop=np.log10(10.0), num=100, base=10)
 BSC_PERIOD = [
@@ -165,11 +165,17 @@ def compute_measure_single(waveform, ims, comps, im_options, str_comps):
         result[station_name]["pSA"] = pSA_values
 
     if "FAS" in ims:
-        value = get_fourier_spectrum(accelerations, DT, im_options["FAS"])
-        result[station_name]["FAS"] = (
-            im_options["FAS"],
-            (array_to_dict(value, str_comps, "FAS", comps)),
-        )
+        try:
+            value = get_fourier_spectrum(accelerations, DT, im_options["FAS"])
+        except FileNotFoundError as e:
+            print(
+                f"Attempting to compute fourier spectrum raised exception: {e}\nThis was most likely caused by attempting to compute for a waveform with more than 16384 timesteps."
+            )
+        else:
+            result[station_name]["FAS"] = (
+                im_options["FAS"],
+                (array_to_dict(value, str_comps, "FAS", comps)),
+            )
 
     # TODO: Speed up Ds calculations
     if "Ds595" in ims:
@@ -268,7 +274,7 @@ def compute_measures_multiprocess(
     total_stations = len(station_names)
     steps = get_steps(input_path, process, total_stations)
 
-    all_result_dict = {}
+    all_results = []
     p = Pool(process)
 
     i = 0
@@ -287,11 +293,9 @@ def compute_measures_multiprocess(
         for waveform in waveforms:
             array_params.append((waveform, ims, comp, im_options, str_comps))
 
-        result_list = p.starmap(compute_measure_single, array_params)
+        all_results.extend(p.starmap(compute_measure_single, array_params))
 
-        for result in result_list:
-            all_result_dict.update(result)
-
+    all_result_dict = ChainMap(*all_results)
     write_result(
         all_result_dict, output, identifier, comp, ims, im_options, simple_output
     )
@@ -307,7 +311,7 @@ def get_header(ims, im_options):
     """
     write header colums for output im_calculations csv file
     :param ims: a list of im measures
-    :param im_options: a list of pSA periods
+    :param im_options: a dictionary mapping IMs to lists of periods or frequencies
     :return: header
     """
     header = ["station", "component"]
@@ -418,21 +422,6 @@ def generate_metadata(output_folder, identifier, rupture, run_type, version):
         meta_writer.writerow([identifier, rupture, run_type, date, version])
 
 
-def get_im_or_period_help(available_values, default_values, im_or_period):
-    """
-    :param available_values: All available predefined constants. Must be a superset of default_values
-    :param default_values: predefined constants
-    :param im_or_period: should be either string "im" or string "period"
-    :return: a help message for input component arg
-    """
-    return "Available {}s are: {} and default {}s are: {}".format(
-        im_or_period,
-        ",".join(str(v) for v in available_values),
-        im_or_period,
-        ",".join(str(v) for v in default_values),
-    )
-
-
 def validate_input_path(parser, arg_input, arg_file_type):
     """
     validate input path
@@ -456,25 +445,6 @@ def validate_input_path(parser, arg_input, arg_file_type):
                 "The path should be a directory but not a file. Correct "
                 "Sample: /home/tt/sims/"
             )
-
-
-def validate_im(parser, arg_im):
-    """
-    returns validated user input if pass the validation else raise parser error
-    :param parser:
-    :param arg_im: input
-    :return: validated im(s) in a list
-    """
-    im = arg_im
-    if im != ALL_IMS:
-        for m in im:
-            if m not in ALL_IMS:
-                parser.error(
-                    "please enter valid im measure name. {}".format(
-                        get_im_or_period_help(ALL_IMS, DEFAULT_IMS, "IM")
-                    )
-                )
-    return im
 
 
 def validate_period(arg_period, arg_extended_period):

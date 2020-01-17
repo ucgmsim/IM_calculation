@@ -65,10 +65,7 @@ def main():
         nargs="+",
         default=calc.DEFAULT_IMS,
         choices=calc.ALL_IMS,
-        help="Please specify im measure(s) separated by a space(if more than one). "
-        "eg: PGV PGA CAV. {}".format(
-            calc.get_im_or_period_help(calc.DEFAULT_IMS, calc.ALL_IMS, "IM")
-        ),
+        help="Please specify im measure(s) separated by a space(if more than one). eg: PGV PGA CAV",
     )
     parser.add_argument(
         "-p",
@@ -77,8 +74,8 @@ def main():
         default=calc.BSC_PERIOD,
         type=float,
         help="Please provide pSA period(s) separated by a space. eg: "
-        "0.02 0.05 0.1. {}".format(
-            calc.get_im_or_period_help(calc.BSC_PERIOD, calc.BSC_PERIOD, "period")
+        "0.02 0.05 0.1. Default periods are: {}".format(
+            ",".join(str(v) for v in calc.BSC_PERIOD)
         ),
     )
     parser.add_argument(
@@ -150,17 +147,15 @@ def main():
 
     run_type = calc.META_TYPE_DICT[args.run_type]
 
-    im = calc.validate_im(parser, args.im, args.components)
+    im = args.im
 
     im_options = {}
 
     if "pSA" in im:
-        im_options["pSA"] = calc.validate_period(
-            parser, args.period, args.extended_period, im
-        )
+        im_options["pSA"] = calc.validate_period(args.period, args.extended_period)
 
     if "FAS" in im:
-        im_options["FAS"] = calc.validate_FAS_frequency(parser, args.fas_frequency, im)
+        im_options["FAS"] = calc.validate_FAS_frequency(args.fas_frequency)
 
     # Create output dir
     utils.setup_dir(args.output_path)
