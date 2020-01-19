@@ -1,5 +1,4 @@
 import csv
-import getpass
 import glob
 import os
 import sys
@@ -10,6 +9,7 @@ from collections import ChainMap
 import numpy as np
 
 from qcore import timeseries, constants
+from qcore.constants import Components
 
 from IM_calculation.IM import read_waveform, intensity_measures
 from IM_calculation.IM.computeFAS import get_fourier_spectrum
@@ -41,46 +41,24 @@ BSC_PERIOD = [
 ]
 FAS_FREQUENCY = np.logspace(-1, 2, num=100, base=10.0)
 
-COMPONENTS = ["090", "000", "ver", "geom", "rotd50", "rotd100", "rotd10050"]
 
 FILE_TYPE_DICT = {"a": "ascii", "b": "binary"}
 META_TYPE_DICT = {"s": "simulated", "o": "observed", "u": "unknown"}
 RUNNAME_DEFAULT = "all_station_ims"
 
-OUTPUT_PATH = os.path.join("/home", getpass.getuser())
 OUTPUT_SUBFOLDER = "stations"
 
 MEM_PER_CORE = 7.5e8
 MEM_FACTOR = 4
 
 
-def convert_str_comp(arg_comps):
-    """
-    convert arg comps to str_comps_for integer_convestion in read_waveform & str comps for writing result
-    :param arg_comps: user input a list of comp(s)
-    :return: two lists of str comps
-    """
-    # comps = ["000", "geom",'ver']
-    if "geom" in arg_comps or "rotd50" in arg_comps or "rotd100" in arg_comps or "rotd10050" in arg_comps:
-        # ['000', 'ver', '090', 'geom']
-        str_comps = list(set(arg_comps).union({"090", "000"}))
-        # for integer convention, str_comps shouldn't include geom as waveform has max 3 components
-        str_comps.remove("geom")
-        # for writing result, make a copy of the str_comps for int convention, and shift geom to the end
-        str_comps_for_writing = str_comps[:]
-        str_comps_for_writing.append("geom")
-        return str_comps, str_comps_for_writing
-    else:
-        return arg_comps, arg_comps
-
-
-def array_to_dict(value, str_comps, im, arg_comps):
+def array_to_dict(value, comps_to_calc, im, comps_to_store):
     """
     convert a numpy arrary that contains calculated im values to a dict {comp: value}
     :param value: calculated intensity measure for a waveform
-    :param str_comps: a list of components converted from user input
+    :param comps_to_calc: a list of components converted from user input
     :param im:
-    :param arg_comps:user input list of components
+    :param comps_to_store:user input list of components
     :return: a dict {comp: value}
     """
     value_dict = {}
@@ -89,35 +67,37 @@ def array_to_dict(value, str_comps, im, arg_comps):
     for i in range(value.shape[-1]):
         # pSA returns a 2D array
         if im in MULTI_VALUE_IMS:
-            value_dict[str_comps[i]] = value[:, i]
+            value_dict[comps_to_calc[i]] = value[:, i]
         else:
-            value_dict[str_comps[i]] = value[i]
+            value_dict[comps_to_calc[i]] = value[i]
     # In this case, if geom in str_comps,
     # it's guaranteed that 090 and 000 will be present in value_dict
-    if "geom" in str_comps:
-        value_dict["geom"] = intensity_measures.get_geom(
-            value_dict["090"], value_dict["000"]
+    if Components.cgeom in comps_to_calc:
+        value_dict[Components.cgeom] = intensity_measures.get_geom(
+            value_dict[Components.c090], value_dict[Components.c000]
         )
     # then we pop unwanted keys from value_dict
-    for k in str_comps:
-        if k not in arg_comps:
+    for k in comps_to_store:
+        if k not in comps_to_calc:
             del value_dict[k]
     return value_dict
 
 
-def calculate_rotd(waveforms, str_comps, arg_comps):
+def calculate_rotd(waveforms, comps_to_calculate):
     rotd = sorted(intensity_measures.calc_rotd(waveforms))
     value_dict = {}
-    if "rotd50" in str_comps:
-        value_dict["rotd50"] = rotd[len(rotd)//2]
-    if "rotd100" in str_comps:
+    if "rotd50" in comps_to_calculate:
+        value_dict["rotd50"] = rotd[len(rotd) // 2]
+    if "rotd100" in comps_to_calculate:
         value_dict["rotd100"] = rotd[-1]
-    if "rotd10050" in str_comps:
-        value_dict["rotd10050"] = rotd[-1]/rotd[len(rotd)//2]
+    if "rotd10050" in comps_to_calculate:
+        value_dict["rotd10050"] = rotd[-1] / rotd[len(rotd) // 2]
     return value_dict
 
 
-def compute_measure_single(waveform, ims, comps, im_options, str_comps):
+def compute_measure_single(
+    waveform, ims, comps_to_store, im_options, comps_to_calculate
+):
     """
     Compute measures for a single station
     :param: a tuple consisting 5 params: waveform, ims, comp, period, str_comps
@@ -143,11 +123,15 @@ def compute_measure_single(waveform, ims, comps, im_options, str_comps):
 
     if "PGV" in ims:
         value = intensity_measures.get_max_nd(velocities)
-        result[station_name]["PGV"] = array_to_dict(value, str_comps, "PGV", comps)
+        result[station_name]["PGV"] = array_to_dict(
+            value, comps_to_calculate, "PGV", comps_to_store
+        )
 
     if "PGA" in ims:
         value = intensity_measures.get_max_nd(accelerations)
-        result[station_name]["PGA"] = array_to_dict(value, str_comps, "PGA", comps)
+        result[station_name]["PGA"] = array_to_dict(
+            value, comps_to_calculate, "PGA", comps_to_store
+        )
 
     if "pSA" in ims:
         # store a im type values into a dict {comp: np_array/single float}
@@ -157,9 +141,9 @@ def compute_measure_single(waveform, ims, comps, im_options, str_comps):
         )
         pSA_values = (
             im_options["pSA"],  # periods
-            array_to_dict(psa, str_comps, "pSA", comps),
+            array_to_dict(psa, comps_to_calculate, "pSA", comps_to_store),
         )
-        rotd = calculate_rotd(u, str_comps, comps)
+        rotd = calculate_rotd(u, comps_to_calculate)
         pSA_values[1].update(rotd)
 
         result[station_name]["pSA"] = pSA_values
@@ -174,29 +158,39 @@ def compute_measure_single(waveform, ims, comps, im_options, str_comps):
         else:
             result[station_name]["FAS"] = (
                 im_options["FAS"],
-                (array_to_dict(value, str_comps, "FAS", comps)),
+                (array_to_dict(value, comps_to_calculate, "FAS", comps_to_store)),
             )
 
     # TODO: Speed up Ds calculations
     if "Ds595" in ims:
         value = intensity_measures.getDs_nd(DT, accelerations, 5, 95)
-        result[station_name]["Ds595"] = array_to_dict(value, str_comps, "Ds595", comps)
+        result[station_name]["Ds595"] = array_to_dict(
+            value, comps_to_calculate, "Ds595", comps_to_store
+        )
 
     if "Ds575" in ims:
         value = intensity_measures.getDs_nd(DT, accelerations, 5, 75)
-        result[station_name]["Ds575"] = array_to_dict(value, str_comps, "Ds575", comps)
+        result[station_name]["Ds575"] = array_to_dict(
+            value, comps_to_calculate, "Ds575", comps_to_store
+        )
 
     if "AI" in ims:
         value = intensity_measures.get_arias_intensity_nd(accelerations, G, times)
-        result[station_name]["AI"] = array_to_dict(value, str_comps, "AI", comps)
+        result[station_name]["AI"] = array_to_dict(
+            value, comps_to_calculate, "AI", comps_to_store
+        )
 
     if "CAV" in ims:
         value = intensity_measures.get_cumulative_abs_velocity_nd(accelerations, times)
-        result[station_name]["CAV"] = array_to_dict(value, str_comps, "CAV", comps)
+        result[station_name]["CAV"] = array_to_dict(
+            value, comps_to_calculate, "CAV", comps_to_store
+        )
 
     if "MMI" in ims:
         value = intensity_measures.calculate_MMI_nd(velocities)
-        result[station_name]["MMI"] = array_to_dict(value, str_comps, "MMI", comps)
+        result[station_name]["MMI"] = array_to_dict(
+            value, comps_to_calculate, "MMI", comps_to_store
+        )
 
     return result
 
@@ -267,7 +261,9 @@ def compute_measures_multiprocess(
     :param simple_output:
     :return:
     """
-    str_comps_for_int, str_comps = convert_str_comp(comp)
+    components_to_calculate, components_to_store = constants.Components.get_comps_to_calc_and_store(
+        comp
+    )
 
     bbseries, station_names = get_bbseis(input_path, file_type, station_names)
 
@@ -283,7 +279,7 @@ def compute_measures_multiprocess(
             input_path,
             bbseries,
             station_names[i : i + steps],
-            str_comps_for_int,
+            components_to_calculate,
             wave_type=wave_type,
             file_type=file_type,
             units=units,
@@ -291,13 +287,27 @@ def compute_measures_multiprocess(
         i += steps
         array_params = []
         for waveform in waveforms:
-            array_params.append((waveform, ims, comp, im_options, str_comps))
+            array_params.append(
+                (
+                    waveform,
+                    ims,
+                    components_to_calculate,
+                    im_options,
+                    components_to_store,
+                )
+            )
 
         all_results.extend(p.starmap(compute_measure_single, array_params))
 
     all_result_dict = ChainMap(*all_results)
     write_result(
-        all_result_dict, output, identifier, comp, ims, im_options, simple_output
+        all_result_dict,
+        output,
+        identifier,
+        components_to_store,
+        ims,
+        im_options,
+        simple_output,
     )
 
     generate_metadata(output, identifier, rupture, run_type, version)
@@ -342,7 +352,7 @@ def write_rows(comps, station, ims, result_dict, big_csv_writer, sub_csv_writer=
     :return: write a single row
     """
     for c in comps:
-        row = [station, c]
+        row = [station, str(c.str_value)]
         for im in ims:
             if im not in MULTI_VALUE_IMS:
                 row.append(result_dict[station][im][c])
@@ -382,7 +392,7 @@ def write_result(
                 station_csv = os.path.join(
                     output_folder,
                     OUTPUT_SUBFOLDER,
-                    "{}_{}.csv".format(station, "_".join(comps)),
+                    "{}_{}.csv".format(station, "_".join([c.str_value for c in comps])),
                 )
                 with open(station_csv, "w") as sub_csv_file:
                     sub_csv_writer = csv.writer(
