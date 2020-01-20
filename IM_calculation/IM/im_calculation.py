@@ -291,9 +291,9 @@ def compute_measures_multiprocess(
                 (
                     waveform,
                     ims,
-                    components_to_calculate,
-                    im_options,
                     components_to_store,
+                    im_options,
+                    components_to_calculate,
                 )
             )
 
@@ -355,9 +355,11 @@ def write_rows(comps, station, ims, result_dict, big_csv_writer, sub_csv_writer=
         row = [station, str(c.str_value)]
         for im in ims:
             if im not in MULTI_VALUE_IMS:
-                row.append(result_dict[station][im][c])
+                current_row = result_dict[station][im]
             else:
-                row += result_dict[station][im][1][c].tolist()
+                current_row = result_dict[station][im][1]
+            if c in current_row:
+                row += current_row[c].tolist()
         big_csv_writer.writerow(row)
         if sub_csv_writer:
             sub_csv_writer.writerow(row)
