@@ -255,7 +255,9 @@ def compute_measures_multiprocess(
     bbseries, station_names = get_bbseis(input_path, file_type, station_names)
 
     total_stations = len(station_names)
-    steps = get_steps(input_path, process, total_stations, "FAS" in ims and bbseries.nt > 32768)
+    steps = get_steps(
+        input_path, process, total_stations, "FAS" in ims and bbseries.nt > 32768
+    )
 
     all_results = []
     p = Pool(process)
