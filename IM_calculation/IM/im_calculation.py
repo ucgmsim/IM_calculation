@@ -5,6 +5,7 @@ import sys
 from datetime import datetime
 from multiprocessing.pool import Pool
 from collections import ChainMap
+from typing import List
 
 import numpy as np
 
@@ -72,26 +73,34 @@ def array_to_dict(value, comps_to_calc, im, comps_to_store):
             value_dict[comps_to_calc[i]] = value[i]
     # In this case, if geom in str_comps,
     # it's guaranteed that 090 and 000 will be present in value_dict
-    if Components.cgeom in comps_to_calc:
+    if Components.cgeom in comps_to_store:
         value_dict[Components.cgeom] = intensity_measures.get_geom(
             value_dict[Components.c090], value_dict[Components.c000]
         )
     # then we pop unwanted keys from value_dict
-    for k in comps_to_store:
-        if k not in comps_to_calc:
+    for k in comps_to_calc:
+        if k not in comps_to_store and k in value_dict:
             del value_dict[k]
     return value_dict
 
 
-def calculate_rotd(waveforms, comps_to_calculate):
-    rotd = sorted(intensity_measures.calc_rotd(waveforms))
+def calculate_rotd(spectral_displacements, comps_to_store: List[Components]):
+    """
+    Calculates rotd for given spectral displacements
+    :param spectral_displacements: An array with shape [periods.size, nt, 2] where nt is the number of timesteps in the original waveform
+    :param comps_to_store: A list of components to store
+    :return: A dictionary with the comps_to_store as keys, and 1d arrays of shape [periods.size] containing the rotd values
+    """
+    rotd = intensity_measures.calc_rotd(spectral_displacements)
     value_dict = {}
-    if "rotd50" in comps_to_calculate:
-        value_dict["rotd50"] = rotd[len(rotd) // 2]
-    if "rotd100" in comps_to_calculate:
-        value_dict["rotd100"] = rotd[-1]
-    if "rotd10050" in comps_to_calculate:
-        value_dict["rotd10050"] = rotd[-1] / rotd[len(rotd) // 2]
+    if Components.crotd50 in comps_to_store:
+        value_dict[Components.crotd50] = np.median(rotd, axis=1)
+    if Components.crotd100 in comps_to_store:
+        value_dict[Components.crotd100] = np.max(rotd, axis=1)
+    if Components.crotd100_50 in comps_to_store:
+        value_dict[Components.crotd100_50] = np.max(rotd, axis=1) / np.median(
+            rotd, axis=1
+        )
     return value_dict
 
 
@@ -143,7 +152,7 @@ def compute_measure_single(
             im_options["pSA"],  # periods
             array_to_dict(psa, comps_to_calculate, "pSA", comps_to_store),
         )
-        rotd = calculate_rotd(u, comps_to_calculate)
+        rotd = calculate_rotd(u, comps_to_store)
         pSA_values[1].update(rotd)
 
         result[station_name]["pSA"] = pSA_values
@@ -296,7 +305,6 @@ def compute_measures_multiprocess(
                     components_to_calculate,
                 )
             )
-
         all_results.extend(p.starmap(compute_measure_single, array_params))
 
     all_result_dict = ChainMap(*all_results)
@@ -354,6 +362,8 @@ def write_rows(comps, station, ims, result_dict, big_csv_writer, sub_csv_writer=
     for c in comps:
         row = [station, str(c.str_value)]
         for im in ims:
+            if im not in result_dict[station]:
+                print(f"IM {im} not available for this station ({station}), continuing")
             if im not in MULTI_VALUE_IMS:
                 current_row = result_dict[station][im]
             else:

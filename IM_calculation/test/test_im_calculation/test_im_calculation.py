@@ -7,6 +7,7 @@ import pickle
 
 import pytest
 import numpy as np
+from qcore.constants import Components
 
 import IM_calculation.IM.im_calculation as calculate_ims
 from qcore import utils
@@ -15,6 +16,7 @@ from IM_calculation.test.test_common_set_up import INPUT, OUTPUT, compare_dicts,
 # This is a hack, to allow loading of the test pickle objects
 import sys
 import IM_calculation.IM as IM
+
 sys.modules["IM"] = IM
 
 
@@ -32,18 +34,13 @@ utils.setup_dir("fake_dir")
     "test_period, test_extended, expected_period",
     [
         (BSC_PERIOD, False, np.array(BSC_PERIOD)),
-        (
-            BSC_PERIOD,
-            True,
-            np.unique(np.append(BSC_PERIOD, calculate_ims.EXT_PERIOD)),
-        ),
+        (BSC_PERIOD, True, np.unique(np.append(BSC_PERIOD, calculate_ims.EXT_PERIOD))),
     ],
 )
 def test_validate_period(test_period, test_extended, expected_period):
     assert all(
         np.equal(
-            calculate_ims.validate_period(test_period, test_extended),
-            expected_period,
+            calculate_ims.validate_period(test_period, test_extended), expected_period
         )
     )
 
@@ -64,7 +61,7 @@ class TestPickleTesting:
             ) as load_file:
                 comp = pickle.load(load_file)
 
-            int_comp, str_comp = calculate_ims.convert_str_comp(comp)
+            int_comp, str_comp = Components.get_comps_to_calc_and_store(comp)
 
             with open(
                 os.path.join(root_path, OUTPUT, function + "_str_comp_for_int.P"), "rb"
@@ -75,8 +72,8 @@ class TestPickleTesting:
             ) as load_file:
                 expected_str_comp = pickle.load(load_file)
 
-            assert sorted(int_comp) == sorted(expected_int_comp)
-            assert sorted(str_comp) == sorted(expected_str_comp)
+            assert [x.str_value for x in int_comp] == expected_int_comp
+            assert [x.str_value for x in str_comp] == expected_str_comp
 
     def test_array_to_dict(self, set_up):
         function = "array_to_dict"
@@ -98,6 +95,8 @@ class TestPickleTesting:
             ) as load_file:
                 im = pickle.load(load_file)
 
+            str_comps = [Components.from_str(x) for x in str_comps]
+            arg_comps = [Components.from_str(x) for x in arg_comps]
             actual_value_dict = calculate_ims.array_to_dict(
                 value, str_comps, im, arg_comps
             )
@@ -106,6 +105,9 @@ class TestPickleTesting:
                 os.path.join(root_path, OUTPUT, function + "_value_dict.P"), "rb"
             ) as load_file:
                 expected_value_dict = pickle.load(load_file)
+                for x in list(expected_value_dict.keys())[:]:
+                    expected_value_dict[Components.from_str(x)] = expected_value_dict[x]
+                    del expected_value_dict[x]
 
             assert actual_value_dict == expected_value_dict
 
@@ -117,13 +119,31 @@ class TestPickleTesting:
             ) as load_file:
                 value_tuple = pickle.load(load_file)
             waveform, ims, comps, periods, str_comps = value_tuple
-            im_options = {"pSA":periods}
-            actual_result = calculate_ims.compute_measure_single(waveform, ims, comps, im_options, str_comps)
+            im_options = {"pSA": periods}
+            comps = [Components.from_str(x) for x in comps]
+            str_comps = [Components.from_str(x) for x in str_comps]
+            actual_result = calculate_ims.compute_measure_single(
+                waveform, ims, comps, im_options, str_comps
+            )
 
             with open(
                 os.path.join(root_path, OUTPUT, function + "_result.P"), "rb"
             ) as load_file:
                 expected_result = pickle.load(load_file)
+                for station in expected_result.keys():
+                    for im in expected_result[station].keys():
+                        if im == "pSA":
+                            for comp in list(expected_result[station][im][1].keys()):
+                                expected_result[station][im][1][
+                                    Components.from_str(comp)
+                                ] = expected_result[station][im][1][comp]
+                                del expected_result[station][im][1][comp]
+                        else:
+                            for comp in list(expected_result[station][im].keys()):
+                                expected_result[station][im][
+                                    Components.from_str(comp)
+                                ] = expected_result[station][im][comp]
+                                del expected_result[station][im][comp]
 
             compare_dicts(actual_result, expected_result)
 
@@ -269,6 +289,7 @@ class TestPickleTesting:
                 os.path.join(root_path, INPUT, function + "_comp.P"), "rb"
             ) as load_file:
                 comps = pickle.load(load_file)
+                comps = [Components.from_str(c) for c in comps]
             with open(
                 os.path.join(root_path, INPUT, function + "_station.P"), "rb"
             ) as load_file:
@@ -286,6 +307,21 @@ class TestPickleTesting:
             big_csv_writer = csv.writer(big_csv)
             sub_csv = io.StringIO()
             sub_csv_writer = csv.writer(sub_csv)
+
+            for station_n in result_dict.keys():
+                for im in result_dict[station_n].keys():
+                    if im == "pSA":
+                        for compo in list(result_dict[station_n][im][1].keys()):
+                            result_dict[station_n][im][1][
+                                Components.from_str(compo)
+                            ] = result_dict[station_n][im][1][compo]
+                            del result_dict[station_n][im][1][compo]
+                    else:
+                        for compo in list(result_dict[station_n][im].keys()):
+                            result_dict[station_n][im][
+                                Components.from_str(compo)
+                            ] = result_dict[station_n][im][compo]
+                            del result_dict[station_n][im][compo]
 
             calculate_ims.write_rows(
                 comps,
@@ -338,8 +374,29 @@ class TestPickleTesting:
                 os.path.join(output_folder, calculate_ims.OUTPUT_SUBFOLDER),
                 exist_ok=True,
             )
+            comp = [Components.from_str(c) for c in comp]
+            for station in result_dict.keys():
+                for im in result_dict[station].keys():
+                    if im == "pSA":
+                        for compo in list(result_dict[station][im][1].keys()):
+                            result_dict[station][im][1][
+                                Components.from_str(compo)
+                            ] = result_dict[station][im][1][compo]
+                            del result_dict[station][im][1][compo]
+                    else:
+                        for compo in list(result_dict[station][im].keys()):
+                            result_dict[station][im][
+                                Components.from_str(compo)
+                            ] = result_dict[station][im][compo]
+                            del result_dict[station][im][compo]
             calculate_ims.write_result(
-                result_dict, output_folder, identifier, comp, ims, {"pSA": period}, simple_output
+                result_dict,
+                output_folder,
+                identifier,
+                comp,
+                ims,
+                {"pSA": period},
+                simple_output,
             )
             expected_output_path = calculate_ims.get_result_filepath(
                 output_folder, identifier, ".csv"
@@ -398,7 +455,6 @@ class TestPickleTesting:
 
             calculate_ims.validate_input_path(PARSER, arg_input, arg_file_type)
             # Function does not return anything, only raises errors through the parser
-
 
     def test_validate_period(self, set_up):
         function = "validate_period"
