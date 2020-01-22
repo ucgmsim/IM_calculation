@@ -255,7 +255,7 @@ def compute_measures_multiprocess(
     bbseries, station_names = get_bbseis(input_path, file_type, station_names)
 
     total_stations = len(station_names)
-    steps = get_steps(input_path, process, total_stations)
+    steps = get_steps(input_path, process, total_stations, "FAS" in ims and bbseries.nt > 32768)
 
     all_results = []
     p = Pool(process)
@@ -458,14 +458,17 @@ def validate_FAS_frequency(arg_fas_freq):
     return frequencies
 
 
-def get_steps(input_path, nps, total_stations):
+def get_steps(input_path, nps, total_stations, high_mem_usage=False):
     """
     :param input_path: user input file/dir path
     :param nps: number of processes
     :param total_stations: total number of stations
+    :param high_mem_usage: If a calculation requiring even larger amounts of RAM is required (ie FAS), this increases the estimated RAM even further
     :return: number of stations per iteration/batch
     """
     estimated_mem = os.stat(input_path).st_size * MEM_FACTOR
+    if high_mem_usage:
+        estimated_mem *= MEM_FACTOR
     available_mem = nps * MEM_PER_CORE
     batches = np.ceil(np.divide(estimated_mem, available_mem))
     steps = int(np.floor(np.divide(total_stations, batches)))
