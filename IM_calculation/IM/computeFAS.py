@@ -35,7 +35,7 @@ def get_fourier_spectrum(
     size = len(fa_spectrum)
     konno = np.load(
         os.path.join(os.path.dirname(__file__), "KO_matrices", f"KO_{size-1}.npy"),
-        mmap_mode="r+",
+        mmap_mode="r",
     )
 
     # apply konno ohmachi smoothing
