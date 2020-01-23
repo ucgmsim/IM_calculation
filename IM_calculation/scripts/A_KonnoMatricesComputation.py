@@ -12,7 +12,7 @@ def createKonnoMatrix_single(ft_len):
     return konno
 
 
-def createKonnoMatrices(install_directory, num_to_gen: int = 5):
+def createKonnoMatrices(install_directory, num_to_gen: int = 7):
     root = os.path.abspath(
         os.path.join(install_directory, "IM_calculation", "IM", "KO_matrices")
     )
