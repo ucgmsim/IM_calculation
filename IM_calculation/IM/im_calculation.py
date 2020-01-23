@@ -154,7 +154,11 @@ def compute_measure_single(
             im_options["pSA"],  # periods
             array_to_dict(psa, comps_to_calculate, "pSA", comps_to_store),
         )
-        if {Components.crotd50, Components.crotd100, Components.crotd100_50}.intersection(comps_to_store):
+        if {
+            Components.crotd50,
+            Components.crotd100,
+            Components.crotd100_50,
+        }.intersection(comps_to_store):
             # Only run if any of the given components are selected (Non empty intersection)
             rotd = calculate_rotd(spectral_displacements, comps_to_store)
             pSA_values[1].update(rotd)
