@@ -63,9 +63,9 @@ def main():
         "-m",
         "--im",
         nargs="+",
-        default=calc.IMS,
-        help="Please specify im measure(s) separated by a space(if more than one). "
-        "eg: PGV PGA CAV. {}".format(calc.get_im_or_period_help(calc.IMS, "IM")),
+        default=calc.DEFAULT_IMS,
+        choices=calc.ALL_IMS,
+        help="Please specify im measure(s) separated by a space(if more than one). eg: PGV PGA CAV",
     )
     parser.add_argument(
         "-p",
@@ -74,8 +74,8 @@ def main():
         default=calc.BSC_PERIOD,
         type=float,
         help="Please provide pSA period(s) separated by a space. eg: "
-        "0.02 0.05 0.1. {}".format(
-            calc.get_im_or_period_help(calc.BSC_PERIOD, "period")
+        "0.02 0.05 0.1. Default periods are: {}".format(
+            ",".join(str(v) for v in calc.BSC_PERIOD)
         ),
     )
     parser.add_argument(
@@ -85,6 +85,20 @@ def main():
         help="Please add '-e' to indicate the use of extended(100) pSA periods. "
         "Default not using",
     )
+    parser.add_argument(
+        "--fas_frequency",
+        nargs="+",
+        default=calc.FAS_FREQUENCY,
+        type=float,
+        help="Please provide fourier spectrum frequencies separated by a space. eg: "
+        "0.1 0.2 0.4",
+    )
+    # parser.add_argument(
+    #     "--extended_fas_frequency",
+    #     "-f",
+    #     action="store_true",
+    #     help="Please add '-f' to indicate the use of extended(100) FAS frequencies. Default not using",
+    # )
     parser.add_argument(
         "-n",
         "--station_names",
@@ -133,9 +147,15 @@ def main():
 
     run_type = calc.META_TYPE_DICT[args.run_type]
 
-    im = calc.validate_im(parser, args.im)
+    im = args.im
 
-    period = calc.validate_period(parser, args.period, args.extended_period, im)
+    im_options = {}
+
+    if "pSA" in im:
+        im_options["pSA"] = calc.validate_period(args.period, args.extended_period)
+
+    if "FAS" in im:
+        im_options["FAS"] = calc.validate_FAS_frequency(args.fas_frequency)
 
     # Create output dir
     utils.setup_dir(args.output_path)
@@ -150,7 +170,7 @@ def main():
         station_names=args.station_names,
         ims=im,
         comp=args.components,
-        period=period,
+        im_options=im_options,
         output=args.output_path,
         identifier=args.identifier,
         rupture=args.rupture,
