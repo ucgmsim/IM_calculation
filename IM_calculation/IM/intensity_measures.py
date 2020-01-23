@@ -46,7 +46,7 @@ def get_spectral_acceleration_nd(acceleration, period, NT, DT):
 
 def calc_rotd(
     spectral_displacements,
-    delta_theta: int = 2,
+    delta_theta: int = 1,
     min_angle: int = 0,
     max_angle: int = 180,
 ):
