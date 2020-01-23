@@ -110,7 +110,7 @@ def main():
         "--components",
         nargs="+",
         choices=list(Components.iterate_str_values()),
-        default=list(Components.iterate_str_values())[:4],
+        default=[Components.cgeom.str_value],
         help="Please provide the velocity/acc component(s) you want to calculate eg.geom."
         " Available compoents are: {} components. Default is all components".format(
             ",".join(Components.iterate_str_values())

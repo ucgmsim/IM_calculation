@@ -51,6 +51,23 @@ def test_validate_input_path_fail(test_path, test_file_type):
         calculate_ims.validate_input_path(PARSER, test_path, test_file_type)
 
 
+def convert_str_comps_to_enum(expected_result):
+    for station in expected_result.keys():
+        for im in expected_result[station].keys():
+            if im == "pSA":
+                for comp in expected_result[station][im][1]:
+                    expected_result[station][im][1][
+                        Components.from_str(comp)
+                    ] = expected_result[station][im][1][comp]
+                    del expected_result[station][im][1][comp]
+            else:
+                for comp in expected_result[station][im]:
+                    expected_result[station][im][
+                        Components.from_str(comp)
+                    ] = expected_result[station][im][comp]
+                    del expected_result[station][im][comp]
+
+
 class TestPickleTesting:
     def test_convert_str_comp(self, set_up):
         function = "convert_str_comp"
@@ -105,7 +122,7 @@ class TestPickleTesting:
                 os.path.join(root_path, OUTPUT, function + "_value_dict.P"), "rb"
             ) as load_file:
                 expected_value_dict = pickle.load(load_file)
-                for x in list(expected_value_dict.keys())[:]:
+                for x in list(expected_value_dict.keys()):
                     expected_value_dict[Components.from_str(x)] = expected_value_dict[x]
                     del expected_value_dict[x]
 
@@ -130,22 +147,11 @@ class TestPickleTesting:
                 os.path.join(root_path, OUTPUT, function + "_result.P"), "rb"
             ) as load_file:
                 expected_result = pickle.load(load_file)
-                for station in expected_result.keys():
-                    for im in expected_result[station].keys():
-                        if im == "pSA":
-                            for comp in list(expected_result[station][im][1].keys()):
-                                expected_result[station][im][1][
-                                    Components.from_str(comp)
-                                ] = expected_result[station][im][1][comp]
-                                del expected_result[station][im][1][comp]
-                        else:
-                            for comp in list(expected_result[station][im].keys()):
-                                expected_result[station][im][
-                                    Components.from_str(comp)
-                                ] = expected_result[station][im][comp]
-                                del expected_result[station][im][comp]
+                convert_str_comps_to_enum(expected_result)
 
             compare_dicts(actual_result, expected_result)
+
+
 
     def test_get_bbseis(self, set_up):
         function = "get_bbseis"
@@ -302,26 +308,12 @@ class TestPickleTesting:
                 os.path.join(root_path, INPUT, function + "_result_dict.P"), "rb"
             ) as load_file:
                 result_dict = pickle.load(load_file)
+                convert_str_comps_to_enum(result_dict)
 
             big_csv = io.StringIO()
             big_csv_writer = csv.writer(big_csv)
             sub_csv = io.StringIO()
             sub_csv_writer = csv.writer(sub_csv)
-
-            for station_n in result_dict.keys():
-                for im in result_dict[station_n].keys():
-                    if im == "pSA":
-                        for compo in list(result_dict[station_n][im][1].keys()):
-                            result_dict[station_n][im][1][
-                                Components.from_str(compo)
-                            ] = result_dict[station_n][im][1][compo]
-                            del result_dict[station_n][im][1][compo]
-                    else:
-                        for compo in list(result_dict[station_n][im].keys()):
-                            result_dict[station_n][im][
-                                Components.from_str(compo)
-                            ] = result_dict[station_n][im][compo]
-                            del result_dict[station_n][im][compo]
 
             calculate_ims.write_rows(
                 comps,
@@ -347,6 +339,7 @@ class TestPickleTesting:
                 os.path.join(root_path, INPUT, function + "_result_dict.P"), "rb"
             ) as load_file:
                 result_dict = pickle.load(load_file)
+                convert_str_comps_to_enum(result_dict)
             with open(
                 os.path.join(root_path, INPUT, function + "_identifier.P"), "rb"
             ) as load_file:
@@ -355,6 +348,7 @@ class TestPickleTesting:
                 os.path.join(root_path, INPUT, function + "_comp.P"), "rb"
             ) as load_file:
                 comp = pickle.load(load_file)
+                comp = [Components.from_str(c) for c in comp]
             with open(
                 os.path.join(root_path, INPUT, function + "_ims.P"), "rb"
             ) as load_file:
@@ -374,21 +368,7 @@ class TestPickleTesting:
                 os.path.join(output_folder, calculate_ims.OUTPUT_SUBFOLDER),
                 exist_ok=True,
             )
-            comp = [Components.from_str(c) for c in comp]
-            for station in result_dict.keys():
-                for im in result_dict[station].keys():
-                    if im == "pSA":
-                        for compo in list(result_dict[station][im][1].keys()):
-                            result_dict[station][im][1][
-                                Components.from_str(compo)
-                            ] = result_dict[station][im][1][compo]
-                            del result_dict[station][im][1][compo]
-                    else:
-                        for compo in list(result_dict[station][im].keys()):
-                            result_dict[station][im][
-                                Components.from_str(compo)
-                            ] = result_dict[station][im][compo]
-                            del result_dict[station][im][compo]
+
             calculate_ims.write_result(
                 result_dict,
                 output_folder,

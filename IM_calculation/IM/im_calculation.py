@@ -145,15 +145,19 @@ def compute_measure_single(
     if "pSA" in ims:
         # store a im type values into a dict {comp: np_array/single float}
         # Geometric is also calculated here
-        psa, u = intensity_measures.get_spectral_acceleration_nd(
+        psa, spectral_displacements = intensity_measures.get_spectral_acceleration_nd(
             accelerations, im_options["pSA"], waveform_acc.NT, DT
         )
+        # Store the pSA im values in the format Tuple(List(periods), dict(component: List(im_values)))
+        # Where the im_values in the component dictionaries correspond to the periods in the periods list
         pSA_values = (
             im_options["pSA"],  # periods
             array_to_dict(psa, comps_to_calculate, "pSA", comps_to_store),
         )
-        rotd = calculate_rotd(u, comps_to_store)
-        pSA_values[1].update(rotd)
+        if {Components.crotd50, Components.crotd100, Components.crotd100_50}.intersection(comps_to_store):
+            # Only run if any of the given components are selected (Non empty intersection)
+            rotd = calculate_rotd(spectral_displacements, comps_to_store)
+            pSA_values[1].update(rotd)
 
         result[station_name]["pSA"] = pSA_values
 

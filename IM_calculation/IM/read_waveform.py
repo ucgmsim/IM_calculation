@@ -5,8 +5,6 @@ import numpy as np
 
 from qcore.constants import Components
 
-COMP_DICT = {Components.c090: 0, Components.c000: 1, Components.cver: 2}
-
 G = 981
 
 
@@ -120,7 +118,7 @@ def read_waveforms(
     path,
     bbseis,
     station_names=None,
-    comp=tuple(Components)[:2],
+    comp=(Components.c090, Components.c000),
     wave_type=None,
     file_type=None,
     units="g",
@@ -236,8 +234,6 @@ def read_binary_file(
     :return: [(waveform_acc, waveform_vel])
     """
     waveforms = []
-    # convert str comps to integer
-    # comps = [COMP_DICT[c] for c in comps]
     for station_name in station_names:
         waveform_acc = read_one_station_from_bbseries(
             bbseries, station_name, comps, wave_type="a", file_type=file_type
