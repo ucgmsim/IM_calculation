@@ -375,11 +375,11 @@ def write_rows(comps, station, ims, result_dict, big_csv_writer, sub_csv_writer=
             if im not in result_dict[station]:
                 print(f"IM {im} not available for this station ({station}), continuing")
             if im not in MULTI_VALUE_IMS:
-                current_row = result_dict[station][im]
+                if c in result_dict[station][im]:
+                    row.append(result_dict[station][im][c])
             else:
-                current_row = result_dict[station][im][1]
-            if c in current_row:
-                row += current_row[c].tolist()
+                if c in result_dict[station][im][1]:
+                    row += result_dict[station][im][1][c].tolist()
         big_csv_writer.writerow(row)
         if sub_csv_writer:
             sub_csv_writer.writerow(row)

@@ -55,13 +55,13 @@ def convert_str_comps_to_enum(expected_result):
     for station in expected_result.keys():
         for im in expected_result[station].keys():
             if im == "pSA":
-                for comp in expected_result[station][im][1]:
+                for comp in list(expected_result[station][im][1]):
                     expected_result[station][im][1][
                         Components.from_str(comp)
                     ] = expected_result[station][im][1][comp]
                     del expected_result[station][im][1][comp]
             else:
-                for comp in expected_result[station][im]:
+                for comp in list(expected_result[station][im]):
                     expected_result[station][im][
                         Components.from_str(comp)
                     ] = expected_result[station][im][comp]
