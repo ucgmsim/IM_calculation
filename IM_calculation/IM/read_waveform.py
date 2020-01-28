@@ -3,7 +3,7 @@ import sys
 
 import numpy as np
 
-COMP_DICT = {"090": 0, "000": 1, "ver": 2}
+from qcore.constants import Components
 
 G = 981
 
@@ -118,7 +118,7 @@ def read_waveforms(
     path,
     bbseis,
     station_names=None,
-    comp=Ellipsis,
+    comp=(Components.c090, Components.c000),
     wave_type=None,
     file_type=None,
     units="g",
@@ -207,21 +207,16 @@ def read_one_station_from_bbseries(
         waveform.NT, waveform.DT
     )  # array of time values
     # treat 2 components as all 3 components then remove the unwanted comp
-    if len(comps) == 1:
-        comp = comps[0]
-    else:
-        comp = Ellipsis
+    comps_to_get = [c.value for c in comps]
     try:
         if wave_type == "a":
             waveform.values = bbseries.acc(
-                station=station_name, comp=comp
+                station=station_name, comp=comps_to_get
             )  # get timeseries/acc for a station
         elif wave_type == "v":
-            waveform.values = bbseries.vel(station=station_name, comp=comp)
+            waveform.values = bbseries.vel(station=station_name, comp=comps_to_get)
     except KeyError:
         sys.exit("station name {} does not exist".format(station_name))
-    # keep specified comps. eg. remove 3rd column if comps=[0,1]
-    waveform.values = waveform.values[:, comps]
 
     return waveform
 
@@ -239,8 +234,6 @@ def read_binary_file(
     :return: [(waveform_acc, waveform_vel])
     """
     waveforms = []
-    # convert str comps to integer
-    comps = [COMP_DICT[c] for c in comps]
     for station_name in station_names:
         waveform_acc = read_one_station_from_bbseries(
             bbseries, station_name, comps, wave_type="a", file_type=file_type

@@ -13,6 +13,7 @@ import os
 
 import IM_calculation.IM.im_calculation as calc
 from qcore import utils
+from qcore.constants import Components
 
 
 def main():
@@ -28,7 +29,6 @@ def main():
     parser.add_argument(
         "-o",
         "--output_path",
-        default=calc.OUTPUT_PATH,
         help="path to output folder that stores the computed measures.Folder name must "
         "not be inclusive.eg.home/tt/. Default to /home/$user/",
     )
@@ -109,11 +109,11 @@ def main():
         "-c",
         "--components",
         nargs="+",
-        choices=calc.COMPONENTS,
-        default=calc.COMPONENTS,
+        choices=list(Components.iterate_str_values()),
+        default=[Components.cgeom.str_value],
         help="Please provide the velocity/acc component(s) you want to calculate eg.geom."
         " Available compoents are: {} components. Default is all components".format(
-            ",".join(calc.COMPONENTS)
+            ",".join(Components.iterate_str_values())
         ),
     )
     parser.add_argument(
