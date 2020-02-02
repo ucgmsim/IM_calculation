@@ -3,7 +3,6 @@ import glob
 import os
 import sys
 from datetime import datetime
-from itertools import product
 from multiprocessing.pool import Pool
 from collections import ChainMap
 from typing import List
@@ -398,9 +397,7 @@ def write_result(
         # Save individual station IM csvs using the MultiIndex
         for station in stations:
             station_csv = os.path.join(
-                output_folder,
-                OUTPUT_SUBFOLDER,
-                "{}_{}.csv".format(identifier, station),
+                output_folder, OUTPUT_SUBFOLDER, "{}_{}.csv".format(identifier, station)
             )
             results_dataframe.loc[station].to_csv(station_csv)
 
