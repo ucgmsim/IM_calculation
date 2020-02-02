@@ -3,11 +3,13 @@ import glob
 import os
 import sys
 from datetime import datetime
+from itertools import product
 from multiprocessing.pool import Pool
 from collections import ChainMap
 from typing import List
 
 import numpy as np
+import pandas as pd
 
 from qcore import timeseries, constants
 from qcore.constants import Components
@@ -335,56 +337,6 @@ def get_result_filepath(output_folder, arg_identifier, suffix):
     return os.path.join(output_folder, "{}{}".format(arg_identifier, suffix))
 
 
-def get_header(ims, im_options):
-    """
-    write header colums for output im_calculations csv file
-    :param ims: a list of im measures
-    :param im_options: a dictionary mapping IMs to lists of periods or frequencies
-    :return: header
-    """
-    header = ["station", "component"]
-    psa_names = []
-
-    for im in ims:
-        if im in MULTI_VALUE_IMS:  # only write period if im is pSA.
-            for p in im_options[im]:
-                if p in BSC_PERIOD:
-                    psa_names.append(f"{im}_{p}")
-                else:
-                    psa_names.append("{}_{:.12f}".format(im, p))
-            header += psa_names
-        else:
-            header.append(im)
-    return header
-
-
-def write_rows(comps, station, ims, result_dict, big_csv_writer, sub_csv_writer=None):
-    """
-    write rows to big csv and, also to single station csvs if not simple output
-    :param comps:
-    :param station:
-    :param ims:
-    :param result_dict:
-    :param big_csv_writer:
-    :param sub_csv_writer:
-    :return: write a single row
-    """
-    for c in comps:
-        row = [station, str(c.str_value)]
-        for im in ims:
-            if im not in result_dict[station]:
-                print(f"IM {im} not available for this station ({station}), continuing")
-            if im not in MULTI_VALUE_IMS:
-                if c in result_dict[station][im]:
-                    row.append(result_dict[station][im][c])
-            else:
-                if c in result_dict[station][im][1]:
-                    row += result_dict[station][im][1][c].tolist()
-        big_csv_writer.writerow(row)
-        if sub_csv_writer:
-            sub_csv_writer.writerow(row)
-
-
 def write_result(
     result_dict, output_folder, identifier, comps, ims, im_options, simple_output
 ):
@@ -400,37 +352,52 @@ def write_result(
     :return:output result into csvs
     """
     output_path = get_result_filepath(output_folder, identifier, ".csv")
-    header = get_header(ims, im_options)
+    stations = sorted(result_dict.keys())
+    sorted_comps = sorted(comps, key=lambda x: x.value)
+    sorted_ims = sorted(ims)
 
-    # big csv containing all stations
-    with open(output_path, "w") as csv_file:
-        csv_writer = csv.writer(csv_file, delimiter=",", quotechar="|")
-        csv_writer.writerow(header)
-        stations = sorted(result_dict.keys())
+    # Create dictionary to hold organised results
+    rectangular_result_dict = {(station, comp.str_value): [] for station, comp in product(stations, sorted_comps)}
 
-        # write each row
+    # Create table column headers. These will be used as row indexes until the table is saved
+    headers = []
+    for im in sorted_ims:
+        if im in im_options:
+            headers.extend([f"{im}_{str(x).replace('.', 'p')}" for x in im_options[im]])
+        else:
+            headers.append(im)
+
+    # Go through each station adding its results to the dict.
+    # Adding buffer nans if no value is available (ie RotD50 for PGA)
+    for station in stations:
+        for im, comp in product(sorted_ims, sorted_comps):
+            if im in MULTI_VALUE_IMS:
+                target = result_dict[station][im][1]
+                if comp not in target:
+                    rectangular_result_dict[(station, comp.str_value)].extend([np.nan] * im_options[im].size)
+                else:
+                    rectangular_result_dict[(station, comp.str_value)].extend(target[comp])
+            else:
+                target = result_dict[station][im]
+                if comp not in target:
+                    rectangular_result_dict[(station, comp.str_value)].append(np.nan)
+                else:
+                    rectangular_result_dict[(station, comp.str_value)].append(target[comp])
+
+    # Convert to a data frame using the station and comp.str_values as indexs. Set the 'headers' as the row names
+    df = pd.DataFrame.from_dict(rectangular_result_dict).set_axis(headers)
+    # Save the transposed dataframe
+    df.T.to_csv(output_path, index_label=["station", "component"])
+
+    if not simple_output:
+        # Save individual station IM csvs using the MultiIndex
         for station in stations:
-            if not simple_output:  # if single station csvs are needed
-                station_csv = os.path.join(
-                    output_folder,
-                    OUTPUT_SUBFOLDER,
-                    "{}_{}.csv".format(station, "_".join([c.str_value for c in comps])),
-                )
-                with open(station_csv, "w") as sub_csv_file:
-                    sub_csv_writer = csv.writer(
-                        sub_csv_file, delimiter=",", quotechar="|"
-                    )
-                    sub_csv_writer.writerow(header)
-                    write_rows(
-                        comps,
-                        station,
-                        ims,
-                        result_dict,
-                        csv_writer,
-                        sub_csv_writer=sub_csv_writer,
-                    )
-            else:  # if only the big summary csv is needed
-                write_rows(comps, station, ims, result_dict, csv_writer)
+            station_csv = os.path.join(
+                output_folder,
+                OUTPUT_SUBFOLDER,
+                "{}_{}.csv".format(identifier, station),
+            )
+            df[station].T.to_csv(station_csv, index_label="component")
 
 
 def generate_metadata(output_folder, identifier, rupture, run_type, version):
