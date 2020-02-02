@@ -356,9 +356,6 @@ def write_result(
     sorted_comps = sorted(comps, key=lambda x: x.value)
     sorted_ims = sorted(ims)
 
-    # Create dictionary to hold organised results
-    rectangular_result_dict = {(station, comp.str_value): [] for station, comp in product(stations, sorted_comps)}
-
     # Create table column headers. These will be used as row indexes until the table is saved
     headers = []
     for im in sorted_ims:
@@ -367,27 +364,35 @@ def write_result(
         else:
             headers.append(im)
 
-    # Go through each station adding its results to the dict.
-    # Adding buffer nans if no value is available (ie RotD50 for PGA)
-    for station in stations:
-        for im, comp in product(sorted_ims, sorted_comps):
-            if im in MULTI_VALUE_IMS:
-                target = result_dict[station][im][1]
-                if comp not in target:
-                    rectangular_result_dict[(station, comp.str_value)].extend([np.nan] * im_options[im].size)
-                else:
-                    rectangular_result_dict[(station, comp.str_value)].extend(target[comp])
-            else:
-                target = result_dict[station][im]
-                if comp not in target:
-                    rectangular_result_dict[(station, comp.str_value)].append(np.nan)
-                else:
-                    rectangular_result_dict[(station, comp.str_value)].append(target[comp])
+    # Create a table of nans with the
+    results_dataframe = pd.DataFrame(
+        index=pd.MultiIndex.from_product(
+            [stations, [x.str_value for x in sorted_comps]],
+            names=["station", "component"],
+        ),
+        columns=headers,
+    )
 
-    # Convert to a data frame using the station and comp.str_values as indexs. Set the 'headers' as the row names
-    df = pd.DataFrame.from_dict(rectangular_result_dict).set_axis(headers)
+    # Go through each station adding its results to the dataframe. NaNs fill the gaps
+    for station in stations:
+        for comp in sorted_comps:
+            i = 0
+            for im in sorted_ims:
+                if im in MULTI_VALUE_IMS:
+                    target = result_dict[station][im][1]
+                    size = im_options[im].size
+                else:
+                    target = result_dict[station][im]
+                    size = 1
+                if comp in target:
+                    results_dataframe.iloc[
+                        results_dataframe.index.get_locs((station, comp.str_value)),
+                        i : i + size,
+                    ] = target[comp]
+                i += size
+
     # Save the transposed dataframe
-    df.T.to_csv(output_path, index_label=["station", "component"])
+    results_dataframe.to_csv(output_path)
 
     if not simple_output:
         # Save individual station IM csvs using the MultiIndex
@@ -397,7 +402,7 @@ def write_result(
                 OUTPUT_SUBFOLDER,
                 "{}_{}.csv".format(identifier, station),
             )
-            df[station].T.to_csv(station_csv, index_label="component")
+            results_dataframe.loc[station].to_csv(station_csv)
 
 
 def generate_metadata(output_folder, identifier, rupture, run_type, version):
