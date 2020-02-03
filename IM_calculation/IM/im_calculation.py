@@ -166,7 +166,9 @@ def compute_measure_single(
                 f"Attempting to compute fourier spectrum raised exception: {e}\nThis was most likely caused by attempting to compute for a waveform with more than 16384 timesteps."
             )
         else:
-            result["FAS"] = (array_to_dict(value, comps_to_calculate, "FAS", comps_to_store)),
+            result["FAS"] = (
+                (array_to_dict(value, comps_to_calculate, "FAS", comps_to_store)),
+            )
 
     # TODO: Speed up Ds calculations
     if "Ds595" in ims:
@@ -362,9 +364,7 @@ def write_result(
             headers.append(im)
 
     results_dataframe = pd.DataFrame.from_dict(
-        result_dict,
-        orient="index",
-        columns=headers,
+        result_dict, orient="index", columns=headers
     )
     results_dataframe.index = pd.MultiIndex.from_tuples(results_dataframe.index)
 
