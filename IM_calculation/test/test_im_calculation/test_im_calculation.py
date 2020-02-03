@@ -148,8 +148,19 @@ class TestPickleTesting:
             ) as load_file:
                 expected_result = pickle.load(load_file)
                 convert_str_comps_to_enum(expected_result)
+                actual_expected_result = {}
+                for station in sorted(expected_result):
+                    expected_result[station]["pSA"] = expected_result[station]["pSA"][1]
+                    for im in expected_result[station]:
+                        for comp in expected_result[station][im]:
+                            if (station, comp.str_value) not in actual_expected_result:
+                                actual_expected_result[(station, comp.str_value)] = []
+                            if im in calculate_ims.MULTI_VALUE_IMS:
+                                actual_expected_result[(station, comp.str_value)].extend(expected_result[station][im][comp])
+                            else:
+                                actual_expected_result[(station, comp.str_value)].append(expected_result[station][im][comp])
 
-            compare_dicts(actual_result, expected_result)
+            compare_dicts(actual_result, actual_expected_result)
 
 
 
@@ -274,8 +285,20 @@ class TestPickleTesting:
             with open(
                 os.path.join(root_path, INPUT, function + "_result_dict.P"), "rb"
             ) as load_file:
-                result_dict = pickle.load(load_file)
-                convert_str_comps_to_enum(result_dict)
+                temp_result_dict = pickle.load(load_file)
+                convert_str_comps_to_enum(temp_result_dict)
+                result_dict = {}
+                for station in sorted(temp_result_dict):
+                    temp_result_dict[station]["pSA"] = temp_result_dict[station]["pSA"][1]
+                    for im in sorted(temp_result_dict[station]):
+                        for comp in temp_result_dict[station][im]:
+                            if (station, comp.str_value) not in result_dict:
+                                result_dict[(station, comp.str_value)] = []
+                            if im in calculate_ims.MULTI_VALUE_IMS:
+                                result_dict[(station, comp.str_value)].extend(temp_result_dict[station][im][comp])
+                            else:
+                                result_dict[(station, comp.str_value)].append(temp_result_dict[station][im][comp])
+
             with open(
                 os.path.join(root_path, INPUT, function + "_identifier.P"), "rb"
             ) as load_file:
