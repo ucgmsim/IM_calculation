@@ -156,7 +156,7 @@ def compute_measure_single(
         "Ds595", intensity_measures.getDs_nd, DT, accelerations, 5, 95
     )
     process_single_value_im(
-        "Ds595", intensity_measures.getDs_nd, DT, accelerations, 5, 75
+        "Ds575", intensity_measures.getDs_nd, DT, accelerations, 5, 75
     )
 
     if "pSA" in ims:
@@ -315,7 +315,7 @@ def compute_measures_multiprocess(
         all_results.extend(p.starmap(compute_measure_single, array_params))
 
     all_result_dict = ChainMap(*all_results)
-    write_result(all_result_dict, output, identifier, ims, im_options, simple_output)
+    write_result(all_result_dict, output, identifier, simple_output)
 
     generate_metadata(output, identifier, rupture, run_type, version)
 
@@ -324,16 +324,12 @@ def get_result_filepath(output_folder, arg_identifier, suffix):
     return os.path.join(output_folder, "{}{}".format(arg_identifier, suffix))
 
 
-def write_result(
-    result_dict, output_folder, identifier, ims, im_options, simple_output
-):
+def write_result(result_dict, output_folder, identifier, simple_output):
     """
     write a big csv that contains all calculated im value and single station csvs
     :param result_dict:
     :param output_folder:
     :param identifier: user input run name
-    :param ims: a list of im(s)
-    :param im_options:
     :param simple_output
     :return:output result into csvs
     """
