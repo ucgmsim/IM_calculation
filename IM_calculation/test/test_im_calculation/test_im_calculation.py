@@ -1,7 +1,5 @@
 import argparse
-import csv
 import filecmp
-import io
 import os
 import pickle
 
@@ -114,9 +112,7 @@ class TestPickleTesting:
 
             str_comps = [Components.from_str(x) for x in str_comps]
             arg_comps = [Components.from_str(x) for x in arg_comps]
-            actual_value_dict = calculate_ims.array_to_dict(
-                value, str_comps, im, arg_comps
-            )
+            actual_value_dict = calculate_ims.array_to_dict(value, str_comps, im, arg_comps)
 
             with open(
                 os.path.join(root_path, OUTPUT, function + "_value_dict.P"), "rb"
@@ -328,15 +324,7 @@ class TestPickleTesting:
                 exist_ok=True,
             )
 
-            calculate_ims.write_result(
-                result_dict,
-                output_folder,
-                identifier,
-                comp,
-                ims,
-                {"pSA": period},
-                simple_output,
-            )
+            calculate_ims.write_result(result_dict, output_folder, identifier, ims, {"pSA": period}, simple_output)
             expected_output_path = calculate_ims.get_result_filepath(
                 output_folder, identifier, ".csv"
             )
