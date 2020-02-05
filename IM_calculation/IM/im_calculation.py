@@ -274,9 +274,10 @@ def compute_measures_multiprocess(
     :param simple_output:
     :return:
     """
-    components_to_calculate, components_to_store = constants.Components.get_comps_to_calc_and_store(
-        comp
-    )
+    (
+        components_to_calculate,
+        components_to_store,
+    ) = constants.Components.get_comps_to_calc_and_store(comp)
 
     bbseries, station_names = get_bbseis(input_path, file_type, station_names)
 
