@@ -12,7 +12,7 @@ import pandas as pd
 
 from qcore import timeseries, constants
 from qcore.constants import Components
-from qcore.im import order_im_cols_df, default_pattern_order
+from qcore.im import order_im_cols_df
 
 from IM_calculation.IM import read_waveform, intensity_measures
 from IM_calculation.IM.computeFAS import get_fourier_spectrum
