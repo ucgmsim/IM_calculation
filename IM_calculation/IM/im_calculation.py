@@ -8,9 +8,11 @@ from collections import ChainMap
 from typing import List
 
 import numpy as np
+import pandas as pd
 
 from qcore import timeseries, constants
 from qcore.constants import Components
+from qcore.im import order_im_cols_df
 
 from IM_calculation.IM import read_waveform, intensity_measures
 from IM_calculation.IM.computeFAS import get_fourier_spectrum
@@ -68,19 +70,19 @@ def array_to_dict(value, comps_to_calc, im, comps_to_store):
     for i in range(value.shape[-1]):
         # pSA returns a 2D array
         if im in MULTI_VALUE_IMS:
-            value_dict[comps_to_calc[i]] = value[:, i]
+            value_dict[comps_to_calc[i].str_value] = value[:, i]
         else:
-            value_dict[comps_to_calc[i]] = value[i]
+            value_dict[comps_to_calc[i].str_value] = value[i]
     # In this case, if geom in str_comps,
     # it's guaranteed that 090 and 000 will be present in value_dict
     if Components.cgeom in comps_to_store:
-        value_dict[Components.cgeom] = intensity_measures.get_geom(
-            value_dict[Components.c090], value_dict[Components.c000]
+        value_dict[Components.cgeom.str_value] = intensity_measures.get_geom(
+            value_dict[Components.c090.str_value], value_dict[Components.c000.str_value]
         )
     # then we pop unwanted keys from value_dict
     for k in comps_to_calc:
-        if k not in comps_to_store and k in value_dict:
-            del value_dict[k]
+        if k not in comps_to_store and k.str_value in value_dict:
+            del value_dict[k.str_value]
     return value_dict
 
 
@@ -113,7 +115,6 @@ def compute_measure_single(
     waveform: a single tuple that contains (waveform_acc,waveform_vel)
     :return: {result[station_name]: {[im]: value or (period,value}}
     """
-    result = {}
     waveform_acc, waveform_vel = waveform
     DT = waveform_acc.DT
     times = waveform_acc.times
@@ -128,32 +129,47 @@ def compute_measure_single(
 
     station_name = waveform_acc.station_name
 
-    result[station_name] = {}
+    result = {(station_name, comp.str_value): {} for comp in comps_to_store}
 
-    if "PGV" in ims:
-        value = intensity_measures.get_max_nd(velocities)
-        result[station_name]["PGV"] = array_to_dict(
-            value, comps_to_calculate, "PGV", comps_to_store
-        )
+    def process_single_value_im(im, func, *args, **kwargs):
+        if im in ims:
+            value = func(*args, **kwargs)
+            values_to_store = array_to_dict(
+                value, comps_to_calculate, im, comps_to_store
+            )
+            for comp in comps_to_store:
+                if comp.str_value in values_to_store:
+                    result[(station_name, comp.str_value)][im] = values_to_store[
+                        comp.str_value
+                    ]
 
-    if "PGA" in ims:
-        value = intensity_measures.get_max_nd(accelerations)
-        result[station_name]["PGA"] = array_to_dict(
-            value, comps_to_calculate, "PGA", comps_to_store
-        )
+    process_single_value_im("PGV", intensity_measures.get_max_nd, velocities)
+    process_single_value_im("PGA", intensity_measures.get_max_nd, accelerations)
+    process_single_value_im(
+        "CAV", intensity_measures.get_cumulative_abs_velocity_nd, accelerations, times
+    )
+    process_single_value_im(
+        "AI", intensity_measures.get_arias_intensity_nd, accelerations, G, times
+    )
+    process_single_value_im("MMI", intensity_measures.calculate_MMI_nd, velocities)
+    process_single_value_im(
+        "Ds595", intensity_measures.getDs_nd, DT, accelerations, 5, 95
+    )
+    process_single_value_im(
+        "Ds575", intensity_measures.getDs_nd, DT, accelerations, 5, 75
+    )
 
     if "pSA" in ims:
+        im = "pSA"
         # store a im type values into a dict {comp: np_array/single float}
         # Geometric is also calculated here
         psa, spectral_displacements = intensity_measures.get_spectral_acceleration_nd(
-            accelerations, im_options["pSA"], waveform_acc.NT, DT
+            accelerations, im_options[im], waveform_acc.NT, DT
         )
         # Store the pSA im values in the format Tuple(List(periods), dict(component: List(im_values)))
         # Where the im_values in the component dictionaries correspond to the periods in the periods list
-        pSA_values = (
-            im_options["pSA"],  # periods
-            array_to_dict(psa, comps_to_calculate, "pSA", comps_to_store),
-        )
+        pSA_values = array_to_dict(psa, comps_to_calculate, im, comps_to_store)
+
         if {
             Components.crotd50,
             Components.crotd100,
@@ -161,53 +177,33 @@ def compute_measure_single(
         }.intersection(comps_to_store):
             # Only run if any of the given components are selected (Non empty intersection)
             rotd = calculate_rotd(spectral_displacements, comps_to_store)
-            pSA_values[1].update(rotd)
+            pSA_values.update(rotd)
 
-        result[station_name]["pSA"] = pSA_values
+        for comp in comps_to_store:
+            if comp.str_value in pSA_values:
+                for i, val in enumerate(im_options[im]):
+                    result[(station_name, comp.str_value)][
+                        f"{im}_{str(val).replace('.', 'p')}"
+                    ] = pSA_values[comp.str_value][i]
 
     if "FAS" in ims:
+        im = "FAS"
         try:
-            value = get_fourier_spectrum(accelerations, DT, im_options["FAS"])
+            value = get_fourier_spectrum(accelerations, DT, im_options[im])
         except FileNotFoundError as e:
             print(
                 f"Attempting to compute fourier spectrum raised exception: {e}\nThis was most likely caused by attempting to compute for a waveform with more than 16384 timesteps."
             )
         else:
-            result[station_name]["FAS"] = (
-                im_options["FAS"],
-                (array_to_dict(value, comps_to_calculate, "FAS", comps_to_store)),
+            values_to_store = array_to_dict(
+                value, comps_to_calculate, im, comps_to_store
             )
-
-    # TODO: Speed up Ds calculations
-    if "Ds595" in ims:
-        value = intensity_measures.getDs_nd(DT, accelerations, 5, 95)
-        result[station_name]["Ds595"] = array_to_dict(
-            value, comps_to_calculate, "Ds595", comps_to_store
-        )
-
-    if "Ds575" in ims:
-        value = intensity_measures.getDs_nd(DT, accelerations, 5, 75)
-        result[station_name]["Ds575"] = array_to_dict(
-            value, comps_to_calculate, "Ds575", comps_to_store
-        )
-
-    if "AI" in ims:
-        value = intensity_measures.get_arias_intensity_nd(accelerations, G, times)
-        result[station_name]["AI"] = array_to_dict(
-            value, comps_to_calculate, "AI", comps_to_store
-        )
-
-    if "CAV" in ims:
-        value = intensity_measures.get_cumulative_abs_velocity_nd(accelerations, times)
-        result[station_name]["CAV"] = array_to_dict(
-            value, comps_to_calculate, "CAV", comps_to_store
-        )
-
-    if "MMI" in ims:
-        value = intensity_measures.calculate_MMI_nd(velocities)
-        result[station_name]["MMI"] = array_to_dict(
-            value, comps_to_calculate, "MMI", comps_to_store
-        )
+            for comp in comps_to_store:
+                if comp.str_value in values_to_store:
+                    for i, val in enumerate(im_options[im]):
+                        result[(station_name, comp.str_value)][
+                            f"{im}_{str(val).replace('.', 'p')}"
+                        ] = values_to_store[comp.str_value][i]
 
     return result
 
@@ -278,9 +274,10 @@ def compute_measures_multiprocess(
     :param simple_output:
     :return:
     """
-    components_to_calculate, components_to_store = constants.Components.get_comps_to_calc_and_store(
-        comp
-    )
+    (
+        components_to_calculate,
+        components_to_store,
+    ) = constants.Components.get_comps_to_calc_and_store(comp)
 
     bbseries, station_names = get_bbseis(input_path, file_type, station_names)
 
@@ -309,24 +306,16 @@ def compute_measures_multiprocess(
             array_params.append(
                 (
                     waveform,
-                    ims,
-                    components_to_store,
+                    sorted(ims),
+                    sorted(components_to_store, key=lambda x: x.value),
                     im_options,
-                    components_to_calculate,
+                    sorted(components_to_calculate, key=lambda x: x.value),
                 )
             )
         all_results.extend(p.starmap(compute_measure_single, array_params))
 
     all_result_dict = ChainMap(*all_results)
-    write_result(
-        all_result_dict,
-        output,
-        identifier,
-        components_to_store,
-        ims,
-        im_options,
-        simple_output,
-    )
+    write_result(all_result_dict, output, identifier, simple_output)
 
     generate_metadata(output, identifier, rupture, run_type, version)
 
@@ -335,102 +324,34 @@ def get_result_filepath(output_folder, arg_identifier, suffix):
     return os.path.join(output_folder, "{}{}".format(arg_identifier, suffix))
 
 
-def get_header(ims, im_options):
-    """
-    write header colums for output im_calculations csv file
-    :param ims: a list of im measures
-    :param im_options: a dictionary mapping IMs to lists of periods or frequencies
-    :return: header
-    """
-    header = ["station", "component"]
-    psa_names = []
-
-    for im in ims:
-        if im in MULTI_VALUE_IMS:  # only write period if im is pSA.
-            for p in im_options[im]:
-                if p in BSC_PERIOD:
-                    psa_names.append(f"{im}_{p}")
-                else:
-                    psa_names.append("{}_{:.12f}".format(im, p))
-            header += psa_names
-        else:
-            header.append(im)
-    return header
-
-
-def write_rows(comps, station, ims, result_dict, big_csv_writer, sub_csv_writer=None):
-    """
-    write rows to big csv and, also to single station csvs if not simple output
-    :param comps:
-    :param station:
-    :param ims:
-    :param result_dict:
-    :param big_csv_writer:
-    :param sub_csv_writer:
-    :return: write a single row
-    """
-    for c in comps:
-        row = [station, str(c.str_value)]
-        for im in ims:
-            if im not in result_dict[station]:
-                print(f"IM {im} not available for this station ({station}), continuing")
-            if im not in MULTI_VALUE_IMS:
-                if c in result_dict[station][im]:
-                    row.append(result_dict[station][im][c])
-            else:
-                if c in result_dict[station][im][1]:
-                    row += result_dict[station][im][1][c].tolist()
-        big_csv_writer.writerow(row)
-        if sub_csv_writer:
-            sub_csv_writer.writerow(row)
-
-
-def write_result(
-    result_dict, output_folder, identifier, comps, ims, im_options, simple_output
-):
+def write_result(result_dict, output_folder, identifier, simple_output):
     """
     write a big csv that contains all calculated im value and single station csvs
     :param result_dict:
     :param output_folder:
     :param identifier: user input run name
-    :param comps: a list of comp(s)
-    :param ims: a list of im(s)
-    :param im_options:
     :param simple_output
     :return:output result into csvs
     """
     output_path = get_result_filepath(output_folder, identifier, ".csv")
-    header = get_header(ims, im_options)
 
-    # big csv containing all stations
-    with open(output_path, "w") as csv_file:
-        csv_writer = csv.writer(csv_file, delimiter=",", quotechar="|")
-        csv_writer.writerow(header)
-        stations = sorted(result_dict.keys())
+    results_dataframe = pd.DataFrame.from_dict(result_dict, orient="index")
+    results_dataframe.index = pd.MultiIndex.from_tuples(
+        results_dataframe.index, names=["station", "component"]
+    )
+    results_dataframe.sort_values(["station", "component"], inplace=True)
+    results_dataframe = order_im_cols_df(results_dataframe)
 
-        # write each row
-        for station in stations:
-            if not simple_output:  # if single station csvs are needed
-                station_csv = os.path.join(
-                    output_folder,
-                    OUTPUT_SUBFOLDER,
-                    "{}_{}.csv".format(station, "_".join([c.str_value for c in comps])),
-                )
-                with open(station_csv, "w") as sub_csv_file:
-                    sub_csv_writer = csv.writer(
-                        sub_csv_file, delimiter=",", quotechar="|"
-                    )
-                    sub_csv_writer.writerow(header)
-                    write_rows(
-                        comps,
-                        station,
-                        ims,
-                        result_dict,
-                        csv_writer,
-                        sub_csv_writer=sub_csv_writer,
-                    )
-            else:  # if only the big summary csv is needed
-                write_rows(comps, station, ims, result_dict, csv_writer)
+    # Save the transposed dataframe
+    results_dataframe.to_csv(output_path)
+
+    if not simple_output:
+        # For each subframe with the same station write it to csv
+        for station, sub_frame in results_dataframe.groupby(level=0):
+            station_csv = os.path.join(
+                output_folder, OUTPUT_SUBFOLDER, "{}_{}.csv".format(identifier, station)
+            )
+            sub_frame.to_csv(station_csv)
 
 
 def generate_metadata(output_folder, identifier, rupture, run_type, version):

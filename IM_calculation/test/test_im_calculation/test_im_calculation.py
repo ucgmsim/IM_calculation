@@ -1,7 +1,5 @@
 import argparse
-import csv
 import filecmp
-import io
 import os
 import pickle
 
@@ -114,17 +112,12 @@ class TestPickleTesting:
 
             str_comps = [Components.from_str(x) for x in str_comps]
             arg_comps = [Components.from_str(x) for x in arg_comps]
-            actual_value_dict = calculate_ims.array_to_dict(
-                value, str_comps, im, arg_comps
-            )
+            actual_value_dict = calculate_ims.array_to_dict(value, str_comps, im, arg_comps)
 
             with open(
                 os.path.join(root_path, OUTPUT, function + "_value_dict.P"), "rb"
             ) as load_file:
                 expected_value_dict = pickle.load(load_file)
-                for x in list(expected_value_dict.keys()):
-                    expected_value_dict[Components.from_str(x)] = expected_value_dict[x]
-                    del expected_value_dict[x]
 
             assert actual_value_dict == expected_value_dict
 
@@ -148,8 +141,9 @@ class TestPickleTesting:
             ) as load_file:
                 expected_result = pickle.load(load_file)
                 convert_str_comps_to_enum(expected_result)
+                actual_expected_result = self.convert_to_results_dict(periods, expected_result)
 
-            compare_dicts(actual_result, expected_result)
+            compare_dicts(actual_result, actual_expected_result)
 
 
 
@@ -267,96 +261,25 @@ class TestPickleTesting:
 
             assert actual_ret_val == expected_ret_val
 
-    def test_get_header(self, set_up):
-        function = "get_header"
-        for root_path in set_up:
-            with open(
-                os.path.join(root_path, INPUT, function + "_ims.P"), "rb"
-            ) as load_file:
-                ims = pickle.load(load_file)
-            with open(
-                os.path.join(root_path, INPUT, function + "_period.P"), "rb"
-            ) as load_file:
-                period = pickle.load(load_file)
-
-            actual_header = calculate_ims.get_header(ims, {"pSA": period})
-
-            with open(
-                os.path.join(root_path, OUTPUT, function + "_header.P"), "rb"
-            ) as load_file:
-                expected_header = pickle.load(load_file)
-
-            assert actual_header == expected_header
-
-    def test_write_rows(self, set_up):
-        function = "write_rows"
-        for root_path in set_up:
-            with open(
-                os.path.join(root_path, INPUT, function + "_comp.P"), "rb"
-            ) as load_file:
-                comps = pickle.load(load_file)
-                comps = [Components.from_str(c) for c in comps]
-            with open(
-                os.path.join(root_path, INPUT, function + "_station.P"), "rb"
-            ) as load_file:
-                station = pickle.load(load_file)
-            with open(
-                os.path.join(root_path, INPUT, function + "_ims.P"), "rb"
-            ) as load_file:
-                ims = pickle.load(load_file)
-            with open(
-                os.path.join(root_path, INPUT, function + "_result_dict.P"), "rb"
-            ) as load_file:
-                result_dict = pickle.load(load_file)
-                convert_str_comps_to_enum(result_dict)
-
-            big_csv = io.StringIO()
-            big_csv_writer = csv.writer(big_csv)
-            sub_csv = io.StringIO()
-            sub_csv_writer = csv.writer(sub_csv)
-
-            calculate_ims.write_rows(
-                comps,
-                station,
-                ims,
-                result_dict,
-                big_csv_writer,
-                sub_csv_writer=sub_csv_writer,
-            )
-
-            with open(
-                os.path.join(root_path, OUTPUT, function + "_out_data.P"), "rb"
-            ) as load_file:
-                expected_out_data = pickle.load(load_file)
-
-            assert expected_out_data == big_csv.getvalue()
-            assert expected_out_data == sub_csv.getvalue()
 
     def test_write_result(self, set_up):
         function = "write_result"
         for root_path in set_up:
             with open(
+                os.path.join(root_path, INPUT, function + "_period.P"), "rb"
+            ) as load_file:
+                period = pickle.load(load_file)
+            with open(
                 os.path.join(root_path, INPUT, function + "_result_dict.P"), "rb"
             ) as load_file:
-                result_dict = pickle.load(load_file)
-                convert_str_comps_to_enum(result_dict)
+                temp_result_dict = pickle.load(load_file)
+                convert_str_comps_to_enum(temp_result_dict)
+                result_dict = self.convert_to_results_dict(period, temp_result_dict)
+
             with open(
                 os.path.join(root_path, INPUT, function + "_identifier.P"), "rb"
             ) as load_file:
                 identifier = pickle.load(load_file)
-            with open(
-                os.path.join(root_path, INPUT, function + "_comp.P"), "rb"
-            ) as load_file:
-                comp = pickle.load(load_file)
-                comp = [Components.from_str(c) for c in comp]
-            with open(
-                os.path.join(root_path, INPUT, function + "_ims.P"), "rb"
-            ) as load_file:
-                ims = pickle.load(load_file)
-            with open(
-                os.path.join(root_path, INPUT, function + "_period.P"), "rb"
-            ) as load_file:
-                period = pickle.load(load_file)
             with open(
                 os.path.join(root_path, INPUT, function + "_simple_output.P"), "rb"
             ) as load_file:
@@ -369,15 +292,7 @@ class TestPickleTesting:
                 exist_ok=True,
             )
 
-            calculate_ims.write_result(
-                result_dict,
-                output_folder,
-                identifier,
-                comp,
-                ims,
-                {"pSA": period},
-                simple_output,
-            )
+            calculate_ims.write_result(result_dict, output_folder, identifier, simple_output)
             expected_output_path = calculate_ims.get_result_filepath(
                 output_folder, identifier, ".csv"
             )
@@ -386,6 +301,22 @@ class TestPickleTesting:
             )
 
             assert filecmp.cmp(expected_output_path, actual_output_path)
+
+    def convert_to_results_dict(self, period, temp_result_dict):
+        result_dict = {}
+        for station in sorted(temp_result_dict):
+            temp_result_dict[station]["pSA"] = temp_result_dict[station]["pSA"][1]
+            for im in sorted(temp_result_dict[station]):
+                for comp in temp_result_dict[station][im]:
+                    if (station, comp.str_value) not in result_dict:
+                        result_dict[(station, comp.str_value)] = {}
+                    if im in calculate_ims.MULTI_VALUE_IMS:
+                        for i, val in enumerate(period):
+                            result_dict[(station, comp.str_value)][f"{im}_{str(val).replace('.', 'p')}"] = \
+                            temp_result_dict[station][im][comp][i]
+                    else:
+                        result_dict[(station, comp.str_value)][im] = temp_result_dict[station][im][comp]
+        return result_dict
 
     def test_generate_metadata(self, set_up):
         function = "generate_metadata"

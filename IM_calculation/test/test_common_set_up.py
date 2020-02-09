@@ -1,6 +1,5 @@
 import os
 import shutil
-import sys
 from ftplib import FTP
 from urllib import parse
 
@@ -11,7 +10,6 @@ from qcore import shared
 
 # This is a hack, to allow loading of the test pickle objects
 import sys
-import IM_calculation
 import IM_calculation.IM as IM
 
 sys.modules["IM"] = IM
@@ -100,7 +98,7 @@ def compare_dicts(actual_result, expected_result):
 
     assert isinstance(actual_result, dict)
     assert isinstance(expected_result, dict)
-    assert actual_result.keys() == expected_result.keys()
+    assert set(actual_result.keys()) == set(expected_result.keys())
 
     for key in actual_result.keys():
         if isinstance(actual_result[key], dict) or isinstance(

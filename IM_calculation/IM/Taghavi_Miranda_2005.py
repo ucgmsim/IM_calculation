@@ -313,7 +313,14 @@ def calculate_structural_response(
     sa_time, sd_time = sa_sd_time(acc_time_history, dt, t1_range=vibration_period, c=c)
 
     # calculate structural response
-    displacement, slope, moment, shear, load, rel_accel = calculate_structural_response_b(
+    (
+        displacement,
+        slope,
+        moment,
+        shear,
+        load,
+        rel_accel,
+    ) = calculate_structural_response_b(
         participation_factor,
         phi,
         phi_1,
@@ -415,7 +422,18 @@ def Taghavi_Miranda_2005(
         alpha, gamma, storey
     )
     # 3c calculate structural response
-    disp, slope, moment, storey_moment, shear, storey_shear, load, ground_accel, rel_accel, total_accel = calculate_structural_response(
+    (
+        disp,
+        slope,
+        moment,
+        storey_moment,
+        shear,
+        storey_shear,
+        load,
+        ground_accel,
+        rel_accel,
+        total_accel,
+    ) = calculate_structural_response(
         vibration_period,
         waveform,
         dt,
@@ -431,7 +449,18 @@ def Taghavi_Miranda_2005(
         g=g,
     )
     # 3d extract peak structural response values from each earthquake ground motion record
-    disp_peak, slope_peak, moment_peak, storey_moment_peak, shear_peak, storey_shear_peak, load_peak, ground_accel_peak, rel_accel_peak, total_accel_peak = extract_peak_structural_response(
+    (
+        disp_peak,
+        slope_peak,
+        moment_peak,
+        storey_moment_peak,
+        shear_peak,
+        storey_shear_peak,
+        load_peak,
+        ground_accel_peak,
+        rel_accel_peak,
+        total_accel_peak,
+    ) = extract_peak_structural_response(
         disp,
         slope,
         moment,

@@ -42,5 +42,5 @@ def get_fourier_spectrum(
     fa_smooth = np.dot(konno, fa_spectrum)
 
     # interpolate at output frequencies
-    interpolator = interp1d(fa_frequencies, fa_smooth, axis=0)
+    interpolator = interp1d(fa_frequencies, fa_smooth, axis=0, fill_value="extrapolate")
     return interpolator(fa_frequencies_int)
