@@ -5,8 +5,10 @@ Unreleased
 Fixed
 
 Changed
+- Added 16 more pSA periods to the default.
 
 Added
+- New intensity measures (FAS, IESAR, ROTD)
 
 [19.6.1] - 2019-06-06  
 Added  
