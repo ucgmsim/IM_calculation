@@ -40,10 +40,10 @@ GAMMA = 1 / 2
 BETA = 1 / 6  # linear acceleration (stable if Dt/T<=0.551)
 
 
-def Bilinear_Newmark_withTH(period: np.ndarray, z: np.ndarray, dy: np.ndarray, alpha: np.ndarray,
+def Bilinear_Newmark_withTH(period: np.ndarray, z: float, dy: float, alpha: float,
                             ag: np.ndarray, dt: float):
 
-    num_oscillators = max([period.size, z.size, dy.size, alpha.size])
+    num_oscillators = period.size
 
     # m*a + c*v + fs(k,fy,kalpha) = p
     m = 1
@@ -84,6 +84,7 @@ def Bilinear_Newmark_withTH(period: np.ndarray, z: np.ndarray, dy: np.ndarray, a
         fs[i + 1] = fs[i] + ki * Ddi
         d[i + 1] = d[i] + Ddi
 
+        # Inelastic behaviour begins
         fsmax = fy + kalpha * (d[i + 1] - dy)
         fsmin = -fy + kalpha * (d[i + 1] + dy)
         jjabove = np.where(fs[i + 1] > fsmax)
@@ -95,6 +96,7 @@ def Bilinear_Newmark_withTH(period: np.ndarray, z: np.ndarray, dy: np.ndarray, a
             DR = DPi - Df
             Ddi = Ddi + DR / Ki
             d[i + 1] = d[i] + Ddi
+        # Inelastic behaviour ends
 
         Dvi = (
             GAMMA / (BETA * dt) * Ddi
