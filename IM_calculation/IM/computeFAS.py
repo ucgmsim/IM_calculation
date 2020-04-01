@@ -39,7 +39,7 @@ def get_fourier_spectrum(
     )
 
     # apply konno ohmachi smoothing
-    fa_smooth = np.dot(fa_spectrum, konno)
+    fa_smooth = np.dot(fa_spectrum.T, konno).T
 
     # interpolate at output frequencies
     interpolator = interp1d(fa_frequencies, fa_smooth, axis=0, fill_value="extrapolate")
