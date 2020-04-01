@@ -13,7 +13,7 @@ import os
 
 import IM_calculation.IM.im_calculation as calc
 from qcore import utils
-from qcore.constants import Components
+from qcore import constants
 
 
 def main():
@@ -71,11 +71,11 @@ def main():
         "-p",
         "--period",
         nargs="+",
-        default=calc.BSC_PERIOD,
+        default=constants.DEFAULT_PSA_PERIODS,
         type=float,
         help="Please provide pSA period(s) separated by a space. eg: "
         "0.02 0.05 0.1. Default periods are: {}".format(
-            ",".join(str(v) for v in calc.BSC_PERIOD)
+            ",".join(str(v) for v in constants.DEFAULT_PSA_PERIODS)
         ),
     )
     parser.add_argument(
@@ -109,11 +109,11 @@ def main():
         "-c",
         "--components",
         nargs="+",
-        choices=list(Components.iterate_str_values()),
-        default=[Components.cgeom.str_value],
+        choices=list(constants.Components.iterate_str_values()),
+        default=[constants.Components.cgeom.str_value],
         help="Please provide the velocity/acc component(s) you want to calculate eg.geom."
         " Available compoents are: {} components. Default is all components".format(
-            ",".join(Components.iterate_str_values())
+            ",".join(constants.Components.iterate_str_values())
         ),
     )
     parser.add_argument(
