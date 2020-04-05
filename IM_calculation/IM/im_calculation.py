@@ -12,7 +12,7 @@ import pandas as pd
 
 from qcore import timeseries, constants
 from qcore.constants import Components
-from qcore.im import order_im_cols_df, default_pattern_order
+from qcore.im import order_im_cols_df
 
 from IM_calculation.IM import read_waveform, intensity_measures
 from IM_calculation.IM.computeFAS import get_fourier_spectrum
@@ -24,24 +24,6 @@ ALL_IMS = ("PGA", "PGV", "CAV", "AI", "Ds575", "Ds595", "MMI", "pSA", "FAS")
 
 MULTI_VALUE_IMS = ("pSA", "FAS")
 
-EXT_PERIOD = np.logspace(start=np.log10(0.01), stop=np.log10(10.0), num=100, base=10)
-BSC_PERIOD = [
-    0.02,
-    0.05,
-    0.1,
-    0.2,
-    0.3,
-    0.4,
-    0.5,
-    0.75,
-    1.0,
-    2.0,
-    3.0,
-    4.0,
-    5.0,
-    7.5,
-    10.0,
-]
 FAS_FREQUENCY = np.logspace(-1, 2, num=100, base=10.0)
 
 
@@ -412,7 +394,7 @@ def validate_period(arg_period, arg_extended_period):
     period = np.array(arg_period, dtype="float64")
 
     if arg_extended_period:
-        period = np.unique(np.append(period, EXT_PERIOD))
+        period = np.unique(np.append(period, constants.EXT_PERIOD))
 
     return period
 

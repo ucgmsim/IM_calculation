@@ -8,7 +8,7 @@ import numpy as np
 from qcore.constants import Components
 
 import IM_calculation.IM.im_calculation as calculate_ims
-from qcore import utils
+from qcore import utils, constants
 from IM_calculation.test.test_common_set_up import INPUT, OUTPUT, compare_dicts, set_up
 
 # This is a hack, to allow loading of the test pickle objects
@@ -32,7 +32,7 @@ utils.setup_dir("fake_dir")
     "test_period, test_extended, expected_period",
     [
         (BSC_PERIOD, False, np.array(BSC_PERIOD)),
-        (BSC_PERIOD, True, np.unique(np.append(BSC_PERIOD, calculate_ims.EXT_PERIOD))),
+        (BSC_PERIOD, True, np.unique(np.append(BSC_PERIOD, constants.EXT_PERIOD))),
     ],
 )
 def test_validate_period(test_period, test_extended, expected_period):
