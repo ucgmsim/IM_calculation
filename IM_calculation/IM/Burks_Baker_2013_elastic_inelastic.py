@@ -40,8 +40,9 @@ GAMMA = 1 / 2
 BETA = 1 / 6  # linear acceleration (stable if Dt/T<=0.551)
 
 
-def Bilinear_Newmark_withTH(period: np.ndarray, z: float, dy: float, alpha: float,
-                            ag: np.ndarray, dt: float):
+def Bilinear_Newmark_withTH(
+    period: np.ndarray, z: float, dy: float, alpha: float, ag: np.ndarray, dt: float
+):
 
     num_oscillators = period.size
 
@@ -65,7 +66,7 @@ def Bilinear_Newmark_withTH(period: np.ndarray, z: float, dy: float, alpha: floa
     A = 1 / (BETA * dt) * m + GAMMA / BETA * c
     B = 1 / (2 * BETA) * m + dt * (GAMMA / (2 * BETA) - 1) * c
 
-    for i in range(lp-1):
+    for i in range(lp - 1):
 
         DPi = p[i + 1] - p[i] + A * v[i] + B * a[i]
 
@@ -73,7 +74,7 @@ def Bilinear_Newmark_withTH(period: np.ndarray, z: float, dy: float, alpha: floa
         jj = np.where(
             np.logical_or(
                 np.logical_and(DPi > 0, fs[i] >= fy + kalpha * (d[i] - dy)),
-                np.logical_and(DPi < 0, fs[i] <= -fy + kalpha * (d[i] + dy))
+                np.logical_and(DPi < 0, fs[i] <= -fy + kalpha * (d[i] + dy)),
             )
         )
         ki[jj] = kalpha[jj]
@@ -89,7 +90,7 @@ def Bilinear_Newmark_withTH(period: np.ndarray, z: float, dy: float, alpha: floa
         fsmin = -fy + kalpha * (d[i + 1] + dy)
         jjabove = np.where(fs[i + 1] > fsmax)
         jjbelow = np.where(fs[i + 1] < fsmin)
-        if (len(jjabove)+len(jjbelow)) > 0:
+        if (len(jjabove) + len(jjbelow)) > 0:
             fs[i + 1, jjabove] = fsmax[jjabove]
             fs[i + 1, jjbelow] = fsmin[jjbelow]
             Df = fs[i + 1] - fs[i] + (Ki - ki) * Ddi
@@ -118,7 +119,7 @@ def Bilinear_Newmark_withTH(period: np.ndarray, z: float, dy: float, alpha: floa
     # Hfs = fs
     # else:
 
-    return Sd #, Sv, Sa, Hd, Hv, Ha, Hfs
+    return Sd  # , Sv, Sa, Hd, Hv, Ha, Hfs
 
 
 #
