@@ -292,9 +292,6 @@ class TestPickleTesting:
                 exist_ok=True,
             )
 
-            # hack to make the test data match the headers
-            result_dict = {key.replace('.', 'p') for key in result_dict.keys()}
-
             calculate_ims.write_result(result_dict, output_folder, identifier, simple_output)
             expected_output_path = calculate_ims.get_result_filepath(
                 output_folder, identifier, ".csv"
@@ -315,7 +312,7 @@ class TestPickleTesting:
                         result_dict[(station, comp.str_value)] = {}
                     if im in calculate_ims.MULTI_VALUE_IMS:
                         for i, val in enumerate(period):
-                            result_dict[(station, comp.str_value)][f"{im}_{str(val)}"] = \
+                            result_dict[(station, comp.str_value)][f"{im}_{str(val).replace('p', '.')}"] = \
                             temp_result_dict[station][im][comp][i]
                     else:
                         result_dict[(station, comp.str_value)][im] = temp_result_dict[station][im][comp]
