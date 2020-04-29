@@ -98,10 +98,6 @@ def compare_dicts(actual_result, expected_result):
 
     assert isinstance(actual_result, dict)
     assert isinstance(expected_result, dict)
-
-    # hack to convert the headers to the same as the testdata
-    actual_result = {key.replace('.', 'p'): actual_result[key] for key in actual_result}
-
     assert set(actual_result.keys()) == set(expected_result.keys())
 
     for key in actual_result.keys():

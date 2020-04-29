@@ -312,7 +312,7 @@ class TestPickleTesting:
                         result_dict[(station, comp.str_value)] = {}
                     if im in calculate_ims.MULTI_VALUE_IMS:
                         for i, val in enumerate(period):
-                            result_dict[(station, comp.str_value)][f"{im}_{str(val).replace('.', 'p')}"] = \
+                            result_dict[(station, comp.str_value)][f"{im}_{str(val)}"] = \
                             temp_result_dict[station][im][comp][i]
                     else:
                         result_dict[(station, comp.str_value)][im] = temp_result_dict[station][im][comp]
