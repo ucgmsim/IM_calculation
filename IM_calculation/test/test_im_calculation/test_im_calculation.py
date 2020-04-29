@@ -274,7 +274,7 @@ class TestPickleTesting:
             ) as load_file:
                 temp_result_dict = pickle.load(load_file)
                 convert_str_comps_to_enum(temp_result_dict)
-                result_dict = self.convert_to_results_dict(period, temp_result_dict)
+                result_dict = self.convert_to_results_dict(period, temp_result_dict, keep_ps=True)
 
             with open(
                 os.path.join(root_path, INPUT, function + "_identifier.P"), "rb"
@@ -302,7 +302,7 @@ class TestPickleTesting:
 
             assert filecmp.cmp(expected_output_path, actual_output_path)
 
-    def convert_to_results_dict(self, period, temp_result_dict):
+    def convert_to_results_dict(self, period, temp_result_dict, keep_ps=False):
         result_dict = {}
         for station in sorted(temp_result_dict):
             temp_result_dict[station]["pSA"] = temp_result_dict[station]["pSA"][1]
@@ -312,8 +312,13 @@ class TestPickleTesting:
                         result_dict[(station, comp.str_value)] = {}
                     if im in calculate_ims.MULTI_VALUE_IMS:
                         for i, val in enumerate(period):
-                            result_dict[(station, comp.str_value)][f"{im}_{str(val).replace('.', 'p')}"] = \
-                            temp_result_dict[station][im][comp][i]
+                            if keep_ps:
+                                result_dict[(station, comp.str_value)][f"{im}_{str(val).replace('.', 'p')}"] = \
+                                temp_result_dict[station][im][comp][i]
+                            else:
+
+                                result_dict[(station, comp.str_value)][f"{im}_{str(val)}"] = \
+                                temp_result_dict[station][im][comp][i]
                     else:
                         result_dict[(station, comp.str_value)][im] = temp_result_dict[station][im][comp]
         return result_dict

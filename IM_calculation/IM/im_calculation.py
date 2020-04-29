@@ -165,7 +165,7 @@ def compute_measure_single(
             if comp.str_value in pSA_values:
                 for i, val in enumerate(im_options[im]):
                     result[(station_name, comp.str_value)][
-                        f"{im}_{str(val).replace('.', 'p')}"
+                        f"{im}_{str(val)}"
                     ] = pSA_values[comp.str_value][i]
 
     if "FAS" in ims:
@@ -184,7 +184,7 @@ def compute_measure_single(
                 if comp.str_value in values_to_store:
                     for i, val in enumerate(im_options[im]):
                         result[(station_name, comp.str_value)][
-                            f"{im}_{str(val).replace('.', 'p')}"
+                            f"{im}_{str(val)}"
                         ] = values_to_store[comp.str_value][i]
 
     return result
