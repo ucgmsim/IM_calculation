@@ -78,11 +78,11 @@ def calculate_rotd(spectral_displacements, comps_to_store: List[Components]):
     rotd = intensity_measures.calc_rotd(spectral_displacements)
     value_dict = {}
     if Components.crotd50 in comps_to_store:
-        value_dict[Components.crotd50] = np.median(rotd, axis=1)
+        value_dict[Components.crotd50.str_value] = np.median(rotd, axis=1)
     if Components.crotd100 in comps_to_store:
-        value_dict[Components.crotd100] = np.max(rotd, axis=1)
+        value_dict[Components.crotd100.str_value] = np.max(rotd, axis=1)
     if Components.crotd100_50 in comps_to_store:
-        value_dict[Components.crotd100_50] = np.max(rotd, axis=1) / np.median(
+        value_dict[Components.crotd100_50.str_value] = np.max(rotd, axis=1) / np.median(
             rotd, axis=1
         )
     return value_dict
