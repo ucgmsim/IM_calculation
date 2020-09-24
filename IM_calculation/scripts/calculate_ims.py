@@ -166,16 +166,7 @@ def main():
         utils.setup_dir(os.path.join(args.output_path, calc.OUTPUT_SUBFOLDER))
 
     if args.observed != None:
-        #retreived station list from observed/fault(eventname)/*.CSV
-        #csv_glob_dir = os.path.join(args.observed, args.rupture)
-        #csv_glob = os.path.join(args.observed, '*.CSV')
-        #csv_path = glob.glob(csv_glob)[0]
-        #try:
-        #    df = pd.read_csv(csv_path)
-        #    station_names = df["Site Code"].tolist()
-        #except:
-        #    station_names = args.station_names
-        #    print(f"possible incorrect csv file: {csv_path}")
+        #retreived station list from observed/fault(eventname)/Vol*/data/accBB/station.*
         # glob for potential directory
         obs_accBB_dir_glob = os.path.join(args.observed,'*/*/accBB')
         obs_accBB_dirs = glob.glob(obs_accBB_dir_glob)
