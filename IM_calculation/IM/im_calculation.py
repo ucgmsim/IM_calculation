@@ -214,7 +214,7 @@ def get_bbseis(input_path, file_type, selected_stations):
         bbseries = timeseries.BBSeis(input_path)
         bb_stations = bbseries.stations.name
         if selected_stations is None:
-            station_names = bb_stations 
+            station_names = bb_stations
         else:
             # making sure selected stations are in bbseis
             station_list_tmp = []

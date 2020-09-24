@@ -147,7 +147,11 @@ def main():
     parser.add_argument(
         "--OpenSees_path", default="OpenSees", help="Path to OpenSees binary"
     )
-    parser.add_argument("--observed", default=None, help="path to the observed data for matching station list")
+    parser.add_argument(
+        "--observed",
+        default=None,
+        help="path to the observed data for matching station list",
+    )
     args = parser.parse_args()
 
     calc.validate_input_path(parser, args.input_path, args.file_type)
@@ -166,14 +170,16 @@ def main():
         utils.setup_dir(os.path.join(args.output_path, calc.OUTPUT_SUBFOLDER))
 
     if args.observed != None:
-        #retreived station list from observed/fault(eventname)/Vol*/data/accBB/station.*
+        # retreived station list from observed/fault(eventname)/Vol*/data/accBB/station.*
         # glob for potential directory
-        obs_accBB_dir_glob = os.path.join(args.observed,'*/*/accBB')
+        obs_accBB_dir_glob = os.path.join(args.observed, "*/*/accBB")
         obs_accBB_dirs = glob.glob(obs_accBB_dir_glob)
         station_names = []
         # for cases that there are more than one Vol records
         for obs_accBB_dir in obs_accBB_dirs:
-            _, station_names_tmp = calc.get_bbseis(obs_accBB_dir, calc.FILE_TYPE_DICT['a'], None)
+            _, station_names_tmp = calc.get_bbseis(
+                obs_accBB_dir, calc.FILE_TYPE_DICT["a"], None
+            )
             station_names = list(set(station_names + station_names_tmp))
     else:
         station_names = args.station_names

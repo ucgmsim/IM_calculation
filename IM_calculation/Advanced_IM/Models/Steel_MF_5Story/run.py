@@ -103,21 +103,22 @@ def create_im_csv(output_dir, im_name, component, component_outdir, print_header
 
     for im_recorder in im_recorders:
         sub_im_name = os.path.splitext(os.path.basename(im_recorder))[0]
-    
+
         # finding matching gravity files for disp and drift and subtract them
         # get base name
         sub_im_type = sub_im_name.split("_")[0]
-        sub_im_gravity_dir = os.path.join(component_outdir,"gravity_"+sub_im_type)
-        sub_im_gravity_recorder = os.path.join(sub_im_gravity_dir,"gr_"+os.path.basename(im_recorder))
-        #find corrosponding gravity file
-        
+        sub_im_gravity_dir = os.path.join(component_outdir, "gravity_" + sub_im_type)
+        sub_im_gravity_recorder = os.path.join(
+            sub_im_gravity_dir, "gr_" + os.path.basename(im_recorder)
+        )
+        # find corrosponding gravity file
+
         im_value_tmp = read_out_file(im_recorder, model_converged)
         if os.path.exists(sub_im_gravity_recorder):
             gr_value = read_out_file(sub_im_gravity_recorder, model_converged)
         else:
             gr_value = 0
         im_value = float(im_value_tmp) - float(gr_value)
-        
 
         full_im_name = im_name + "_" + sub_im_name
         value_dict[full_im_name] = im_value
