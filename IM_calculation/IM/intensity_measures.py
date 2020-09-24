@@ -64,7 +64,7 @@ def getDs(dt, fx, percLow=5, percHigh=75):
         percLow - The lower percentage bound (default 5%)
         percHigh - The higher percentage bound (default 75%)
     Outputs:
-        Ds - The duration (s)    """
+        Ds - The duration (s)"""
     nsteps = np.size(fx)
     husid = np.zeros(nsteps)
     husid[0] = 0  # initialize first to 0
@@ -88,7 +88,7 @@ def getDs_nd(dt, accelerations, percLow=5, percHigh=75):
         percLow - The lower percentage bound (default 5%)
         percHigh - The higher percentage bound (default 75%)
     Outputs:
-        Ds - The duration (s)    """
+        Ds - The duration (s)"""
     if accelerations.ndim == 1:
         return getDs(dt, accelerations, percLow, percHigh)
     else:

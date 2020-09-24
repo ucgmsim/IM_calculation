@@ -193,8 +193,8 @@ def calculate_geom(output_dir, im_name):
 
 def agg_csv(output_dir, im_name, print_header=True):
     """
-        aggregate all data into one huge csv that contains multiple rows
-        000,090, geom, norm
+    aggregate all data into one huge csv that contains multiple rows
+    000,090, geom, norm
     """
     # read all df
     # im_csv_glob = os.path.join(output_dir, im_name + "_*" + ".csv")
@@ -225,7 +225,7 @@ def create_im_csv(
     remove_gravity=True,
 ):
     """
-        create a csv file for each single component/analysis
+    create a csv file for each single component/analysis
     """
     if check_converge:
         success_glob = os.path.join(component_dir, "Analysis_*")
