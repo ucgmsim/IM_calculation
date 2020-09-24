@@ -18,3 +18,5 @@ ATC_Steel_SCBF_6Story:
   script_location: 'Models/ATC_Steel_SCBF_6Story/run.py'
 ATC_Steel_SCBF_12Story:
   script_location: 'Models/ATC_Steel_SCBF_12Story/run.py'
+Taghavi_Miranda_2005:
+  script_location: 'Models/Taghavi_Miranda_2005/run.py'
