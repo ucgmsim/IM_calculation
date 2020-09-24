@@ -26,11 +26,12 @@ source [file join [file dirname [info script]] ../general/time_series.tcl]
 # recorder Drift -file $Output_path/drift/roof_drift.out -time -iNode [lindex $ctrl_nodes 0] -jNode \
         # $roof_node -dof 1 -perpDirn 2
 
-		
+set nSD 10	
+
 # --Define the story and roof envelope drift recorders--
 
 for {set story 1} {$story <= $num_stories} {incr story} {
-    set recTags($story) [recorder EnvelopeDrift -file $Output_path/env_drift/drift_story${story}.out -time -iNode [lindex $ctrl_nodes \
+    set recTags($story) [recorder EnvelopeDrift -file $Output_path/env_drift/drift_story${story}.out -precision $nSD -time -iNode [lindex $ctrl_nodes \
             [expr {$story - 1}]] -jNode [lindex $ctrl_nodes $story] -dof 1 -perpDirn 2]
 }
 # set roof_node [lindex $ctrl_nodes end]

@@ -103,10 +103,47 @@ def create_im_csv(output_dir, im_name, component, component_outdir, print_header
 
     for im_recorder in im_recorders:
         sub_im_name = os.path.splitext(os.path.basename(im_recorder))[0]
-        im_value = read_out_file(im_recorder, model_converged)
+
+        #get base name
+        #env_dir = os.path.dirname(im_recorder)
+        #env_name = os.path.basename(env_dir).split('_')[-1]
+        sub_im_type = sub_im_name.split("_")[0]
+        sub_im_gravity_dir = os.path.join(component_outdir,"gravity_"+sub_im_type)
+        sub_im_gravity_recorder = os.path.join(sub_im_gravity_dir,"gr_"+os.path.basename(im_recorder))
+        #find corrosponding gravity file
+
+        if os.path.exists(sub_im_gravity_recorder):
+            gr_value = float(read_out_file(sub_im_gravity_recorder, model_converged))
+        else:
+            gr_value = 0
+        print(f"im_name: {im_name}: gravity:{gr_value}")
+#        im_value_tmp = read_out_file(im_recorder, model_converged)
+        # read whole csv instead of just last line
+        with open(im_recorder) as f_im_recorder:
+#            im_records = f_im_recorder.readlines()[:-1]
+            im_records_list_tmp = [ float(line.split()[1]) for line in f_im_recorder ]
+        im_records_list=[]     
+        #read all lines except the last
+        for im_record in im_records_list_tmp[:-1]:
+            #loop through all records
+            #print(im_record)
+            #print(f"im_record: {im_record}")
+            im_record = im_record - gr_value
+            im_records_list.append(abs(im_record))
+
+        im_value = max(im_records_list)
+            
+#        im_value = float(im_value_tmp) - float(gr_value)
+
 
         full_im_name = im_name + "_" + sub_im_name
         value_dict[full_im_name] = im_value
+
+
+#        im_value = read_out_file(im_recorder, model_converged)
+#
+#        full_im_name = im_name + "_" + sub_im_name
+#        value_dict[full_im_name] = im_value
 
     value_dict = {component: value_dict}
     result_df = pd.DataFrame.from_dict(value_dict, orient="index")

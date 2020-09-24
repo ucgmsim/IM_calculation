@@ -8,7 +8,7 @@
 # Create a non-linear, concentrated plasticity model of a steel moment frame using information from
 # "model_data_file"
 
-proc CreateSteelMFModel {model_data_file FEMs} {
+proc CreateSteelMFModel {model_data_file FEMs Output_path} {
     
      	
     # Source required files
@@ -17,7 +17,7 @@ proc CreateSteelMFModel {model_data_file FEMs} {
     source [file join [file dirname [info script]] Original/atc72_equations.tcl]
 	
     source $model_data_file
-    
+    puts "Output_path = $Output_path" 
       model BasicBuilder -ndm 2
 
     # Set debug flag to true to create a file with information about each plastic hinge
@@ -897,8 +897,25 @@ proc CreateSteelMFModel {model_data_file FEMs} {
     }
 
     # source [file join [file dirname [info script]] original/display2D.tcl]		
+    file mkdir $Output_path/gravity_drift
+    file mkdir $Output_path/gravity_disp
 	
-    # Apply the gravity load in 10 steps and hold it constant for the rest of the analysis
+    # Define the list of nodes used to compute story drifts
+    set ctrl_nodes 1[format "%02d" [expr {$num_bays + 1}]]002
+    for {set story 1} {$story <= $num_stories} {incr story} {
+        lappend ctrl_nodes 1[format "%02d" [expr {$num_bays + 1}]][format "%02d" $story]4
+    }	
+   
+   for {set story 1} {$story <= $num_stories} {incr story} {
+        recorder Drift -file $Output_path/gravity_drift/gr_drift_story${story}.out -time -iNode [lindex $ctrl_nodes \
+            [expr {$story - 1}]] -jNode [lindex $ctrl_nodes $story] -dof 1 -perpDirn 2
+}
+
+for {set story 1} {$story <= $num_stories} {incr story} {
+    recorder Node -file $Output_path/gravity_disp/gr_disp_story${story}.out -time  -node [lindex $ctrl_nodes $story] -dof 1  disp
+}
+
+   # Apply the gravity load in 10 steps and hold it constant for the rest of the analysis
     set numsteps 10
     set tol 1e-12
     set maxiter 20
@@ -918,7 +935,7 @@ proc CreateSteelMFModel {model_data_file FEMs} {
     puts "Gravity is done!"	
     loadConst -time 0.0
     wipeAnalysis
-
+    remove recorders
     ###########################################  Define Damping  ###########################################
 
     # Set percentage of critical damping and two mode numbers to apply it to. The frequencies of these modes,
@@ -937,7 +954,6 @@ proc CreateSteelMFModel {model_data_file FEMs} {
     # column. Use the committed stiffness matrix at each step to form the damping matrix.
     region 12 -eleRange 100000 299999 -rayleigh $alphaM 0.0 0.0 $betaK
 }
-
 # Create a Modified Ibarra-Medina-Krawinkler bilinear material that models the relation between moment and
 # rotation in a steel moment frame plastic hinge
 # Return the integer tag of the material created

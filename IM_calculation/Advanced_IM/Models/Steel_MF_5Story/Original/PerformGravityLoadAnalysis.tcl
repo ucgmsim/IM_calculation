@@ -45,15 +45,31 @@
 
 
 #############################################
-# Apply gravity load pattern defined above
 
+# Recorders
+ file mkdir $Output_path/gravity_drift
+ file mkdir $Output_path/gravity_disp
+
+
+# --Define the story drift recorders--
+for {set story 1} {$story <= $num_stories} {incr story} {
+   recorder Drift -file $Output_path/gravity_drift/gr_drift_story${story}.out -time -iNode [lindex $ctrl_nodes \
+            [expr {$story - 1}]] -jNode [lindex $ctrl_nodes $story] -dof 1 -perpDirn 2
+}
+
+# Displacement
+for {set story 1} {$story <= $num_stories} {incr story} {
+    recorder Node -file $Output_path/gravity_disp/gr_disp_story${story}.out -time -node [lindex $ctrl_nodes $story] -dof 1 disp
+}
+
+# Apply gravity load pattern defined above
 # Apply the loading
 integrator LoadControl 0.20 1 0.20 0.20;	# Apply in 5 steps - I fixed this to apply the full
 							#	amount of load on 2-19-05 (see hand notes if needed).
 
 # Convergence test
 #                  	tolerance maxIter displayCode
-test RelativeNormDispIncr  1.0e-06     10         0
+test RelativeNormDispIncr  1.0e-6     10         0
 
 # Solution algorithm
 algorithm Newton
@@ -79,11 +95,11 @@ set ok [analyze 5];	# Apply in 5 steps, to be consistent with definition in inte
 if {$ok != 0} {
 	puts "*** Gravity Load application failed!!! "
 	ERROR - stop analysis
-}
+	}
 
 loadConst -time 0.0;	# This sets all previous loads to be constant, so we don't incremet the gravity loads in future portions of the analysis
 wipeAnalysis
-
+remove recorders
 # puts "Check: Gravity Load Applied!"
 
 # Print element information - for testing

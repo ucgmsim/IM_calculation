@@ -212,10 +212,15 @@ def get_bbseis(input_path, file_type, selected_stations):
     bbseries = None
     if file_type == FILE_TYPE_DICT["b"]:
         bbseries = timeseries.BBSeis(input_path)
+        bb_stations = bbseries.stations.name
         if selected_stations is None:
-            station_names = bbseries.stations.name
+            station_names = bb_stations 
         else:
-            station_names = selected_stations
+            station_list_tmp = []
+            for staion_name in selected_stations:
+                if staion_name in bb_stations:
+                    station_list_tmp.append(staion_name)
+            station_names = station_list_tmp
     elif file_type == FILE_TYPE_DICT["a"]:
         search_path = os.path.abspath(os.path.join(input_path, "*"))
         files = glob.glob(search_path)
@@ -300,9 +305,9 @@ def compute_measures_multiprocess(
     :return:
     """
     str_comps_for_int, str_comps = convert_str_comp(comp)
-
+    #print(station_names)
     bbseries, station_names = get_bbseis(input_path, file_type, station_names)
-
+    #print(station_names)
     total_stations = len(station_names)
     # determine the size of each iteration base on num of processers
     steps = get_steps(input_path, process, total_stations)
@@ -317,6 +322,7 @@ def compute_measures_multiprocess(
         # read waveforms of stations
         # each iteration = steps size
         stations_to_run = station_names[i : i + steps]
+        #print(f"stations_to_run {stations_to_run} {i} steps: {steps}")
         waveforms = read_waveform.read_waveforms(
             input_path,
             bbseries,
@@ -584,8 +590,12 @@ def get_steps(input_path, nps, total_stations):
     :return: number of stations per iteration/batch
     """
     estimated_mem = os.stat(input_path).st_size * MEM_FACTOR
+    #print(f"estimated_mem {estimated_mem}")
     available_mem = nps * MEM_PER_CORE
+    #print(f" available_mem {available_mem}")
+    #print(f"total_stations {total_stations}")
     batches = np.ceil(np.divide(estimated_mem, available_mem))
+    #print(f"batches f{batches}")
     steps = int(np.floor(np.divide(total_stations, batches)))
     if steps == 0:
         steps = total_stations

@@ -1049,6 +1049,20 @@ mass 202049 [expr ($MFloorMass2)/($NMBays+1)/6]		[expr ($MFloorMass2)/($NMBays+1
  
 #########################################################################################################################
 
+########## Define Additional Information ##########
+
+# Define the number of stories in the frame
+set num_stories 5
+
+# Define the control nodes used to compute story drifts
+set ctrl_nodes {
+    3013
+    3021
+    3031
+    3041
+    3051
+    3061
+}
 #########################################################################################################################
 
 puts "Model Built!"
@@ -1074,17 +1088,3 @@ puts "Gravity analysis is Done!"
 # # Run Dynamic Anallysis.tcl
 # source DefineTimeHistory1.tcl
 
-########## Define Additional Information ##########
-
-# Define the number of stories in the frame
-set num_stories 5
-
-# Define the control nodes used to compute story drifts
-set ctrl_nodes {
-    3013
-    3021
-    3031
-    3041
-    3051
-    3061
-}

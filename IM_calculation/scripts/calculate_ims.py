@@ -10,6 +10,8 @@ command:
 
 import argparse
 import os
+import pandas as pd
+import glob
 
 import IM_calculation.IM.im_calculation as calc
 from IM_calculation.Advanced_IM import advanced_IM_factory
@@ -145,7 +147,7 @@ def main():
     parser.add_argument(
         "--OpenSees_path", default="OpenSees", help="Path to OpenSees binary"
     )
-
+    parser.add_argument("--observed", default=None, help="path to the observed data for matching station list")
     args = parser.parse_args()
 
     calc.validate_input_path(parser, args.input_path, args.file_type)
@@ -163,12 +165,34 @@ def main():
     if not args.simple_output:
         utils.setup_dir(os.path.join(args.output_path, calc.OUTPUT_SUBFOLDER))
 
+    if args.observed != None:
+        #retreived station list from observed/fault(eventname)/*.CSV
+        #csv_glob_dir = os.path.join(args.observed, args.rupture)
+        #csv_glob = os.path.join(args.observed, '*.CSV')
+        #csv_path = glob.glob(csv_glob)[0]
+        #try:
+        #    df = pd.read_csv(csv_path)
+        #    station_names = df["Site Code"].tolist()
+        #except:
+        #    station_names = args.station_names
+        #    print(f"possible incorrect csv file: {csv_path}")
+        # glob for potential directory
+        obs_accBB_dir_glob = os.path.join(args.observed,'*/*/accBB')
+        obs_accBB_dirs = glob.glob(obs_accBB_dir_glob)
+        station_names = []
+        # for cases that there are more than one Vol records
+        for obs_accBB_dir in obs_accBB_dirs:
+            _, station_names_tmp = calc.get_bbseis(obs_accBB_dir, calc.FILE_TYPE_DICT['a'], None)
+            station_names = list(set(station_names + station_names_tmp))
+    else:
+        station_names = args.station_names
     # multiprocessor
+
     calc.compute_measures_multiprocess(
         args.input_path,
         file_type,
         wave_type=None,
-        station_names=args.station_names,
+        station_names=station_names,
         ims=im,
         comp=args.components,
         period=period,
