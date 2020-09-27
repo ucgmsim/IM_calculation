@@ -2,6 +2,7 @@ import os
 import pickle
 
 import numpy as np
+from qcore.constants import Components
 
 from IM_calculation.IM import read_waveform
 from IM_calculation.test.test_common_set_up import (
@@ -15,6 +16,7 @@ from IM_calculation.test.test_common_set_up import (
 # This is a hack, to allow loading of the test pickle objects
 import sys
 import IM_calculation.IM as IM
+
 sys.modules["IM"] = IM
 
 
@@ -26,7 +28,12 @@ def get_common_waveform_values(root_path, function_name):
     with open(
         os.path.join(root_path, INPUT, function_name + "_comp.P"), "rb"
     ) as load_file:
-        comp = pickle.load(load_file)
+        comp = []
+        for c in pickle.load(load_file):
+            if isinstance(c, str):
+                comp.append(Components.from_str(c))
+            else:
+                comp.append(list(Components)[c])
     with open(
         os.path.join(root_path, INPUT, function_name + "_wave_type.P"), "rb"
     ) as load_file:
