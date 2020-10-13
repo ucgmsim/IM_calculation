@@ -333,10 +333,10 @@ def compute_measures_multiprocess(
 
     all_result_dict = {}
     p = Pool(process)
-    
+
     if advanced_im_config.IM_list:
         df_adv_im = {im: pd.DataFrame() for im in advanced_im_config.IM_list}
-    
+
     i = 0
     while i < total_stations:
         # read waveforms of stations
@@ -364,8 +364,8 @@ def compute_measures_multiprocess(
                     sorted(components_to_calculate, key=lambda x: x.value),
                 )
             )
-            
-            #array_params.append((waveform, ims, comp, period, str_comps))
+
+            # array_params.append((waveform, ims, comp, period, str_comps))
             adv_array_params.append((waveform, advanced_im_config, output))
         # only run simply im if and only if adv_im not going to run
         if not advanced_im_config.IM_list:
@@ -385,9 +385,7 @@ def compute_measures_multiprocess(
 
     # write the ouput after all cals are done
     if not advanced_im_config.IM_list:
-        write_result(
-            all_result_dict, output, identifier, simple_output
-        )
+        write_result(all_result_dict, output, identifier, simple_output)
     # write for advanced IM (pandas array)
     if advanced_im_config.IM_list:
         # dump the whole array

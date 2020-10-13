@@ -114,7 +114,7 @@ def calculate_norm(im_name, output_dir, print_header=True):
     value_dict = {}
 
     # read data from recordings
-    for recorder_name in ["disp", "drift","accl"]:
+    for recorder_name in ["disp", "drift", "accl"]:
         # find recorder in 000 first
         # read all 2nd coloumn
         recorder_dir = os.path.join(dir_000, recorder_name)
