@@ -71,7 +71,7 @@ def calc_rotd(
     rotds = np.zeros((periods, thetas.size))
 
     # Magic number empirically determined from runs on Maui
-    step = int(np.floor(86000000/(thetas.size*nt)))
+    step = int(np.floor(86000000 / (thetas.size * nt)))
     step = np.min(np.max(step, 1), periods)
 
     for period in range(0, periods, step):
