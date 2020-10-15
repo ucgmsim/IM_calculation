@@ -69,19 +69,19 @@ def calc_rotd(
     rotation_matrices = np.asarray([np.cos(thetas), np.sin(thetas)])
     periods, nt, _ = specspectral_displacements.shape
     rotds = np.zeros((periods, thetas.size))
-    
+
     # Magic number empirically determined from runs on Maui
     step = int(np.floor(86000000/(thetas.size*nt)))
     step = np.min(np.max(step, 1), periods)
-    
+
     for period in range(0, periods, step):
-        rotds[period: period+step] = np.max(
+        rotds[period : period + step] = np.max(
             np.abs(
                 np.dot(
-                    spectral_displacements[period: period+step], rotation_matrices
+                    spectral_displacements[period : period + step], rotation_matrices
                 )
-            ), 
-            axis=1
+            ),
+            axis=1,
         )
 
     return np.asarray(rotds)
