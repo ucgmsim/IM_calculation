@@ -380,7 +380,7 @@ def compute_measures_multiprocess(
             for im_type in advanced_im_config.IM_list:
                 # agg_csv(stations_to_run, output_dir, im_type)
                 df_adv_im[im_type] = df_adv_im[im_type].append(
-                    agg_csv(stations_to_run, output_dir, im_type)
+                    agg_csv(stations_to_run, output, im_type)
                 )
 
     # write the ouput after all cals are done
@@ -396,7 +396,7 @@ def compute_measures_multiprocess(
                 + sorted(df_adv_im[im_type].columns[2:], key=natural_key)
             ]
             # check if file exist already, if exist header=False
-            adv_im_out = os.path.join(output_dir, im_type + ".csv")
+            adv_im_out = os.path.join(output, im_type + ".csv")
             print("Dumping adv_im data to : {}".format(adv_im_out))
             if os.path.isfile(adv_im_out):
                 print_header = False
@@ -405,7 +405,7 @@ def compute_measures_multiprocess(
             df_adv_im[im_type].to_csv(
                 adv_im_out, mode="a", header=print_header, index=False
             )
-    generate_metadata(output_dir, identifier, rupture, run_type, version)
+    generate_metadata(output, identifier, rupture, run_type, version)
 
 
 def natural_key(string_):
