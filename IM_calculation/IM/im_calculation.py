@@ -418,9 +418,7 @@ def compute_measures_multiprocess(
                     sorted(components_to_calculate, key=lambda x: x.value),
                 )
             )
-        results = [compute_measure_single(*array_params[0])]
-        pprint(results)
-        all_results.extend(results)
+        all_results.extend(p.starmap(compute_measure_single, array_params))
 
     all_result_dict = ChainMap(*all_results)
     output_path = get_result_filepath(output, identifier, ".csv")
