@@ -151,6 +151,11 @@ def compute_measure_single(
     return result
 
 
+def sanitise_single_value_arrays(input_dict):
+    for key, item in input_dict.items():
+        input_dict[key] = np.squeeze(item)
+
+
 def calc_DS(
     accelerations, dt, perclow, perchigh, im, comps_to_store, comps_to_calculate
 ):
@@ -185,6 +190,7 @@ def calc_PG(waveform, im, comps_to_store, comps_to_calculate):
         Components.crotd100_50,
     }.intersection(comps_to_store):
         rotd = calculate_rotd(np.expand_dims(waveform, 0), comps_to_store)
+        sanitise_single_value_arrays(rotd)
         values.update(rotd)
     return values
 
