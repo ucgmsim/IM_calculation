@@ -19,7 +19,6 @@ matrix_lock = Lock()
 def get_konno_matrix(size):
     with matrix_lock:
         if size not in matrices.keys():
-            print(f"Loading matrix of size {size-1}")
             matrices[size] = np.load(
                 os.path.join(
                     os.path.dirname(__file__), "KO_matrices", f"KO_{size - 1}.npy"
