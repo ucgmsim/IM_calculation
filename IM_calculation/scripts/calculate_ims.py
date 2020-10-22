@@ -16,7 +16,7 @@ from qcore import utils
 from qcore import constants
 
 
-def main():
+def load_args():
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "input_path", help="path to input bb binary file eg./home/melody/BB.bin"
@@ -138,10 +138,13 @@ def main():
         default="g",
         help="The units that input acceleration files are in",
     )
-
     args = parser.parse_args()
-
     calc.validate_input_path(parser, args.input_path, args.file_type)
+    return args
+
+
+def main():
+    args = load_args()
 
     file_type = calc.FILE_TYPE_DICT[args.file_type]
 
@@ -155,7 +158,7 @@ def main():
         im_options["pSA"] = calc.validate_period(args.period, args.extended_period)
 
     if "FAS" in im:
-        im_options["FAS"] = calc.validate_FAS_frequency(args.fas_frequency)
+        im_options["FAS"] = calc.validate_fas_frequency(args.fas_frequency)
 
     # Create output dir
     utils.setup_dir(args.output_path)
