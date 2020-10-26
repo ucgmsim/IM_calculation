@@ -6,8 +6,7 @@ from datetime import datetime
 from functools import partial
 from multiprocessing.pool import Pool
 from collections import ChainMap
-from pprint import pprint
-from typing import List
+from typing import List, Iterable
 
 import numpy as np
 import pandas as pd
@@ -70,6 +69,21 @@ def array_to_dict(value, comps_to_calc, im, comps_to_store):
     return value_dict
 
 
+def check_rotd(comps_to_store: Iterable[Components]) -> bool:
+    """
+    Checks for any rotd components in the components to store list
+    :param comps_to_store: An iterable of the Components enum
+    :return: True if any rotd components are to be stored, false otherwise
+    """
+    return bool(
+        {
+            Components.crotd50,
+            Components.crotd100,
+            Components.crotd100_50,
+        }.intersection(comps_to_store)
+    )
+
+
 def calculate_rotd(
     spectral_displacements,
     comps_to_store: List[Components],
@@ -84,14 +98,16 @@ def calculate_rotd(
     """
     rotd = func(intensity_measures.get_rotations(spectral_displacements))
     value_dict = {}
+
+    rotd50 = np.median(rotd, axis=-1)
+    rotd100 = np.max(rotd, axis=-1)
+
     if Components.crotd50 in comps_to_store:
-        value_dict[Components.crotd50.str_value] = np.median(rotd, axis=-1)
+        value_dict[Components.crotd50.str_value] = rotd50
     if Components.crotd100 in comps_to_store:
-        value_dict[Components.crotd100.str_value] = np.max(rotd, axis=-1)
+        value_dict[Components.crotd100.str_value] = rotd100
     if Components.crotd100_50 in comps_to_store:
-        value_dict[Components.crotd100_50.str_value] = np.max(
-            rotd, axis=-1
-        ) / np.median(rotd, axis=-1)
+        value_dict[Components.crotd100_50.str_value] = rotd100 / rotd50
     return value_dict
 
 
@@ -163,11 +179,7 @@ def calc_DS(
         accelerations, dt=dt, percLow=perclow, percHigh=perchigh
     )
     values = array_to_dict(value, comps_to_calculate, im, comps_to_store)
-    if {
-        Components.crotd50,
-        Components.crotd100,
-        Components.crotd100_50,
-    }.intersection(comps_to_store):
+    if check_rotd(comps_to_store):
         func = partial(
             intensity_measures.getDs_nd,
             dt=dt,
@@ -184,11 +196,7 @@ def calc_DS(
 def calc_PG(waveform, im, comps_to_store, comps_to_calculate):
     value = intensity_measures.get_max_nd(waveform)
     values = array_to_dict(value, comps_to_calculate, im, comps_to_store)
-    if {
-        Components.crotd50,
-        Components.crotd100,
-        Components.crotd100_50,
-    }.intersection(comps_to_store):
+    if check_rotd(comps_to_store):
         rotd = calculate_rotd(np.expand_dims(waveform, 0), comps_to_store)
         sanitise_single_value_arrays(rotd)
         values.update(rotd)
@@ -198,11 +206,7 @@ def calc_PG(waveform, im, comps_to_store, comps_to_calculate):
 def calc_CAV(waveform, times, im, comps_to_store, comps_to_calculate):
     value = intensity_measures.get_cumulative_abs_velocity_nd(waveform, times)
     values = array_to_dict(value, comps_to_calculate, im, comps_to_store)
-    if {
-        Components.crotd50,
-        Components.crotd100,
-        Components.crotd100_50,
-    }.intersection(comps_to_store):
+    if check_rotd(comps_to_store):
         func = lambda x: intensity_measures.get_cumulative_abs_velocity_nd(
             np.squeeze(x), times=times
         )
@@ -214,11 +218,7 @@ def calc_CAV(waveform, times, im, comps_to_store, comps_to_calculate):
 def calc_MMI(waveform, im, comps_to_store, comps_to_calculate):
     value = intensity_measures.calculate_MMI_nd(waveform)
     values = array_to_dict(value, comps_to_calculate, im, comps_to_store)
-    if {
-        Components.crotd50,
-        Components.crotd100,
-        Components.crotd100_50,
-    }.intersection(comps_to_store):
+    if check_rotd(comps_to_store):
         func = lambda x: intensity_measures.calculate_MMI_nd(np.squeeze(x))
         rotd = calculate_rotd(np.expand_dims(waveform, 0), comps_to_store, func)
         values.update(rotd)
@@ -228,11 +228,7 @@ def calc_MMI(waveform, im, comps_to_store, comps_to_calculate):
 def calc_AI(accelerations, G, times, im, comps_to_store, comps_to_calculate):
     value = intensity_measures.get_arias_intensity_nd(accelerations, G, times)
     values = array_to_dict(value, comps_to_calculate, im, comps_to_store)
-    if {
-        Components.crotd50,
-        Components.crotd100,
-        Components.crotd100_50,
-    }.intersection(comps_to_store):
+    if check_rotd(comps_to_store):
         func = lambda x: intensity_measures.get_arias_intensity_nd(
             np.squeeze(x), g=G, times=times
         )
@@ -256,11 +252,7 @@ def calc_FAS(
     try:
         value = get_fourier_spectrum(accelerations[:, :2], DT, im_options[im])
         values_to_store = array_to_dict(value, comps_to_calculate, im, comps_to_store)
-        if {
-            Components.crotd50,
-            Components.crotd100,
-            Components.crotd100_50,
-        }.intersection(comps_to_store):
+        if check_rotd(comps_to_store):
             func = lambda rotated_waveform: get_fourier_spectrum(
                 rotated_waveform.squeeze(), dt=DT, fa_frequencies_int=im_options[im]
             )
@@ -301,11 +293,7 @@ def calculate_pSAs(
     # Where the im_values in the component dictionaries correspond to the periods in the periods list
     pSA_values = array_to_dict(psa, comps_to_calculate, im, comps_to_store)
 
-    if {
-        Components.crotd50,
-        Components.crotd100,
-        Components.crotd100_50,
-    }.intersection(comps_to_store):
+    if check_rotd(comps_to_store):
         # Only run if any of the given components are selected (Non empty intersection)
         rotd = calculate_rotd(spectral_displacements, comps_to_store)
         pSA_values.update(rotd)
@@ -414,7 +402,7 @@ def compute_measures_multiprocess(
         )
         i += steps
         array_params = []
-        for j, waveform in enumerate(waveforms):
+        for waveform in waveforms:
             array_params.append(
                 (
                     waveform,
