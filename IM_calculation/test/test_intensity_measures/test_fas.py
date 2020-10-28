@@ -14,6 +14,7 @@ def test_compute_FAS(set_up):
         bb = BBSeis(os.path.join(root_path, INPUT, "BB.bin"))
         station = bb.stations[0].name
         waveform = bb.acc(station)
+        # Only test 000 and 090 (first two columns)
         test_output = computeFAS.get_fourier_spectrum(waveform[:, :2], bb.dt)
 
         with open(
