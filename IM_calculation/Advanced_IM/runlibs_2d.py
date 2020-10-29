@@ -111,8 +111,6 @@ def create_im_csv(output_dir, im_name, component, component_outdir, print_header
         sub_im_name = os.path.splitext(os.path.basename(im_recorder))[0]
 
         # get base name
-        # env_dir = os.path.dirname(im_recorder)
-        # env_name = os.path.basename(env_dir).split('_')[-1]
         sub_im_type = sub_im_name.split("_")[0]
         sub_im_gravity_dir = os.path.join(component_outdir, "gravity_" + sub_im_type)
         sub_im_gravity_recorder = os.path.join(
