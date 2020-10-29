@@ -100,9 +100,7 @@ def agg_csv(stations, im_calc_dir, im_type):
     for station in stations:
         # use glob(?) and qcore.sim_struc to get specific station_im.csv
         # TODO: define this structure into qcore.sim_struct
-        station_im_dir = os.path.join(im_calc_dir, station)
-        im_type_path = os.path.join(station_im_dir, im_type)
-        im_path = os.path.join(im_type_path, im_type + ".csv")
+        im_path = os.path.join(im_calc_dir, station, im_type, im_type + ".csv")
         # read a df and add station name as colum
         df_tmp = pd.read_csv(im_path)
 
