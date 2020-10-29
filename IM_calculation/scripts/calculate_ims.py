@@ -19,7 +19,7 @@ from qcore import utils
 from qcore import constants
 
 
-def main():
+def load_args():
     parent_parser = argparse.ArgumentParser(add_help=False)
     parent_parser.add_argument(
         "--advanced_im_config",
@@ -30,7 +30,6 @@ def main():
     parent_args = parent_parser.parse_known_args()
 
     parser = argparse.ArgumentParser(parents=[parent_parser], add_help=True)
-
     parser.add_argument(
         "input_path", help="path to input bb binary file eg./home/melody/BB.bin"
     )
@@ -151,6 +150,7 @@ def main():
         default="g",
         help="The units that input acceleration files are in",
     )
+
     parser.add_argument(
         "-a",
         "--advanced_ims",
@@ -167,8 +167,15 @@ def main():
         help="path to the observed data for matching station list",
     )
     args = parser.parse_args()
-
     calc.validate_input_path(parser, args.input_path, args.file_type)
+    
+    return args
+
+
+def main():
+    args = load_args()
+
+
     file_type = calc.FILE_TYPE_DICT[args.file_type]
     run_type = calc.META_TYPE_DICT[args.run_type]
 
@@ -180,7 +187,7 @@ def main():
         im_options["pSA"] = calc.validate_period(args.period, args.extended_period)
 
     if "FAS" in im:
-        im_options["FAS"] = calc.validate_FAS_frequency(args.fas_frequency)
+        im_options["FAS"] = calc.validate_fas_frequency(args.fas_frequency)
 
     advanced_im_config = advanced_IM_factory.advanced_im_config(
         args.advanced_ims, args.advanced_im_config, args.OpenSees_path
