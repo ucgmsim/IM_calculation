@@ -23,13 +23,10 @@ def get_config(config_file=CONFIG_FILE_NAME):
     return config
 
 
-def get_im_list(config_file=CONFIG_FILE_NAME, model_type=None):
+def get_im_list(config_file=CONFIG_FILE_NAME):
     """Retrieves the list of IMs that are present in config_file"""
     config = get_config(config_file)
-    if model_type == None:
-        return list(config.keys())
-    else:
-        return [ config[im] for im in config if "model_type" in config[im].keys() and config[im]["model_type"] == model_type]
+    return list(config.keys())
 
 
 def compute_ims(accelerations, configuration, adv_im_out_dir):
@@ -54,7 +51,6 @@ def compute_ims(accelerations, configuration, adv_im_out_dir):
             script = [
                 "python",
                 os.path.join(advanced_im_dir, im_config["script_location"]),
-                im,
                 "--OpenSees_path",
                 configuration.OpenSees_path,
             ]

@@ -1,7 +1,3 @@
-"""
-Python script to run a 3D waveform through Steel_MF_5Story and store the outputs to a txt file
-"""
-
 import argparse
 import glob
 import os
@@ -10,36 +6,24 @@ import subprocess
 import numpy as np
 import pandas as pd
 
-from IM_calculation.Advanced_IM import advanced_IM_factory
-
 DEFAULT_OPEN_SEES_PATH = "OpenSees"
 
-SCRIPT_LOCATION = os.path.dirname(__file__)
-
-
-def main():
-
+def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "im_name",
-        choices=advanced_IM_factory.get_im_list(
-            advanced_IM_factory.CONFIG_FILE_NAME, model_type="2D"
-        ),
-        help="the name of adv_im model",
-    )
+    
     parser.add_argument(
         "comp_000", help="filepath to a station's 000 waveform ascii file"
-    )
+    )   
     parser.add_argument(
         "comp_090", help="filepath to a station's 090 waveform ascii file"
-    )
+    )   
     parser.add_argument(
         "comp_ver", help="filepath to a station's ver waveform ascii file"
-    )
+    )   
     parser.add_argument(
         "output_dir",
         help="Where the IM_csv file is written to. Also contains the temporary recorders output",
-    )
+    )   
 
     parser.add_argument(
         "--OpenSees_path",
@@ -48,12 +32,10 @@ def main():
     )
 
     args = parser.parse_args()
-    
-    im_name = args.im_name
-    # this should be moved into config if rules become complicated
-    model_dir = os.path.join(SCRIPT_LOCATION,f"{im_name}")
-    run_script = os.path.join(model_dir, "Run_script.tcl")
 
+    return args
+
+def main(args, im_name, run_script):
     output_dir = args.output_dir
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
@@ -89,6 +71,7 @@ def main():
         station_name=os.path.basename(args.comp_000).split('.')[0]
         print(f"failed to converge for {station_name}")
 
+
 def check_converge(component_outdir):
     success_glob = os.path.join(component_outdir, "Analysis_*")
     success_files = glob.glob(success_glob)
@@ -97,7 +80,7 @@ def check_converge(component_outdir):
         with open(f) as fp:
             contents = fp.read()
         model_converged = model_converged or (contents.strip() == "Successful")
-    return model_converged    
+    return model_converged
 
 def calculate_geom(im_csv_fname):
     ims = pd.read_csv(im_csv_fname, dtype={"component": str})
@@ -110,7 +93,6 @@ def calculate_geom(im_csv_fname):
     cols = list(ims.columns)
     cols.sort()
     ims.to_csv(im_csv_fname, columns=cols)
-
 
 def create_im_csv(output_dir, im_name, component, component_outdir, print_header=True):
     """
@@ -178,6 +160,3 @@ def read_out_file(file):
         return value
 
 
-if __name__ == "__main__":
-
-    main()
