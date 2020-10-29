@@ -453,10 +453,7 @@ def compute_measures_multiprocess(
             # array_params.append((waveform, ims, comp, period, str_comps))
             adv_array_params.append((waveform, advanced_im_config, output))
         # only run simply im if and only if adv_im not going to run
-        if not advanced_im_config.IM_list:
-            result_list = p.starmap(compute_measure_single, array_params)
-            all_result_dict = ChainMap( *result_list)             
-        else:
+        if advanced_im_config.IM_list:
             # calculate IM for stations in this iteration
             p.starmap(compute_adv_measure, adv_array_params)
             # read and agg data into a pandas array
@@ -466,24 +463,12 @@ def compute_measures_multiprocess(
                 df_adv_im[im_type] = df_adv_im[im_type].append(
                     agg_csv(stations_to_run, output, im_type)
                 )
+        else:
+            result_list = p.starmap(compute_measure_single, array_params)
+            all_result_dict = ChainMap( *result_list)             
 
-
-    # write the ouput after all cals are done
-    if not advanced_im_config.IM_list:
-        # write_result(all_result_dict, output, identifier, simple_output)
-        output_path = get_result_filepath(output, identifier, ".csv")
-
-        results_dataframe = pd.DataFrame.from_dict(all_result_dict, orient="index")
-        results_dataframe.index = pd.MultiIndex.from_tuples(
-            results_dataframe.index, names=["station", "component"]
-        )
-        results_dataframe.sort_values(["station", "component"], inplace=True)
-        results_dataframe = order_im_cols_df(results_dataframe)
-
-        # Save the transposed dataframe
-        results_dataframe.to_csv(output_path)
     # write for advanced IM (pandas array)
-    else:
+    if advanced_im_config.IM_list:
         # dump the whole array
         for im_type in advanced_im_config.IM_list:
             # do a natural sort on the column names
@@ -501,6 +486,19 @@ def compute_measures_multiprocess(
             df_adv_im[im_type].to_csv(
                 adv_im_out, mode="a", header=print_header, index=False
             )
+    else:
+        # write_result(all_result_dict, output, identifier, simple_output)
+        output_path = get_result_filepath(output, identifier, ".csv")
+
+        results_dataframe = pd.DataFrame.from_dict(all_result_dict, orient="index")
+        results_dataframe.index = pd.MultiIndex.from_tuples(
+            results_dataframe.index, names=["station", "component"]
+        )
+        results_dataframe.sort_values(["station", "component"], inplace=True)
+        results_dataframe = order_im_cols_df(results_dataframe)
+
+        # Save the transposed dataframe
+        results_dataframe.to_csv(output_path)
     generate_metadata(output, identifier, rupture, run_type, version)
 
 
