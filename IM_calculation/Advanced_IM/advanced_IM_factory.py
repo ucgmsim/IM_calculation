@@ -1,5 +1,6 @@
 from collections import namedtuple
 import numpy as np
+import pandas as pd
 import os
 import subprocess
 import tempfile
@@ -84,3 +85,32 @@ def save_waveform_to_tmp_files(tmp_folder, accelerations, station_name):
             station_name,
             component,
         )
+
+def agg_csv(stations, im_calc_dir, im_type):
+    # get csv base on station name
+    # quick check of args format
+    if type(im_type) != str:
+        raise TypeError(
+            "im_type should be a string, but get {} instead".format(type(im_type))
+        )
+    # initial a blank dataframe
+    df = pd.DataFrame()
+
+    # loop through all stations
+    for station in stations:
+        # use glob(?) and qcore.sim_struc to get specific station_im.csv
+        # TODO: define this structure into qcore.sim_struct
+        station_im_dir = os.path.join(im_calc_dir, station)
+        im_type_path = os.path.join(station_im_dir, im_type)
+        im_path = os.path.join(im_type_path, im_type + ".csv")
+        # read a df and add station name as colum
+        df_tmp = pd.read_csv(im_path)
+
+        # add in the station name before agg
+        df_tmp.insert(0, "station", station)
+
+        # append the df
+        df = df.append(df_tmp)
+
+    # leave write csv to parent function
+    return df

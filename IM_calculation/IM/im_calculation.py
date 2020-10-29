@@ -247,36 +247,6 @@ def get_bbseis(input_path, file_type, selected_stations):
     return bbseries, list(station_names)
 
 
-def agg_csv(stations, im_calc_dir, im_type):
-    # get csv base on station name
-    # quick check of args format
-    if type(im_type) != str:
-        raise TypeError(
-            "im_type should be a string, but get {} instead".format(type(im_type))
-        )
-    # initial a blank dataframe
-    df = pd.DataFrame()
-
-    # loop through all stations
-    for station in stations:
-        # use glob(?) and qcore.sim_struc to get specific station_im.csv
-        # TODO: define this structure into qcore.sim_struct
-        station_im_dir = os.path.join(im_calc_dir, station)
-        im_type_path = os.path.join(station_im_dir, im_type)
-        im_path = os.path.join(im_type_path, im_type + ".csv")
-        # read a df and add station name as colum
-        df_tmp = pd.read_csv(im_path)
-
-        # add in the station name before agg
-        df_tmp.insert(0, "station", station)
-
-        # append the df
-        df = df.append(df_tmp)
-
-    # leave write csv to parent function
-    return df
-
-
 def compute_measures_multiprocess(
     input_path,
     file_type,
@@ -366,9 +336,8 @@ def compute_measures_multiprocess(
         # only run simply im if and only if adv_im not going to run
         if not advanced_im_config.IM_list:
             result_list = p.starmap(compute_measure_single, array_params)
-            for result in result_list:
-                all_result_dict.update(result)
-        if advanced_im_config.IM_list:
+            all_result_dict = ChainMap( *result_list) 
+        else:
             # calculate IM for stations in this iteration
             p.starmap(compute_adv_measure, adv_array_params)
             # read and agg data into a pandas array
@@ -383,7 +352,7 @@ def compute_measures_multiprocess(
     if not advanced_im_config.IM_list:
         write_result(all_result_dict, output, identifier, simple_output)
     # write for advanced IM (pandas array)
-    if advanced_im_config.IM_list:
+    else:
         # dump the whole array
         for im_type in advanced_im_config.IM_list:
             # do a natural sort on the column names
