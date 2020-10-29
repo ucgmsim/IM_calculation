@@ -73,7 +73,7 @@ def main():
         help="Please specify the version of the simulation. eg.18p4",
     )
     parser.add_argument(
-        "-im",
+        "-m",
         "--im",
         nargs="+",
         default=calc.DEFAULT_IMS,

@@ -5,18 +5,25 @@
 #                  Absolute paths also work
 
 Steel_MF_5Story:
-  script_location: 'Models/Steel_MF_5Story/run.py'
+  script_location: 'Models/run_2D.py'
+  model_type: '2D'
 SAC_Steel_MF_3Story:
-  script_location: 'Models/SAC_Steel_MF_3Story/run.py'
+  script_location: 'Models/run_2D.py'
+  model_type: '2D'
 SAC_Steel_MF_9Story:
-  script_location: 'Models/SAC_Steel_MF_9Story/run.py'
+  script_location: 'Models/run_2D.py'
+  model_type: '2D'
 Spear_3D_Model:
-  script_location: 'Models/Spear_3D_Model/run.py'
+  script_location: 'Models/run_3D.py'
+  model_type: '3D'
 ATC_Steel_SCBF_3Story:
-  script_location: 'Models/ATC_Steel_SCBF_3Story/run.py'
+  script_location: 'Models/run_2D.py'
+  model_type: '2D'
 ATC_Steel_SCBF_6Story:
-  script_location: 'Models/ATC_Steel_SCBF_6Story/run.py'
+  script_location: 'Models/run_2D.py'
+  model_type: '2D'
 ATC_Steel_SCBF_12Story:
-  script_location: 'Models/ATC_Steel_SCBF_12Story/run.py'
+  script_location: 'Models/run_2D.py'
+  model_type: '2D'
 Taghavi_Miranda_2005:
   script_location: 'Models/Taghavi_Miranda_2005/run.py'

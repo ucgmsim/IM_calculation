@@ -231,11 +231,7 @@ def get_bbseis(input_path, file_type, selected_stations):
             station_names = bb_stations
         else:
             # making sure selected stations are in bbseis
-            station_list_tmp = []
-            for staion_name in selected_stations:
-                if staion_name in bb_stations:
-                    station_list_tmp.append(staion_name)
-            station_names = station_list_tmp
+            station_names = [station_name for station_name in selected_stations if station_name in bb_stations]
     elif file_type == FILE_TYPE_DICT["a"]:
         search_path = os.path.abspath(os.path.join(input_path, "*"))
         files = glob.glob(search_path)
