@@ -4,7 +4,6 @@ Python script to run a 3D waveform through ATC_Steel_SCBF_12Story/ and store the
 
 import os
 
-from IM_calculation.Advanced_IM import advanced_IM_factory
 from IM_calculation.Advanced_IM import runlibs_2d
 
 SCRIPT_LOCATION = os.path.dirname(__file__)

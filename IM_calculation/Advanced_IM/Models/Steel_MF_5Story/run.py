@@ -4,7 +4,6 @@ Python script to run a 3D waveform through Steel_MF_5Story and store the outputs
 
 import os
 
-from IM_calculation.Advanced_IM import advanced_IM_factory
 from IM_calculation.Advanced_IM import runlibs_2d
 
 SCRIPT_LOCATION = os.path.dirname(__file__)
