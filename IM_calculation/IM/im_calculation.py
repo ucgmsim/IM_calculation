@@ -3,9 +3,10 @@ import glob
 import os
 import sys
 from datetime import datetime
+from functools import partial
 from multiprocessing.pool import Pool
 from collections import ChainMap
-from typing import List
+from typing import List, Iterable
 
 import numpy as np
 import pandas as pd
@@ -68,23 +69,45 @@ def array_to_dict(value, comps_to_calc, im, comps_to_store):
     return value_dict
 
 
-def calculate_rotd(spectral_displacements, comps_to_store: List[Components]):
+def check_rotd(comps_to_store: Iterable[Components]) -> bool:
+    """
+    Checks for any rotd components in the components to store list
+    :param comps_to_store: An iterable of the Components enum
+    :return: True if any rotd components are to be stored, false otherwise
+    """
+    return bool(
+        {
+            Components.crotd50,
+            Components.crotd100,
+            Components.crotd100_50,
+        }.intersection(comps_to_store)
+    )
+
+
+def calculate_rotd(
+    spectral_displacements,
+    comps_to_store: List[Components],
+    func=lambda x: np.max(np.abs(x), axis=1),
+):
     """
     Calculates rotd for given spectral displacements
     :param spectral_displacements: An array with shape [periods.size, nt, 2] where nt is the number of timesteps in the original waveform
     :param comps_to_store: A list of components to store
+    :param func: The function to apply to the rotated waveforms. Defaults to taking the maximum absolute value across all rotations (used by PGA, PGV, pSA)
     :return: A dictionary with the comps_to_store as keys, and 1d arrays of shape [periods.size] containing the rotd values
     """
-    rotd = intensity_measures.calc_rotd(spectral_displacements)
+    rotd = func(intensity_measures.get_rotations(spectral_displacements))
     value_dict = {}
+
+    rotd50 = np.median(rotd, axis=-1)
+    rotd100 = np.max(rotd, axis=-1)
+
     if Components.crotd50 in comps_to_store:
-        value_dict[Components.crotd50.str_value] = np.median(rotd, axis=1)
+        value_dict[Components.crotd50.str_value] = rotd50
     if Components.crotd100 in comps_to_store:
-        value_dict[Components.crotd100.str_value] = np.max(rotd, axis=1)
+        value_dict[Components.crotd100.str_value] = rotd100
     if Components.crotd100_50 in comps_to_store:
-        value_dict[Components.crotd100_50.str_value] = np.max(rotd, axis=1) / np.median(
-            rotd, axis=1
-        )
+        value_dict[Components.crotd100_50.str_value] = rotd100 / rotd50
     return value_dict
 
 
@@ -113,81 +136,174 @@ def compute_measure_single(
 
     result = {(station_name, comp.str_value): {} for comp in comps_to_store}
 
-    def process_single_value_im(im, func, *args, **kwargs):
-        if im in ims:
-            value = func(*args, **kwargs)
-            values_to_store = array_to_dict(
-                value, comps_to_calculate, im, comps_to_store
-            )
-            for comp in comps_to_store:
-                if comp.str_value in values_to_store:
-                    result[(station_name, comp.str_value)][im] = values_to_store[
-                        comp.str_value
-                    ]
+    im_functions = {
+        "PGV": (calc_PG, (velocities,)),
+        "PGA": (calc_PG, (accelerations,)),
+        "CAV": (calc_CAV, (accelerations, times)),
+        "pSA": (
+            calculate_pSAs,
+            (DT, accelerations, im_options, result, station_name, waveform_acc),
+        ),
+        "FAS": (calc_FAS, (DT, accelerations, im_options, result, station_name)),
+        "AI": (calc_AI, (accelerations, G, times)),
+        "MMI": (calc_MMI, (velocities,)),
+        "Ds595": (calc_DS, (accelerations, DT, 5, 95)),
+        "Ds575": (calc_DS, (accelerations, DT, 5, 75)),
+    }
 
-    process_single_value_im("PGV", intensity_measures.get_max_nd, velocities)
-    process_single_value_im("PGA", intensity_measures.get_max_nd, accelerations)
-    process_single_value_im(
-        "CAV", intensity_measures.get_cumulative_abs_velocity_nd, accelerations, times
-    )
-    process_single_value_im(
-        "AI", intensity_measures.get_arias_intensity_nd, accelerations, G, times
-    )
-    process_single_value_im("MMI", intensity_measures.calculate_MMI_nd, velocities)
-    process_single_value_im(
-        "Ds595", intensity_measures.getDs_nd, DT, accelerations, 5, 95
-    )
-    process_single_value_im(
-        "Ds575", intensity_measures.getDs_nd, DT, accelerations, 5, 75
-    )
-
-    if "pSA" in ims:
-        im = "pSA"
-        # store a im type values into a dict {comp: np_array/single float}
-        # Geometric is also calculated here
-        psa, spectral_displacements = intensity_measures.get_spectral_acceleration_nd(
-            accelerations, im_options[im], waveform_acc.NT, DT
-        )
-        # Store the pSA im values in the format Tuple(List(periods), dict(component: List(im_values)))
-        # Where the im_values in the component dictionaries correspond to the periods in the periods list
-        pSA_values = array_to_dict(psa, comps_to_calculate, im, comps_to_store)
-
-        if {
-            Components.crotd50,
-            Components.crotd100,
-            Components.crotd100_50,
-        }.intersection(comps_to_store):
-            # Only run if any of the given components are selected (Non empty intersection)
-            rotd = calculate_rotd(spectral_displacements, comps_to_store)
-            pSA_values.update(rotd)
-
+    for im in set(ims).intersection(im_functions.keys()):
+        # print(im)
+        func, args = im_functions[im]
+        values_to_store = func(*args, im, comps_to_store, comps_to_calculate)
+        if values_to_store is None:
+            # value storing has been handled by the called function
+            continue
         for comp in comps_to_store:
-            if comp.str_value in pSA_values:
+            if comp.str_value in values_to_store:
+                result[(station_name, comp.str_value)][im] = values_to_store[
+                    comp.str_value
+                ]
+
+    return result
+
+
+def sanitise_single_value_arrays(input_dict):
+    for key, item in input_dict.items():
+        input_dict[key] = np.squeeze(item)
+
+
+def calc_DS(
+    accelerations, dt, perclow, perchigh, im, comps_to_store, comps_to_calculate
+):
+    value = intensity_measures.getDs_nd(
+        accelerations, dt=dt, percLow=perclow, percHigh=perchigh
+    )
+    values = array_to_dict(value, comps_to_calculate, im, comps_to_store)
+    if check_rotd(comps_to_store):
+        func = partial(
+            intensity_measures.getDs_nd,
+            dt=dt,
+            percLow=perclow,
+            percHigh=perchigh,
+        )
+        rotd = calculate_rotd(
+            np.expand_dims(accelerations, 0), comps_to_store, func=func
+        )
+        values.update(rotd)
+    return values
+
+
+def calc_PG(waveform, im, comps_to_store, comps_to_calculate):
+    value = intensity_measures.get_max_nd(waveform)
+    values = array_to_dict(value, comps_to_calculate, im, comps_to_store)
+    if check_rotd(comps_to_store):
+        rotd = calculate_rotd(np.expand_dims(waveform, 0), comps_to_store)
+        sanitise_single_value_arrays(rotd)
+        values.update(rotd)
+    return values
+
+
+def calc_CAV(waveform, times, im, comps_to_store, comps_to_calculate):
+    value = intensity_measures.get_cumulative_abs_velocity_nd(waveform, times)
+    values = array_to_dict(value, comps_to_calculate, im, comps_to_store)
+    if check_rotd(comps_to_store):
+        func = lambda x: intensity_measures.get_cumulative_abs_velocity_nd(
+            np.squeeze(x), times=times
+        )
+        rotd = calculate_rotd(np.expand_dims(waveform, 0), comps_to_store, func)
+        values.update(rotd)
+    return values
+
+
+def calc_MMI(waveform, im, comps_to_store, comps_to_calculate):
+    value = intensity_measures.calculate_MMI_nd(waveform)
+    values = array_to_dict(value, comps_to_calculate, im, comps_to_store)
+    if check_rotd(comps_to_store):
+        func = lambda x: intensity_measures.calculate_MMI_nd(np.squeeze(x))
+        rotd = calculate_rotd(np.expand_dims(waveform, 0), comps_to_store, func)
+        values.update(rotd)
+    return values
+
+
+def calc_AI(accelerations, G, times, im, comps_to_store, comps_to_calculate):
+    value = intensity_measures.get_arias_intensity_nd(accelerations, G, times)
+    values = array_to_dict(value, comps_to_calculate, im, comps_to_store)
+    if check_rotd(comps_to_store):
+        func = lambda x: intensity_measures.get_arias_intensity_nd(
+            np.squeeze(x), g=G, times=times
+        )
+        rotd = calculate_rotd(
+            np.expand_dims(accelerations, 0), comps_to_store, func=func
+        )
+        values.update(rotd)
+    return values
+
+
+def calc_FAS(
+    DT,
+    accelerations,
+    im_options,
+    result,
+    station_name,
+    im,
+    comps_to_store,
+    comps_to_calculate,
+):
+    try:
+        value = get_fourier_spectrum(accelerations[:, :2], DT, im_options[im])
+        values_to_store = array_to_dict(value, comps_to_calculate, im, comps_to_store)
+        if check_rotd(comps_to_store):
+            func = lambda rotated_waveform: get_fourier_spectrum(
+                rotated_waveform.squeeze(), dt=DT, fa_frequencies_int=im_options[im]
+            )
+            rotd = calculate_rotd(
+                np.expand_dims(accelerations, 0), comps_to_store, func=func
+            )
+            values_to_store.update(rotd)
+    except FileNotFoundError as e:
+        print(
+            f"Attempting to compute fourier spectrum raised exception: {e}\nThis was most likely caused by attempting to compute for a waveform with more than 16384 timesteps."
+        )
+    else:
+        for comp in comps_to_store:
+            if comp.str_value in values_to_store:
                 for i, val in enumerate(im_options[im]):
                     result[(station_name, comp.str_value)][
                         f"{im}_{str(val)}"
-                    ] = pSA_values[comp.str_value][i]
+                    ] = values_to_store[comp.str_value][i]
 
-    if "FAS" in ims:
-        im = "FAS"
-        try:
-            value = get_fourier_spectrum(accelerations, DT, im_options[im])
-        except FileNotFoundError as e:
-            print(
-                f"Attempting to compute fourier spectrum raised exception: {e}\nThis was most likely caused by attempting to compute for a waveform with more than 16384 timesteps."
-            )
-        else:
-            values_to_store = array_to_dict(
-                value, comps_to_calculate, im, comps_to_store
-            )
-            for comp in comps_to_store:
-                if comp.str_value in values_to_store:
-                    for i, val in enumerate(im_options[im]):
-                        result[(station_name, comp.str_value)][
-                            f"{im}_{str(val)}"
-                        ] = values_to_store[comp.str_value][i]
 
-    return result
+def calculate_pSAs(
+    DT,
+    accelerations,
+    im_options,
+    result,
+    station_name,
+    waveform_acc,
+    im,
+    comps_to_store,
+    comps_to_calculate,
+):
+    # store a im type values into a dict {comp: np_array/single float}
+    # Geometric is also calculated here
+    psa, spectral_displacements = intensity_measures.get_spectral_acceleration_nd(
+        accelerations, im_options[im], waveform_acc.NT, DT
+    )
+    # Store the pSA im values in the format Tuple(List(periods), dict(component: List(im_values)))
+    # Where the im_values in the component dictionaries correspond to the periods in the periods list
+    pSA_values = array_to_dict(psa, comps_to_calculate, im, comps_to_store)
+
+    if check_rotd(comps_to_store):
+        # Only run if any of the given components are selected (Non empty intersection)
+        rotd = calculate_rotd(spectral_displacements, comps_to_store)
+        pSA_values.update(rotd)
+
+    for comp in comps_to_store:
+        if comp.str_value in pSA_values:
+            for i, val in enumerate(im_options[im]):
+                result[(station_name, comp.str_value)][f"{im}_{str(val)}"] = pSA_values[
+                    comp.str_value
+                ][i]
 
 
 def get_bbseis(input_path, file_type, selected_stations):
@@ -216,6 +332,8 @@ def get_bbseis(input_path, file_type, selected_stations):
                         selected_stations, input_path
                     )
                 )
+    else:
+        return
     return bbseries, list(station_names)
 
 
@@ -297,7 +415,19 @@ def compute_measures_multiprocess(
         all_results.extend(p.starmap(compute_measure_single, array_params))
 
     all_result_dict = ChainMap(*all_results)
-    write_result(all_result_dict, output, identifier, simple_output)
+    output_path = get_result_filepath(output, identifier, ".csv")
+
+    results_dataframe = pd.DataFrame.from_dict(all_result_dict, orient="index")
+    results_dataframe.index = pd.MultiIndex.from_tuples(
+        results_dataframe.index, names=["station", "component"]
+    )
+    results_dataframe.sort_values(["station", "component"], inplace=True)
+    results_dataframe = order_im_cols_df(results_dataframe)
+
+    # Save the transposed dataframe
+    results_dataframe.to_csv(output_path)
+
+    # write_result(all_result_dict, output, identifier, simple_output)
 
     generate_metadata(output, identifier, rupture, run_type, version)
 
@@ -399,7 +529,7 @@ def validate_period(arg_period, arg_extended_period):
     return period
 
 
-def validate_FAS_frequency(arg_fas_freq):
+def validate_fas_frequency(arg_fas_freq):
     """
     returns validated user input if pass the validation else raise parser error
     :param arg_fas_freq: input

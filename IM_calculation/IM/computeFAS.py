@@ -19,7 +19,6 @@ matrix_lock = Lock()
 def get_konno_matrix(size):
     with matrix_lock:
         if size not in matrices.keys():
-            print(f"Loading matrix of size {size-1}")
             matrices[size] = np.load(
                 os.path.join(
                     os.path.dirname(__file__), "KO_matrices", f"KO_{size - 1}.npy"
@@ -43,8 +42,7 @@ def get_fourier_spectrum(
     dt: float = 0.005,
     fa_frequencies_int: List[float] = np.logspace(-1, 2, num=100, base=10.0),
 ):
-    waveforms = waveform[:, :2]
-    fa_spectrum, fa_frequencies = generate_fa_spectrum(waveforms, dt, waveform.shape[0])
+    fa_spectrum, fa_frequencies = generate_fa_spectrum(waveform, dt, waveform.shape[0])
     fa_spectrum = np.abs(fa_spectrum)
 
     # get appropriate konno ohmachi matrix

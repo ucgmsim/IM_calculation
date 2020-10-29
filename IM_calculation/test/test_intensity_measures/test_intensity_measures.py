@@ -186,7 +186,7 @@ def test_getDs_nd(set_up):
             os.path.join(root_path, INPUT, function + "_accelerations.P"), "rb"
         ) as load_file:
             acc = pickle.load(load_file)
-        test_output = intensity_measures.getDs_nd(dt, acc, perc_low, perc_high)
+        test_output = intensity_measures.getDs_nd(acc, dt, perc_low, perc_high)
         with open(
             os.path.join(root_path, OUTPUT, function + "_values.P"), "rb"
         ) as load_file:
