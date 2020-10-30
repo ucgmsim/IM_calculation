@@ -71,7 +71,6 @@ def array_to_dict(value, comps_to_calc, im, comps_to_store):
     return value_dict
 
 
-
 def compute_adv_measure(waveform, advanced_im_config, output_dir):
     """
     Wrapper function to call advanced IM workflow
@@ -348,7 +347,11 @@ def get_bbseis(input_path, file_type, selected_stations):
             station_names = bb_stations
         else:
             # making sure selected stations are in bbseis
-            station_names = [station_name for station_name in selected_stations if station_name in bb_stations]
+            station_names = [
+                station_name
+                for station_name in selected_stations
+                if station_name in bb_stations
+            ]
     elif file_type == FILE_TYPE_DICT["a"]:
         search_path = os.path.abspath(os.path.join(input_path, "*"))
         files = glob.glob(search_path)
@@ -465,7 +468,7 @@ def compute_measures_multiprocess(
                 )
         else:
             result_list = p.starmap(compute_measure_single, array_params)
-            all_result_dict = ChainMap( *result_list)             
+            all_result_dict = ChainMap(*result_list)
 
     # write for advanced IM (pandas array)
     if advanced_im_config.IM_list:

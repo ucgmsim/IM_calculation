@@ -86,6 +86,7 @@ def save_waveform_to_tmp_files(tmp_folder, accelerations, station_name):
             component,
         )
 
+
 def agg_csv(stations, im_calc_dir, im_type):
     # get csv base on station name
     # quick check of args format

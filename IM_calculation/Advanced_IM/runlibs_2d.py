@@ -8,22 +8,23 @@ import pandas as pd
 
 DEFAULT_OPEN_SEES_PATH = "OpenSees"
 
+
 def parse_args():
     parser = argparse.ArgumentParser()
-    
+
     parser.add_argument(
         "comp_000", help="filepath to a station's 000 waveform ascii file"
-    )   
+    )
     parser.add_argument(
         "comp_090", help="filepath to a station's 090 waveform ascii file"
-    )   
+    )
     parser.add_argument(
         "comp_ver", help="filepath to a station's ver waveform ascii file"
-    )   
+    )
     parser.add_argument(
         "output_dir",
         help="Where the IM_csv file is written to. Also contains the temporary recorders output",
-    )   
+    )
 
     parser.add_argument(
         "--OpenSees_path",
@@ -34,6 +35,7 @@ def parse_args():
     args = parser.parse_args()
 
     return args
+
 
 def main(args, im_name, run_script):
     output_dir = args.output_dir
@@ -60,13 +62,13 @@ def main(args, im_name, run_script):
 
     # skip creating csv if any component has zero success count
     if model_converged:
-        # aggregate 
+        # aggregate
         create_im_csv(output_dir, im_name, component, component_outdir)
 
         im_csv_fname = os.path.join(output_dir, im_name + ".csv")
         calculate_geom(im_csv_fname)
     else:
-        station_name=os.path.basename(args.comp_000).split('.')[0]
+        station_name = os.path.basename(args.comp_000).split(".")[0]
         print(f"failed to converge for {station_name}")
 
 
@@ -80,6 +82,7 @@ def check_converge(component_outdir):
         model_converged = model_converged or (contents.strip() == "Successful")
     return model_converged
 
+
 def calculate_geom(im_csv_fname):
     ims = pd.read_csv(im_csv_fname, dtype={"component": str})
     ims.set_index("component", inplace=True)
@@ -91,6 +94,7 @@ def calculate_geom(im_csv_fname):
     cols = list(ims.columns)
     cols.sort()
     ims.to_csv(im_csv_fname, columns=cols)
+
 
 def create_im_csv(output_dir, im_name, component, component_outdir, print_header=True):
     """
@@ -154,5 +158,3 @@ def read_out_file(file):
         value = lines[-1].split()[1]
 
         return value
-
-

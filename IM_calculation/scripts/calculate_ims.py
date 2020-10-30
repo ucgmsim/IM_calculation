@@ -168,13 +168,12 @@ def load_args():
     )
     args = parser.parse_args()
     calc.validate_input_path(parser, args.input_path, args.file_type)
-    
+
     return args
 
 
 def main():
     args = load_args()
-
 
     file_type = calc.FILE_TYPE_DICT[args.file_type]
     run_type = calc.META_TYPE_DICT[args.run_type]
