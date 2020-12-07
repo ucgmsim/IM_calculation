@@ -19,7 +19,7 @@ pipeline {
                 pip install --no-deps ./qcore/
                 ln -s $HOME/data/testing/${env.JOB_NAME}/sample0 ${env.WORKSPACE}/test
 		ln -s $HOME/data/testing/${env.JOB_NAME}/rspectra.cpython-37m-x86_64-linux-gnu.so ${env.WORKSPACE}/${env.JOB_NAME}/IM/rspectra_calculations/
-		ln -s $HOME/data/testing/${env.JOB_NAME}/Burks_Baker_2013_elastic_inelastic.cpython-37m-x86_64-linux-gnu.so ${env.WORKSPACE}/${env.JOB_NAME}//IM/riesdr_calculation/
+		ln -s $HOME/data/testing/${env.JOB_NAME}/Burks_Baker_2013_elastic_inelastic.cpython-37m-x86_64-linux-gnu.so ${env.WORKSPACE}/${env.JOB_NAME}/IM/iesdr_calculation/
 		python travis_setup.py
                 """
             }
