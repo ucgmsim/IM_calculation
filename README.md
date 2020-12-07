@@ -17,7 +17,7 @@ In the terminal, type:
 
 $ cd IM_calculation
 
-$ python setup_rspectra.py build_ext --inplace
+$ python setup.py build_ext --inplace
 
 ```
 usage: calculate_ims.py [-h] [-o OUTPUT_PATH] [-i IDENTIFIER] [-r RUPTURE]
