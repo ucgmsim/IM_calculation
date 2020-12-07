@@ -79,7 +79,7 @@ def set_up(request):
     # Remove the test data directory
     for PATH in test_data_save_dirs:
         if os.path.isdir(PATH):
-            shutil.rmtree(PATH)
+            shutil.rmtree(PATH, ignore_errors=True)
 
 
 def compare_waveforms(bench_waveform, test_waveform):
