@@ -1,6 +1,5 @@
 # IM_calculation
-
-[![Build Status](https://travis-ci.org/ucgmsim/IM_calculation.svg?branch=master)](https://travis-ci.org/ucgmsim/IM_calculation)
+[![Build Status](http://13.238.107.244:8080/job/IM_calculation/badge/icon)](http://13.238.107.244:8080/job/IM_calculation)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 To calculate rrups:
@@ -18,7 +17,7 @@ In the terminal, type:
 
 $ cd IM_calculation
 
-$ python setup_rspectra.py build_ext --inplace
+$ python setup.py build_ext --inplace
 
 ```
 usage: calculate_ims.py [-h] [-o OUTPUT_PATH] [-i IDENTIFIER] [-r RUPTURE]
