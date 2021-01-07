@@ -13,10 +13,10 @@ import os
 
 import IM_calculation.IM.im_calculation as calc
 from qcore import utils
-from qcore.constants import Components
+from qcore import constants
 
 
-def main():
+def load_args():
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "input_path", help="path to input bb binary file eg./home/melody/BB.bin"
@@ -71,11 +71,11 @@ def main():
         "-p",
         "--period",
         nargs="+",
-        default=calc.BSC_PERIOD,
+        default=constants.DEFAULT_PSA_PERIODS,
         type=float,
         help="Please provide pSA period(s) separated by a space. eg: "
         "0.02 0.05 0.1. Default periods are: {}".format(
-            ",".join(str(v) for v in calc.BSC_PERIOD)
+            ",".join(str(v) for v in constants.DEFAULT_PSA_PERIODS)
         ),
     )
     parser.add_argument(
@@ -109,11 +109,11 @@ def main():
         "-c",
         "--components",
         nargs="+",
-        choices=list(Components.iterate_str_values()),
-        default=[Components.cgeom.str_value],
+        choices=list(constants.Components.iterate_str_values()),
+        default=[constants.Components.cgeom.str_value],
         help="Please provide the velocity/acc component(s) you want to calculate eg.geom."
         " Available compoents are: {} components. Default is all components".format(
-            ",".join(Components.iterate_str_values())
+            ",".join(constants.Components.iterate_str_values())
         ),
     )
     parser.add_argument(
@@ -138,10 +138,13 @@ def main():
         default="g",
         help="The units that input acceleration files are in",
     )
-
     args = parser.parse_args()
-
     calc.validate_input_path(parser, args.input_path, args.file_type)
+    return args
+
+
+def main():
+    args = load_args()
 
     file_type = calc.FILE_TYPE_DICT[args.file_type]
 
@@ -155,7 +158,7 @@ def main():
         im_options["pSA"] = calc.validate_period(args.period, args.extended_period)
 
     if "FAS" in im:
-        im_options["FAS"] = calc.validate_FAS_frequency(args.fas_frequency)
+        im_options["FAS"] = calc.validate_fas_frequency(args.fas_frequency)
 
     # Create output dir
     utils.setup_dir(args.output_path)
