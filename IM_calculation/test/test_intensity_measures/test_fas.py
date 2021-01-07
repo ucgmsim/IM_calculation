@@ -14,12 +14,13 @@ def test_compute_FAS(set_up):
         bb = BBSeis(os.path.join(root_path, INPUT, "BB.bin"))
         station = bb.stations[0].name
         waveform = bb.acc(station)
-        test_output = computeFAS.get_fourier_spectrum(waveform, bb.dt)
+        # Only test 000 and 090 (first two columns)
+        test_output = computeFAS.get_fourier_spectrum(waveform[:, :2], bb.dt)
 
         with open(
             os.path.join(root_path, OUTPUT, function + "_ret_val.P"), "rb"
         ) as load_file:
-            bench_output = pickle.load(load_file)[:, :2]
+            bench_output = pickle.load(load_file)
 
         assert np.isclose(test_output, bench_output).all()
 

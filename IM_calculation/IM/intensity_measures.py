@@ -44,7 +44,7 @@ def get_spectral_acceleration_nd(acceleration, period, NT, DT):
         return get_spectral_acceleration(acceleration, period, NT, DT)
 
 
-def calc_rotd(
+def get_rotations(
     spectral_displacements,
     delta_theta: int = 1,
     min_angle: int = 0,
@@ -62,13 +62,24 @@ def calc_rotd(
     :param delta_theta: The difference between each angle to take. Defaults to 2 degrees
     :param min_angle: The minimum angle in degrees to calculate from, 0 is due East
     :param max_angle: The maximum angle in degrees to calculate to, 180 is due West. This value is not included in the calculations
-    :return: An array of shape [periods.size, (max_angle-min_angle)/delta_theta] containing rotd values
+    :return: An array of shape [periods.size, nt, (max_angle-min_angle)/delta_theta] containing rotd values
     """
 
     thetas = np.deg2rad(np.arange(min_angle, max_angle, delta_theta))
     rotation_matrices = np.asarray([np.cos(thetas), np.sin(thetas)])
+    periods, nt, xy = spectral_displacements.shape
+    rotds = np.zeros((periods, nt, thetas.size))
 
-    return np.max(np.abs(np.dot(spectral_displacements, rotation_matrices)), axis=1)
+    # Magic number empirically determined from runs on Maui
+    step = int(np.floor(86000000 / (thetas.size * nt)))
+    step = np.min([np.max([step, 1]), periods])
+
+    for period in range(0, periods, step):
+        rotds[period : period + step] = np.dot(
+            spectral_displacements[period : period + step], rotation_matrices
+        )
+
+    return rotds
 
 
 def get_cumulative_abs_velocity_nd(acceleration, times):
@@ -95,7 +106,7 @@ def getDs(dt, fx, percLow=5, percHigh=75):
         percLow - The lower percentage bound (default 5%)
         percHigh - The higher percentage bound (default 75%)
     Outputs:
-        Ds - The duration (s)    """
+        Ds - The duration (s)"""
     nsteps = np.size(fx)
     husid = np.zeros(nsteps)
     husid[0] = 0  # initialize first to 0
@@ -110,7 +121,7 @@ def getDs(dt, fx, percLow=5, percHigh=75):
     return Ds
 
 
-def getDs_nd(dt, accelerations, percLow=5, percHigh=75):
+def getDs_nd(accelerations, dt, percLow=5, percHigh=75):
     """Computes the percLow-percHigh% sign duration for a nd(>1) ground motion component
     Based on getDs575.m
     Inputs:
@@ -119,7 +130,7 @@ def getDs_nd(dt, accelerations, percLow=5, percHigh=75):
         percLow - The lower percentage bound (default 5%)
         percHigh - The higher percentage bound (default 75%)
     Outputs:
-        Ds - The duration (s)    """
+        Ds - The duration (s)"""
     if accelerations.ndim == 1:
         return getDs(dt, accelerations, percLow, percHigh)
     else:

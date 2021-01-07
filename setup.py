@@ -37,6 +37,10 @@ setup(
         Extension(
             "IM_calculation.IM.rspectra_calculations.rspectra",
             ["IM_calculation/IM/rspectra_calculations/rspectra.pyx"],
+        ),
+        Extension(
+            "IM_calculation.IM.iesdr_calculations.Burks_Baker_2013_elastic_inelastic",
+            ["IM_calculation/IM/iesdr_calculations/Burks_Baker_2013_elastic_inelastic.pyx"],
         )
     ],
     scripts=[
