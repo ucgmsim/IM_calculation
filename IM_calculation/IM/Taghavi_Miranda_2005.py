@@ -314,7 +314,14 @@ def calculate_structural_response(
     sa_time, sd_time = sa_sd_time(acc_time_history, dt, t1_range=vibration_period, c=c)
 
     # calculate structural response
-    displacement, slope, moment, shear, load, rel_accel = calculate_structural_response_b(
+    (
+        displacement,
+        slope,
+        moment,
+        shear,
+        load,
+        rel_accel,
+    ) = calculate_structural_response_b(
         participation_factor,
         phi,
         phi_1,
@@ -416,7 +423,18 @@ def Taghavi_Miranda_2005(
         alpha, gamma, storey
     )
     # 3c calculate structural response
-    disp, slope, moment, storey_moment, shear, storey_shear, load, ground_accel, rel_accel, total_accel = calculate_structural_response(
+    (
+        disp,
+        slope,
+        moment,
+        storey_moment,
+        shear,
+        storey_shear,
+        load,
+        ground_accel,
+        rel_accel,
+        total_accel,
+    ) = calculate_structural_response(
         vibration_period,
         waveform,
         dt,
