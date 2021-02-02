@@ -18,8 +18,8 @@
 set Tmax $Tmax1
 set dt $dt1
 
-set Outputs_nm [open [file join [file dirname [info script]] $Output_path/Analysis_NM_${st1}.txt] w]
-set Outputs_cd [open [file join [file dirname [info script]] $Output_path/Analysis_CD_${st1}.txt] w]
+set Outputs_nm [open $Output_path/Analysis_NM_${st1}.txt w]
+set Outputs_cd [open $Output_path/Analysis_CD_${st1}.txt w]
 
 set algoList "{NewtonLineSearch 0.65} ModifiedNewton KrylovNewton BFGS Broyden"
 
