@@ -10,20 +10,19 @@ def get_max_nd(data):
 
 def get_spectral_acceleration(acceleration, period, NT, DT):
     # pSA
-    deltat = 0.005
+    deltat = DT if DT != 0.005 else 0.005
     c = 0.05
     M = 1.0
     beta = 0.25
     gamma = 0.5
 
-    acc_step = np.zeros(NT + 1)
-    acc_step[1:] = acceleration
-
+    acc_step = np.zeros(NT)
+    acc_step = acceleration
     # interpolation additions
     Npts = np.shape(acceleration)[0]
-    Nstep = np.floor(Npts * DT / deltat)
-    t_orig = np.arange(Npts + 1) * DT
-    t_solve = np.arange(Nstep + 1) * deltat
+    Nstep = np.round(Npts * DT / deltat)
+    t_orig = np.arange(Npts ) * DT
+    t_solve = np.arange(Nstep ) * deltat
     acc_step = np.interp(t_solve, t_orig, acc_step)
     return rspectra.Response_Spectra(acc_step, deltat, c, period, M, gamma, beta)
 
