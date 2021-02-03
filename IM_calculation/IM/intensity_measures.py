@@ -21,8 +21,8 @@ def get_spectral_acceleration(acceleration, period, NT, DT):
     # interpolation additions
     Npts = np.shape(acceleration)[0]
     Nstep = np.round(Npts * DT / deltat)
-    t_orig = np.arange(Npts ) * DT
-    t_solve = np.arange(Nstep ) * deltat
+    t_orig = np.arange(Npts) * DT
+    t_solve = np.arange(Nstep) * deltat
     acc_step = np.interp(t_solve, t_orig, acc_step)
     return rspectra.Response_Spectra(acc_step, deltat, c, period, M, gamma, beta)
 

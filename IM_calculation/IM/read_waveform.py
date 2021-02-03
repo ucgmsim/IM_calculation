@@ -30,7 +30,9 @@ class Waveform:
         self.station_name = station_name
 
 
-def read_ascii_file(f_090, f_000, f_ver,comp=(Components.c090, Components.c000), wave_type=None):
+def read_ascii_file(
+    f_090, f_000, f_ver, comp=(Components.c090, Components.c000), wave_type=None
+):
     waveform = Waveform()
     waveform.wave_type = wave_type
     waveform.file_type = "EMOD3D_ascii"
@@ -46,18 +48,17 @@ def read_ascii_file(f_090, f_000, f_ver,comp=(Components.c090, Components.c000),
 
     waveform.times = calculate_timesteps(waveform.NT, waveform.DT)
 
-
     i = 0
     f_comp_dict = {
-                    Components.c090: f_090,
-                    Components.c000: f_000,
-                    Components.cver: f_ver,
-                    }
-    comp_to_get = [ f_comp_dict[x] for x in f_comp_dict.keys() if x in comp ]
+        Components.c090: f_090,
+        Components.c000: f_000,
+        Components.cver: f_ver,
+    }
+    comp_to_get = [f_comp_dict[x] for x in f_comp_dict.keys() if x in comp]
     files = zip(*comp_to_get)
     values = np.zeros((waveform.NT, len(comp_to_get)))
     for line in list(files):
-        a = [ line[x].split() for x in range(len(comp_to_get)) ]
+        a = [line[x].split() for x in range(len(comp_to_get))]
         line_values = np.array(a, np.float).transpose()
         n_vals = len(line_values)
         values[i : i + n_vals] = line_values
@@ -179,7 +180,7 @@ def read_ascii_folder(path, station_names, comp, units="g"):
             )
             return None, None
 
-        waveform = read_ascii_file(f_090, f_000, f_ver, comp,"acceleration")
+        waveform = read_ascii_file(f_090, f_000, f_ver, comp, "acceleration")
         if units == "cm/s^2":
             waveform.values = waveform.values / G
         waveforms.append((waveform, None))
