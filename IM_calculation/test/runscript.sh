@@ -1,3 +1,5 @@
+# random change to test master testing
+
 DIRS='test_*'
 curdir=$PWD
 for DIR in $DIRS
