@@ -77,7 +77,7 @@ def read_ascii_header(fid):
     # second line of the header
     header2 = next(fid).split()
     NT = np.int(header2[0])
-    DT = np.float(header2[1])
+    DT = np.float32(header2[1])
 
     hour = np.float(header2[2])
     minutes = np.float(header2[3])
