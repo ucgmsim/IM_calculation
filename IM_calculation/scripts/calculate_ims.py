@@ -119,9 +119,9 @@ def load_args():
     parser.add_argument(
         "-np",
         "--process",
-        default=2,
+        default=1,
         type=int,
-        help="Please provide the number of processors. Default is 2",
+        help="Please provide the number of processors. Default is 1",
     )
     parser.add_argument(
         "-s",
