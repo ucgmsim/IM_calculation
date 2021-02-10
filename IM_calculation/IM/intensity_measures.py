@@ -5,6 +5,7 @@ from qcore import timeseries
 
 deltat = 0.005
 
+
 def get_max_nd(data):
     return np.max(np.abs(data), axis=0)
 
@@ -35,7 +36,9 @@ def get_spectral_acceleration_nd(acceleration, period, NT, DT):
 
         displacements = np.zeros((period.size, Nstep, dims))
         for i in range(dims):
-            psa, u = get_spectral_acceleration(acceleration[:, i], period, NT, DT, Nstep)
+            psa, u = get_spectral_acceleration(
+                acceleration[:, i], period, NT, DT, Nstep
+            )
             values[:, i] = psa
             displacements[:, :, i] = u
 
