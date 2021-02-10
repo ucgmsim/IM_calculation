@@ -30,7 +30,9 @@ class Waveform:
         self.station_name = station_name
 
 
-def read_ascii_file(f_000, f_090, f_ver, wave_type=None):
+def read_ascii_file(
+    f_090, f_000, f_ver, comp=(Components.c090, Components.c000), wave_type=None
+):
     waveform = Waveform()
     waveform.wave_type = wave_type
     waveform.file_type = "EMOD3D_ascii"
@@ -46,12 +48,17 @@ def read_ascii_file(f_000, f_090, f_ver, wave_type=None):
 
     waveform.times = calculate_timesteps(waveform.NT, waveform.DT)
 
-    values = np.zeros((waveform.NT, 3))
-
     i = 0
-    files = zip(f_000, f_090, f_ver)
-    for l_000, l_090, l_ver in files:
-        a = [l_090.split(), l_000.split(), l_ver.split()]
+    f_comp_dict = {
+        Components.c090: f_090,
+        Components.c000: f_000,
+        Components.cver: f_ver,
+    }
+    comp_to_get = [f_comp_dict[x] for x in f_comp_dict.keys() if x in comp]
+    files = zip(*comp_to_get)
+    values = np.zeros((waveform.NT, len(comp_to_get)))
+    for line in list(files):
+        a = [line[x].split() for x in range(len(comp_to_get))]
         line_values = np.array(a, np.float).transpose()
         n_vals = len(line_values)
         values[i : i + n_vals] = line_values
@@ -70,7 +77,8 @@ def read_ascii_header(fid):
     # second line of the header
     header2 = next(fid).split()
     NT = np.int(header2[0])
-    DT = np.float(header2[1])
+    # force dtype to be float32 to match qcore.BBSeis as well as EMOD3D
+    DT = np.float32(header2[1])
 
     hour = np.float(header2[2])
     minutes = np.float(header2[3])
@@ -134,7 +142,7 @@ def read_waveforms(
     """
     print(units)
     if file_type == "ascii":
-        return read_ascii_folder(path, station_names, units=units)
+        return read_ascii_folder(path, station_names, comp=comp, units=units)
     elif file_type == "binary":
         return read_binary_file(
             bbseis,
@@ -155,7 +163,7 @@ def get_station_name_from_filepath(path):
     return station_name
 
 
-def read_ascii_folder(path, station_names, units="g"):
+def read_ascii_folder(path, station_names, comp, units="g"):
     waveforms = list()
 
     for station in station_names:
@@ -173,7 +181,7 @@ def read_ascii_folder(path, station_names, units="g"):
             )
             return None, None
 
-        waveform = read_ascii_file(f_000, f_090, f_ver, "acceleration")
+        waveform = read_ascii_file(f_090, f_000, f_ver, comp, "acceleration")
         if units == "cm/s^2":
             waveform.values = waveform.values / G
         waveforms.append((waveform, None))

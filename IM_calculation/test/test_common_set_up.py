@@ -89,7 +89,7 @@ def compare_waveforms(bench_waveform, test_waveform):
     vars_bench = vars(bench_waveform)
     for k in vars_bench.keys():
         if isinstance(vars_bench[k], np.ndarray):
-            assert np.isclose(vars_test[k], vars_bench[k]).all()
+            assert np.isclose(vars_test[k], vars_bench[k], atol=1e-6).all()
         else:
             assert vars_test[k] == vars_bench[k]
 
