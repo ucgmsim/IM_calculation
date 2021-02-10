@@ -3,7 +3,7 @@ import numpy as np
 from IM_calculation.IM.rspectra_calculations import rspectra as rspectra
 from qcore import timeseries
 
-deltat = 0.005
+DELTA_T = 0.005
 
 
 def get_max_nd(data):
@@ -22,9 +22,9 @@ def get_spectral_acceleration(acceleration, period, NT, DT, Nstep):
 
     # interpolation additions
     t_orig = np.arange(NT + 1) * DT
-    t_solve = np.arange(Nstep) * deltat
+    t_solve = np.arange(Nstep) * DELTA_T
     acc_step = np.interp(t_solve, t_orig, acc_step)
-    return rspectra.Response_Spectra(acc_step, deltat, c, period, M, gamma, beta)
+    return rspectra.Response_Spectra(acc_step, DELTA_T, c, period, M, gamma, beta)
 
 
 def get_spectral_acceleration_nd(acceleration, period, NT, DT):
@@ -32,7 +32,7 @@ def get_spectral_acceleration_nd(acceleration, period, NT, DT):
     if acceleration.ndim != 1:
         ts, dims = acceleration.shape
         values = np.zeros((period.size, dims))
-        Nstep = ts * int(round(DT / deltat))
+        Nstep = calculate_Nstep(DT, NT)
 
         displacements = np.zeros((period.size, Nstep, dims))
         for i in range(dims):
@@ -45,6 +45,10 @@ def get_spectral_acceleration_nd(acceleration, period, NT, DT):
         return values, displacements
     else:
         return get_spectral_acceleration(acceleration, period, NT, DT)
+
+
+def calculate_Nstep(DT, NT):
+    return NT * int(round(DT / DELTA_T))
 
 
 def get_rotations(
