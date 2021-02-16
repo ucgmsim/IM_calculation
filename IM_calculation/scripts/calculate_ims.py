@@ -14,9 +14,10 @@ import os
 import IM_calculation.IM.im_calculation as calc
 from IM_calculation.Advanced_IM import advanced_IM_factory
 from qcore import utils
+from qcore import constants
 
 
-def main():
+def load_args():
     parent_parser = argparse.ArgumentParser(add_help=False)
     parent_parser.add_argument(
         "--advanced_im_config",
@@ -27,7 +28,8 @@ def main():
     parent_args = parent_parser.parse_known_args()
 
     parser = argparse.ArgumentParser(parents=[parent_parser], add_help=True)
-
+    #
+    #parser = argparse.ArgumentParser()
     parser.add_argument(
         "input_path", help="path to input bb binary file eg./home/melody/BB.bin"
     )
@@ -73,20 +75,19 @@ def main():
         "-im",
         "--im",
         nargs="+",
-        choices=calc.IMS,
-        default=calc.IMS,
-        help="Please specify im measure(s) separated by a space(if more than one). "
-        "eg: PGV PGA CAV. {}".format(calc.get_im_or_period_help(calc.IMS, "IM")),
+        default=calc.DEFAULT_IMS,
+        choices=calc.ALL_IMS,
+        help="Please specify im measure(s) separated by a space(if more than one). eg: PGV PGA CAV",
     )
     parser.add_argument(
         "-p",
         "--period",
         nargs="+",
-        default=calc.BSC_PERIOD,
+        default=constants.DEFAULT_PSA_PERIODS,
         type=float,
         help="Please provide pSA period(s) separated by a space. eg: "
-        "0.02 0.05 0.1. {}".format(
-            calc.get_im_or_period_help(calc.BSC_PERIOD, "period")
+        "0.02 0.05 0.1. Default periods are: {}".format(
+            ",".join(str(v) for v in constants.DEFAULT_PSA_PERIODS)
         ),
     )
     parser.add_argument(
@@ -97,6 +98,20 @@ def main():
         "Default not using",
     )
     parser.add_argument(
+        "--fas_frequency",
+        nargs="+",
+        default=calc.FAS_FREQUENCY,
+        type=float,
+        help="Please provide fourier spectrum frequencies separated by a space. eg: "
+        "0.1 0.2 0.4",
+    )
+    # parser.add_argument(
+    #     "--extended_fas_frequency",
+    #     "-f",
+    #     action="store_true",
+    #     help="Please add '-f' to indicate the use of extended(100) FAS frequencies. Default not using",
+    # )
+    parser.add_argument(
         "-n",
         "--station_names",
         nargs="+",
@@ -106,11 +121,11 @@ def main():
         "-c",
         "--components",
         nargs="+",
-        choices=calc.COMPONENTS,
-        default=calc.COMPONENTS,
+        choices=list(constants.Components.iterate_str_values()),
+        default=[constants.Components.cgeom.str_value],
         help="Please provide the velocity/acc component(s) you want to calculate eg.geom."
         " Available compoents are: {} components. Default is all components".format(
-            ",".join(calc.COMPONENTS)
+            ",".join(constants.Components.iterate_str_values())
         ),
     )
     parser.add_argument(
@@ -147,12 +162,26 @@ def main():
     )
 
     args = parser.parse_args()
-
     calc.validate_input_path(parser, args.input_path, args.file_type)
+    return args
+
+
+def main():
+    args = load_args()
+
     file_type = calc.FILE_TYPE_DICT[args.file_type]
     run_type = calc.META_TYPE_DICT[args.run_type]
-    im = calc.validate_im(parser, args.im)
     period = calc.validate_period(parser, args.period, args.extended_period, im)
+
+    im = args.im
+
+    im_options = {}
+
+    if "pSA" in im:
+        im_options["pSA"] = calc.validate_period(args.period, args.extended_period)
+
+    if "FAS" in im:
+        im_options["FAS"] = calc.validate_fas_frequency(args.fas_frequency)
 
     advanced_im_config = advanced_IM_factory.advanced_im_config(
         args.advanced_ims, args.advanced_im_config, args.OpenSees_path
@@ -171,8 +200,8 @@ def main():
         station_names=args.station_names,
         ims=im,
         comp=args.components,
-        period=period,
-        output_dir=args.output_path,
+        im_options=im_options,
+        output=args.output_path,
         identifier=args.identifier,
         rupture=args.rupture,
         run_type=run_type,
