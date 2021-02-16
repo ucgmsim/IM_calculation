@@ -67,7 +67,6 @@ def convert_str_comp(arg_comps):
     else:
         return arg_comps, arg_comps
 
-
 def array_to_dict(value, comps_to_calc, im, comps_to_store):
     """
     convert a numpy arrary that contains calculated im values to a dict {comp: value}
@@ -503,13 +502,13 @@ def compute_measures_multiprocess(
                     sorted(components_to_calculate, key=lambda x: x.value),
                 )
             )
-            adv_array_params.append((waveform, advanced_im_config, output_dir))
+            adv_array_params.append((waveform, advanced_im_config, output))
         # only run simply im if and only if adv_im not going to run
         if not advanced_im_config.IM_list:
             all_results.extend(p.starmap(compute_measure_single, array_params))
             # adv_im changes for ref, TODO:del once test pass
-            # result_list = p.map(compute_measure_single, array_params)
-            # for result in result_list:
+            #result_list = p.map(compute_measure_single, array_params)
+            #for result in result_list:
             #    all_result_dict.update(result)
         if advanced_im_config.IM_list:
             # calculate IM for stations in this iteration
@@ -519,28 +518,29 @@ def compute_measures_multiprocess(
             for im_type in advanced_im_config.IM_list:
                 # agg_csv(stations_to_run, output_dir, im_type)
                 df_adv_im[im_type] = df_adv_im[im_type].append(
-                    agg_csv(stations_to_run, output_dir, im_type)
+                    agg_csv(stations_to_run, output, im_type)
                 )
 
     # write the ouput after all cals are done
     if not advanced_im_config.IM_list:
         # TODO: del after test pass
-        # write_result(
+        #write_result(
         #    all_result_dict, output_dir, identifier, comp, ims, period, simple_output
-        # )
-
+        #)
+        
         all_result_dict = ChainMap(*all_results)
         output_path = get_result_filepath(output, identifier, ".csv")
 
         results_dataframe = pd.DataFrame.from_dict(all_result_dict, orient="index")
         results_dataframe.index = pd.MultiIndex.from_tuples(
             results_dataframe.index, names=["station", "component"]
-        )
+        )   
         results_dataframe.sort_values(["station", "component"], inplace=True)
         results_dataframe = order_im_cols_df(results_dataframe)
 
         # Save the transposed dataframe
         results_dataframe.to_csv(output_path)
+
 
     # write for advanced IM (pandas array)
     if advanced_im_config.IM_list:
