@@ -28,8 +28,7 @@ def load_args():
     parent_args = parent_parser.parse_known_args()
 
     parser = argparse.ArgumentParser(parents=[parent_parser], add_help=True)
-    #
-    # parser = argparse.ArgumentParser()
+
     parser.add_argument(
         "input_path", help="path to input bb binary file eg./home/melody/BB.bin"
     )

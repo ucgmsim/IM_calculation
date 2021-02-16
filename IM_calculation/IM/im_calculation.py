@@ -507,27 +507,18 @@ def compute_measures_multiprocess(
         # only run simply im if and only if adv_im not going to run
         if not advanced_im_config.IM_list:
             all_results.extend(p.starmap(compute_measure_single, array_params))
-            # adv_im changes for ref, TODO:del once test pass
-            # result_list = p.map(compute_measure_single, array_params)
-            # for result in result_list:
-            #    all_result_dict.update(result)
         if advanced_im_config.IM_list:
             # calculate IM for stations in this iteration
             p.starmap(compute_adv_measure, adv_array_params)
             # read and agg data into a pandas array
             # loop through all im_type in advanced_im_config
             for im_type in advanced_im_config.IM_list:
-                # agg_csv(stations_to_run, output_dir, im_type)
                 df_adv_im[im_type] = df_adv_im[im_type].append(
                     agg_csv(stations_to_run, output, im_type)
                 )
 
     # write the ouput after all cals are done
     if not advanced_im_config.IM_list:
-        # TODO: del after test pass
-        # write_result(
-        #    all_result_dict, output_dir, identifier, comp, ims, period, simple_output
-        # )
 
         all_result_dict = ChainMap(*all_results)
         output_path = get_result_filepath(output, identifier, ".csv")
