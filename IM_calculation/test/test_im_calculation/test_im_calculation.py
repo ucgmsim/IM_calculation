@@ -1,15 +1,14 @@
 import argparse
-import csv
 import filecmp
-import io
 import os
 import pickle
 
 import pytest
 import numpy as np
+from qcore.constants import Components
 
 import IM_calculation.IM.im_calculation as calculate_ims
-from qcore import utils
+from qcore import utils, constants
 from IM_calculation.test.test_common_set_up import INPUT, OUTPUT, compare_dicts, set_up
 
 # This is a hack, to allow loading of the test pickle objects
@@ -30,39 +29,41 @@ utils.setup_dir("fake_dir")
 
 
 @pytest.mark.parametrize(
-    "test_period, test_extended, test_im, expected_period",
+    "test_period, test_extended, expected_period",
     [
-        (BSC_PERIOD, False, TEST_IMS, np.array(BSC_PERIOD)),
-        (
-            BSC_PERIOD,
-            True,
-            TEST_IMS,
-            np.unique(np.append(BSC_PERIOD, calculate_ims.EXT_PERIOD)),
-        ),
+        (BSC_PERIOD, False, np.array(BSC_PERIOD)),
+        (BSC_PERIOD, True, np.unique(np.append(BSC_PERIOD, constants.EXT_PERIOD))),
     ],
 )
-def test_validate_period(test_period, test_extended, test_im, expected_period):
+def test_validate_period(test_period, test_extended, expected_period):
     assert all(
         np.equal(
-            calculate_ims.validate_period(PARSER, test_period, test_extended, test_im),
-            expected_period,
+            calculate_ims.validate_period(test_period, test_extended), expected_period
         )
     )
-
-
-@pytest.mark.parametrize(
-    "test_period, test_extended, test_im",
-    [(BSC_PERIOD, False, TEST_IMS[:-1]), (BSC_PERIOD, True, TEST_IMS[:-1])],
-)
-def test_validate_period_fail(test_period, test_extended, test_im):
-    with pytest.raises(SystemExit):
-        calculate_ims.validate_period(PARSER, test_period, test_extended, test_im)
 
 
 @pytest.mark.parametrize("test_path, test_file_type", [("asdf", "b"), (FAKE_DIR, "b")])
 def test_validate_input_path_fail(test_path, test_file_type):
     with pytest.raises(SystemExit):
         calculate_ims.validate_input_path(PARSER, test_path, test_file_type)
+
+
+def convert_str_comps_to_enum(expected_result):
+    for station in expected_result.keys():
+        for im in expected_result[station].keys():
+            if im == "pSA":
+                for comp in list(expected_result[station][im][1]):
+                    expected_result[station][im][1][
+                        Components.from_str(comp)
+                    ] = expected_result[station][im][1][comp]
+                    del expected_result[station][im][1][comp]
+            else:
+                for comp in list(expected_result[station][im]):
+                    expected_result[station][im][
+                        Components.from_str(comp)
+                    ] = expected_result[station][im][comp]
+                    del expected_result[station][im][comp]
 
 
 class TestPickleTesting:
@@ -75,7 +76,7 @@ class TestPickleTesting:
             ) as load_file:
                 comp = pickle.load(load_file)
 
-            int_comp, str_comp = calculate_ims.convert_str_comp(comp)
+            int_comp, str_comp = Components.get_comps_to_calc_and_store(comp)
 
             with open(
                 os.path.join(root_path, OUTPUT, function + "_str_comp_for_int.P"), "rb"
@@ -86,8 +87,8 @@ class TestPickleTesting:
             ) as load_file:
                 expected_str_comp = pickle.load(load_file)
 
-            assert sorted(int_comp) == sorted(expected_int_comp)
-            assert sorted(str_comp) == sorted(expected_str_comp)
+            assert [x.str_value for x in int_comp] == expected_int_comp
+            assert [x.str_value for x in str_comp] == expected_str_comp
 
     def test_array_to_dict(self, set_up):
         function = "array_to_dict"
@@ -109,9 +110,9 @@ class TestPickleTesting:
             ) as load_file:
                 im = pickle.load(load_file)
 
-            actual_value_dict = calculate_ims.array_to_dict(
-                value, str_comps, im, arg_comps
-            )
+            str_comps = [Components.from_str(x) for x in str_comps]
+            arg_comps = [Components.from_str(x) for x in arg_comps]
+            actual_value_dict = calculate_ims.array_to_dict(value, str_comps, im, arg_comps)
 
             with open(
                 os.path.join(root_path, OUTPUT, function + "_value_dict.P"), "rb"
@@ -127,14 +128,24 @@ class TestPickleTesting:
                 os.path.join(root_path, INPUT, function + "_value_tuple.P"), "rb"
             ) as load_file:
                 value_tuple = pickle.load(load_file)
-            actual_result = calculate_ims.compute_measure_single(value_tuple)
+            waveform, ims, comps, periods, str_comps = value_tuple
+            im_options = {"pSA": periods}
+            comps = [Components.from_str(x) for x in comps]
+            str_comps = [Components.from_str(x) for x in str_comps]
+            actual_result = calculate_ims.compute_measure_single(
+                waveform, ims, comps, im_options, str_comps
+            )
 
             with open(
                 os.path.join(root_path, OUTPUT, function + "_result.P"), "rb"
             ) as load_file:
                 expected_result = pickle.load(load_file)
+                convert_str_comps_to_enum(expected_result)
+                actual_expected_result = self.convert_to_results_dict(periods, expected_result)
 
-            compare_dicts(actual_result, expected_result)
+            compare_dicts(actual_result, actual_expected_result)
+
+
 
     def test_get_bbseis(self, set_up):
         function = "get_bbseis"
@@ -213,7 +224,7 @@ class TestPickleTesting:
                 station_names,
                 ims,
                 comp,
-                period,
+                {"pSA": period},
                 output,
                 identifier,
                 rupture,
@@ -250,92 +261,25 @@ class TestPickleTesting:
 
             assert actual_ret_val == expected_ret_val
 
-    def test_get_header(self, set_up):
-        function = "get_header"
-        for root_path in set_up:
-            with open(
-                os.path.join(root_path, INPUT, function + "_ims.P"), "rb"
-            ) as load_file:
-                ims = pickle.load(load_file)
-            with open(
-                os.path.join(root_path, INPUT, function + "_period.P"), "rb"
-            ) as load_file:
-                period = pickle.load(load_file)
-
-            actual_header = calculate_ims.get_header(ims, period)
-
-            with open(
-                os.path.join(root_path, OUTPUT, function + "_header.P"), "rb"
-            ) as load_file:
-                expected_header = pickle.load(load_file)
-
-            assert actual_header == expected_header
-
-    def test_write_rows(self, set_up):
-        function = "write_rows"
-        for root_path in set_up:
-            with open(
-                os.path.join(root_path, INPUT, function + "_comp.P"), "rb"
-            ) as load_file:
-                comps = pickle.load(load_file)
-            with open(
-                os.path.join(root_path, INPUT, function + "_station.P"), "rb"
-            ) as load_file:
-                station = pickle.load(load_file)
-            with open(
-                os.path.join(root_path, INPUT, function + "_ims.P"), "rb"
-            ) as load_file:
-                ims = pickle.load(load_file)
-            with open(
-                os.path.join(root_path, INPUT, function + "_result_dict.P"), "rb"
-            ) as load_file:
-                result_dict = pickle.load(load_file)
-
-            big_csv = io.StringIO()
-            big_csv_writer = csv.writer(big_csv)
-            sub_csv = io.StringIO()
-            sub_csv_writer = csv.writer(sub_csv)
-
-            calculate_ims.write_rows(
-                comps,
-                station,
-                ims,
-                result_dict,
-                big_csv_writer,
-                sub_csv_writer=sub_csv_writer,
-            )
-
-            with open(
-                os.path.join(root_path, OUTPUT, function + "_out_data.P"), "rb"
-            ) as load_file:
-                expected_out_data = pickle.load(load_file)
-
-            assert expected_out_data == big_csv.getvalue()
-            assert expected_out_data == sub_csv.getvalue()
 
     def test_write_result(self, set_up):
         function = "write_result"
         for root_path in set_up:
             with open(
+                os.path.join(root_path, INPUT, function + "_period.P"), "rb"
+            ) as load_file:
+                period = pickle.load(load_file)
+            with open(
                 os.path.join(root_path, INPUT, function + "_result_dict.P"), "rb"
             ) as load_file:
-                result_dict = pickle.load(load_file)
+                temp_result_dict = pickle.load(load_file)
+                convert_str_comps_to_enum(temp_result_dict)
+                result_dict = self.convert_to_results_dict(period, temp_result_dict, keep_ps=True)
+
             with open(
                 os.path.join(root_path, INPUT, function + "_identifier.P"), "rb"
             ) as load_file:
                 identifier = pickle.load(load_file)
-            with open(
-                os.path.join(root_path, INPUT, function + "_comp.P"), "rb"
-            ) as load_file:
-                comp = pickle.load(load_file)
-            with open(
-                os.path.join(root_path, INPUT, function + "_ims.P"), "rb"
-            ) as load_file:
-                ims = pickle.load(load_file)
-            with open(
-                os.path.join(root_path, INPUT, function + "_period.P"), "rb"
-            ) as load_file:
-                period = pickle.load(load_file)
             with open(
                 os.path.join(root_path, INPUT, function + "_simple_output.P"), "rb"
             ) as load_file:
@@ -347,9 +291,8 @@ class TestPickleTesting:
                 os.path.join(output_folder, calculate_ims.OUTPUT_SUBFOLDER),
                 exist_ok=True,
             )
-            calculate_ims.write_result(
-                result_dict, output_folder, identifier, comp, ims, period, simple_output
-            )
+
+            calculate_ims.write_result(result_dict, output_folder, identifier, simple_output)
             expected_output_path = calculate_ims.get_result_filepath(
                 output_folder, identifier, ".csv"
             )
@@ -358,6 +301,27 @@ class TestPickleTesting:
             )
 
             assert filecmp.cmp(expected_output_path, actual_output_path)
+
+    def convert_to_results_dict(self, period, temp_result_dict, keep_ps=False):
+        result_dict = {}
+        for station in sorted(temp_result_dict):
+            temp_result_dict[station]["pSA"] = temp_result_dict[station]["pSA"][1]
+            for im in sorted(temp_result_dict[station]):
+                for comp in temp_result_dict[station][im]:
+                    if (station, comp.str_value) not in result_dict:
+                        result_dict[(station, comp.str_value)] = {}
+                    if im in calculate_ims.MULTI_VALUE_IMS:
+                        for i, val in enumerate(period):
+                            if keep_ps:
+                                result_dict[(station, comp.str_value)][f"{im}_{str(val).replace('.', 'p')}"] = \
+                                temp_result_dict[station][im][comp][i]
+                            else:
+
+                                result_dict[(station, comp.str_value)][f"{im}_{str(val)}"] = \
+                                temp_result_dict[station][im][comp][i]
+                    else:
+                        result_dict[(station, comp.str_value)][im] = temp_result_dict[station][im][comp]
+        return result_dict
 
     def test_generate_metadata(self, set_up):
         function = "generate_metadata"
@@ -396,29 +360,6 @@ class TestPickleTesting:
 
             filecmp.cmp(actual_output_path, expected_output_path)
 
-    def test_get_im_or_period_help(self, set_up):
-        function = "get_im_or_period_help"
-        for root_path in set_up:
-            with open(
-                os.path.join(root_path, INPUT, function + "_default_values.P"), "rb"
-            ) as load_file:
-                default_values = pickle.load(load_file)
-            with open(
-                os.path.join(root_path, INPUT, function + "_im_or_period.P"), "rb"
-            ) as load_file:
-                im_or_period = pickle.load(load_file)
-
-            actual_ret_val = calculate_ims.get_im_or_period_help(
-                default_values, im_or_period
-            )
-
-            with open(
-                os.path.join(root_path, OUTPUT, function + "_ret_val.P"), "rb"
-            ) as load_file:
-                expected_ret_val = pickle.load(load_file)
-
-            assert actual_ret_val == expected_ret_val
-
     def test_validate_input_path(self, set_up):
         function = "validate_input_path"
         for root_path in set_up:
@@ -430,23 +371,6 @@ class TestPickleTesting:
 
             calculate_ims.validate_input_path(PARSER, arg_input, arg_file_type)
             # Function does not return anything, only raises errors through the parser
-
-    def test_validate_im(self, set_up):
-        function = "validate_im"
-        for root_path in set_up:
-            with open(
-                os.path.join(root_path, INPUT, function + "_arg_im.P"), "rb"
-            ) as load_file:
-                arg_im = pickle.load(load_file)
-
-            actual_im = calculate_ims.validate_im(PARSER, arg_im)
-
-            with open(
-                os.path.join(root_path, OUTPUT, function + "_im.P"), "rb"
-            ) as load_file:
-                expected_im = pickle.load(load_file)
-
-            assert actual_im == expected_im
 
     def test_validate_period(self, set_up):
         function = "validate_period"
@@ -460,13 +384,9 @@ class TestPickleTesting:
                 "rb",
             ) as load_file:
                 arg_extended_period = pickle.load(load_file)
-            with open(
-                os.path.join(root_path, INPUT, function + "_im.P"), "rb"
-            ) as load_file:
-                im = pickle.load(load_file)
 
             actual_period = calculate_ims.validate_period(
-                PARSER, arg_period, arg_extended_period, im
+                arg_period, arg_extended_period
             )
 
             with open(

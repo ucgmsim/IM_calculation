@@ -86,7 +86,7 @@ def test_get_spectral_acceleration(set_up):
     function = "get_spectral_acceleration"
     for root_path in set_up:
         acc, period, NT, DT = get_common_spectral_vals(root_path, function)
-        test_output = intensity_measures.get_spectral_acceleration(acc, period, NT, DT)
+        test_output = intensity_measures.get_spectral_acceleration(acc, period, NT, DT)[0]
 
         with open(
             os.path.join(root_path, OUTPUT, function + "_ret_val.P"), "rb"
@@ -102,7 +102,7 @@ def test_get_spectral_acceleration_nd(set_up):
         acc, period, NT, DT = get_common_spectral_vals(root_path, function)
         test_output = intensity_measures.get_spectral_acceleration_nd(
             acc, period, NT, DT
-        )
+        )[0]
 
         with open(
             os.path.join(root_path, OUTPUT, function + "_values.P"), "rb"
@@ -186,7 +186,7 @@ def test_getDs_nd(set_up):
             os.path.join(root_path, INPUT, function + "_accelerations.P"), "rb"
         ) as load_file:
             acc = pickle.load(load_file)
-        test_output = intensity_measures.getDs_nd(dt, acc, perc_low, perc_high)
+        test_output = intensity_measures.getDs_nd(acc, dt, perc_low, perc_high)
         with open(
             os.path.join(root_path, OUTPUT, function + "_values.P"), "rb"
         ) as load_file:
