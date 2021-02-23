@@ -73,8 +73,8 @@ def load_args():
         nargs="+",
         default=constants.DEFAULT_PSA_PERIODS,
         type=float,
-        help="Please provide pSA or IESDR period(s) separated by a space. eg: "
-        "0.02 0.05 0.1. Default periods are: {}".format(
+        help="Please provide pSA period(s) separated by a space. eg: "
+        "0.02 0.05 0.1. Default periods are: {} (also used for IESDR).".format(
             ",".join(str(v) for v in constants.DEFAULT_PSA_PERIODS)
         ),
     )
@@ -82,7 +82,7 @@ def load_args():
         "-e",
         "--extended_period",
         action="store_true",
-        help="Please add '-e' to indicate the use of extended(100) pSA periods. "
+        help="Please add '-e' to indicate the use of extended(100) pSA periods (also used for IESDR)."
         "Default not using",
     )
     parser.add_argument(
