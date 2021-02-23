@@ -319,11 +319,10 @@ def calculate_IESDR(
     im,
     comps_to_store,
     comps_to_calculate,
+    z=0.05,  # damping ratio
+    alpha=0.05,  # strain hardening ratios
+    dy=0.025,  # strain hardening ratios
 ):
-    # for the time being, following 3 parameters are fixed
-    z = 0.05  # damping ratio
-    alpha = 0.05  # strain hardening ratios
-    dy = 0.025  # strain hardening ratios
 
     acc_values = array_to_dict(accelerations, comps_to_calculate, im, comps_to_store)
     for comp in comps_to_store:
