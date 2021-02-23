@@ -310,15 +310,15 @@ def calculate_pSAs(
 
 
 def calculate_IESDR(
-        DT,
-        accelerations,
-        im_options,
-        result,
-        station_name,
-        waveform_acc,
-        im,
-        comps_to_store,
-        comps_to_calculate,
+    DT,
+    accelerations,
+    im_options,
+    result,
+    station_name,
+    waveform_acc,
+    im,
+    comps_to_store,
+    comps_to_calculate,
 ):
     # for the time being, following 3 parameters are fixed
     z = 0.05  # damping ratio
@@ -328,8 +328,14 @@ def calculate_IESDR(
     acc_values = array_to_dict(accelerations, comps_to_calculate, im, comps_to_store)
     for comp in comps_to_store:
         if comp.str_value in acc_values:
-            Sd = Bilinear_Newmark_withTH(np.array(im_options[im]), z, dy, alpha, acc_values[comp.str_value],
-                                         waveform_acc.DT)
+            Sd = Bilinear_Newmark_withTH(
+                np.array(im_options[im]),
+                z,
+                dy,
+                alpha,
+                acc_values[comp.str_value],
+                waveform_acc.DT,
+            )
             for i, val in enumerate(im_options[im]):
                 result[(station_name, comp.str_value)][f"{im}_{str(val)}"] = Sd[i]
 
