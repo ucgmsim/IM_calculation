@@ -39,13 +39,15 @@ def parse_args():
 
 def main(args, im_name, run_script):
     output_dir = args.output_dir
-    os.makedirs(output_dir, exist_ok=True)
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
 
     model_converged = True
     for component in ["000", "090"]:
         component_outdir = os.path.join(output_dir, component)
         # check if folder exist, if not create it (opensees does not create the folder and will crash)
-        os.makedirs(component_outdir, exist_ok=True)
+        if not os.path.isdir(component_outdir):
+            os.makedirs(component_outdir, exist_ok=True)
         script = [
             args.OpenSees_path,
             run_script,
@@ -58,29 +60,52 @@ def main(args, im_name, run_script):
 
         # check for success message
         # marked as failed if any component fail
-        model_converged = model_converged and check_converge(component_outdir)
+        model_converged = model_converged and check_status(component_outdir)
 
     # skip creating csv if any component has zero success count
     if model_converged:
-        # aggregate
-        create_im_csv(output_dir, im_name, component, component_outdir)
 
-        im_csv_fname = os.path.join(output_dir, im_name + ".csv")
-        calculate_geom(im_csv_fname)
+        for component in ["000", "090"]:
+            component_outdir = os.path.join(output_dir, component)
+            # aggregate
+            create_im_csv(output_dir, im_name, component, component_outdir)
+
+            im_csv_fname = os.path.join(output_dir, im_name + ".csv")
+            calculate_geom(im_csv_fname)
     else:
         station_name = os.path.basename(args.comp_000).split(".")[0]
+        im_csv_failed_name = os.path.join(output_dir, im_name + "_failed" + ".csv")
+        with open(im_csv_failed_name, "w") as f:
+            f.write("status\n")
+            f.write("failed")
         print(f"failed to converge for {station_name}")
 
 
-def check_converge(component_outdir):
-    success_glob = os.path.join(component_outdir, "Analysis_*")
-    success_files = glob.glob(success_glob)
-    model_converged = False
-    for f in success_files:
-        with open(f) as fp:
-            contents = fp.read()
-        model_converged = model_converged or (contents.strip() == "Successful")
-    return model_converged
+def check_status(component_outdir, check_fail=False):
+    """
+    check the status of a run by scanning Analysis_* for keyword: "Successful" / "Failed"
+    check_fail: Bools. changes the keyword
+    """
+
+    analysis_glob = os.path.join(component_outdir, "Analysis_*")
+    analysis_files = glob.glob(analysis_glob)
+
+    if check_fail:
+        keyword = "Failed"
+        result = True
+        for f in analysis_files:
+            with open(f) as fp:
+                contents = fp.read()
+                result = result and (contents.strip() == keyword)
+    else:
+        keyword = "Successful"
+
+        result = False
+        for f in analysis_files:
+            with open(f) as fp:
+                contents = fp.read()
+                result = result or (contents.strip() == keyword)
+    return result
 
 
 def calculate_geom(im_csv_fname):
@@ -113,6 +138,8 @@ def create_im_csv(output_dir, im_name, component, component_outdir, print_header
         sub_im_name = os.path.splitext(os.path.basename(im_recorder))[0]
 
         # get base name
+        # env_dir = os.path.dirname(im_recorder)
+        # env_name = os.path.basename(env_dir).split('_')[-1]
         sub_im_type = sub_im_name.split("_")[0]
         sub_im_gravity_dir = os.path.join(component_outdir, "gravity_" + sub_im_type)
         sub_im_gravity_recorder = os.path.join(
