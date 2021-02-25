@@ -90,6 +90,9 @@ def check_status(component_outdir, check_fail=False):
     analysis_glob = os.path.join(component_outdir, "Analysis_*")
     analysis_files = glob.glob(analysis_glob)
 
+    if len(analysis_files) == 0:
+        return False
+
     if check_fail:
         keyword = "Failed"
         result = True
@@ -99,7 +102,6 @@ def check_status(component_outdir, check_fail=False):
                 result = result and (contents.strip() == keyword)
     else:
         keyword = "Successful"
-
         result = False
         for f in analysis_files:
             with open(f) as fp:
