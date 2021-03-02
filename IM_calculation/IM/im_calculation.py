@@ -100,30 +100,6 @@ def array_to_dict(value, comps_to_calc, im, comps_to_store):
     return value_dict
 
 
-def compute_adv_measure(waveform, advanced_im_config, output_dir):
-    """
-    Wrapper function to call advanced IM workflow
-    :param waveform: Tuple of waveform objects (first is acc, second is vel)
-    :param advanced_im_config: advanced_im_config Named Tuple containing list of IMs, config file and path to OpenSeeS
-    :param output_dir: Directory where output folders are contained. Structure is /path/to/output_dir/station/im_name
-    :return:
-    """
-    try:
-        if advanced_im_config.IM_list is not None:
-            waveform_acc = waveform[0]
-            station_name = waveform_acc.station_name
-            adv_im_out_dir = os.path.join(output_dir, station_name)
-            advanced_IM_factory.compute_ims(
-                waveform_acc, advanced_im_config, adv_im_out_dir
-            )
-    except AttributeError:
-        print(
-            "cannot access IM_list under advanced_im_config : {}".format(
-                advanced_im_config
-            )
-        )
-
-
 def check_rotd(comps_to_store: Iterable[Components]) -> bool:
     """
     Checks for any rotd components in the components to store list
