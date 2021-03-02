@@ -52,13 +52,13 @@ def compute_ims(accelerations, configuration, adv_im_out_dir):
             script = [
                 "python",
                 os.path.join(advanced_im_dir, im_config["script_location"]),
-                "--OpenSees_path",
-                configuration.OpenSees_path,
             ]
             # waveform component sequence
             comp_list = ["000", "090", "ver"]
             script.extend([get_acc_filename(f_dir, station_name, x) for x in comp_list])
             script.extend([out_dir])
+
+            script.extend(f"--OpenSees_path {configuration.OpenSees_path}")
 
             print(" ".join(script))
             subprocess.call(script)
