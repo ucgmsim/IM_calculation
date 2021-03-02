@@ -3,6 +3,7 @@ import glob
 import os
 import re
 import sys
+
 from datetime import datetime
 from functools import partial
 from multiprocessing.pool import Pool
@@ -16,6 +17,7 @@ from qcore import timeseries, constants
 from qcore.constants import Components
 from qcore.im import order_im_cols_df
 
+from IM_calculation.Advanced_IM import advanced_IM_factory
 from IM_calculation.IM import read_waveform, intensity_measures
 from IM_calculation.Advanced_IM import advanced_IM_factory
 from IM_calculation.IM.computeFAS import get_fourier_spectrum
@@ -38,6 +40,33 @@ OUTPUT_SUBFOLDER = "stations"
 
 MEM_PER_CORE = 7.5e8
 MEM_FACTOR = 4
+
+
+def add_if_not_exist(component_list, component):
+    if not component in component_list:
+        component_list.append(component)
+    return component_list
+
+
+def convert_str_comp(arg_comps):
+    """
+    convert arg comps to str_comps_for integer_convestion in read_waveform & str comps for writing result
+    :param arg_comps: user input a list of comp(s)
+    :return: two lists of str comps
+    """
+    # comps = ["000", "geom",'ver']
+    if "geom" in arg_comps:
+        # ['000', 'ver', '090', 'geom']
+        str_comps = add_if_not_exist(arg_comps, "090")
+        str_comps = add_if_not_exist(str_comps, "000")
+        # for integer convention, str_comps shouldn't include geom as waveform has max 3 components
+        str_comps.remove("geom")
+        # for writing result, make a copy of the str_comps for int convention, and shift geom to the end
+        str_comps_for_writing = str_comps[:]
+        str_comps_for_writing.append("geom")
+        return str_comps, str_comps_for_writing
+    else:
+        return arg_comps, arg_comps
 
 
 def array_to_dict(value, comps_to_calc, im, comps_to_store):
@@ -135,6 +164,30 @@ def calculate_rotd(
     if Components.crotd100_50 in comps_to_store:
         value_dict[Components.crotd100_50.str_value] = rotd100 / rotd50
     return value_dict
+
+
+def compute_adv_measure(waveform, advanced_im_config, output_dir):
+    """
+    Wrapper function to call advanced IM workflow
+    :param waveform: Tuple of waveform objects (first is acc, second is vel)
+    :param advanced_im_config: advanced_im_config Named Tuple containing list of IMs, config file and path to OpenSeeS
+    :param output_dir: Directory where output folders are contained. Structure is /path/to/output_dir/station/im_name
+    :return:
+    """
+    try:
+        if advanced_im_config.IM_list is not None:
+            waveform_acc = waveform[0]
+            station_name = waveform_acc.station_name
+            adv_im_out_dir = os.path.join(output_dir, station_name)
+            advanced_IM_factory.compute_ims(
+                waveform_acc, advanced_im_config, adv_im_out_dir
+            )
+    except AttributeError:
+        print(
+            "cannot access IM_list under advanced_im_config : {}".format(
+                advanced_im_config
+            )
+        )
 
 
 def compute_measure_single(
@@ -452,17 +505,16 @@ def compute_measures_multiprocess(
                     sorted(components_to_calculate, key=lambda x: x.value),
                 )
             )
-
-            # array_params.append((waveform, ims, comp, period, str_comps))
             adv_array_params.append((waveform, advanced_im_config, output))
         # only run simply im if and only if adv_im not going to run
+        if not advanced_im_config.IM_list:
+            all_results.extend(p.starmap(compute_measure_single, array_params))
         if advanced_im_config.IM_list:
             # calculate IM for stations in this iteration
             p.starmap(compute_adv_measure, adv_array_params)
             # read and agg data into a pandas array
             # loop through all im_type in advanced_im_config
             for im_type in advanced_im_config.IM_list:
-                # agg_csv(stations_to_run, output_dir, im_type)
                 df_adv_im[im_type] = df_adv_im[im_type].append(
                     agg_csv(stations_to_run, output, im_type)
                 )

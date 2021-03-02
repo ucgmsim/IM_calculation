@@ -30,6 +30,7 @@ def load_args():
     parent_args = parent_parser.parse_known_args()
 
     parser = argparse.ArgumentParser(parents=[parent_parser], add_help=True)
+
     parser.add_argument(
         "input_path", help="path to input bb binary file eg./home/melody/BB.bin"
     )
@@ -150,7 +151,6 @@ def load_args():
         default="g",
         help="The units that input acceleration files are in",
     )
-
     parser.add_argument(
         "-a",
         "--advanced_ims",
@@ -166,9 +166,9 @@ def load_args():
         default=None,
         help="path to the observed data for matching station list",
     )
+
     args = parser.parse_args()
     calc.validate_input_path(parser, args.input_path, args.file_type)
-
     return args
 
 
@@ -177,6 +177,7 @@ def main():
 
     file_type = calc.FILE_TYPE_DICT[args.file_type]
     run_type = calc.META_TYPE_DICT[args.run_type]
+    period = calc.validate_period(parser, args.period, args.extended_period, im)
 
     im = args.im
 
