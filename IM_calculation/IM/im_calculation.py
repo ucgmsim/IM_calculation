@@ -21,9 +21,9 @@ from IM_calculation.IM.Burks_Baker_2013_elastic_inelastic import Bilinear_Newmar
 
 G = 981.0
 DEFAULT_IMS = ("PGA", "PGV", "CAV", "AI", "Ds575", "Ds595", "MMI", "pSA")
-ALL_IMS = ("PGA", "PGV", "CAV", "AI", "Ds575", "Ds595", "MMI", "pSA", "FAS", "IESDR")
+ALL_IMS = ("PGA", "PGV", "CAV", "AI", "Ds575", "Ds595", "MMI", "pSA", "FAS", "IESD")
 
-MULTI_VALUE_IMS = ("pSA", "FAS", "IESDR")
+MULTI_VALUE_IMS = ("pSA", "FAS", "IESD")
 
 FAS_FREQUENCY = np.logspace(-1, 2, num=100, base=10.0)
 
@@ -143,8 +143,8 @@ def compute_measure_single(
             calculate_pSAs,
             (DT, accelerations, im_options, result, station_name, waveform_acc),
         ),
-        "IESDR": (
-            calculate_IESDR,
+        "IESD": (
+            calculate_IESD,
             (DT, accelerations, im_options, result, station_name, waveform_acc),
         ),
         "FAS": (calc_FAS, (DT, accelerations, im_options, result, station_name)),
@@ -309,7 +309,7 @@ def calculate_pSAs(
                 ][i]
 
 
-def calculate_IESDR(
+def calculate_IESD(
     DT,
     accelerations,
     im_options,

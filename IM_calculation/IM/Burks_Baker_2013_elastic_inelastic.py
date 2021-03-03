@@ -43,6 +43,22 @@ BETA = 1 / 6  # linear acceleration (stable if Dt/T<=0.551)
 def Bilinear_Newmark_withTH(
     period: np.ndarray, z: float, dy: float, alpha: float, ag: np.ndarray, dt: float
 ):
+    #MATLAB code has Dtg (time-step of waveform) and Dt (analysis time step)
+    # Python has only one dt = Dtg and no Dt.
+
+
+    # Analysis time step
+    # % ------------------
+    # if isempty(Dt) | | Dt / min(T) > 0.551
+    #     denominator = 2 * ceil(Dtg / min(Dtg / 5, min(T) / 30) / 2);
+    #     Dt = Dtg / denominator;
+    #     disp(['Note:  Dt set equal to ' num2str(Dt)]);
+    # end
+    #
+    denominator = 2 * np.ceil(dt / np.min( [dt/5, np.min(period)/30] ) /2)
+    Dt = dt / denominator
+    #Dt = dt
+
 
     num_oscillators = period.size
 
@@ -54,7 +70,17 @@ def Bilinear_Newmark_withTH(
     fy = k * dy
     kalpha = k * alpha
 
-    p = -ag * m
+    # % Interpolate
+    # p = -ag * m(linearly)
+    # % ------------------------------
+    # tg = [0:(length(ag) - 1)]' * Dtg;
+    # t = [0:Dt: tg(end)]';
+    # p = interp1(tg, -ag * m, t);
+
+    p = -ag * m #p = interp1( tg, -ag*m, t );
+    tg = np.linspace(0,ag.size-1, ag.size)*dt
+    t = np.linspace(0,tg[-1],int(tg[-1]/Dt)+1) #num of steps
+    p = np.interp(t, tg, p) #interpolate for t
 
     lp = p.size
     d = np.zeros((lp, num_oscillators))
@@ -63,8 +89,8 @@ def Bilinear_Newmark_withTH(
     fs = np.zeros((lp, num_oscillators))
 
     a[0] = (p[0] - c * v[0] - fs[0]) / m
-    A = 1 / (BETA * dt) * m + GAMMA / BETA * c
-    B = 1 / (2 * BETA) * m + dt * (GAMMA / (2 * BETA) - 1) * c
+    A = 1 / (BETA * Dt) * m + GAMMA / BETA * c
+    B = 1 / (2 * BETA) * m + Dt * (GAMMA / (2 * BETA) - 1) * c
 
     for i in range(lp - 1):
 
@@ -79,7 +105,7 @@ def Bilinear_Newmark_withTH(
         )
         ki[jj] = kalpha[jj]
 
-        Ki = ki + A / dt
+        Ki = ki + A / Dt
 
         Ddi = DPi / Ki
         fs[i + 1] = fs[i] + ki * Ddi
@@ -100,9 +126,9 @@ def Bilinear_Newmark_withTH(
         # Inelastic behaviour ends
 
         Dvi = (
-            GAMMA / (BETA * dt) * Ddi
+            GAMMA / (BETA * Dt) * Ddi
             - GAMMA / BETA * v[i]
-            + dt * (1 - GAMMA / (2 * BETA)) * a[i]
+            + Dt * (1 - GAMMA / (2 * BETA)) * a[i]
         )
         v[i + 1] = v[i] + Dvi
 

@@ -74,7 +74,7 @@ def load_args():
         default=constants.DEFAULT_PSA_PERIODS,
         type=float,
         help="Please provide pSA period(s) separated by a space. eg: "
-        "0.02 0.05 0.1. Default periods are: {} (also used for IESDR).".format(
+        "0.02 0.05 0.1. Default periods are: {} (also used for IESD).".format(
             ",".join(str(v) for v in constants.DEFAULT_PSA_PERIODS)
         ),
     )
@@ -157,8 +157,8 @@ def main():
     if "pSA" in im:
         im_options["pSA"] = calc.validate_period(args.period, args.extended_period)
 
-    if "IESDR" in im:
-        im_options["IESDR"] = calc.validate_period(args.period, args.extended_period)
+    if "IESD" in im:
+        im_options["IESD"] = calc.validate_period(args.period, args.extended_period)
 
     if "FAS" in im:
         im_options["FAS"] = calc.validate_fas_frequency(args.fas_frequency)
