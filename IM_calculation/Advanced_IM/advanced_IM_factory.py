@@ -76,8 +76,6 @@ def save_waveform_to_tmp_files(tmp_folder, accelerations, station_name):
     :param accelerations: Acceleration array, 1 column for each component. Ordering is specified in COMP_DICT
     :return: None
     """
-    print(f"accelerations {accelerations}")
-    # TODO: Fix bug when differing components are specified in calculate_ims
     for component in COMP_DICT.keys():
         seis2txt(
             accelerations.values[:, COMP_DICT[component]],
