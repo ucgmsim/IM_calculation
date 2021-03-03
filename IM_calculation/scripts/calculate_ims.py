@@ -87,7 +87,7 @@ def load_args():
         default=constants.DEFAULT_PSA_PERIODS,
         type=float,
         help="Please provide pSA period(s) separated by a space. eg: "
-        "0.02 0.05 0.1. Default periods are: {}".format(
+        "0.02 0.05 0.1. Default periods are: {} (also used for IESDR).".format(
             ",".join(str(v) for v in constants.DEFAULT_PSA_PERIODS)
         ),
     )
@@ -95,7 +95,7 @@ def load_args():
         "-e",
         "--extended_period",
         action="store_true",
-        help="Please add '-e' to indicate the use of extended(100) pSA periods. "
+        help="Please add '-e' to indicate the use of extended(100) pSA periods (also used for IESDR)."
         "Default not using",
     )
     parser.add_argument(
@@ -132,9 +132,9 @@ def load_args():
     parser.add_argument(
         "-np",
         "--process",
-        default=2,
+        default=1,
         type=int,
-        help="Please provide the number of processors. Default is 2",
+        help="Please provide the number of processors. Default is 1",
     )
     parser.add_argument(
         "-s",
@@ -177,7 +177,6 @@ def main():
 
     file_type = calc.FILE_TYPE_DICT[args.file_type]
     run_type = calc.META_TYPE_DICT[args.run_type]
-    period = calc.validate_period(parser, args.period, args.extended_period, im)
 
     im = args.im
 
@@ -185,6 +184,9 @@ def main():
 
     if "pSA" in im:
         im_options["pSA"] = calc.validate_period(args.period, args.extended_period)
+
+    if "IESDR" in im:
+        im_options["IESDR"] = calc.validate_period(args.period, args.extended_period)
 
     if "FAS" in im:
         im_options["FAS"] = calc.validate_fas_frequency(args.fas_frequency)
@@ -212,6 +214,10 @@ def main():
             station_names = list(set(station_names + station_names_tmp))
     else:
         station_names = args.station_names
+    if args.advanced_ims != None:
+        components = advanced_IM_factory.COMP_DICT.keys()
+    else:
+        components = args.components
     # multiprocessor
 
     calc.compute_measures_multiprocess(
@@ -220,7 +226,7 @@ def main():
         wave_type=None,
         station_names=station_names,
         ims=im,
-        comp=args.components,
+        comp=components,
         im_options=im_options,
         output=args.output_path,
         identifier=args.identifier,

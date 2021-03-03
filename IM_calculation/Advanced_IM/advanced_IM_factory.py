@@ -58,7 +58,7 @@ def compute_ims(accelerations, configuration, adv_im_out_dir):
             script.extend([get_acc_filename(f_dir, station_name, x) for x in comp_list])
             script.extend([out_dir])
 
-            script.extend(f"--OpenSees_path {configuration.OpenSees_path}")
+            script.extend(["--OpenSees_path",f"{configuration.OpenSees_path}"])
 
             print(" ".join(script))
             subprocess.call(script)
@@ -76,6 +76,7 @@ def save_waveform_to_tmp_files(tmp_folder, accelerations, station_name):
     :param accelerations: Acceleration array, 1 column for each component. Ordering is specified in COMP_DICT
     :return: None
     """
+    print(f"accelerations {accelerations}")
     # TODO: Fix bug when differing components are specified in calculate_ims
     for component in COMP_DICT.keys():
         seis2txt(

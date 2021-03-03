@@ -21,16 +21,15 @@ from IM_calculation.Advanced_IM import advanced_IM_factory
 from IM_calculation.IM import read_waveform, intensity_measures
 from IM_calculation.Advanced_IM import advanced_IM_factory
 from IM_calculation.IM.computeFAS import get_fourier_spectrum
-
+from IM_calculation.IM.Burks_Baker_2013_elastic_inelastic import Bilinear_Newmark_withTH
 
 G = 981.0
 DEFAULT_IMS = ("PGA", "PGV", "CAV", "AI", "Ds575", "Ds595", "MMI", "pSA")
-ALL_IMS = ("PGA", "PGV", "CAV", "AI", "Ds575", "Ds595", "MMI", "pSA", "FAS")
+ALL_IMS = ("PGA", "PGV", "CAV", "AI", "Ds575", "Ds595", "MMI", "pSA", "FAS", "IESDR")
 
-MULTI_VALUE_IMS = ("pSA", "FAS")
+MULTI_VALUE_IMS = ("pSA", "FAS", "IESDR")
 
 FAS_FREQUENCY = np.logspace(-1, 2, num=100, base=10.0)
-
 
 FILE_TYPE_DICT = {"a": "ascii", "b": "binary"}
 META_TYPE_DICT = {"s": "simulated", "o": "observed", "u": "unknown"}
@@ -199,6 +198,10 @@ def compute_measure_single(
             calculate_pSAs,
             (DT, accelerations, im_options, result, station_name, waveform_acc),
         ),
+        "IESDR": (
+            calculate_IESDR,
+            (DT, accelerations, im_options, result, station_name, waveform_acc),
+        ),
         "FAS": (calc_FAS, (DT, accelerations, im_options, result, station_name)),
         "AI": (calc_AI, (accelerations, G, times)),
         "MMI": (calc_MMI, (velocities,)),
@@ -361,6 +364,36 @@ def calculate_pSAs(
                 ][i]
 
 
+def calculate_IESDR(
+    DT,
+    accelerations,
+    im_options,
+    result,
+    station_name,
+    waveform_acc,
+    im,
+    comps_to_store,
+    comps_to_calculate,
+    z=0.05,  # damping ratio
+    alpha=0.05,  # strain hardening ratios
+    dy=0.025,  # strain hardening ratios
+):
+
+    acc_values = array_to_dict(accelerations, comps_to_calculate, im, comps_to_store)
+    for comp in comps_to_store:
+        if comp.str_value in acc_values:
+            Sd = Bilinear_Newmark_withTH(
+                np.array(im_options[im]),
+                z,
+                dy,
+                alpha,
+                acc_values[comp.str_value],
+                waveform_acc.DT,
+            )
+            for i, val in enumerate(im_options[im]):
+                result[(station_name, comp.str_value)][f"{im}_{str(val)}"] = Sd[i]
+
+
 def get_bbseis(input_path, file_type, selected_stations):
     """
     :param input_path: user input path to bb.bin or a folder containing ascii files
@@ -483,8 +516,6 @@ def compute_measures_multiprocess(
             )
             adv_array_params.append((waveform, advanced_im_config, output))
         # only run simply im if and only if adv_im not going to run
-        if not advanced_im_config.IM_list:
-            all_results.extend(p.starmap(compute_measure_single, array_params))
         if advanced_im_config.IM_list:
             # calculate IM for stations in this iteration
             p.starmap(compute_adv_measure, adv_array_params)
