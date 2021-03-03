@@ -46,7 +46,6 @@ def Bilinear_Newmark_withTH(
     #MATLAB code has Dtg (time-step of waveform) and Dt (analysis time step)
     # Python has only one dt = Dtg and no Dt.
 
-
     # Analysis time step
     # % ------------------
     # if isempty(Dt) | | Dt / min(T) > 0.551
@@ -57,7 +56,6 @@ def Bilinear_Newmark_withTH(
     #
     denominator = 2 * np.ceil(dt / np.min( [dt/5, np.min(period)/30] ) /2)
     Dt = dt / denominator
-    #Dt = dt
 
 
     num_oscillators = period.size
@@ -77,7 +75,7 @@ def Bilinear_Newmark_withTH(
     # t = [0:Dt: tg(end)]';
     # p = interp1(tg, -ag * m, t);
 
-    p = -ag * m #p = interp1( tg, -ag*m, t );
+    p = -ag * m 
     tg = np.linspace(0,ag.size-1, ag.size)*dt
     t = np.linspace(0,tg[-1],int(tg[-1]/Dt)+1) #num of steps
     p = np.interp(t, tg, p) #interpolate for t
