@@ -177,7 +177,6 @@ def main():
 
     file_type = calc.FILE_TYPE_DICT[args.file_type]
     run_type = calc.META_TYPE_DICT[args.run_type]
-    period = calc.validate_period(parser, args.period, args.extended_period, im)
 
     im = args.im
 
@@ -212,6 +211,10 @@ def main():
             station_names = list(set(station_names + station_names_tmp))
     else:
         station_names = args.station_names
+    if args.advanced_ims != None:
+        components = advanced_IM_factory.COMP_DICT.keys()
+    else:
+        components = args.components
     # multiprocessor
 
     calc.compute_measures_multiprocess(
@@ -220,7 +223,7 @@ def main():
         wave_type=None,
         station_names=station_names,
         ims=im,
-        comp=args.components,
+        comp=components,
         im_options=im_options,
         output=args.output_path,
         identifier=args.identifier,

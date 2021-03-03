@@ -483,8 +483,6 @@ def compute_measures_multiprocess(
             )
             adv_array_params.append((waveform, advanced_im_config, output))
         # only run simply im if and only if adv_im not going to run
-        if not advanced_im_config.IM_list:
-            all_results.extend(p.starmap(compute_measure_single, array_params))
         if advanced_im_config.IM_list:
             # calculate IM for stations in this iteration
             p.starmap(compute_adv_measure, adv_array_params)
