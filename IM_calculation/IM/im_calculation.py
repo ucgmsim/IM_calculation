@@ -19,7 +19,6 @@ from qcore.im import order_im_cols_df
 
 from IM_calculation.Advanced_IM import advanced_IM_factory
 from IM_calculation.IM import read_waveform, intensity_measures
-from IM_calculation.Advanced_IM import advanced_IM_factory
 from IM_calculation.IM.computeFAS import get_fourier_spectrum
 from IM_calculation.IM.Burks_Baker_2013_elastic_inelastic import Bilinear_Newmark_withTH
 
