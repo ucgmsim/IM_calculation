@@ -109,7 +109,10 @@ if __name__ == "__main__":
         )
 
         log_mean_im = [np.exp(stat_fn(im_val_concat[k])) for k in stations]
-        df_dict[im_type] = log_mean_im
+        log_stdev_im = [np.std(im_val_concat[k]) for k in stations]
+        modified_im_name = im_type if im_type[0] != 'p' else f"p{im_type[1:].replace('p', '.')}"
+        df_dict[modified_im_name] = log_mean_im
+        df_dict[f"{modified_im_name}_sigma"] = log_stdev_im
 
     log_mean_ims_df = pd.DataFrame(df_dict)
     output_file = os.path.join(
