@@ -90,7 +90,9 @@ def save_waveform_to_tmp_files(tmp_folder, accelerations, station_name):
 def agg_csv(stations, im_calc_dir, im_type):
     # get csv base on station name
     # quick check of args format
-    assert type(im_type) == str, "im_type should be a string, but get {} instead".format(type(im_type))
+    assert (
+        type(im_type) == str
+    ), "im_type should be a string, but get {} instead".format(type(im_type))
     # initial a blank dataframe
     df = pd.DataFrame()
 
