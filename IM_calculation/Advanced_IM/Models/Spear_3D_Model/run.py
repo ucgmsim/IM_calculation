@@ -1,51 +1,26 @@
 import argparse
 import glob
 import os
-import pandas as pd
 import subprocess
 
 import numpy as np
+import pandas as pd
 
-
-DEFAULT_OPEN_SEES_PATH = "OpenSees"
+from IM_calculation.Advanced_IM import runlibs_2d
 
 model_dir = os.path.dirname(__file__)
 
+def main(comp_000, comp_090, output_dir, OpenSees_path):
 
-def main():
-
-    parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "comp_000", help="filepath to a station's 000 waveform ascii file"
-    )
-    parser.add_argument(
-        "comp_090", help="filepath to a station's 090 waveform ascii file"
-    )
-    parser.add_argument(
-        "comp_ver", help="filepath to a station's ver waveform ascii file"
-    )
-    parser.add_argument(
-        "output_dir",
-        help="Where the IM_csv file is written to. Also contains the temporary recorders output",
-    )
-
-    parser.add_argument(
-        "--OpenSees_path",
-        default=DEFAULT_OPEN_SEES_PATH,
-        help="Path to OpenSees binary",
-    )
-
-    args = parser.parse_args()
-
-    if not os.path.exists(args.output_dir):
+    if not os.path.exists(output_dir):
         os.makedirs(args.output_dir)
 
     script = [
-        args.OpenSees_path,
+        OpenSees_path,
         os.path.join(model_dir, "Run_script.tcl"),
-        args.comp_000,
-        args.comp_090,
-        args.output_dir,
+        comp_000,
+        comp_090,
+        output_dir,
     ]
 
     print(" ".join(script))
@@ -61,18 +36,18 @@ def main():
 
     # create CSV for each component
     for component in ["000", "090"]:
-        component_dir = os.path.join(args.output_dir, component)
+        component_dir = os.path.join(output_dir, component)
 
         create_im_csv(
-            args.output_dir, im_name, component, component_dir, check_converge=False
+            output_dir, im_name, component, component_dir, check_converge=False
         )
     # create a geom csv
-    calculate_geom(args.output_dir, im_name)
+    calculate_geom(output_dir, im_name)
 
     # calculate the disp&drift Norm from records from 000 and 090
-    calculate_norm(im_name, args.output_dir)
+    calculate_norm(im_name, output_dir)
 
-    agg_csv(args.output_dir, im_name)
+    agg_csv(output_dir, im_name)
 
 
 # calc norm
@@ -308,4 +283,5 @@ def read_out_file(file, success=True):
 
 if __name__ == "__main__":
 
-    main()
+    args = runlibs_2d.parse_args()
+    main(args.comp_000, args.comp_090, args.output_dir, args.OpenSees_path)
