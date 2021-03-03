@@ -106,11 +106,9 @@ def check_rotd(comps_to_store: Iterable[Components]) -> bool:
     :return: True if any rotd components are to be stored, false otherwise
     """
     return bool(
-        {
-            Components.crotd50,
-            Components.crotd100,
-            Components.crotd100_50,
-        }.intersection(comps_to_store)
+        {Components.crotd50, Components.crotd100, Components.crotd100_50}.intersection(
+            comps_to_store
+        )
     )
 
 
@@ -239,10 +237,7 @@ def calc_DS(
     values = array_to_dict(value, comps_to_calculate, im, comps_to_store)
     if check_rotd(comps_to_store):
         func = partial(
-            intensity_measures.getDs_nd,
-            dt=dt,
-            percLow=perclow,
-            percHigh=perchigh,
+            intensity_measures.getDs_nd, dt=dt, percLow=perclow, percHigh=perchigh
         )
         rotd = calculate_rotd(
             np.expand_dims(accelerations, 0), comps_to_store, func=func
@@ -523,7 +518,7 @@ def compute_measures_multiprocess(
             # loop through all im_type in advanced_im_config
             for im_type in advanced_im_config.IM_list:
                 df_adv_im[im_type] = df_adv_im[im_type].append(
-                    agg_csv(stations_to_run, output, im_type)
+                    advanced_IM_factory.agg_csv(stations_to_run, output, im_type)
                 )
         else:
             result_list = p.starmap(compute_measure_single, array_params)
