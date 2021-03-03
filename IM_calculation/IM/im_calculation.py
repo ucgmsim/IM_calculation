@@ -21,16 +21,15 @@ from IM_calculation.Advanced_IM import advanced_IM_factory
 from IM_calculation.IM import read_waveform, intensity_measures
 from IM_calculation.Advanced_IM import advanced_IM_factory
 from IM_calculation.IM.computeFAS import get_fourier_spectrum
-
+from IM_calculation.IM.Burks_Baker_2013_elastic_inelastic import Bilinear_Newmark_withTH
 
 G = 981.0
 DEFAULT_IMS = ("PGA", "PGV", "CAV", "AI", "Ds575", "Ds595", "MMI", "pSA")
-ALL_IMS = ("PGA", "PGV", "CAV", "AI", "Ds575", "Ds595", "MMI", "pSA", "FAS")
+ALL_IMS = ("PGA", "PGV", "CAV", "AI", "Ds575", "Ds595", "MMI", "pSA", "FAS", "IESDR")
 
-MULTI_VALUE_IMS = ("pSA", "FAS")
+MULTI_VALUE_IMS = ("pSA", "FAS", "IESDR")
 
 FAS_FREQUENCY = np.logspace(-1, 2, num=100, base=10.0)
-
 
 FILE_TYPE_DICT = {"a": "ascii", "b": "binary"}
 META_TYPE_DICT = {"s": "simulated", "o": "observed", "u": "unknown"}
@@ -107,11 +106,9 @@ def check_rotd(comps_to_store: Iterable[Components]) -> bool:
     :return: True if any rotd components are to be stored, false otherwise
     """
     return bool(
-        {
-            Components.crotd50,
-            Components.crotd100,
-            Components.crotd100_50,
-        }.intersection(comps_to_store)
+        {Components.crotd50, Components.crotd100, Components.crotd100_50}.intersection(
+            comps_to_store
+        )
     )
 
 
@@ -199,6 +196,10 @@ def compute_measure_single(
             calculate_pSAs,
             (DT, accelerations, im_options, result, station_name, waveform_acc),
         ),
+        "IESDR": (
+            calculate_IESDR,
+            (DT, accelerations, im_options, result, station_name, waveform_acc),
+        ),
         "FAS": (calc_FAS, (DT, accelerations, im_options, result, station_name)),
         "AI": (calc_AI, (accelerations, G, times)),
         "MMI": (calc_MMI, (velocities,)),
@@ -236,10 +237,7 @@ def calc_DS(
     values = array_to_dict(value, comps_to_calculate, im, comps_to_store)
     if check_rotd(comps_to_store):
         func = partial(
-            intensity_measures.getDs_nd,
-            dt=dt,
-            percLow=perclow,
-            percHigh=perchigh,
+            intensity_measures.getDs_nd, dt=dt, percLow=perclow, percHigh=perchigh
         )
         rotd = calculate_rotd(
             np.expand_dims(accelerations, 0), comps_to_store, func=func
@@ -359,6 +357,36 @@ def calculate_pSAs(
                 result[(station_name, comp.str_value)][f"{im}_{str(val)}"] = pSA_values[
                     comp.str_value
                 ][i]
+
+
+def calculate_IESDR(
+    DT,
+    accelerations,
+    im_options,
+    result,
+    station_name,
+    waveform_acc,
+    im,
+    comps_to_store,
+    comps_to_calculate,
+    z=0.05,  # damping ratio
+    alpha=0.05,  # strain hardening ratios
+    dy=0.025,  # strain hardening ratios
+):
+
+    acc_values = array_to_dict(accelerations, comps_to_calculate, im, comps_to_store)
+    for comp in comps_to_store:
+        if comp.str_value in acc_values:
+            Sd = Bilinear_Newmark_withTH(
+                np.array(im_options[im]),
+                z,
+                dy,
+                alpha,
+                acc_values[comp.str_value],
+                waveform_acc.DT,
+            )
+            for i, val in enumerate(im_options[im]):
+                result[(station_name, comp.str_value)][f"{im}_{str(val)}"] = Sd[i]
 
 
 def get_bbseis(input_path, file_type, selected_stations):
@@ -490,7 +518,7 @@ def compute_measures_multiprocess(
             # loop through all im_type in advanced_im_config
             for im_type in advanced_im_config.IM_list:
                 df_adv_im[im_type] = df_adv_im[im_type].append(
-                    agg_csv(stations_to_run, output, im_type)
+                    advanced_IM_factory.agg_csv(stations_to_run, output, im_type)
                 )
         else:
             result_list = p.starmap(compute_measure_single, array_params)
