@@ -61,7 +61,7 @@ def compute_ims(accelerations, configuration, adv_im_out_dir):
             script.extend(["--OpenSees_path", f"{configuration.OpenSees_path}"])
 
             print(" ".join(script))
-            subprocess.call(script)
+            subprocess.run(script)
 
 
 def get_acc_filename(folder, stat, component):
