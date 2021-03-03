@@ -322,6 +322,8 @@ def calculate_IESD(
     z=0.05,  # damping ratio
     alpha=0.05,  # strain hardening ratios
     dy=0.025,  # strain hardening ratios
+    Dt=0.005, # analysis time step
+
 ):
 
     acc_values = array_to_dict(accelerations, comps_to_calculate, im, comps_to_store)
@@ -334,6 +336,7 @@ def calculate_IESD(
                 alpha,
                 acc_values[comp.str_value],
                 waveform_acc.DT,
+                Dt,
             )
             for i, val in enumerate(im_options[im]):
                 result[(station_name, comp.str_value)][f"{im}_{str(val)}"] = Sd[i]
