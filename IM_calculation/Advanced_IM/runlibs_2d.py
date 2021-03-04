@@ -39,15 +39,13 @@ def parse_args():
 
 def main(args, im_name, run_script):
     output_dir = args.output_dir
-    if not os.path.exists(output_dir):
-        os.makedirs(output_dir)
+    os.makedirs(output_dir, exist_ok=True)
 
     model_converged = True
     for component in ["000", "090"]:
         component_outdir = os.path.join(output_dir, component)
         # check if folder exist, if not create it (opensees does not create the folder and will crash)
-        if not os.path.isdir(component_outdir):
-            os.makedirs(component_outdir, exist_ok=True)
+        os.makedirs(component_outdir, exist_ok=True)
         script = [
             args.OpenSees_path,
             run_script,
