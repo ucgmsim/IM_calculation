@@ -55,8 +55,8 @@ def main(comp_000, comp_090, output_dir, OpenSees_path):
 def read_recorder_all(direction_dir, recorder_name, im_recorder_fname):
 
     # find corrosponding gravity file
-    im_gravity_dir = os.path.join(direction_dir, "gravity_" + recorder_name)
-    im_gravity_recorder = os.path.join(im_gravity_dir, "gr_" + im_recorder_fname)
+    im_gravity_dir = os.path.join(direction_dir, f"gravity_{recorder_name}")
+    im_gravity_recorder = os.path.join(im_gravity_dir, f"gr_{im_recorder_fname}")
 
     if os.path.exists(im_gravity_recorder):
         gr_value = float(read_out_file(im_gravity_recorder))
@@ -83,7 +83,7 @@ def calculate_norm(im_name, output_dir, print_header=True):
     dir_090 = os.path.join(output_dir, "090")
     component = "norm"
 
-    im_csv_fname = os.path.join(output_dir, im_name + "_" + component + ".csv")
+    im_csv_fname = os.path.join(output_dir, f"{im_name}_{component}.csv")
 
     value_dict = {}
 
@@ -147,10 +147,10 @@ def calculate_geom(output_dir, im_name):
     im_name: adv_im model name
     """
     df_000 = pd.read_csv(
-        os.path.join(output_dir, im_name + "_000" + ".csv"), dtype={"component": str}
+        os.path.join(output_dir, f"{im_name}_000.csv"), dtype={"component": str}
     )
     df_090 = pd.read_csv(
-        os.path.join(output_dir, im_name + "_090" + ".csv"), dtype={"component": str}
+        os.path.join(output_dir, f"{im_name}_090.csv"), dtype={"component": str}
     )
     #
     ims = df_000.append(df_090)
@@ -166,7 +166,7 @@ def calculate_geom(output_dir, im_name):
         raise (ValueError("Error: no 000 or 090 found in csv"))
     cols = list(im_geom.columns)
     cols.sort()
-    im_csv_fname = os.path.join(output_dir, im_name + "_geom" + ".csv")
+    im_csv_fname = os.path.join(output_dir, f"{im_name}_geom.csv")
     im_geom.to_csv(im_csv_fname, columns=cols, index=True, header=True)
 
 
@@ -181,7 +181,7 @@ def agg_csv(output_dir, im_name, print_header=True):
     df.index.name = "component"
     for component in ["000", "090", "geom", "norm"]:
         component_csv_fname = os.path.join(
-            output_dir, im_name + "_" + component + ".csv"
+            output_dir, f"{im_name}_{component}.csv"
         )
         df = df.append(pd.read_csv(component_csv_fname, dtype={"component": str}))
     df.set_index("component", inplace=True)
@@ -218,7 +218,7 @@ def create_im_csv(
         # read even if not converged
         model_converged = True
 
-    im_csv_fname = os.path.join(output_dir, im_name + "_" + component + ".csv")
+    im_csv_fname = os.path.join(output_dir, f"{im_name}_{component}.csv")
     result_df = pd.DataFrame()
     im_recorder_glob = os.path.join(component_dir, "env*/*.out")
     im_recorders = glob.glob(im_recorder_glob)
