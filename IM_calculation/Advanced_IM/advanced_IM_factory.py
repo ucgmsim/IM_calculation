@@ -150,6 +150,6 @@ def natural_key(string_):
     """
     using regex to get a sequence of numbers in a string and turn them into int for sorting purpose
     example strings: test_model_v20p1p1  test_model2_v20p1p11
-    keys: [test_model_v, 20, p, 1, p , 1],  [test_model2_v, 20, p, 1, p, 11]
+    keys: ["test_model_v", 20, "p", 1, "p", 1],  ["test_model",2,"_v", 20, "p", 1, "p", 11]
     """
     return [int(s) if s.isdigit() else s for s in re.split(r"(\d+)", string_)]
