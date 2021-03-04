@@ -10,7 +10,6 @@ from qcore.timeseries import seis2txt
 
 advanced_im_dir = os.path.dirname(__file__)
 CONFIG_FILE_NAME = os.path.join(advanced_im_dir, "advanced_im_config.yaml")
-VALUES_PER_LINE = 6
 
 advanced_im_config = namedtuple(
     "advanced_im_config", ["IM_list", "config_file", "OpenSees_path"]
