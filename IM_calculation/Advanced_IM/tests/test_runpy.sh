@@ -1,7 +1,7 @@
 #!/bin/bash
 #out_dir=/nesi/nobackup/nesi00213/RunFolder/ykh22/test_adv_im/v19p5p8_no_gr_SAC_3and9/Runs/3792018/3792018/test_station/tmp/test_ATC12
 if [[ $# -lt 1 ]];then
-    echo "please provide 1. the model name 2. level of magnitude(small, moderate,large) 3. path for output (optional)"
+    echo "please provide 1. the model name. 2(optional): level of magnitude(small(default), moderate,large) 3(optional): path for output "
     exit 1
 fi
 
