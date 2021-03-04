@@ -376,7 +376,7 @@ def get_bbseis(input_path, file_type, selected_stations):
             station_names = bb_stations
         else:
             # making sure selected stations are in bbseis
-            station_names = selected_station.intersection(bb_stations)
+            station_names = list(set(selected_stations).intersection(bb_stations))
     elif file_type == FILE_TYPE_DICT["a"]:
         search_path = os.path.abspath(os.path.join(input_path, "*"))
         files = glob.glob(search_path)
@@ -444,7 +444,7 @@ def compute_measures_multiprocess(
         input_path, process, total_stations, "FAS" in ims and bbseries.nt > 32768
     )
 
-    all_result_dict = {}
+    all_results = []
     p = Pool(process)
 
     if advanced_im_config.IM_list:
@@ -478,40 +478,18 @@ def compute_measures_multiprocess(
                 )
             )
             adv_array_params.append((waveform, advanced_im_config, output))
-        # only run simply im if and only if adv_im not going to run
+        # only run basic im if and only if adv_im not going to run
         if advanced_im_config.IM_list:
             # calculate IM for stations in this iteration
             p.starmap(compute_adv_measure, adv_array_params)
-            # read and agg data into a pandas array
-            # loop through all im_type in advanced_im_config
-            for im_type in advanced_im_config.IM_list:
-                df_adv_im[im_type] = df_adv_im[im_type].append(
-                    advanced_IM_factory.agg_csv(stations_to_run, output, im_type)
-                )
         else:
-            result_list = p.starmap(compute_measure_single, array_params)
-            all_result_dict = ChainMap(*result_list)
+            all_results.extend(p.starmap(compute_measure_single, array_params))
 
-    # write for advanced IM (pandas array)
     if advanced_im_config.IM_list:
-        # dump the whole array
-        for im_type in advanced_im_config.IM_list:
-            # do a natural sort on the column names
-            df_adv_im[im_type] = df_adv_im[im_type][
-                list(df_adv_im[im_type].columns[:2])
-                + sorted(df_adv_im[im_type].columns[2:], key=natural_key)
-            ]
-            # check if file exist already, if exist header=False
-            adv_im_out = os.path.join(output, im_type + ".csv")
-            print("Dumping adv_im data to : {}".format(adv_im_out))
-            if os.path.isfile(adv_im_out):
-                print_header = False
-            else:
-                print_header = True
-            df_adv_im[im_type].to_csv(
-                adv_im_out, mode="a", header=print_header, index=False
-            )
+        # read, agg and store csv
+        advanced_IM_factory.agg_csv(advanced_im_config, station_names, output)
     else:
+        all_result_dict = ChainMap(*all_results)
         # write_result(all_result_dict, output, identifier, simple_output)
         output_path = get_result_filepath(output, identifier, ".csv")
 

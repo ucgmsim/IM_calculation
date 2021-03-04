@@ -85,8 +85,13 @@ def save_waveform_to_tmp_files(tmp_folder, accelerations, station_name):
         )
 
 
-def agg_csv(stations, im_calc_dir, im_type):
-    # get csv base on station name
+def read_csv(stations, im_calc_dir, im_type):
+    """
+    read csv into a pandas dataframe.
+    stations: list[(str),] list of station names
+    im_calc_dir: IM_calc dir that contains all the stations' result
+    im_type: the name of the adv_im model
+    """
     # quick check of args format
     assert (
         type(im_type) == str
@@ -96,6 +101,7 @@ def agg_csv(stations, im_calc_dir, im_type):
 
     # loop through all stations
     for station in stations:
+        # get csv base on station name
         # use glob(?) and qcore.sim_struc to get specific station_im.csv
         # TODO: define this structure into qcore.sim_struct
         im_path = os.path.join(im_calc_dir, station, im_type, im_type + ".csv")
@@ -110,3 +116,34 @@ def agg_csv(stations, im_calc_dir, im_type):
 
     # leave write csv to parent function
     return df
+
+
+def agg_csv(advanced_im_config, stations, im_calc_dir):
+    """
+    """
+
+    adv_im_df_dict = {im: pd.DataFrame() for im in advanced_im_config.IM_list}
+
+    for im_type in advanced_im_config.IM_list:
+        adv_im_df_dict[im_type] = adv_im_df_dict[im_type].append(
+            read_csv(stations, im_calc_dir, im_type)
+        )
+        # do a natural sort on the column names
+        adv_im_df_dict[im_type] = adv_im_df_dict[im_type][
+            list(adv_im_df_dict[im_type].columns[:2])
+            + sorted(adv_im_df_dict[im_type].columns[2:], key=natural_key)
+        ]
+        # check if file exist already, if exist header=False
+        adv_im_out = os.path.join(output, im_type + ".csv")
+        print(f"Dumping adv_im data to : {adv_im_out}")
+        if os.path.isfile(adv_im_out):
+            print_header = False
+        else:
+            print_header = True
+        adv_im_df_dict[im_type].to_csv(
+            adv_im_out, mode="a", header=print_header, index=False
+        )
+
+
+def natural_key(string_):
+    return [int(s) if s.isdigit() else s for s in re.split(r"(\d+)", string_)]
