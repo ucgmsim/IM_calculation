@@ -40,33 +40,6 @@ MEM_PER_CORE = 7.5e8
 MEM_FACTOR = 4
 
 
-def add_if_not_exist(component_list, component):
-    if not component in component_list:
-        component_list.append(component)
-    return component_list
-
-
-def convert_str_comp(arg_comps):
-    """
-    convert arg comps to str_comps_for integer_convestion in read_waveform & str comps for writing result
-    :param arg_comps: user input a list of comp(s)
-    :return: two lists of str comps
-    """
-    # comps = ["000", "geom",'ver']
-    if "geom" in arg_comps:
-        # ['000', 'ver', '090', 'geom']
-        str_comps = add_if_not_exist(arg_comps, "090")
-        str_comps = add_if_not_exist(str_comps, "000")
-        # for integer convention, str_comps shouldn't include geom as waveform has max 3 components
-        str_comps.remove("geom")
-        # for writing result, make a copy of the str_comps for int convention, and shift geom to the end
-        str_comps_for_writing = str_comps[:]
-        str_comps_for_writing.append("geom")
-        return str_comps, str_comps_for_writing
-    else:
-        return arg_comps, arg_comps
-
-
 def array_to_dict(value, comps_to_calc, im, comps_to_store):
     """
     convert a numpy arrary that contains calculated im values to a dict {comp: value}
