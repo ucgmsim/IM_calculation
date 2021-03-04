@@ -200,20 +200,8 @@ def main():
     if not args.simple_output:
         utils.setup_dir(os.path.join(args.output_path, calc.OUTPUT_SUBFOLDER))
 
-    if args.observed != None:
-        # retreived station list from observed/fault(eventname)/Vol*/data/accBB/station.*
-        # glob for potential directory
-        obs_accBB_dir_glob = os.path.join(args.observed, "*/*/accBB")
-        obs_accBB_dirs = glob.glob(obs_accBB_dir_glob)
-        station_names = []
-        # for cases that there are more than one Vol records
-        for obs_accBB_dir in obs_accBB_dirs:
-            _, station_names_tmp = calc.get_bbseis(
-                obs_accBB_dir, calc.FILE_TYPE_DICT["a"], None
-            )
-            station_names = list(set(station_names + station_names_tmp))
-    else:
-        station_names = args.station_names
+    # TODO: this may need to be updated to read file if the length of list becomes an issue
+    station_names = args.station_names
     if args.advanced_ims != None:
         components = advanced_IM_factory.COMP_DICT.keys()
     else:
