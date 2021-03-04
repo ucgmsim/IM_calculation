@@ -118,21 +118,18 @@ def compute_adv_measure(waveform, advanced_im_config, output_dir):
     :param output_dir: Directory where output folders are contained. Structure is /path/to/output_dir/station/im_name
     :return:
     """
-    
-    if advanced_im_config.IM_list is not None:
+
+    if (advanced_im_config is not None) and (advanced_im_config.IM_list is not None):
         waveform_acc = waveform[0]
         station_name = waveform_acc.station_name
         adv_im_out_dir = os.path.join(output_dir, station_name)
-        try:
-            advanced_IM_factory.compute_ims(
+        advanced_IM_factory.compute_ims(
             waveform_acc, advanced_im_config, adv_im_out_dir
-            )
-        except AttributeError:
-            print(
-                "cannot access IM_list under advanced_im_config : {}".format(
-                    advanced_im_config
-                )
-            )
+        )
+    else:
+        raise AttributeError(
+            f"cannot access advanced_im_config doesnt contains IM_list {advanced_im_config}"
+        )
 
 
 def compute_measure_single(
