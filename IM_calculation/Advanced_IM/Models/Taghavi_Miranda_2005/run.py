@@ -54,9 +54,9 @@ def main(comp_000, comp_090, output_dir):
                         results[component][f"{im_name}{i}_slope_peak"] = df.iloc[
                             i
                         ].slope_peak
-                        results[component][
-                            f"{im_name}{i}_storey_shear_peak"
-                        ] = df.iloc[i].storey_shear_peak
+                        results[component][f"{im_name}{i}_storey_shear_peak"] = df.iloc[
+                            i
+                        ].storey_shear_peak
                         results[component][f"{im_name}{i}_total_accel_peak"] = df.iloc[
                             i
                         ].total_accel_peak

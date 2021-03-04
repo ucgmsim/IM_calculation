@@ -180,9 +180,7 @@ def agg_csv(output_dir, im_name, print_header=True):
     df = pd.DataFrame()
     df.index.name = "component"
     for component in ["000", "090", "geom", "norm"]:
-        component_csv_fname = os.path.join(
-            output_dir, f"{im_name}_{component}.csv"
-        )
+        component_csv_fname = os.path.join(output_dir, f"{im_name}_{component}.csv")
         df = df.append(pd.read_csv(component_csv_fname, dtype={"component": str}))
     df.set_index("component", inplace=True)
     # im_csvs = glob.glob(im_csv_glob)
