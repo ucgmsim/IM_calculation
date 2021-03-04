@@ -143,7 +143,7 @@ def calculate_norm(im_name, output_dir, print_header=True):
 def calculate_geom(output_dir, im_name):
     """
     generates geom by globing results from 000 and 090
-    output_dir: folder that contains adv_im_comp.csv. used to grab data from 000, 090. 
+    output_dir: folder that contains adv_im_comp.csv. used to grab data from 000, 090.
     im_name: adv_im model name
     """
     df_000 = pd.read_csv(
