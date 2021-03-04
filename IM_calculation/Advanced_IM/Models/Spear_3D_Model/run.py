@@ -26,7 +26,7 @@ def main(comp_000, comp_090, output_dir, OpenSees_path):
 
     print(" ".join(script))
 
-    subprocess.call(script)
+    subprocess.run(script)
 
     im_name = "Spear_3D_Model"
     # create CSV for norm

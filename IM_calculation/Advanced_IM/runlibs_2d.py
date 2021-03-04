@@ -54,7 +54,7 @@ def main(args, im_name, run_script):
         ]
 
         print(" ".join(script))
-        subprocess.call(script)
+        subprocess.run(script)
 
         # check for success message
         # marked as failed if any component fail
