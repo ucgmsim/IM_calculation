@@ -65,8 +65,8 @@ def test_elastic_inelastic():
             -1.4989352e-07,
         ]
     )
-    dt = 0.005
-
+    Dtg = 0.005
+    Dt = 0.005
     bench = np.asarray(
         [
             1.51521e-12,
@@ -87,6 +87,5 @@ def test_elastic_inelastic():
         ]
     )
 
-    res = Bilinear_Newmark_withTH(periods, z, dy, alpha, acc, dt)
-
+    res = Bilinear_Newmark_withTH(periods, z, dy, alpha, acc, Dtg, Dt)
     assert np.allclose(res, bench)
