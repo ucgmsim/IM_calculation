@@ -10,6 +10,7 @@ from IM_calculation.Advanced_IM import runlibs_2d
 
 model_dir = os.path.dirname(__file__)
 
+
 def main(comp_000, comp_090, output_dir, OpenSees_path):
 
     if not os.path.exists(output_dir):
