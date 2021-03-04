@@ -8,6 +8,7 @@ import tempfile
 import yaml
 
 from qcore.timeseries import seis2txt
+from qcore.utils import load_yaml
 
 advanced_im_dir = os.path.dirname(__file__)
 CONFIG_FILE_NAME = os.path.join(advanced_im_dir, "advanced_im_config.yaml")
@@ -19,9 +20,7 @@ COMP_DICT = {"090": 0, "000": 1, "ver": 2}
 
 
 def get_config(config_file=CONFIG_FILE_NAME):
-    with open(config_file) as cf:
-        config = yaml.safe_load(cf)
-    return config
+    return load_yaml(config_file)
 
 
 def get_im_list(config_file=CONFIG_FILE_NAME):
@@ -136,7 +135,7 @@ def agg_csv(advanced_im_config, stations, im_calc_dir):
             + sorted(adv_im_df_dict[im_type].columns[2:], key=natural_key)
         ]
         # check if file exist already, if exist header=False
-        adv_im_out = os.path.join(output, im_type + ".csv")
+        adv_im_out = os.path.join(im_calc_dir, im_type + ".csv")
         print(f"Dumping adv_im data to : {adv_im_out}")
         if os.path.isfile(adv_im_out):
             print_header = False
