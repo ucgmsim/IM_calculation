@@ -41,23 +41,19 @@ BETA = 1 / 6  # linear acceleration (stable if Dt/T<=0.551)
 
 
 def Bilinear_Newmark_withTH(
-    period: np.ndarray, z: float, dy: float, alpha: float, ag: np.ndarray, Dtg: float, Dt: float
+    period: np.ndarray,
+    z: float,
+    dy: float,
+    alpha: float,
+    ag: np.ndarray,
+    Dtg: float,
+    Dt: float,
 ):
-    #MATLAB code has Dtg (time-step of waveform) and Dt (analysis time step)
-    # Python has only one Dtg = Dtg and no Dt.
-
     # Analysis time step
-    # % ------------------
-    # if isempty(Dt) | | Dt / min(T) > 0.551
-    #     denominator = 2 * ceil(Dtg / min(Dtg / 5, min(T) / 30) / 2);
-    #     Dt = Dtg / denominator;
-    #     disp(['Note:  Dt set equal to ' num2str(Dt)]);
-    # end
-    #
-    if Dt is None or Dt / np.min(period) >0.551:
-        denominator = 2 * np.ceil(Dtg / np.min( [Dtg/5, np.min(period)/30] ) /2)
+    # If Dt is too high in relation to the period, adjust it to ensure numerical stability
+    if Dt is None or Dt / np.min(period) > 0.551:
+        denominator = 2 * np.ceil(Dtg / np.min([Dtg / 5, np.min(period) / 30]) / 2)
         Dt = Dtg / denominator
-
 
     num_oscillators = period.size
 
@@ -69,17 +65,11 @@ def Bilinear_Newmark_withTH(
     fy = k * dy
     kalpha = k * alpha
 
-    # % Interpolate
-    # p = -ag * m(linearly)
-    # % ------------------------------
-    # tg = [0:(length(ag) - 1)]' * Dtg;
-    # t = [0:Dt: tg(end)]';
-    # p = interp1(tg, -ag * m, t);
-
-    p = -ag * m 
-    tg = np.linspace(0,ag.size-1, ag.size)*Dtg
-    t = np.linspace(0,tg[-1],int(tg[-1]/Dt)+1) #num of steps
-    p = np.interp(t, tg, p) #interpolate for t
+    # % Interpolate p=-ag*m (linearly)
+    p = -ag * m
+    tg = np.linspace(0, ag.size - 1, ag.size) * Dtg
+    t = np.linspace(0, tg[-1], int(tg[-1] / Dt) + 1)  # num of steps increased from tg
+    p = np.interp(t, tg, p)  # interpolate for t
 
     lp = p.size
     d = np.zeros((lp, num_oscillators))
