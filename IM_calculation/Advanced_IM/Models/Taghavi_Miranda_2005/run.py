@@ -2,13 +2,13 @@
 Python script to run a 3D waveform through Taghavi_Miranda_2005 and store the outputs to a txt file
 """
 
-import argparse
 import logging
 import os
 
 import numpy as np
 import pandas as pd
 
+from IM_calculation.Advanced_IM import runlibs_2d
 from IM_calculation.IM.Taghavi_Miranda_2005 import Taghavi_Miranda_2005
 from qcore.timeseries import read_ascii
 
@@ -21,38 +21,19 @@ T = [0.1, 0.4, 0.7, 1.5, 3.0]
 STORIES = 10
 
 
-def main():
+def main(comp_000, comp_090, output_dir):
 
-    parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "comp_000", help="filepath to a station's 000 waveform ascii file"
-    )
-    parser.add_argument(
-        "comp_090", help="filepath to a station's 090 waveform ascii file"
-    )
-    parser.add_argument(
-        "comp_ver", help="filepath to a station's ver waveform ascii file"
-    )
-    parser.add_argument(
-        "output_dir",
-        help="Where the IM_csv file is written to. Also contains the temporary recorders output",
-    )
-
-    args, unused_args = parser.parse_known_args()
-
-    output_dir = args.output_dir
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
 
-    log_file = os.path.join(args.output_dir, "log")
+    log_file = os.path.join(output_dir, "log")
     logging.basicConfig(
         format="%(asctime)s %(message)s", filename=log_file, level=logging.DEBUG
     )
-    logging.debug(f"Ignored arguments: {unused_args}")
 
     waveforms = {}
-    waveforms["000"], meta = read_ascii(args.comp_000, meta=True)
-    waveforms["090"] = read_ascii(args.comp_090)
+    waveforms["000"], meta = read_ascii(comp_000, meta=True)
+    waveforms["090"] = read_ascii(comp_090)
     dt = meta["dt"]
     results = {}
 
@@ -89,5 +70,5 @@ def main():
 
 
 if __name__ == "__main__":
-
-    main()
+    args = runlibs_2d.parse_args()
+    main(args.comp_000, args.comp_090, args.output_dir)
