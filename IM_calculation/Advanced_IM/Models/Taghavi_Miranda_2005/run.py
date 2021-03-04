@@ -48,16 +48,16 @@ def main(comp_000, comp_090, output_dir):
                         waveforms[component], dt, period, a, c, storey=STORIES
                     )
                     for i in range(STORIES + 1):
-                        results[component][im_name + f"{i}_disp_peak"] = df.iloc[
+                        results[component][f"{im_name}{i}_disp_peak"] = df.iloc[
                             i
                         ].disp_peak
-                        results[component][im_name + f"{i}_slope_peak"] = df.iloc[
+                        results[component][f"{im_name}{i}_slope_peak"] = df.iloc[
                             i
                         ].slope_peak
                         results[component][
-                            im_name + f"{i}_storey_shear_peak"
+                            f"{im_name}{i}_storey_shear_peak"
                         ] = df.iloc[i].storey_shear_peak
-                        results[component][im_name + f"{i}_total_accel_peak"] = df.iloc[
+                        results[component][f"{im_name}{i}_total_accel_peak"] = df.iloc[
                             i
                         ].total_accel_peak
 

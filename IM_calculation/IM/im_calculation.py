@@ -1,7 +1,6 @@
 import csv
 import glob
 import os
-import re
 import sys
 
 from datetime import datetime
@@ -119,20 +118,21 @@ def compute_adv_measure(waveform, advanced_im_config, output_dir):
     :param output_dir: Directory where output folders are contained. Structure is /path/to/output_dir/station/im_name
     :return:
     """
-    try:
-        if advanced_im_config.IM_list is not None:
-            waveform_acc = waveform[0]
-            station_name = waveform_acc.station_name
-            adv_im_out_dir = os.path.join(output_dir, station_name)
+    
+    if advanced_im_config.IM_list is not None:
+        waveform_acc = waveform[0]
+        station_name = waveform_acc.station_name
+        adv_im_out_dir = os.path.join(output_dir, station_name)
+        try:
             advanced_IM_factory.compute_ims(
-                waveform_acc, advanced_im_config, adv_im_out_dir
+            waveform_acc, advanced_im_config, adv_im_out_dir
             )
-    except AttributeError:
-        print(
-            "cannot access IM_list under advanced_im_config : {}".format(
-                advanced_im_config
+        except AttributeError:
+            print(
+                "cannot access IM_list under advanced_im_config : {}".format(
+                    advanced_im_config
+                )
             )
-        )
 
 
 def compute_measure_single(
@@ -503,10 +503,6 @@ def compute_measures_multiprocess(
         # Save the transposed dataframe
         results_dataframe.to_csv(output_path)
     generate_metadata(output, identifier, rupture, run_type, version)
-
-
-def natural_key(string_):
-    return [int(s) if s.isdigit() else s for s in re.split(r"(\d+)", string_)]
 
 
 def get_result_filepath(output_folder, arg_identifier, suffix):

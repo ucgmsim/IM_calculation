@@ -2,6 +2,7 @@ from collections import namedtuple
 import numpy as np
 import pandas as pd
 import os
+import re
 import subprocess
 import tempfile
 import yaml
@@ -120,6 +121,7 @@ def read_csv(stations, im_calc_dir, im_type):
 
 def agg_csv(advanced_im_config, stations, im_calc_dir):
     """
+    aggregate and create a csv that contain results from all stations
     """
 
     adv_im_df_dict = {im: pd.DataFrame() for im in advanced_im_config.IM_list}
@@ -146,4 +148,7 @@ def agg_csv(advanced_im_config, stations, im_calc_dir):
 
 
 def natural_key(string_):
+    """
+    using regex to get a sequence of numbers in a string and turn thme into int for sorting purpose
+    """
     return [int(s) if s.isdigit() else s for s in re.split(r"(\d+)", string_)]
