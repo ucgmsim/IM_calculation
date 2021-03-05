@@ -51,7 +51,7 @@ def Bilinear_Newmark_withTH(
 ):
     # Analysis time step
     # If dt is too high in relation to the period, adjust it to ensure numerical stability
-    if dt is None or dt / np.min(period) > 0.551:
+    if dt / np.min(period) > 0.551:
         denominator = 2 * np.ceil(dtg / np.min([dtg / 5, np.min(period) / 30]) / 2)
         dt = dtg / denominator
 
