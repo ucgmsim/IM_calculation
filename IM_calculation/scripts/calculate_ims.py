@@ -161,11 +161,6 @@ def load_args():
     parser.add_argument(
         "--OpenSees_path", default="OpenSees", help="Path to OpenSees binary"
     )
-    parser.add_argument(
-        "--observed",
-        default=None,
-        help="path to the observed data for matching station list",
-    )
 
     args = parser.parse_args()
     calc.validate_input_path(parser, args.input_path, args.file_type)
@@ -191,9 +186,6 @@ def main():
     if "FAS" in im:
         im_options["FAS"] = calc.validate_fas_frequency(args.fas_frequency)
 
-    advanced_im_config = advanced_IM_factory.advanced_im_config(
-        args.advanced_ims, args.advanced_im_config, args.OpenSees_path
-    )
 
     # Create output dir
     utils.setup_dir(args.output_path)
@@ -202,10 +194,14 @@ def main():
 
     # TODO: this may need to be updated to read file if the length of list becomes an issue
     station_names = args.station_names
-    if args.advanced_ims != None:
+    if args.advanced_ims is not None:
         components = advanced_IM_factory.COMP_DICT.keys()
+        advanced_im_config = advanced_IM_factory.advanced_im_config(
+            args.advanced_ims, args.advanced_im_config, args.OpenSees_path
+        )
     else:
         components = args.components
+        advanced_im_config = None
     # multiprocessor
 
     calc.compute_measures_multiprocess(

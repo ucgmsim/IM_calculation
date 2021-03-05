@@ -9,7 +9,9 @@ import numpy as np
 import pandas as pd
 
 from IM_calculation.Advanced_IM import runlibs_2d
+from IM_calculation.IM.intensity_measures import get_geom
 from IM_calculation.IM.Taghavi_Miranda_2005 import Taghavi_Miranda_2005
+
 from qcore.timeseries import read_ascii
 
 model_dir = os.path.dirname(__file__)
@@ -23,8 +25,7 @@ STORIES = 10
 
 def main(comp_000, comp_090, output_dir):
 
-    if not os.path.exists(output_dir):
-        os.makedirs(output_dir)
+    os.makedirs(output_dir, exist_ok=True)
 
     log_file = os.path.join(output_dir, "log")
     logging.basicConfig(
@@ -64,7 +65,7 @@ def main(comp_000, comp_090, output_dir):
     im_csv_fname = os.path.join(output_dir, "Taghavi_Miranda_2005.csv")
     df = pd.DataFrame.from_dict(results, orient="index")
     df.index.name = "component"
-    geom = pd.Series(np.sqrt(df.loc["000"] * df.loc["090"]), name="geom")
+    geom = pd.Series(get_geom(df.loc["000"], df.loc["090"]), name="geom")
     df = df.append(geom)
     df.to_csv(im_csv_fname)
 

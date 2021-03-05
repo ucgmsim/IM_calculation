@@ -102,9 +102,9 @@ def read_csv(stations, im_calc_dir, im_type):
     # loop through all stations
     for station in stations:
         # get csv base on station name
-        # use glob(?) and qcore.sim_struc to get specific station_im.csv
-        # TODO: define this structure into qcore.sim_struct
-        im_path = os.path.join(im_calc_dir, station, im_type, im_type + ".csv")
+        # use glob(?) and qcore.simulation_structure to get specific station_im.csv
+        # TODO: define this structure into qcore.simulation_structure
+        im_path = os.path.join(im_calc_dir, station, im_type, "{im_type}.csv")
         # read a df and add station name as colum
         df_tmp = pd.read_csv(im_path)
 
@@ -135,7 +135,7 @@ def agg_csv(advanced_im_config, stations, im_calc_dir):
             + sorted(adv_im_df_dict[im_type].columns[2:], key=natural_key)
         ]
         # check if file exist already, if exist header=False
-        adv_im_out = os.path.join(im_calc_dir, im_type + ".csv")
+        adv_im_out = os.path.join(im_calc_dir, f"{im_type}.csv")
         print(f"Dumping adv_im data to : {adv_im_out}")
         if os.path.isfile(adv_im_out):
             print_header = False

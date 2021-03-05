@@ -68,11 +68,11 @@ def main(args, im_name, run_script):
             # aggregate
             create_im_csv(output_dir, im_name, component, component_outdir)
 
-            im_csv_fname = os.path.join(output_dir, im_name + ".csv")
+            im_csv_fname = os.path.join(output_dir, f"{im_name}.csv")
             calculate_geom(im_csv_fname)
     else:
         station_name = os.path.basename(args.comp_000).split(".")[0]
-        im_csv_failed_name = os.path.join(output_dir, im_name + "_failed" + ".csv")
+        im_csv_failed_name = os.path.join(output_dir, f"{im_name}_failed.csv")
         with open(im_csv_failed_name, "w") as f:
             f.write("status\n")
             f.write("failed")
@@ -145,7 +145,7 @@ def create_im_csv(output_dir, im_name, component, component_outdir, print_header
         sub_im_gravity_recorder = os.path.join(
             sub_im_gravity_dir, "gr_" + os.path.basename(im_recorder)
         )
-        # find corrosponding gravity file
+        # find corresponding gravity file
         if os.path.exists(sub_im_gravity_recorder):
             gr_value = float(read_out_file(sub_im_gravity_recorder))
         else:

@@ -119,17 +119,10 @@ def compute_adv_measure(waveform, advanced_im_config, output_dir):
     :return:
     """
 
-    if (advanced_im_config is not None) and (advanced_im_config.IM_list is not None):
-        waveform_acc = waveform[0]
-        station_name = waveform_acc.station_name
-        adv_im_out_dir = os.path.join(output_dir, station_name)
-        advanced_IM_factory.compute_ims(
-            waveform_acc, advanced_im_config, adv_im_out_dir
-        )
-    else:
-        raise AttributeError(
-            f"cannot access advanced_im_config doesnt contains IM_list {advanced_im_config}"
-        )
+    waveform_acc = waveform[0]
+    station_name = waveform_acc.station_name
+    adv_im_out_dir = os.path.join(output_dir, station_name)
+    advanced_IM_factory.compute_ims(waveform_acc, advanced_im_config, adv_im_out_dir)
 
 
 def compute_measure_single(
@@ -407,7 +400,7 @@ def compute_measures_multiprocess(
     process=1,
     simple_output=False,
     units="g",
-    advanced_im_config=advanced_IM_factory.advanced_im_config(None, None, None),
+    advanced_im_config=None,
 ):
     """
     using multiprocesses to compute measures.
@@ -429,6 +422,9 @@ def compute_measures_multiprocess(
     :param simple_output:
     :return:
     """
+    #  for running adv_im
+    running_adv_im = (advanced_im_config is not None) and (advanced_im_config.IM_list is not None)
+
     (
         components_to_calculate,
         components_to_store,
@@ -441,48 +437,48 @@ def compute_measures_multiprocess(
         input_path, process, total_stations, "FAS" in ims and bbseries.nt > 32768
     )
 
-    all_results = []
-    p = Pool(process)
+    # initialize result list for basic IM
+    if not running_adv_im:
+        all_results = []
 
-    if advanced_im_config.IM_list:
-        df_adv_im = {im: pd.DataFrame() for im in advanced_im_config.IM_list}
 
-    i = 0
-    while i < total_stations:
-        # read waveforms of stations
-        # each iteration = steps size
-        stations_to_run = station_names[i : i + steps]
-        waveforms = read_waveform.read_waveforms(
-            input_path,
-            bbseries,
-            stations_to_run,
-            components_to_calculate,
-            wave_type=wave_type,
-            file_type=file_type,
-            units=units,
-        )
-        i += steps
-        array_params = []
-        adv_array_params = []
-        for waveform in waveforms:
-            array_params.append(
-                (
-                    waveform,
-                    sorted(ims),
-                    sorted(components_to_store, key=lambda x: x.value),
-                    im_options,
-                    sorted(components_to_calculate, key=lambda x: x.value),
-                )
+    with Pool(process) as p:
+        i = 0
+        while i < total_stations:
+            # read waveforms of stations
+            # each iteration = steps size
+            stations_to_run = station_names[i : i + steps]
+            waveforms = read_waveform.read_waveforms(
+                input_path,
+                bbseries,
+                stations_to_run,
+                components_to_calculate,
+                wave_type=wave_type,
+                file_type=file_type,
+                units=units,
             )
-            adv_array_params.append((waveform, advanced_im_config, output))
-        # only run basic im if and only if adv_im not going to run
-        if advanced_im_config.IM_list:
-            # calculate IM for stations in this iteration
-            p.starmap(compute_adv_measure, adv_array_params)
-        else:
-            all_results.extend(p.starmap(compute_measure_single, array_params))
+            i += steps
+            # only run basic im if and only if adv_im not going to run
+            if running_adv_im:
+                adv_array_params = [
+                    (waveform, advanced_im_config, output) for waveform in waveforms
+                ]
+                # calculate IM for stations in this iteration
+                p.starmap(compute_adv_measure, adv_array_params)
+            else:
+                array_params = [
+                    (
+                        waveform,
+                        sorted(ims),
+                        sorted(components_to_store, key=lambda x: x.value),
+                        im_options,
+                        sorted(components_to_calculate, key=lambda x: x.value),
+                    )
+                    for waveform in waveforms
+                ]
+                all_results.extend(p.starmap(compute_measure_single, array_params))
 
-    if advanced_im_config.IM_list:
+    if running_adv_im:
         # read, agg and store csv
         advanced_IM_factory.agg_csv(advanced_im_config, station_names, output)
     else:
