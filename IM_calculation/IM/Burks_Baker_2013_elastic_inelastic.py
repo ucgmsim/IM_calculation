@@ -14,8 +14,8 @@ import numpy as np
 # % dy    = yield displacements               ( " )
 # % alpha = strain hardening ratios           ( " )
 # % ag    = ground acceleration time history  ( length(ag) x 1 )
-# % Dtg   = time step of ag                   ( scalar )
-# % Dt    = analyis time step                 ( scalar )
+# % dtg   = time step of ag                   ( scalar )
+# % dt    = analyis time step                 ( scalar )
 # %
 # % OUTPUT
 # % S.d   = relative displacement spectrum               ( 1 x num_oscillators )
@@ -37,7 +37,7 @@ import numpy as np
 #
 
 GAMMA = 1 / 2
-BETA = 1 / 6  # linear acceleration (stable if Dt/T<=0.551)
+BETA = 1 / 6  # linear acceleration (stable if dt/T<=0.551)
 
 
 def Bilinear_Newmark_withTH(
@@ -46,14 +46,14 @@ def Bilinear_Newmark_withTH(
     dy: float,
     alpha: float,
     ag: np.ndarray,
-    Dtg: float,
-    Dt: float,
+    dtg: float,
+    dt: float,
 ):
     # Analysis time step
-    # If Dt is too high in relation to the period, adjust it to ensure numerical stability
-    if Dt is None or Dt / np.min(period) > 0.551:
-        denominator = 2 * np.ceil(Dtg / np.min([Dtg / 5, np.min(period) / 30]) / 2)
-        Dt = Dtg / denominator
+    # If dt is too high in relation to the period, adjust it to ensure numerical stability
+    if dt is None or dt / np.min(period) > 0.551:
+        denominator = 2 * np.ceil(dtg / np.min([dtg / 5, np.min(period) / 30]) / 2)
+        dt = dtg / denominator
 
     num_oscillators = period.size
 
@@ -67,8 +67,8 @@ def Bilinear_Newmark_withTH(
 
     # % Interpolate p=-ag*m (linearly)
     p = -ag * m
-    tg = np.linspace(0, ag.size - 1, ag.size) * Dtg
-    t = np.linspace(0, tg[-1], int(tg[-1] / Dt) + 1)  # num of steps increased from tg
+    tg = np.linspace(0, ag.size - 1, ag.size) * dtg
+    t = np.linspace(0, tg[-1], int(tg[-1] / dt) + 1)  # num of steps increased from tg
     p = np.interp(t, tg, p)  # interpolate for t
 
     lp = p.size
@@ -78,8 +78,8 @@ def Bilinear_Newmark_withTH(
     fs = np.zeros((lp, num_oscillators))
 
     a[0] = (p[0] - c * v[0] - fs[0]) / m
-    A = 1 / (BETA * Dt) * m + GAMMA / BETA * c
-    B = 1 / (2 * BETA) * m + Dt * (GAMMA / (2 * BETA) - 1) * c
+    A = 1 / (BETA * dt) * m + GAMMA / BETA * c
+    B = 1 / (2 * BETA) * m + dt * (GAMMA / (2 * BETA) - 1) * c
 
     for i in range(lp - 1):
 
@@ -94,7 +94,7 @@ def Bilinear_Newmark_withTH(
         )
         ki[jj] = kalpha[jj]
 
-        Ki = ki + A / Dt
+        Ki = ki + A / dt
 
         Ddi = DPi / Ki
         fs[i + 1] = fs[i] + ki * Ddi
@@ -115,9 +115,9 @@ def Bilinear_Newmark_withTH(
         # Inelastic behaviour ends
 
         Dvi = (
-            GAMMA / (BETA * Dt) * Ddi
+            GAMMA / (BETA * dt) * Ddi
             - GAMMA / BETA * v[i]
-            + Dt * (1 - GAMMA / (2 * BETA)) * a[i]
+            + dt * (1 - GAMMA / (2 * BETA)) * a[i]
         )
         v[i + 1] = v[i] + Dvi
 
