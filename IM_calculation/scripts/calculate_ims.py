@@ -186,7 +186,6 @@ def main():
     if "FAS" in im:
         im_options["FAS"] = calc.validate_fas_frequency(args.fas_frequency)
 
-
     # Create output dir
     utils.setup_dir(args.output_path)
     if not args.simple_output:

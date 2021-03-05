@@ -423,7 +423,9 @@ def compute_measures_multiprocess(
     :return:
     """
     #  for running adv_im
-    running_adv_im = (advanced_im_config is not None) and (advanced_im_config.IM_list is not None)
+    running_adv_im = (advanced_im_config is not None) and (
+        advanced_im_config.IM_list is not None
+    )
 
     (
         components_to_calculate,
@@ -440,7 +442,6 @@ def compute_measures_multiprocess(
     # initialize result list for basic IM
     if not running_adv_im:
         all_results = []
-
 
     with Pool(process) as p:
         i = 0
