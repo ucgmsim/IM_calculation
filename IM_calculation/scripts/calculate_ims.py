@@ -10,14 +10,27 @@ command:
 
 import argparse
 import os
+import pandas as pd
+import glob
 
 import IM_calculation.IM.im_calculation as calc
+from IM_calculation.Advanced_IM import advanced_IM_factory
 from qcore import utils
 from qcore import constants
 
 
 def load_args():
-    parser = argparse.ArgumentParser()
+    parent_parser = argparse.ArgumentParser(add_help=False)
+    parent_parser.add_argument(
+        "--advanced_im_config",
+        default=advanced_IM_factory.CONFIG_FILE_NAME,
+        help="Path to the advanced IM_config file",
+    )
+
+    parent_args = parent_parser.parse_known_args()
+
+    parser = argparse.ArgumentParser(parents=[parent_parser], add_help=True)
+
     parser.add_argument(
         "input_path", help="path to input bb binary file eg./home/melody/BB.bin"
     )
@@ -29,15 +42,15 @@ def load_args():
     parser.add_argument(
         "-o",
         "--output_path",
-        help="path to output folder that stores the computed measures.Folder name must "
-        "not be inclusive.eg.home/tt/. Default to /home/$user/",
+        required=True,
+        help="path to output folder that stores the computed measures. Folder name must "
+        "not be inclusive.eg.home/tt/. Required parameter",
     )
     parser.add_argument(
         "-i",
         "--identifier",
-        default=calc.RUNNAME_DEFAULT,
-        help="Please specify the unique runname of the simulation. "
-        "eg.Albury_HYP01-01_S1244",
+        required=True,
+        help="Please specify the unique runname of the simulation. " "eg.Albury_REL01",
     )
     parser.add_argument(
         "-r",
@@ -138,6 +151,17 @@ def load_args():
         default="g",
         help="The units that input acceleration files are in",
     )
+    parser.add_argument(
+        "-a",
+        "--advanced_ims",
+        nargs="+",
+        choices=advanced_IM_factory.get_im_list(parent_args[0].advanced_im_config),
+        help="Provides the list of Advanced IMs to be calculated",
+    )
+    parser.add_argument(
+        "--OpenSees_path", default="OpenSees", help="Path to OpenSees binary"
+    )
+
     args = parser.parse_args()
     calc.validate_input_path(parser, args.input_path, args.file_type)
     return args
@@ -147,7 +171,6 @@ def main():
     args = load_args()
 
     file_type = calc.FILE_TYPE_DICT[args.file_type]
-
     run_type = calc.META_TYPE_DICT[args.run_type]
 
     im = args.im
@@ -168,14 +191,25 @@ def main():
     if not args.simple_output:
         utils.setup_dir(os.path.join(args.output_path, calc.OUTPUT_SUBFOLDER))
 
+    # TODO: this may need to be updated to read file if the length of list becomes an issue
+    station_names = args.station_names
+    if args.advanced_ims is not None:
+        components = advanced_IM_factory.COMP_DICT.keys()
+        advanced_im_config = advanced_IM_factory.advanced_im_config(
+            args.advanced_ims, args.advanced_im_config, args.OpenSees_path
+        )
+    else:
+        components = args.components
+        advanced_im_config = None
     # multiprocessor
+
     calc.compute_measures_multiprocess(
         args.input_path,
         file_type,
         wave_type=None,
-        station_names=args.station_names,
+        station_names=station_names,
         ims=im,
-        comp=args.components,
+        comp=components,
         im_options=im_options,
         output=args.output_path,
         identifier=args.identifier,
@@ -185,6 +219,7 @@ def main():
         process=args.process,
         simple_output=args.simple_output,
         units=args.units,
+        advanced_im_config=advanced_im_config,
     )
 
     print("Calculations are outputted to {}".format(args.output_path))

@@ -33,6 +33,7 @@ setup(
     description="IM calculation code",
     install_requires=["numpy>=1.14.3", "numba>=0.43.1", "Cython", "pandas"],
     cmdclass={"build_ext": build_ext, "build_py": build_konno_matricies},
+    package_data={"": ["*.yaml"]},
     ext_modules=[
         Extension(
             "IM_calculation.IM.rspectra_calculations.rspectra",

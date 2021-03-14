@@ -2,6 +2,7 @@ import csv
 import glob
 import os
 import sys
+
 from datetime import datetime
 from functools import partial
 from multiprocessing.pool import Pool
@@ -15,6 +16,7 @@ from qcore import timeseries, constants
 from qcore.constants import Components
 from qcore.im import order_im_cols_df
 
+from IM_calculation.Advanced_IM import advanced_IM_factory
 from IM_calculation.IM import read_waveform, intensity_measures
 from IM_calculation.IM.computeFAS import get_fourier_spectrum
 from IM_calculation.IM.Burks_Baker_2013_elastic_inelastic import Bilinear_Newmark_withTH
@@ -75,11 +77,9 @@ def check_rotd(comps_to_store: Iterable[Components]) -> bool:
     :return: True if any rotd components are to be stored, false otherwise
     """
     return bool(
-        {
-            Components.crotd50,
-            Components.crotd100,
-            Components.crotd100_50,
-        }.intersection(comps_to_store)
+        {Components.crotd50, Components.crotd100, Components.crotd100_50}.intersection(
+            comps_to_store
+        )
     )
 
 
@@ -108,6 +108,21 @@ def calculate_rotd(
     if Components.crotd100_50 in comps_to_store:
         value_dict[Components.crotd100_50.str_value] = rotd100 / rotd50
     return value_dict
+
+
+def compute_adv_measure(waveform, advanced_im_config, output_dir):
+    """
+    Wrapper function to call advanced IM workflow
+    :param waveform: Tuple of waveform objects (first is acc, second is vel)
+    :param advanced_im_config: advanced_im_config Named Tuple containing list of IMs, config file and path to OpenSeeS
+    :param output_dir: Directory where output folders are contained. Structure is /path/to/output_dir/station/im_name
+    :return:
+    """
+
+    waveform_acc = waveform[0]
+    station_name = waveform_acc.station_name
+    adv_im_out_dir = os.path.join(output_dir, station_name)
+    advanced_IM_factory.compute_ims(waveform_acc, advanced_im_config, adv_im_out_dir)
 
 
 def compute_measure_single(
@@ -184,10 +199,7 @@ def calc_DS(
     values = array_to_dict(value, comps_to_calculate, im, comps_to_store)
     if check_rotd(comps_to_store):
         func = partial(
-            intensity_measures.getDs_nd,
-            dt=dt,
-            percLow=perclow,
-            percHigh=perchigh,
+            intensity_measures.getDs_nd, dt=dt, percLow=perclow, percHigh=perchigh
         )
         rotd = calculate_rotd(
             np.expand_dims(accelerations, 0), comps_to_store, func=func
@@ -351,10 +363,12 @@ def get_bbseis(input_path, file_type, selected_stations):
     bbseries = None
     if file_type == FILE_TYPE_DICT["b"]:
         bbseries = timeseries.BBSeis(input_path)
+        bb_stations = bbseries.stations.name
         if selected_stations is None:
-            station_names = bbseries.stations.name
+            station_names = bb_stations
         else:
-            station_names = selected_stations
+            # making sure selected stations are in bbseis
+            station_names = list(set(selected_stations).intersection(bb_stations))
     elif file_type == FILE_TYPE_DICT["a"]:
         search_path = os.path.abspath(os.path.join(input_path, "*"))
         files = glob.glob(search_path)
@@ -388,9 +402,10 @@ def compute_measures_multiprocess(
     process=1,
     simple_output=False,
     units="g",
+    advanced_im_config=None,
 ):
     """
-    using multiprocesses to computer measures.
+    using multiprocesses to compute measures.
     Calls compute_measure_single() to compute measures for a single station
     write results to csvs and an imcalc.info meta data file
     :param input_path:
@@ -409,61 +424,80 @@ def compute_measures_multiprocess(
     :param simple_output:
     :return:
     """
+    #  for running adv_im
+    running_adv_im = (advanced_im_config is not None) and (
+        advanced_im_config.IM_list is not None
+    )
+
     (
         components_to_calculate,
         components_to_store,
     ) = constants.Components.get_comps_to_calc_and_store(comp)
 
     bbseries, station_names = get_bbseis(input_path, file_type, station_names)
-
     total_stations = len(station_names)
+    # determine the size of each iteration base on num of processers and mem
     steps = get_steps(
         input_path, process, total_stations, "FAS" in ims and bbseries.nt > 32768
     )
 
-    all_results = []
-    p = Pool(process)
+    # initialize result list for basic IM
+    if not running_adv_im:
+        all_results = []
 
-    i = 0
-    while i < total_stations:
-        waveforms = read_waveform.read_waveforms(
-            input_path,
-            bbseries,
-            station_names[i : i + steps],
-            components_to_calculate,
-            wave_type=wave_type,
-            file_type=file_type,
-            units=units,
-        )
-        i += steps
-        array_params = []
-        for waveform in waveforms:
-            array_params.append(
-                (
-                    waveform,
-                    sorted(ims),
-                    sorted(components_to_store, key=lambda x: x.value),
-                    im_options,
-                    sorted(components_to_calculate, key=lambda x: x.value),
-                )
+    with Pool(process) as p:
+        i = 0
+        while i < total_stations:
+            # read waveforms of stations
+            # each iteration = steps size
+            stations_to_run = station_names[i : i + steps]
+            waveforms = read_waveform.read_waveforms(
+                input_path,
+                bbseries,
+                stations_to_run,
+                components_to_calculate,
+                wave_type=wave_type,
+                file_type=file_type,
+                units=units,
             )
-        all_results.extend(p.starmap(compute_measure_single, array_params))
+            i += steps
+            # only run basic im if and only if adv_im not going to run
+            if running_adv_im:
+                adv_array_params = [
+                    (waveform, advanced_im_config, output) for waveform in waveforms
+                ]
+                # calculate IM for stations in this iteration
+                p.starmap(compute_adv_measure, adv_array_params)
+            else:
+                array_params = [
+                    (
+                        waveform,
+                        sorted(ims),
+                        sorted(components_to_store, key=lambda x: x.value),
+                        im_options,
+                        sorted(components_to_calculate, key=lambda x: x.value),
+                    )
+                    for waveform in waveforms
+                ]
+                all_results.extend(p.starmap(compute_measure_single, array_params))
 
-    all_result_dict = ChainMap(*all_results)
-    output_path = get_result_filepath(output, identifier, ".csv")
+    if running_adv_im:
+        # read, agg and store csv
+        advanced_IM_factory.agg_csv(advanced_im_config, station_names, output)
+    else:
+        all_result_dict = ChainMap(*all_results)
+        # write_result(all_result_dict, output, identifier, simple_output)
+        output_path = get_result_filepath(output, identifier, ".csv")
 
-    results_dataframe = pd.DataFrame.from_dict(all_result_dict, orient="index")
-    results_dataframe.index = pd.MultiIndex.from_tuples(
-        results_dataframe.index, names=["station", "component"]
-    )
-    results_dataframe.sort_values(["station", "component"], inplace=True)
-    results_dataframe = order_im_cols_df(results_dataframe)
+        results_dataframe = pd.DataFrame.from_dict(all_result_dict, orient="index")
+        results_dataframe.index = pd.MultiIndex.from_tuples(
+            results_dataframe.index, names=["station", "component"]
+        )
+        results_dataframe.sort_values(["station", "component"], inplace=True)
+        results_dataframe = order_im_cols_df(results_dataframe)
 
-    # Save the transposed dataframe
-    results_dataframe.to_csv(output_path)
-
-    # write_result(all_result_dict, output, identifier, simple_output)
-
+        # Save the transposed dataframe
+        results_dataframe.to_csv(output_path)
     generate_metadata(output, identifier, rupture, run_type, version)
 
 
