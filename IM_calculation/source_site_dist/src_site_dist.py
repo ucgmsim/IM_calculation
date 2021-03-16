@@ -1,11 +1,15 @@
 from typing import List, Dict
 
+import matplotlib.path as mpltPath
 import numba
 import numpy as np
 
 from qcore.geo import get_distances, ll_cross_track_dist, ll_bearing
 
 h_dist_f = numba.njit(get_distances)
+
+VOLCANIC_FRONT_COORDS = [(175.508, -39.364), (177.199, -37.73)]
+VOLCANIC_FRONT_LINE = mpltPath.Path(VOLCANIC_FRONT_COORDS)
 
 
 @numba.jit(parallel=True)
@@ -51,7 +55,7 @@ def calc_rx_ry(srf_points: np.ndarray, plane_infos: List[Dict], locations: np.nd
 
     extended_points = np.r_[srf_points, [[0, 0, 0]]]
 
-    # Seperate the srf points into the different planes
+    # Separate the srf points into the different planes
     pnt_counts = [plane["nstrike"] * plane["ndip"] for plane in plane_infos]
     pnt_counts.insert(0, 0)
     pnt_counts = np.cumsum(pnt_counts)
@@ -66,7 +70,7 @@ def calc_rx_ry(srf_points: np.ndarray, plane_infos: List[Dict], locations: np.nd
         for section, header in zip(pnt_sections, plane_infos)
     ]
     bottom_edges = [
-        section[-header["nstrike"] :]
+        section[-header["nstrike"]:]
         for section, header in zip(pnt_sections, plane_infos)
     ]
 
