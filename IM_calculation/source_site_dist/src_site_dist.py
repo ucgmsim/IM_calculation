@@ -70,7 +70,7 @@ def calc_rx_ry(srf_points: np.ndarray, plane_infos: List[Dict], locations: np.nd
         for section, header in zip(pnt_sections, plane_infos)
     ]
     bottom_edges = [
-        section[-header["nstrike"]:]
+        section[-header["nstrike"] :]
         for section, header in zip(pnt_sections, plane_infos)
     ]
 
@@ -145,7 +145,12 @@ def calc_backarc(srf_points: np.ndarray, locations: np.ndarray):
         # Selection is every 40 SRF points (4 km) - the backarc line is ~200km long.
         # In the case of point sources it will just take the first point
         for srf_point in srf_points[::40]:
-            srf_stat_line = mpltPath.Path([(srf_point[0], srf_point[1]), (locations[loc_index][0], locations[loc_index][1])])
+            srf_stat_line = mpltPath.Path(
+                [
+                    (srf_point[0], srf_point[1]),
+                    (locations[loc_index][0], locations[loc_index][1]),
+                ]
+            )
             if VOLCANIC_FRONT_LINE.intersects_path(srf_stat_line):
                 backarc[loc_index] = 1
                 break

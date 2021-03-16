@@ -98,7 +98,12 @@ if __name__ == "__main__":
 
     # Add depth for the stations (hardcoded to 0)
     filtered_station_np = np.concatenate(
-        (filtered_station_np, np.zeros((filtered_station_np.shape[0], 1), dtype=filtered_station_np.dtype)),
+        (
+            filtered_station_np,
+            np.zeros(
+                (filtered_station_np.shape[0], 1), dtype=filtered_station_np.dtype
+            ),
+        ),
         axis=1,
     )
 
@@ -110,9 +115,7 @@ if __name__ == "__main__":
 
     plane_info = read_header(args.srf_file, idx=True)
 
-    r = ssd.calc_rx_ry(srf_points, plane_info, filtered_station_np)
-    r_x = r[:, 0]
-    r_y = r[:, 1]
+    r_x, r_y = ssd.calc_rx_ry(srf_points, plane_info, filtered_station_np)
 
     backarc = None
     if args.backarc:
@@ -120,5 +123,12 @@ if __name__ == "__main__":
 
     # Save the result as a csv
     write_source_2_site_dists(
-        args.output, stats_2_calc, filtered_station_np, r_rup, r_jb, r_x=r_x, r_y=r_y, backarc=backarc,
+        args.output,
+        stats_2_calc,
+        filtered_station_np,
+        r_rup,
+        r_jb,
+        r_x=r_x,
+        r_y=r_y,
+        backarc=backarc,
     )
