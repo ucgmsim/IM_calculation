@@ -23,9 +23,9 @@ from IM_calculation.IM.Burks_Baker_2013_elastic_inelastic import Bilinear_Newmar
 
 G = 981.0
 DEFAULT_IMS = ("PGA", "PGV", "CAV", "AI", "Ds575", "Ds595", "MMI", "pSA")
-ALL_IMS = ("PGA", "PGV", "CAV", "AI", "Ds575", "Ds595", "MMI", "pSA", "FAS", "IESDR")
+ALL_IMS = ("PGA", "PGV", "CAV", "AI", "Ds575", "Ds595", "MMI", "pSA", "FAS", "IESD")
 
-MULTI_VALUE_IMS = ("pSA", "FAS", "IESDR")
+MULTI_VALUE_IMS = ("pSA", "FAS", "IESD")
 
 FAS_FREQUENCY = np.logspace(-1, 2, num=100, base=10.0)
 
@@ -158,8 +158,8 @@ def compute_measure_single(
             calculate_pSAs,
             (DT, accelerations, im_options, result, station_name, waveform_acc),
         ),
-        "IESDR": (
-            calculate_IESDR,
+        "IESD": (
+            calculate_IESD,
             (DT, accelerations, im_options, result, station_name, waveform_acc),
         ),
         "FAS": (calc_FAS, (DT, accelerations, im_options, result, station_name)),
@@ -321,7 +321,7 @@ def calculate_pSAs(
                 ][i]
 
 
-def calculate_IESDR(
+def calculate_IESD(
     DT,
     accelerations,
     im_options,
@@ -334,6 +334,7 @@ def calculate_IESDR(
     z=0.05,  # damping ratio
     alpha=0.05,  # strain hardening ratios
     dy=0.025,  # strain hardening ratios
+    dt=0.005,  # analysis time step
 ):
 
     acc_values = array_to_dict(accelerations, comps_to_calculate, im, comps_to_store)
@@ -346,6 +347,7 @@ def calculate_IESDR(
                 alpha,
                 acc_values[comp.str_value],
                 waveform_acc.DT,
+                dt,
             )
             for i, val in enumerate(im_options[im]):
                 result[(station_name, comp.str_value)][f"{im}_{str(val)}"] = Sd[i]
