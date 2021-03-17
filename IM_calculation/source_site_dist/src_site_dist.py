@@ -1,11 +1,16 @@
 from typing import List, Dict
 
+import matplotlib.path as mpltPath
 import numba
 import numpy as np
 
 from qcore.geo import get_distances, ll_cross_track_dist, ll_bearing
 
+numba.config.THREADING_LAYER = "omp"
 h_dist_f = numba.njit(get_distances)
+
+VOLCANIC_FRONT_COORDS = [(175.508, -39.364), (177.199, -37.73)]
+VOLCANIC_FRONT_LINE = mpltPath.Path(VOLCANIC_FRONT_COORDS)
 
 
 @numba.jit(parallel=True)
@@ -51,7 +56,7 @@ def calc_rx_ry(srf_points: np.ndarray, plane_infos: List[Dict], locations: np.nd
 
     extended_points = np.r_[srf_points, [[0, 0, 0]]]
 
-    # Seperate the srf points into the different planes
+    # Separate the srf points into the different planes
     pnt_counts = [plane["nstrike"] * plane["ndip"] for plane in plane_infos]
     pnt_counts.insert(0, 0)
     pnt_counts = np.cumsum(pnt_counts)
@@ -132,3 +137,36 @@ def calc_rx_ry(srf_points: np.ndarray, plane_infos: List[Dict], locations: np.nd
             r_y[iloc] = np.min(np.abs([up_strike_dist, down_strike_dist]))
 
     return r_x, r_y
+
+
+def calc_backarc(srf_points: np.ndarray, locations: np.ndarray):
+    """
+    This is a crude approximation of stations that are on the backarc. Defined by source-site lines that cross the
+    Volcanic front line.
+    https://user-images.githubusercontent.com/25143301/111406807-ce5bb600-8737-11eb-9c78-b909efe7d9db.png
+    https://user-images.githubusercontent.com/25143301/111408728-93a74d00-873a-11eb-9afa-5e8371ee2504.png
+
+    srf_points: np.ndarray
+        The fault points from the srf file (qcore, srf.py, read_srf_points),
+        format (lon, lat, depth)
+    locations: np.ndarray
+        The locations for which to calculate the distances,
+        format (lon, lat, depth)
+    :return: a numpy array returning 0 if the station is on the forearc and 1 if the station is on the backarc
+    """
+    n_locations = locations.shape[0]
+    backarc = np.zeros(n_locations, dtype=np.int)
+    for loc_index in range(n_locations):
+        # Selection is every 40 SRF points (4 km) - the backarc line is ~200km long.
+        # In the case of point sources it will just take the first point
+        for srf_point in srf_points[::40]:
+            srf_stat_line = mpltPath.Path(
+                [
+                    (srf_point[0], srf_point[1]),
+                    (locations[loc_index][0], locations[loc_index][1]),
+                ]
+            )
+            if VOLCANIC_FRONT_LINE.intersects_path(srf_stat_line):
+                backarc[loc_index] = 1
+                break
+    return backarc
