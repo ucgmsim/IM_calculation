@@ -6,6 +6,7 @@ import numpy as np
 
 from qcore.geo import get_distances, ll_cross_track_dist, ll_bearing
 
+numba.config.THREADING_LAYER = "omp"
 h_dist_f = numba.njit(get_distances)
 
 VOLCANIC_FRONT_COORDS = [(175.508, -39.364), (177.199, -37.73)]
@@ -139,6 +140,20 @@ def calc_rx_ry(srf_points: np.ndarray, plane_infos: List[Dict], locations: np.nd
 
 
 def calc_backarc(srf_points: np.ndarray, locations: np.ndarray):
+    """
+    This is a crude approximation of stations that are on the backarc. Defined by source-site lines that cross the
+    Volcanic front line.
+    https://user-images.githubusercontent.com/25143301/111406807-ce5bb600-8737-11eb-9c78-b909efe7d9db.png
+    https://user-images.githubusercontent.com/25143301/111408728-93a74d00-873a-11eb-9afa-5e8371ee2504.png
+
+    srf_points: np.ndarray
+        The fault points from the srf file (qcore, srf.py, read_srf_points),
+        format (lon, lat, depth)
+    locations: np.ndarray
+        The locations for which to calculate the distances,
+        format (lon, lat, depth)
+    :return: a numpy array returning 0 if the station is on the forearc and 1 if the station is on the backarc
+    """
     n_locations = locations.shape[0]
     backarc = np.zeros(n_locations, dtype=np.int)
     for loc_index in range(n_locations):

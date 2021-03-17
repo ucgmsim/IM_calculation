@@ -43,7 +43,7 @@ def write_source_2_site_dists(
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        "Script for calculating rrup and rjb for the " "specified fault and stations"
+        "Script for calculating rrup and rjb for the specified fault and stations"
     )
     parser.add_argument(
         "station_file", type=str, help=".ll file with the stations actual locations"
@@ -84,17 +84,15 @@ if __name__ == "__main__":
     station_df = load_station_file(args.station_file)
 
     # Matches the station file with the specified stations or the fd_stat_list. If neither is specified, use the whole list
+    station_mask = np.ones(station_df.shape[0], dtype=bool)
     if args.fd_station_file:
         fd_stations_df = load_station_file(args.fd_station_file)
-        matched_df = fd_stations_df.join(station_df, how="inner", lsuffix="_fd")
-        filtered_station_np = matched_df.loc[:, ("lon", "lat")].values
-        stats_2_calc = matched_df.index.values
+        station_mask = np.isin(station_df.index.values, fd_stations_df)
     elif args.stations:
-        filtered_station_np = station_df.loc[[args.stations], "lon", "lat"].values
-        stats_2_calc = np.asarray(args.stations)
-    else:
-        filtered_station_np = station_df.values
-        stats_2_calc = np.asarray(station_df.index)
+        station_mask = np.isin(station_df.index.values, args.stations)
+
+    filtered_station_np = station_df.loc[station_mask].values
+    stats_2_calc = station_df.loc[station_mask].index.values
 
     # Add depth for the stations (hardcoded to 0)
     filtered_station_np = np.concatenate(
