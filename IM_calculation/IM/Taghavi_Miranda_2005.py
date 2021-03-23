@@ -451,17 +451,19 @@ def Taghavi_Miranda_2005(
     )
     # 3d extract peak structural response values from each earthquake ground motion record
     df = pd.DataFrame(
-        extract_peak_structural_response(
-            disp,
-            slope,
-            moment,
-            storey_moment,
-            shear,
-            storey_shear,
-            load,
-            ground_accel,
-            rel_accel,
-            total_accel,
+        list(
+            extract_peak_structural_response(
+                disp,
+                slope,
+                moment,
+                storey_moment,
+                shear,
+                storey_shear,
+                load,
+                ground_accel,
+                rel_accel,
+                total_accel,
+            )
         )
     ).T
     df.columns = [
