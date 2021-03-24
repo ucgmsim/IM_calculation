@@ -168,8 +168,9 @@ def read_ascii_folder(path, station_names, comp, units="g"):
                 c: open(os.path.join(path, f"{station}.{c.str_value}")) for c in comp
             }
         except IOError:
+            files_names = f"{station}.{{{[c.str_value for c in comp]}}}"
             print(
-                f"Could not open one of the files for {os.path.join(path, station)}. Ignoring this station"
+                f"Could not open one of the files for {os.path.join(path, files_names)}. Ignoring this station."
             )
             continue
 
