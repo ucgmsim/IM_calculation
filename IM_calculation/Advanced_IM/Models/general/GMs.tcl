@@ -10,3 +10,4 @@ lappend list $st1 $comp $dt1 $Tmax1
 puts $station $list
 close $station
 
+
