@@ -14,8 +14,8 @@ import numpy as np
 # % dy    = yield displacements               ( " )
 # % alpha = strain hardening ratios           ( " )
 # % ag    = ground acceleration time history  ( length(ag) x 1 )
-# % Dtg   = time step of ag                   ( scalar )
-# % Dt    = analyis time step                 ( scalar )
+# % dtg   = time step of ag                   ( scalar )
+# % dt    = analyis time step                 ( scalar )
 # %
 # % OUTPUT
 # % S.d   = relative displacement spectrum               ( 1 x num_oscillators )
@@ -37,12 +37,23 @@ import numpy as np
 #
 
 GAMMA = 1 / 2
-BETA = 1 / 6  # linear acceleration (stable if Dt/T<=0.551)
+BETA = 1 / 6  # linear acceleration (stable if dt/T<=0.551)
 
 
 def Bilinear_Newmark_withTH(
-    period: np.ndarray, z: float, dy: float, alpha: float, ag: np.ndarray, dt: float
+    period: np.ndarray,
+    z: float,
+    dy: float,
+    alpha: float,
+    ag: np.ndarray,
+    dtg: float,
+    dt: float,
 ):
+    # Analysis time step
+    # If dt is too high in relation to the period, adjust it to ensure numerical stability
+    if dt / np.min(period) > 0.551:
+        denominator = 2 * np.ceil(dtg / np.min([dtg / 5, np.min(period) / 30]) / 2)
+        dt = dtg / denominator
 
     num_oscillators = period.size
 
@@ -54,7 +65,11 @@ def Bilinear_Newmark_withTH(
     fy = k * dy
     kalpha = k * alpha
 
+    # % Interpolate p=-ag*m (linearly)
     p = -ag * m
+    tg = np.linspace(0, ag.size - 1, ag.size) * dtg
+    t = np.linspace(0, tg[-1], int(tg[-1] / dt) + 1)  # num of steps increased from tg
+    p = np.interp(t, tg, p)  # interpolate for t
 
     lp = p.size
     d = np.zeros((lp, num_oscillators))

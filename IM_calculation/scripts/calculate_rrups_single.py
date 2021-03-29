@@ -18,6 +18,7 @@ def write_source_2_site_dists(
     r_jb: np.ndarray,
     r_x: np.ndarray,
     r_y: np.ndarray,
+    backarc: np.ndarray = None,
 ):
     """Writes the source to site distances to a csv file"""
     data = [locations[:, 0], locations[:, 1], r_rup, r_jb, r_x, r_y]
@@ -30,6 +31,10 @@ def write_source_2_site_dists(
         SourceToSiteDist.R_y.str_value,
     ]
 
+    if backarc is not None:
+        cols_names.append(SourceToSiteDist.Backarc.str_value)
+        data.append(backarc)
+
     data = np.asarray(data).T
 
     df = pd.DataFrame(data=data, columns=cols_names, index=stations)
@@ -38,7 +43,7 @@ def write_source_2_site_dists(
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        "Script for calculating rrup and rjb for the " "specified fault and stations"
+        "Script for calculating rrup and rjb for the specified fault and stations"
     )
     parser.add_argument(
         "station_file", type=str, help=".ll file with the stations actual locations"
@@ -66,29 +71,37 @@ if __name__ == "__main__":
         "will be calculated for all stations in the fd_station_file "
         "and the station_file",
     )
+    parser.add_argument(
+        "-b",
+        "--backarc",
+        action="store_true",
+        help="Add a crude definition of back-arc to the output file. 1 if on back-arc, 0 if on forearc",
+    )
 
     args = parser.parse_args()
 
     # Load the stations
     station_df = load_station_file(args.station_file)
 
-    # Get the location for all station in the fd station file
+    # Matches the station file with the specified stations or the fd_stat_list. If neither is specified, use the whole list
+    station_mask = np.ones(station_df.shape[0], dtype=bool)
     if args.fd_station_file:
         fd_stations_df = load_station_file(args.fd_station_file)
-        matched_df = fd_stations_df.join(station_df, how="inner", lsuffix="_fd")
-        locs_2_calc = matched_df.loc[:, ("lon", "lat")].values
-        stats_2_calc = matched_df.index.values
+        station_mask = np.isin(station_df.index.values, fd_stations_df)
     elif args.stations:
-        locs_2_calc = station_df.loc[[args.stations], "lon", "lat"].values
-        stats_2_calc = np.asarray(args.stations)
-    else:
-        raise argparse.ArgumentError(
-            "Either --fd_station_file or --stations has to be set"
-        )
+        station_mask = np.isin(station_df.index.values, args.stations)
+
+    filtered_station_np = station_df.loc[station_mask].values
+    stats_2_calc = station_df.loc[station_mask].index.values
 
     # Add depth for the stations (hardcoded to 0)
-    locs_2_calc = np.concatenate(
-        (locs_2_calc, np.zeros((locs_2_calc.shape[0], 1), dtype=locs_2_calc.dtype)),
+    filtered_station_np = np.concatenate(
+        (
+            filtered_station_np,
+            np.zeros(
+                (filtered_station_np.shape[0], 1), dtype=filtered_station_np.dtype
+            ),
+        ),
         axis=1,
     )
 
@@ -96,13 +109,24 @@ if __name__ == "__main__":
     srf_points = read_srf_points(args.srf_file)
 
     # Calculate source to site distances
-    r_rup, r_jb = ssd.calc_rrup_rjb(srf_points, locs_2_calc)
+    r_rup, r_jb = ssd.calc_rrup_rjb(srf_points, filtered_station_np)
 
     plane_info = read_header(args.srf_file, idx=True)
 
-    r_x, r_y = ssd.calc_rx_ry(srf_points, plane_info, locs_2_calc)
+    r_x, r_y = ssd.calc_rx_ry(srf_points, plane_info, filtered_station_np)
+
+    backarc = None
+    if args.backarc:
+        backarc = ssd.calc_backarc(srf_points, filtered_station_np)
 
     # Save the result as a csv
     write_source_2_site_dists(
-        args.output, stats_2_calc, locs_2_calc, r_rup, r_jb, r_x=r_x, r_y=r_y
+        args.output,
+        stats_2_calc,
+        filtered_station_np,
+        r_rup,
+        r_jb,
+        r_x=r_x,
+        r_y=r_y,
+        backarc=backarc,
     )
