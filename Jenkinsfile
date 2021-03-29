@@ -20,7 +20,6 @@ pipeline {
 		mkdir -p ${env.WORKSPACE}/${env.JOB_NAME}/IM/rspectra_calculations/
 		mkdir -p ${env.WORKSPACE}/${env.JOB_NAME}/IM/iesdr_calculation/
 		ln -s $HOME/data/testing/${env.JOB_NAME}/rspectra.cpython-37m-x86_64-linux-gnu.so ${env.WORKSPACE}/${env.JOB_NAME}/IM/rspectra_calculations/
-		ln -s $HOME/data/testing/${env.JOB_NAME}/Burks_Baker_2013_elastic_inelastic.cpython-37m-x86_64-linux-gnu.so ${env.WORKSPACE}/${env.JOB_NAME}/IM/iesdr_calculation/
                 ln -s $HOME/data/testing/${env.JOB_NAME}/sample0 ${env.WORKSPACE}/${env.JOB_NAME}/test
 		cd ${env.WORKSPACE}
 		python travis_setup.py
