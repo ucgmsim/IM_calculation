@@ -31,7 +31,9 @@ class Waveform:
 
 
 def read_ascii_file(
-    f_090, f_000, f_ver, comp=(Components.c090, Components.c000), wave_type=None
+    comp_files,
+    comp=(Components.c090, Components.c000),
+    wave_type=None,
 ):
     waveform = Waveform()
     waveform.wave_type = wave_type
@@ -42,23 +44,17 @@ def read_ascii_file(
         waveform.NT,
         waveform.DT,
         waveform.time_offset,
-    ) = read_ascii_header(f_000)
-    skip_header(f_090)
-    skip_header(f_ver)
+    ) = read_ascii_header(comp_files[comp[0]])
+    for c in comp[1:]:
+        skip_header(comp_files[c])
 
     waveform.times = calculate_timesteps(waveform.NT, waveform.DT)
 
     i = 0
-    f_comp_dict = {
-        Components.c090: f_090,
-        Components.c000: f_000,
-        Components.cver: f_ver,
-    }
-    comp_to_get = [f_comp_dict[x] for x in f_comp_dict.keys() if x in comp]
-    files = zip(*comp_to_get)
-    values = np.zeros((waveform.NT, len(comp_to_get)))
-    for line in list(files):
-        a = [line[x].split() for x in range(len(comp_to_get))]
+    values = np.zeros((waveform.NT, len(comp)))
+    comp_files_list = list(zip(*[comp_files[cf] for cf in comp]))
+    for line in comp_files_list:
+        a = [x.split() for x in line]
         line_values = np.array(a, np.float).transpose()
         n_vals = len(line_values)
         values[i : i + n_vals] = line_values
@@ -165,29 +161,27 @@ def get_station_name_from_filepath(path):
 
 def read_ascii_folder(path, station_names, comp, units="g"):
     waveforms = list()
-
+    comp = [c for c in comp if c in Components.get_basic_components()]
     for station in station_names:
-        filename_000 = os.path.join(path, station + ".000")
-        filename_090 = os.path.join(path, station + ".090")
-        filename_ver = os.path.join(path, station + ".ver")
         try:
-            f_000 = open(filename_000)
-            f_090 = open(filename_090)
-            f_ver = open(filename_ver)
+            component_files = {
+                c: open(os.path.join(path, f"{station}.{c.str_value}")) for c in comp
+            }
         except IOError:
+            files_paths = os.path.join(
+                path, f"{station}.{{{[c.str_value for c in comp]}}}"
+            )
             print(
-                "Could not open file %s Ignoring this station"
-                % os.path.join(path, station)
+                f"Could not open one of the files for {files_paths}. Ignoring this station."
             )
             continue
 
-        waveform = read_ascii_file(f_090, f_000, f_ver, comp, "acceleration")
+        waveform = read_ascii_file(component_files, comp, "acceleration")
         if units == "cm/s^2":
             waveform.values = waveform.values / G
         waveforms.append((waveform, None))
-        f_000.close()
-        f_090.close()
-        f_ver.close()
+        for c in comp:
+            component_files[c].close()
     return waveforms
 
 
