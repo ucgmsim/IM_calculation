@@ -41,6 +41,16 @@ def main(args, im_name, run_script):
     output_dir = args.output_dir
     os.makedirs(output_dir, exist_ok=True)
 
+    station_completed = True
+    for component in ["000", "090"]:
+        component_outdir = os.path.join(output_dir, component)
+        check_status(component_outdir)
+        station_completed = station_completed and check_status(component_outdir)
+    # skip the whole calculation if the station has been ran before
+    if station_completed:
+        print(f"{args} completed")
+        return
+
     model_converged = True
     for component in ["000", "090"]:
         component_outdir = os.path.join(output_dir, component)
@@ -62,14 +72,21 @@ def main(args, im_name, run_script):
 
     # skip creating csv if any component has zero success count
     if model_converged:
-
         for component in ["000", "090"]:
+            # special treatment for first component
+            # wipe out previous csv to prevent corrupted data
+            if component == "000":
+                append_csv = False
+            else:
+                append_csv = True
             component_outdir = os.path.join(output_dir, component)
             # aggregate
-            create_im_csv(output_dir, im_name, component, component_outdir)
+            create_im_csv(
+                output_dir, im_name, component, component_outdir, append_csv=append_csv
+            )
 
-            im_csv_fname = os.path.join(output_dir, f"{im_name}.csv")
-            calculate_geom(im_csv_fname)
+        im_csv_fname = os.path.join(output_dir, f"{im_name}.csv")
+        calculate_geom(im_csv_fname)
     else:
         station_name = os.path.basename(args.comp_000).split(".")[0]
         im_csv_failed_name = os.path.join(output_dir, f"{im_name}_failed.csv")
@@ -121,7 +138,7 @@ def calculate_geom(im_csv_fname):
     ims.to_csv(im_csv_fname, columns=cols)
 
 
-def create_im_csv(output_dir, im_name, component, component_outdir, print_header=True):
+def create_im_csv(output_dir, im_name, component, component_outdir, append_csv=True):
     """
     After the OpenSees code has run, read the recorder files and output it to a CSV file
     :param output_dir: Path to OpenSees recorders output and CSV path
@@ -171,10 +188,13 @@ def create_im_csv(output_dir, im_name, component, component_outdir, print_header
 
     cols = list(result_df.columns)
     cols.sort()
-    # test if file exist, if exist, no header
-    if os.path.isfile(im_csv_fname):
+    if append_csv:
         print_header = False
-    result_df.to_csv(im_csv_fname, mode="a", header=print_header, columns=cols)
+        write_mode = "a"
+    else:
+        print_header = True
+        write_mode = "w"
+    result_df.to_csv(im_csv_fname, mode=write_mode, header=print_header, columns=cols)
 
 
 def read_out_file(file):

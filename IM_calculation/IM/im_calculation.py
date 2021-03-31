@@ -486,18 +486,7 @@ def compute_measures_multiprocess(
         advanced_IM_factory.agg_csv(advanced_im_config, station_names, output)
     else:
         all_result_dict = ChainMap(*all_results)
-        # write_result(all_result_dict, output, identifier, simple_output)
-        output_path = get_result_filepath(output, identifier, ".csv")
-
-        results_dataframe = pd.DataFrame.from_dict(all_result_dict, orient="index")
-        results_dataframe.index = pd.MultiIndex.from_tuples(
-            results_dataframe.index, names=["station", "component"]
-        )
-        results_dataframe.sort_values(["station", "component"], inplace=True)
-        results_dataframe = order_im_cols_df(results_dataframe)
-
-        # Save the transposed dataframe
-        results_dataframe.to_csv(output_path)
+        write_result(all_result_dict, output, identifier, simple_output)
     generate_metadata(output, identifier, rupture, run_type, version)
 
 
