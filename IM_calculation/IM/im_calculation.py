@@ -333,24 +333,26 @@ def calculate_IESD(
     comps_to_calculate,
     z=0.05,  # damping ratio
     alpha=0.05,  # strain hardening ratios
-    dy=0.025,  # strain hardening ratios
+    models={"SAC_3Story":0.1765, "SAC_9Story":0.3}, # model and its strain hardening ratio dy
     dt=0.005,  # analysis time step
 ):
 
+
     acc_values = array_to_dict(accelerations, comps_to_calculate, im, comps_to_store)
-    for comp in comps_to_store:
-        if comp.str_value in acc_values:
-            Sd = Bilinear_Newmark_withTH(
-                np.array(im_options[im]),
-                z,
-                dy,
-                alpha,
-                acc_values[comp.str_value],
-                waveform_acc.DT,
-                dt,
-            )
-            for i, val in enumerate(im_options[im]):
-                result[(station_name, comp.str_value)][f"{im}_{str(val)}"] = Sd[i]
+    for model,dy in models.items():
+        for comp in comps_to_store:
+            if comp.str_value in acc_values:
+                Sd = Bilinear_Newmark_withTH(
+                    np.array(im_options[im]),
+                    z,
+                    dy,
+                    alpha,
+                    acc_values[comp.str_value],
+                    waveform_acc.DT,
+                    dt,
+                )
+                for i, val in enumerate(im_options[im]):
+                    result[(station_name, comp.str_value)][f"{im}_{model}_{str(val)}"] = Sd[i]
 
 
 def get_bbseis(input_path, file_type, selected_stations):
