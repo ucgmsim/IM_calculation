@@ -95,7 +95,8 @@ def calculate_rotd(
     :param func: The function to apply to the rotated waveforms. Defaults to taking the maximum absolute value across all rotations (used by PGA, PGV, pSA)
     :return: A dictionary with the comps_to_store as keys, and 1d arrays of shape [periods.size] containing the rotd values
     """
-    rotd = func(intensity_measures.get_rotations(spectral_displacements))
+    # Selects the first two basic components. get_comps_to_calc_and_store makes sure that the first two are 000 and 090
+    rotd = func(intensity_measures.get_rotations(spectral_displacements[:, :, [0, 1]]))
     value_dict = {}
 
     rotd50 = np.median(rotd, axis=-1)
@@ -436,7 +437,7 @@ def compute_measures_multiprocess(
 
     bbseries, station_names = get_bbseis(input_path, file_type, station_names)
     total_stations = len(station_names)
-    # determine the size of each iteration base on num of processers and mem
+    # determine the size of each iteration base on num of processes and mem
     steps = get_steps(
         input_path, process, total_stations, "FAS" in ims and bbseries.nt > 32768
     )
