@@ -437,7 +437,7 @@ def compute_measures_multiprocess(
 
     bbseries, station_names = get_bbseis(input_path, file_type, station_names)
     total_stations = len(station_names)
-    # determine the size of each iteration base on num of processors and mem
+    # determine the size of each iteration base on num of processes and mem
     steps = get_steps(
         input_path, process, total_stations, "FAS" in ims and bbseries.nt > 32768
     )
