@@ -6,20 +6,27 @@ import subprocess
 import numpy as np
 import pandas as pd
 
+from qcore.constants import Components
+from IM_calculation.IM.intensity_measures import get_geom
+
 DEFAULT_OPEN_SEES_PATH = "OpenSees"
+DF_INDEX_NAME = "component"
 
 
 def parse_args():
     parser = argparse.ArgumentParser()
 
     parser.add_argument(
-        "comp_000", help="filepath to a station's 000 waveform ascii file"
+        Components.c000.str_value,
+        help="filepath to a station's 000 waveform ascii file",
     )
     parser.add_argument(
-        "comp_090", help="filepath to a station's 090 waveform ascii file"
+        Components.c090.str_value,
+        help="filepath to a station's 090 waveform ascii file",
     )
     parser.add_argument(
-        "comp_ver", help="filepath to a station's ver waveform ascii file"
+        Components.cver.str_value,
+        help="filepath to a station's ver waveform ascii file",
     )
     parser.add_argument(
         "output_dir",
@@ -40,55 +47,74 @@ def parse_args():
 def main(args, im_name, run_script):
     output_dir = args.output_dir
     os.makedirs(output_dir, exist_ok=True)
-
-    station_completed = True
-    for component in ["000", "090"]:
-        component_outdir = os.path.join(output_dir, component)
-        check_status(component_outdir)
-        station_completed = station_completed and check_status(component_outdir)
-    # skip the whole calculation if the station has been ran before
-    if station_completed:
-        print(f"{args} completed")
-        return
+    # list of component to run
+    # TODO: make this an arg if future model needs vairable list of components
+    component_list = [Components.c000, Components.c090]
 
     model_converged = True
-    for component in ["000", "090"]:
-        component_outdir = os.path.join(output_dir, component)
+    for component in component_list:
+        component_outdir = os.path.join(output_dir, component.str_value)
         # check if folder exist, if not create it (opensees does not create the folder and will crash)
         os.makedirs(component_outdir, exist_ok=True)
+        # check if the staion has been finished before.
+        # check for all failed from log
+        if check_status(component_outdir, check_fail=True):
+            print(
+                f"{getattr(args,component.str_value)} failed to converged in previous run."
+            )
+            model_converged = False
+            break
+        # chech if successfully ran previously
+        # skip this component if success
+        if check_status(component_outdir):
+            print(f"{getattr(args, component.str_value)} completed in preivous run")
+            continue
+
         script = [
             args.OpenSees_path,
             run_script,
-            getattr(args, "comp_" + component),
+            getattr(args, component.str_value),
             component_outdir,
         ]
 
         print(" ".join(script))
         subprocess.run(script)
 
-        # check for success message
+        # check for success message after a run
         # marked as failed if any component fail
-        model_converged = model_converged and check_status(component_outdir)
+        if not check_status(component_outdir):
+            print(
+                f"{component_outdir} failed to converge, skipping rest of the components"
+            )
+            model_converged = False
+            break
 
+    station_name = os.path.basename(getattr(args, component_list[0].str_value)).split(
+        "."
+    )[0]
     # skip creating csv if any component has zero success count
     if model_converged:
-        for component in ["000", "090"]:
+        for component in component_list:
             # special treatment for first component
             # wipe out previous csv to prevent corrupted data
-            if component == "000":
+            if component == component_list[0]:
                 append_csv = False
             else:
                 append_csv = True
-            component_outdir = os.path.join(output_dir, component)
+            component_outdir = os.path.join(output_dir, component.str_value)
             # aggregate
             create_im_csv(
-                output_dir, im_name, component, component_outdir, append_csv=append_csv
+                output_dir,
+                im_name,
+                component.str_value,
+                component_outdir,
+                append_csv=append_csv,
             )
 
         im_csv_fname = os.path.join(output_dir, f"{im_name}.csv")
         calculate_geom(im_csv_fname)
+        print(f"analysis completed for {station_name}")
     else:
-        station_name = os.path.basename(args.comp_000).split(".")[0]
         im_csv_failed_name = os.path.join(output_dir, f"{im_name}_failed.csv")
         with open(im_csv_failed_name, "w") as f:
             f.write("status\n")
@@ -126,12 +152,17 @@ def check_status(component_outdir, check_fail=False):
 
 
 def calculate_geom(im_csv_fname):
-    ims = pd.read_csv(im_csv_fname, dtype={"component": str})
-    ims.set_index("component", inplace=True)
+    ims = pd.read_csv(im_csv_fname, dtype={DF_INDEX_NAME: str})
+    ims.set_index(DF_INDEX_NAME, inplace=True)
 
-    if "000" in ims.index and "090" in ims.index:
-        line = np.sqrt(ims.loc["090"] * ims.loc["000"])
-        line.rename("geom", inplace=True)
+    if (
+        Components.c000.str_value in ims.index
+        and Components.c090.str_value in ims.index
+    ):
+        line = get_geom(
+            ims.loc[Components.c000.str_value], ims.loc[Components.c090.str_value]
+        )
+        line.rename(Components.cgeom.str_value, inplace=True)
         ims = ims.append(line)
     cols = list(ims.columns)
     cols.sort()
@@ -184,7 +215,7 @@ def create_im_csv(output_dir, im_name, component, component_outdir, append_csv=T
 
     value_dict = {component: value_dict}
     result_df = pd.DataFrame.from_dict(value_dict, orient="index")
-    result_df.index.name = "component"
+    result_df.index.name = DF_INDEX_NAME
 
     cols = list(result_df.columns)
     cols.sort()
