@@ -12,7 +12,7 @@ set Tmax $Tmax1
 
 # Define the time step used to run the analysis using the central difference scheme
 set dt_factor 0.8
-set periods_file [open [file join [file dirname [info script]] ../$FEMs/Original/Models/$FEMs/Model_Info/periods.out]]
+set periods_file [open [file join [file dirname [info script]] ../$FEMs/Original/Model_Info/periods.out]]
 while {[gets $periods_file line] >= 0} {set period $line}
 close $periods_file
 set dt_cd [expr {$dt_factor*$period/$pi}]

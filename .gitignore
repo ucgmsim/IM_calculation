@@ -19,3 +19,6 @@ rrups.csv
 runs/
 **.so
 **sample0
+
+# special cases to unignore
+!periods.out
