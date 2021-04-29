@@ -612,7 +612,7 @@ def get_steps(input_path, nps, total_stations, high_mem_usage=False):
     else:
         names = os.listdir(input_path)
         paths = [os.path.join(input_path, name) for name in names]
-        sizes = np.sum([os.path.getsize(path) for path in paths])
+        sizes = sum([os.path.getsize(path) for path in paths])
         estimated_mem = sizes * MEM_FACTOR
     if high_mem_usage:
         estimated_mem *= MEM_FACTOR
