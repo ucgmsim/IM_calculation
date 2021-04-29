@@ -607,7 +607,13 @@ def get_steps(input_path, nps, total_stations, high_mem_usage=False):
     :param high_mem_usage: If a calculation requiring even larger amounts of RAM is required (ie FAS), this increases the estimated RAM even further
     :return: number of stations per iteration/batch
     """
-    estimated_mem = os.stat(input_path).st_size * MEM_FACTOR
+    if os.path.isfile(input_path):
+        estimated_mem = os.path.getsize(input_path) * MEM_FACTOR
+    else:
+        names = os.listdir(input_path)
+        paths = [os.path.join(input_path, name) for name in names]
+        sizes = np.sum([os.path.getsize(path) for path in paths])
+        estimated_mem = sizes * MEM_FACTOR
     if high_mem_usage:
         estimated_mem *= MEM_FACTOR
     available_mem = nps * MEM_PER_CORE
