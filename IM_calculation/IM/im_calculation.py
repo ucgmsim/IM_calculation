@@ -610,10 +610,13 @@ def get_steps(input_path, nps, total_stations, high_mem_usage=False):
     if os.path.isfile(input_path):
         estimated_mem = os.path.getsize(input_path) * MEM_FACTOR
     else:
-        names = os.listdir(input_path)
-        paths = [os.path.join(input_path, name) for name in names]
-        sizes = sum([os.path.getsize(path) for path in paths])
-        estimated_mem = sizes * MEM_FACTOR
+        # Sum up the total size of the files contained in the folder and use it for estimating the memory use
+        estimated_mem = MEM_FACTOR * sum(
+            [
+                os.path.getsize(os.path.join(input_path, name))
+                for name in os.listdir(input_path)
+            ]
+        )
     if high_mem_usage:
         estimated_mem *= MEM_FACTOR
     available_mem = nps * MEM_PER_CORE
