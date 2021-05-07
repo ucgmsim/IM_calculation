@@ -53,7 +53,7 @@ def calculate_Nstep(DT, NT):
 
 def get_rotations(
     spectral_displacements,
-    func = lambda x: np.max(np.abs(x), axis=1),
+    func=lambda x: np.max(np.abs(x), axis=1),
     delta_theta: int = 1,
     min_angle: int = 0,
     max_angle: int = 180,
@@ -84,9 +84,9 @@ def get_rotations(
     step = np.min([np.max([step, 1]), periods])
 
     for period in range(0, periods, step):
-        rotds[period : period + step] = func(np.dot(
-            spectral_displacements[period : period + step], rotation_matrices
-        ))
+        rotds[period : period + step] = func(
+            np.dot(spectral_displacements[period : period + step], rotation_matrices)
+        )
 
     return rotds
 
