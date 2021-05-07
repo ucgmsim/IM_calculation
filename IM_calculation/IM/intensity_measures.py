@@ -53,6 +53,7 @@ def calculate_Nstep(DT, NT):
 
 def get_rotations(
     spectral_displacements,
+    func = lambda x: np.max(np.abs(x), axis=1),
     delta_theta: int = 1,
     min_angle: int = 0,
     max_angle: int = 180,
@@ -66,6 +67,7 @@ def get_rotations(
     or 180 degrees out of phase of it
     For each angle the maximum displacement is taken.
     :param spectral_displacements: An array with shape [periods.size, nt, 2] where nt is the number of timesteps in the original waveform
+    :param func: The function to be applied to each waveform after rotations have been applied. Default takes the maximum of each angle for each period
     :param delta_theta: The difference between each angle to take. Defaults to 2 degrees
     :param min_angle: The minimum angle in degrees to calculate from, 0 is due East
     :param max_angle: The maximum angle in degrees to calculate to, 180 is due West. This value is not included in the calculations
@@ -75,16 +77,16 @@ def get_rotations(
     thetas = np.deg2rad(np.arange(min_angle, max_angle, delta_theta))
     rotation_matrices = np.asarray([np.cos(thetas), np.sin(thetas)])
     periods, nt, xy = spectral_displacements.shape
-    rotds = np.zeros((periods, nt, thetas.size))
+    rotds = np.zeros((periods, thetas.size))
 
     # Magic number empirically determined from runs on Maui
     step = int(np.floor(86000000 / (thetas.size * nt)))
     step = np.min([np.max([step, 1]), periods])
 
     for period in range(0, periods, step):
-        rotds[period : period + step] = np.dot(
+        rotds[period : period + step] = func(np.dot(
             spectral_displacements[period : period + step], rotation_matrices
-        )
+        ))
 
     return rotds
 
