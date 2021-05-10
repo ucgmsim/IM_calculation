@@ -96,7 +96,7 @@ def calculate_rotd(
     :return: A dictionary with the comps_to_store as keys, and 1d arrays of shape [periods.size] containing the rotd values
     """
     # Selects the first two basic components. get_comps_to_calc_and_store makes sure that the first two are 000 and 090
-    rotd = func(intensity_measures.get_rotations(spectral_displacements[:, :, [0, 1]]))
+    rotd = intensity_measures.get_rotations(spectral_displacements[:, :, [0, 1]], func)
     value_dict = {}
 
     rotd50 = np.median(rotd, axis=-1)
