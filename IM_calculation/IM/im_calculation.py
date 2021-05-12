@@ -442,7 +442,7 @@ def compute_measures_multiprocess(
 
     bbseries, station_names = get_bbseis(input_path, file_type, station_names)
     total_stations = len(station_names)
-    # determine the size of each iteration base on num of processers and mem
+    # determine the size of each iteration base on num of processes and mem
     steps = get_steps(
         input_path, process, total_stations, "FAS" in ims and bbseries.nt > 32768
     )
@@ -486,10 +486,6 @@ def compute_measures_multiprocess(
                     for waveform in waveforms
                 ]
                 all_results.extend(p.starmap(compute_measure_single, array_params))
-                # replace the line above with the below for debugging
-                # for array_param in array_params:
-                #     result=compute_measure_single(*array_param)
-                #     all_results.append(result)
 
     if running_adv_im:
         # read, agg and store csv
