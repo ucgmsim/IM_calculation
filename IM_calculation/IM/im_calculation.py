@@ -281,6 +281,11 @@ def calc_FAS(
             f"Attempting to compute fourier spectrum raised exception: {e}\nThis was most likely caused by attempting to compute for a waveform with more than 16384 timesteps."
         )
     else:
+        # compute EAS, the euclidean distance of FAS 000 and 090
+        values_to_store[
+            Components.ceas.str_value
+        ] = intensity_measures.get_euclidean_dist(value[:, 0], value[:, 1])
+
         for comp in comps_to_store:
             if comp.str_value in values_to_store:
                 for i, val in enumerate(im_options[im]):
@@ -437,7 +442,7 @@ def compute_measures_multiprocess(
 
     bbseries, station_names = get_bbseis(input_path, file_type, station_names)
     total_stations = len(station_names)
-    # determine the size of each iteration base on num of processes and mem
+    # determine the size of each iteration base on num of processers and mem
     steps = get_steps(
         input_path, process, total_stations, "FAS" in ims and bbseries.nt > 32768
     )
@@ -481,6 +486,10 @@ def compute_measures_multiprocess(
                     for waveform in waveforms
                 ]
                 all_results.extend(p.starmap(compute_measure_single, array_params))
+                # replace the line above with the below for debugging
+                # for array_param in array_params:
+                #     result=compute_measure_single(*array_param)
+                #     all_results.append(result)
 
     if running_adv_im:
         # read, agg and store csv

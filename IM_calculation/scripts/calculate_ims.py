@@ -123,9 +123,9 @@ def load_args():
         "--components",
         nargs="+",
         choices=list(constants.Components.iterate_str_values()),
-        default=[constants.Components.cgeom.str_value],
+        default=[],  # to be assigned later
         help="Please provide the velocity/acc component(s) you want to calculate eg.geom."
-        " Available compoents are: {} components. Default is all components".format(
+        " Available components are: {} components. Default is geom component".format(
             ",".join(constants.Components.iterate_str_values())
         ),
     )
@@ -185,6 +185,11 @@ def main():
 
     if "FAS" in im:
         im_options["FAS"] = calc.validate_fas_frequency(args.fas_frequency)
+        if constants.Components.ceas.str_value not in args.components:
+            args.components.append(constants.Components.ceas.str_value)
+
+    if len(args.components) == 0:
+        args.components = [constants.Components.cgeom.str_value]
 
     # Create output dir
     utils.setup_dir(args.output_path)
