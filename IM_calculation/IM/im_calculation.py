@@ -59,7 +59,7 @@ def array_to_dict(value, comps_to_calc, im, comps_to_store):
             value_dict[comps_to_calc[i].str_value] = value[i]
     # In this case, if geom in str_comps,
     # it's guaranteed that 090 and 000 will be present in value_dict
-    if Components.cgeom in comps_to_store:
+    if Components.cgeom in comps_to_store and im != 'FAS': #no geom for FAS
         value_dict[Components.cgeom.str_value] = intensity_measures.get_geom(
             value_dict[Components.c090.str_value], value_dict[Components.c000.str_value]
         )
