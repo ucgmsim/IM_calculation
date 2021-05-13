@@ -176,7 +176,7 @@ def load_args():
                 args.im.remove("FAS")
                 wrong_ims = ",".join(args.im)
         if wrong_ims:
-            parser.error("EAS is not available with the specified IM types: {}".format(wrong_ims))
+            parser.error("The specified IMs need non-EAS components to proceed: {}".format(wrong_ims))
 
     calc.validate_input_path(parser, args.input_path, args.file_type)
     return args
