@@ -163,6 +163,21 @@ def load_args():
     )
 
     args = parser.parse_args()
+
+    if constants.Components.ceas.str_value in args.components:
+        wrong_ims = ""
+        if "FAS" not in args.im:
+            wrong_ims = ",".join(args.im)
+        else:
+            # there are IMs other than FAS but user only wants EAS
+            # without this check, the code still runs, but the non-FAS IMs
+            # won't be shown in the output csv without a notice/warning
+            if len(args.im) > 1 and len(args.components) == 1:
+                args.im.remove("FAS")
+                wrong_ims = ",".join(args.im)
+        if wrong_ims:
+            parser.error("EAS is not available with the specified IM types: {}".format(wrong_ims))
+
     calc.validate_input_path(parser, args.input_path, args.file_type)
     return args
 
@@ -185,13 +200,6 @@ def main():
 
     if "FAS" in im:
         im_options["FAS"] = calc.validate_fas_frequency(args.fas_frequency)
-        if constants.Components.ceas.str_value not in args.components:
-            args.components.append(constants.Components.ceas.str_value)
-        if len(im) == 1: #FAS is the only IM, we can omit geom
-            try:
-                args.components.remove(constants.Components.cgeom.str_value)
-            except ValueError:
-                pass
 
     # Create output dir
     utils.setup_dir(args.output_path)
@@ -208,8 +216,8 @@ def main():
     else:
         components = args.components
         advanced_im_config = None
-    # multiprocessor
 
+    # multiprocessor
     calc.compute_measures_multiprocess(
         args.input_path,
         file_type,
