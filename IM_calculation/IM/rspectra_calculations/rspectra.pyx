@@ -19,7 +19,7 @@ def Response_Spectra(np.ndarray[np.float64_t, ndim=1] acc, double dt, double xi,
     cdef np.ndarray[np.float64_t, ndim=1] dp = np.zeros(Np-1, dtype=float)
     #cdef np.ndarray[np.float64_t, ndim=1] SD = np.zeros(Nt, dtype=float)
     #cdef np.ndarray[np.float64_t, ndim=1] PSV = np.zeros(Nt, dtype=float)
-    cdef np.ndarray[np.float64_t, ndim=1] PSA = np.zeros(Nt, dtype=float)
+    # cdef np.ndarray[np.float64_t, ndim=1] PSA = np.zeros(Nt, dtype=float)
     #cdef np.ndarray[np.float64_t, ndim=1] SV = np.zeros(Nt, dtype=float)
     #cdef np.ndarray[np.float64_t, ndim=1] SA = np.zeros(Nt, dtype=float)
 
@@ -54,6 +54,6 @@ def Response_Spectra(np.ndarray[np.float64_t, ndim=1] acc, double dt, double xi,
         #SA[i_T] = np.max(np.abs(u2+acc))       #never used in Python code so removed
 
     #return SD, PSV, PSA, SV, SA
+
+    # transposing the array allows for multiplication to be broadcast along each period
     return (u.T * w * w).T
-
-

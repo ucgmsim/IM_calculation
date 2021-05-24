@@ -300,25 +300,27 @@ def calculate_pSAs(
     comps_to_store,
     comps_to_calculate,
 ):
-    # store a im type values into a dict {comp: np_array/single float}
-    # Geometric is also calculated here
+    # Get spectral accelerations. Has shape (len(periods), nt)
     spectral_accelerations = intensity_measures.get_spectral_acceleration_nd(
         accelerations, im_options[im], waveform_acc.NT, DT
     )
+    # Calculate the maximums of the basic components and pass this to array_to_dict which calculates geom too
     # Store the pSA im values in the format Tuple(List(periods), dict(component: List(im_values)))
     # Where the im_values in the component dictionaries correspond to the periods in the periods list
-    psa = np.max(np.abs(spectral_accelerations), axis=1)
-    pSA_values = array_to_dict(psa, comps_to_calculate, im, comps_to_store)
-
+    pSA_values = array_to_dict(
+        np.max(np.abs(spectral_accelerations), axis=1),
+        comps_to_calculate,
+        im,
+        comps_to_store,
+    )
     if check_rotd(comps_to_store):
         # Only run if any of the given components are selected (Non empty intersection)
-        rotd = calculate_rotd(spectral_accelerations, comps_to_store)
-        pSA_values.update(rotd)
+        pSA_values.update(calculate_rotd(spectral_accelerations, comps_to_store))
 
     for comp in comps_to_store:
-        if comp.str_value in psa:
+        if comp.str_value in pSA_values:
             for i, val in enumerate(im_options[im]):
-                result[(station_name, comp.str_value)][f"{im}_{str(val)}"] = psa[
+                result[(station_name, comp.str_value)][f"{im}_{str(val)}"] = pSA_values[
                     comp.str_value
                 ][i]
 
