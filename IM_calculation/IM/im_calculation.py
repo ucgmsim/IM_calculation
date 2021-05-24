@@ -302,11 +302,12 @@ def calculate_pSAs(
 ):
     # store a im type values into a dict {comp: np_array/single float}
     # Geometric is also calculated here
-    psa, spectral_accelerations = intensity_measures.get_spectral_acceleration_nd(
+    spectral_accelerations = intensity_measures.get_spectral_acceleration_nd(
         accelerations, im_options[im], waveform_acc.NT, DT
     )
     # Store the pSA im values in the format Tuple(List(periods), dict(component: List(im_values)))
     # Where the im_values in the component dictionaries correspond to the periods in the periods list
+    psa = np.max(np.abs(spectral_accelerations), axis=1)
     pSA_values = array_to_dict(psa, comps_to_calculate, im, comps_to_store)
 
     if check_rotd(comps_to_store):
@@ -315,9 +316,9 @@ def calculate_pSAs(
         pSA_values.update(rotd)
 
     for comp in comps_to_store:
-        if comp.str_value in pSA_values:
+        if comp.str_value in psa:
             for i, val in enumerate(im_options[im]):
-                result[(station_name, comp.str_value)][f"{im}_{str(val)}"] = pSA_values[
+                result[(station_name, comp.str_value)][f"{im}_{str(val)}"] = psa[
                     comp.str_value
                 ][i]
 

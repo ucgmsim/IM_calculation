@@ -49,12 +49,11 @@ def Response_Spectra(np.ndarray[np.float64_t, ndim=1] acc, double dt, double xi,
         #SD[i_T] = np.max(np.abs(u))
         #PSV[i_T] = SD[i_T]*w[i_T]
         #PSA[i_T] = PSV[i_T]*w[i_T]
-        PSA[i_T] = np.max(np.abs(u[i_T, :])) * w[i_T] * w[i_T]
+        #PSA[i_T] = np.max(np.abs(u[i_T, :])) * w[i_T] * w[i_T]
         #SV[i_T] = np.max(np.abs(u1))           #never used in Python code so removed
         #SA[i_T] = np.max(np.abs(u2+acc))       #never used in Python code so removed
 
     #return SD, PSV, PSA, SV, SA
-    return PSA, u2
-
+    return (u.T * w * w).T
 
 

@@ -31,18 +31,15 @@ def get_spectral_acceleration_nd(acceleration, period, NT, DT):
     # pSA
     if acceleration.ndim != 1:
         ts, dims = acceleration.shape
-        values = np.zeros((period.size, dims))
         Nstep = calculate_Nstep(DT, NT)
-
         accelerations = np.zeros((period.size, Nstep, dims))
+
         for i in range(dims):
-            psa, u2 = get_spectral_acceleration(
+            accelerations[:, :, i] = get_spectral_acceleration(
                 acceleration[:, i], period, NT, DT, Nstep
             )
-            values[:, i] = psa
-            accelerations[:, :, i] = u2
 
-        return values, accelerations
+        return accelerations
     else:
         return get_spectral_acceleration(acceleration, period, NT, DT)
 
