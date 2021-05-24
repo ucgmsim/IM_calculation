@@ -158,3 +158,14 @@ def get_geom(d1, d2):
     :return: geom value
     """
     return np.sqrt(d1 * d2)
+
+
+def get_euclidean_dist(d1, d2):
+    """
+    get euclidean distance from the 090 and 000 components
+    :param d1: 090
+    :param d2: 000
+    :return: euclidean distance
+    ----------
+    """
+    return np.sqrt(d1 ** 2 + d2 ** 2)

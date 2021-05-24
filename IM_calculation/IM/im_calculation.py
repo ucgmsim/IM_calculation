@@ -281,6 +281,12 @@ def calc_FAS(
             f"Attempting to compute fourier spectrum raised exception: {e}\nThis was most likely caused by attempting to compute for a waveform with more than 16384 timesteps."
         )
     else:
+        # compute EAS, the euclidean distance of FAS 000 and 090
+        if Components.ceas in comps_to_store:
+            values_to_store[
+                Components.ceas.str_value
+            ] = intensity_measures.get_euclidean_dist(value[:, 0], value[:, 1])
+
         for comp in comps_to_store:
             if comp.str_value in values_to_store:
                 for i, val in enumerate(im_options[im]):
