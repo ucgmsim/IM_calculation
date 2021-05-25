@@ -90,7 +90,9 @@ def calculate_rotd(
 ):
     """
     Calculates rotd for given accelerations
-    :param accelerations: An array with shape [periods.size, nt, 2] where nt is the number of timesteps in the original waveform
+    :param accelerations: An array with shape [[periods.size,] nt, 2] 
+        where the first axis is optional and if present is equal to the number of periods in the intensity measure. 
+        nt is the number of timesteps in the original waveform
     :param comps_to_store: A list of components to store
     :param func: The function to apply to the rotated waveforms. Defaults to taking the maximum absolute value across all rotations (used by PGA, PGV, pSA)
     :return: A dictionary with the comps_to_store as keys, and 1d arrays of shape [periods.size] containing the rotd values
