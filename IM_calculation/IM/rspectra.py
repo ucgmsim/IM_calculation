@@ -1,8 +1,5 @@
 import numpy as np
-import numba
 
-#@numba.njit
-@numba.jit(nopython=True)
 def Response_Spectra(acc,  dt,  xi, period,  m,  gamma,  beta):
     Np = acc.size
     Nt = period.size
@@ -14,21 +11,21 @@ def Response_Spectra(acc,  dt,  xi, period,  m,  gamma,  beta):
     a = m/beta/dt + gamma*c/beta
     b = 0.5*m/beta + dt*(gamma*0.5/beta - 1.0)*c
     
-    p = np.zeros(Np, dtype=numba.float64)
-    dp = np.zeros(Np-1, dtype=numba.float64)
-    #SD = np.zeros(Nt, dtype=numba.float64)
-    #PSV = np.zeros(Nt, dtype=numba.float64)
-    PSA = np.zeros(Nt, dtype=numba.float64)
-    #SV = np.zeros(Nt, dtype=numba.float64)
-    #SA = np.zeros(Nt, dtype=numba.float64)
+    p = np.zeros(Np, dtype=float)
+    dp = np.zeros(Np-1, dtype=float)
+    #SD = np.zeros(Nt, dtype=float)
+    #PSV = np.zeros(Nt, dtype=float)
+    PSA = np.zeros(Nt, dtype=float)
+    #SV = np.zeros(Nt, dtype=float)
+    #SA = np.zeros(Nt, dtype=float)
 
-    dp1 = np.zeros(Np-1, dtype=numba.float64)
-    u = np.zeros((Nt, Np), dtype=numba.float64)
-    du = np.zeros(Np-1, dtype=numba.float64)
-    du1 = np.zeros(Np-1, dtype=numba.float64)
-    du2 = np.zeros(Np-1, dtype=numba.float64)
-    u1 = np.zeros(Np, dtype=numba.float64)
-    u2 = np.zeros(Np, dtype=numba.float64)
+    dp1 = np.zeros(Np-1, dtype=float)
+    u = np.zeros((Nt, Np), dtype=float)
+    du = np.zeros(Np-1, dtype=float)
+    du1 = np.zeros(Np-1, dtype=float)
+    du2 = np.zeros(Np-1, dtype=float)
+    u1 = np.zeros(Np, dtype=float)
+    u2 = np.zeros(Np, dtype=float)
 
     p=-m*acc        #always same so move outside loop
 

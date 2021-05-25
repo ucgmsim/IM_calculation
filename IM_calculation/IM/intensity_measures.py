@@ -1,9 +1,9 @@
 import numpy as np
-
 try:
     from IM_calculation.IM.rspectra_calculations import rspectra as rspectra
 except ImportError:    
     from IM_calculation.IM import rspectra as rspectra
+
 
 from qcore import timeseries
 
