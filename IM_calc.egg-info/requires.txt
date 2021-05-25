@@ -1,0 +1,4 @@
+numpy>=1.14.3
+numba>=0.43.1
+Cython
+pandas
