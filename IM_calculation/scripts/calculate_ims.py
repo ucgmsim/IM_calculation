@@ -123,7 +123,7 @@ def load_args():
         "--components",
         nargs="+",
         choices=list(constants.Components.iterate_str_values()),
-        default= [constants.Components.cgeom.str_value],
+        default=[constants.Components.cgeom.str_value],
         help="Please provide the velocity/acc component(s) you want to calculate eg.geom."
         " Available components are: {} components. Default is geom".format(
             ",".join(constants.Components.iterate_str_values())
@@ -176,7 +176,11 @@ def load_args():
                 args.im.remove("FAS")
                 wrong_ims = ",".join(args.im)
         if wrong_ims:
-            parser.error("The specified IMs need non-EAS components to proceed: {}".format(wrong_ims))
+            parser.error(
+                "The specified IMs need non-EAS components to proceed: {}".format(
+                    wrong_ims
+                )
+            )
 
     calc.validate_input_path(parser, args.input_path, args.file_type)
     return args
