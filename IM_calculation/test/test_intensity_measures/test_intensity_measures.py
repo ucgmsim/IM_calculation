@@ -95,7 +95,7 @@ def test_get_spectral_acceleration(set_up):
         ) as load_file:
             bench_output = pickle.load(load_file)
 
-        assert np.isclose(test_output, bench_output, atol=1e-6).all()
+        assert np.isclose(test_output, bench_output).all()
 
 
 def test_get_spectral_acceleration_nd(set_up):
@@ -111,7 +111,7 @@ def test_get_spectral_acceleration_nd(set_up):
         ) as load_file:
             bench_output = pickle.load(load_file)
 
-        assert np.isclose(test_output, bench_output, atol=1e-6).all()
+        assert np.isclose(test_output, bench_output).all()
 
 
 def test_get_cumulative_abs_velocity_nd(set_up):
