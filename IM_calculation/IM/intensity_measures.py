@@ -82,7 +82,7 @@ def get_rotations(
 
     for period in range(0, periods, step):
         rotds[period : period + step] = func(
-            np.dot(accelerations[period: period + step], rotation_matrices)
+            np.dot(accelerations[period : period + step], rotation_matrices)
         )
 
     return rotds
