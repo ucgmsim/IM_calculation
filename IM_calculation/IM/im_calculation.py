@@ -84,19 +84,19 @@ def check_rotd(comps_to_store: Iterable[Components]) -> bool:
 
 
 def calculate_rotd(
-    spectral_accelerations,
+    accelerations,
     comps_to_store: List[Components],
     func=lambda x: np.max(np.abs(x), axis=1),
 ):
     """
-    Calculates rotd for given spectral accelerations
-    :param spectral_accelerations: An array with shape [periods.size, nt, 2] where nt is the number of timesteps in the original waveform
+    Calculates rotd for given accelerations
+    :param accelerations: An array with shape [periods.size, nt, 2] where nt is the number of timesteps in the original waveform
     :param comps_to_store: A list of components to store
     :param func: The function to apply to the rotated waveforms. Defaults to taking the maximum absolute value across all rotations (used by PGA, PGV, pSA)
     :return: A dictionary with the comps_to_store as keys, and 1d arrays of shape [periods.size] containing the rotd values
     """
     # Selects the first two basic components. get_comps_to_calc_and_store makes sure that the first two are 000 and 090
-    rotd = intensity_measures.get_rotations(spectral_accelerations[:, :, [0, 1]], func)
+    rotd = intensity_measures.get_rotations(accelerations[:, :, [0, 1]], func)
     value_dict = {}
 
     rotd50 = np.median(rotd, axis=-1)
