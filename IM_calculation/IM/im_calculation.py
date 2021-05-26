@@ -98,7 +98,7 @@ def calculate_rotd(
     :return: A dictionary with the comps_to_store as keys, and 1d arrays of shape [periods.size] containing the rotd values
     """
     # Selects the first two basic components. get_comps_to_calc_and_store makes sure that the first two are 000 and 090
-    rotd = intensity_measures.get_rotations(accelerations[..., [0, 1]], func)
+    rotd = intensity_measures.get_rotations(accelerations[..., [0, 1]], func=func)
     value_dict = {}
 
     rotd50 = np.median(rotd, axis=-1)
@@ -226,7 +226,7 @@ def calc_CAV(waveform, times, im, comps_to_store, comps_to_calculate):
         func = lambda x: intensity_measures.get_cumulative_abs_velocity_nd(
             np.squeeze(x), times=times
         )
-        rotd = calculate_rotd(waveform, comps_to_store, func)
+        rotd = calculate_rotd(waveform, comps_to_store, func=func)
         values.update(rotd)
     return values
 
@@ -236,7 +236,7 @@ def calc_MMI(waveform, im, comps_to_store, comps_to_calculate):
     values = array_to_dict(value, comps_to_calculate, im, comps_to_store)
     if check_rotd(comps_to_store):
         func = lambda x: intensity_measures.calculate_MMI_nd(np.squeeze(x))
-        rotd = calculate_rotd(waveform, comps_to_store, func)
+        rotd = calculate_rotd(waveform, comps_to_store, func=func)
         values.update(rotd)
     return values
 
