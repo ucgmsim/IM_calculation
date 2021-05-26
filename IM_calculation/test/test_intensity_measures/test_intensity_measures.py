@@ -88,7 +88,7 @@ def test_get_spectral_acceleration(set_up):
         acc, period, NT, DT = get_common_spectral_vals(root_path, function)
         test_output = intensity_measures.get_spectral_acceleration(
             acc, period, NT, DT, intensity_measures.calculate_Nstep(DT, NT)
-        )[0]
+        )
 
         with open(
             os.path.join(root_path, OUTPUT, function + "_ret_val.P"), "rb"
@@ -104,7 +104,7 @@ def test_get_spectral_acceleration_nd(set_up):
         acc, period, NT, DT = get_common_spectral_vals(root_path, function)
         test_output = intensity_measures.get_spectral_acceleration_nd(
             acc, period, NT, DT
-        )[0]
+        )
 
         with open(
             os.path.join(root_path, OUTPUT, function + "_values.P"), "rb"
