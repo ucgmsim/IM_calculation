@@ -105,6 +105,9 @@ def read_csv(stations, im_calc_dir, im_type):
         # use glob(?) and qcore.simulation_structure to get specific station_im.csv
         # TODO: define this structure into qcore.simulation_structure
         im_path = os.path.join(im_calc_dir, station, im_type, f"{im_type}.csv")
+        if not os.path.isfile(im_path):
+            print(f"{im_path} not found, skipping")
+            continue
         # read a df and add station name as colum
         df_tmp = pd.read_csv(im_path)
 
