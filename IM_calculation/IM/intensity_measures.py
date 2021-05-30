@@ -98,6 +98,11 @@ def get_arias_intensity_nd(acceleration, g, times):
     return np.pi / (2 * g) * np.trapz(integrand, times, axis=0)
 
 
+def get_specific_energy_density_nd(velocity, times):
+    integrand = velocity ** 2
+    return np.trapz(integrand, times, axis=0)
+
+
 def calculate_MMI_nd(velocities):
     pgv = get_max_nd(velocities)
     return timeseries.pgv2MMI(pgv)
