@@ -49,7 +49,16 @@ def calc_rrup_rjb(srf_points: np.ndarray, locations: np.ndarray):
     return rrups, rjb
 
 
-def calc_rx_ry(srf_points: np.ndarray, plane_infos: List[Dict], locations: np.ndarray):
+def calc_rx_ry(srf_points: np.ndarray, plane_infos: List[Dict], locations: np.ndarray, system="GC1"):
+    if system == "GC1":
+        return calc_rx_ry_GC1(srf_points, plane_infos, locations)
+    elif system == "GC2":
+        return calc_rx_ry_GC2(srf_points, plane_infos, locations[..., :2])
+    else:
+        raise ValueError("Illegal system value")
+
+
+def calc_rx_ry_GC1(srf_points: np.ndarray, plane_infos: List[Dict], locations: np.ndarray):
     """Calculates r_x distance using the cross track distance calculation"""
     r_x = np.empty(locations.shape[0])
     r_y = np.empty(locations.shape[0])
@@ -170,3 +179,61 @@ def calc_backarc(srf_points: np.ndarray, locations: np.ndarray):
                 backarc[loc_index] = 1
                 break
     return backarc
+
+
+def calc_rx_ry_GC2(srf_points: np.ndarray, plane_infos: List[Dict], locations: np.ndarray, use_first=False):
+    """
+    Calculates the rx and ry values for a given fault and list of locations
+    :param srf_points: A (n, 3) array giving the lon, lat, depth of each of the n points in the fault srf
+    :param plane_infos: A list of plane header dictionaries, one dictionary for each plane in the fault
+    :param locations: A (m, 2) array giving the lon, lat of each of m stations/locations to find the rx/ry values for
+    :return:
+    """
+
+    # Local import to prevent openquake being a full dependency of any importing script
+    try:
+        from openquake.hazardlib.geo.surface.simple_fault import SimpleFaultSurface
+        from openquake.hazardlib.geo.surface.multi import MultiSurface
+        from openquake.hazardlib.geo.mesh import Mesh, RectangularMesh
+    except ImportError as e:
+        print(
+            "openquake.engine does not seem to be installed. Use 'pip install openquake.engine' to install it"
+        )
+        raise e
+
+    # print(plane_infos)
+
+    # Separate the srf points into the different planes
+    pnt_counts = [plane["nstrike"] * plane["ndip"] for plane in plane_infos]
+    pnt_sections = np.split(srf_points, pnt_counts[:-1])
+    pnt_sections = [
+        plane.reshape((plane_header["nstrike"], plane_header["ndip"], 3))
+        for plane, plane_header in zip(pnt_sections, plane_infos)
+    ]
+
+    planes = []
+    for plane in pnt_sections:
+        fault_points = np.split(plane, 3, axis=-1)
+        squeezed_locs = [loc.squeeze() for loc in fault_points]
+        planes.append(SimpleFaultSurface(RectangularMesh(*squeezed_locs)))
+        # for x in squeezed_locs:
+        #     print(np.unique(x))
+    # print("Planes len: ", len(planes))
+    fault_object = MultiSurface(planes)
+
+    split_locations = [x.squeeze() for x in np.split(locations, 2, axis=-1)]
+
+    location_mesh = Mesh(*split_locations)
+
+    if use_first:
+        r_x = planes[0].get_rx_distance(location_mesh)
+        r_y = planes[0].get_ry0_distance(location_mesh)
+    else:
+        r_x = fault_object.get_rx_distance(location_mesh)
+        r_y = fault_object.get_ry0_distance(location_mesh)
+
+    # print("Diff rx: ", r_x-r_x1)
+    # print("Diff ry: ", r_y-r_y1)
+    # print("Edges ", fault_object.cartesian_edges)
+
+    return r_x, r_y

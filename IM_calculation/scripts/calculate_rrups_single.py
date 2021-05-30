@@ -113,7 +113,7 @@ if __name__ == "__main__":
 
     plane_info = read_header(args.srf_file, idx=True)
 
-    r_x, r_y = ssd.calc_rx_ry(srf_points, plane_info, filtered_station_np)
+    r_x, r_y = ssd.calc_rx_ry(srf_points, plane_info, filtered_station_np, system="GC2")
 
     backarc = None
     if args.backarc:
