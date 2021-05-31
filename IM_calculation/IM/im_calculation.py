@@ -337,8 +337,7 @@ def calculate_IESD(
     dt=0.005,  # analysis time step
 ):
 
-    #Input is in m/s^2
-    acc_values = array_to_dict(accelerations, comps_to_calculate, im, comps_to_store)*G/100
+    acc_values = array_to_dict(accelerations, comps_to_calculate, im, comps_to_store)
     for comp in comps_to_store:
         if comp.str_value in acc_values:
             Sd = Bilinear_Newmark_withTH(
@@ -346,7 +345,7 @@ def calculate_IESD(
                 z,
                 dy,
                 alpha,
-                acc_values[comp.str_value],
+                acc_values[comp.str_value]*G/100,#Input is in m/s^2
                 waveform_acc.DT,
                 dt,
             )
