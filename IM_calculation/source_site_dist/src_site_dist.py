@@ -201,8 +201,6 @@ def calc_rx_ry_GC2(srf_points: np.ndarray, plane_infos: List[Dict], locations: n
         )
         raise e
 
-    # print(plane_infos)
-
     # Separate the srf points into the different planes
     pnt_counts = [plane["nstrike"] * plane["ndip"] for plane in plane_infos]
     pnt_sections = np.split(srf_points, pnt_counts[:-1])
@@ -216,9 +214,6 @@ def calc_rx_ry_GC2(srf_points: np.ndarray, plane_infos: List[Dict], locations: n
         fault_points = np.split(plane, 3, axis=-1)
         squeezed_locs = [loc.squeeze() for loc in fault_points]
         planes.append(SimpleFaultSurface(RectangularMesh(*squeezed_locs)))
-        # for x in squeezed_locs:
-        #     print(np.unique(x))
-    # print("Planes len: ", len(planes))
     fault_object = MultiSurface(planes)
 
     split_locations = [x.squeeze() for x in np.split(locations, 2, axis=-1)]
@@ -231,9 +226,5 @@ def calc_rx_ry_GC2(srf_points: np.ndarray, plane_infos: List[Dict], locations: n
     else:
         r_x = fault_object.get_rx_distance(location_mesh)
         r_y = fault_object.get_ry0_distance(location_mesh)
-
-    # print("Diff rx: ", r_x-r_x1)
-    # print("Diff ry: ", r_y-r_y1)
-    # print("Edges ", fault_object.cartesian_edges)
 
     return r_x, r_y
