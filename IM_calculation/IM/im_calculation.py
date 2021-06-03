@@ -23,7 +23,19 @@ from IM_calculation.IM.Burks_Baker_2013_elastic_inelastic import Bilinear_Newmar
 
 G = 981.0
 DEFAULT_IMS = ("PGA", "PGV", "CAV", "AI", "Ds575", "Ds595", "MMI", "pSA")
-ALL_IMS = ("PGA", "PGV", "CAV", "AI", "Ds575", "Ds595", "MMI", "pSA", "FAS", "IESD")
+ALL_IMS = (
+    "PGA",
+    "PGV",
+    "CAV",
+    "AI",
+    "Ds575",
+    "Ds595",
+    "MMI",
+    "pSA",
+    "SED",
+    "FAS",
+    "IESD",
+)
 
 MULTI_VALUE_IMS = ("pSA", "FAS", "IESD")
 
