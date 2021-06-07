@@ -28,11 +28,11 @@ puts "------------------------ Trying: Newton, dt=$dt1 -------------------------
 set ok [analyze $nSteps $dt1]
 set curTime [getTime]
 set DT [expr $Tmax-$curTime]
-set iTry 6
+set iTry 1
 while {$DT > $dt} {
 
     puts "------------------------ curTime= $curTime, DT= $DT ------------------------"
-    if {$iTry <= 0} {
+    if {$iTry <= 5} {
         set algo [lindex $algoList [expr $iTry-1]]
         puts "------------------------ Trying: [lindex $algo 0], dt=$dt1 --------------------------"
         puts ""

@@ -95,7 +95,8 @@ def calculate_rotd(
     :param func: The function to apply to the rotated waveforms. Defaults to taking the maximum absolute value across all rotations (used by PGA, PGV, pSA)
     :return: A dictionary with the comps_to_store as keys, and 1d arrays of shape [periods.size] containing the rotd values
     """
-    rotd = func(intensity_measures.get_rotations(spectral_displacements))
+    # Selects the first two basic components. get_comps_to_calc_and_store makes sure that the first two are 000 and 090
+    rotd = intensity_measures.get_rotations(spectral_displacements[:, :, [0, 1]], func)
     value_dict = {}
 
     rotd50 = np.median(rotd, axis=-1)
@@ -436,7 +437,7 @@ def compute_measures_multiprocess(
 
     bbseries, station_names = get_bbseis(input_path, file_type, station_names)
     total_stations = len(station_names)
-    # determine the size of each iteration base on num of processers and mem
+    # determine the size of each iteration base on num of processes and mem
     steps = get_steps(
         input_path, process, total_stations, "FAS" in ims and bbseries.nt > 32768
     )
@@ -486,18 +487,7 @@ def compute_measures_multiprocess(
         advanced_IM_factory.agg_csv(advanced_im_config, station_names, output)
     else:
         all_result_dict = ChainMap(*all_results)
-        # write_result(all_result_dict, output, identifier, simple_output)
-        output_path = get_result_filepath(output, identifier, ".csv")
-
-        results_dataframe = pd.DataFrame.from_dict(all_result_dict, orient="index")
-        results_dataframe.index = pd.MultiIndex.from_tuples(
-            results_dataframe.index, names=["station", "component"]
-        )
-        results_dataframe.sort_values(["station", "component"], inplace=True)
-        results_dataframe = order_im_cols_df(results_dataframe)
-
-        # Save the transposed dataframe
-        results_dataframe.to_csv(output_path)
+        write_result(all_result_dict, output, identifier, simple_output)
     generate_metadata(output, identifier, rupture, run_type, version)
 
 
@@ -617,7 +607,16 @@ def get_steps(input_path, nps, total_stations, high_mem_usage=False):
     :param high_mem_usage: If a calculation requiring even larger amounts of RAM is required (ie FAS), this increases the estimated RAM even further
     :return: number of stations per iteration/batch
     """
-    estimated_mem = os.stat(input_path).st_size * MEM_FACTOR
+    if os.path.isfile(input_path):
+        estimated_mem = os.path.getsize(input_path) * MEM_FACTOR
+    else:
+        # Sum up the total size of the files contained in the folder and use it for estimating the memory use
+        estimated_mem = MEM_FACTOR * sum(
+            [
+                os.path.getsize(os.path.join(input_path, name))
+                for name in os.listdir(input_path)
+            ]
+        )
     if high_mem_usage:
         estimated_mem *= MEM_FACTOR
     available_mem = nps * MEM_PER_CORE
