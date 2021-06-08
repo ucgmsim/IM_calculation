@@ -31,18 +31,15 @@ def get_spectral_acceleration_nd(acceleration, period, NT, DT):
     # pSA
     if acceleration.ndim != 1:
         ts, dims = acceleration.shape
-        values = np.zeros((period.size, dims))
         Nstep = calculate_Nstep(DT, NT)
+        accelerations = np.zeros((period.size, Nstep, dims))
 
-        displacements = np.zeros((period.size, Nstep, dims))
         for i in range(dims):
-            psa, u = get_spectral_acceleration(
+            accelerations[:, :, i] = get_spectral_acceleration(
                 acceleration[:, i], period, NT, DT, Nstep
             )
-            values[:, i] = psa
-            displacements[:, :, i] = u
 
-        return values, displacements
+        return accelerations
     else:
         return get_spectral_acceleration(acceleration, period, NT, DT)
 
@@ -52,21 +49,21 @@ def calculate_Nstep(DT, NT):
 
 
 def get_rotations(
-    spectral_displacements,
+    accelerations,
     func=lambda x: np.max(np.abs(x), axis=1),
     delta_theta: int = 1,
     min_angle: int = 0,
     max_angle: int = 180,
 ):
     """
-    Calculates the rotd values for the given spectral displacements
+    Calculates the rotd values for the given accelerations
     Works across multiple periods at once
     For each angle in the range [min_angle, max_angle) with step size delta theta,
-    the displacement at each timestep is rotated to get the component in the direction of the given angle
-    The absolute value is taken as it does not matter if the displacement is in the direction of the angle,
+    the acceleration at each timestep is rotated to get the component in the direction of the given angle
+    The absolute value is taken as it does not matter if the acceleration is in the direction of the angle,
     or 180 degrees out of phase of it
-    For each angle the maximum displacement is taken.
-    :param spectral_displacements: An array with shape [periods.size, nt, 2] where nt is the number of timesteps in the original waveform
+    For each angle the maximum acceleration is taken.
+    :param accelerations: An array with shape [periods.size, nt, 2] where nt is the number of timesteps in the original waveform
     :param func: The function to be applied to each waveform after rotations have been applied. Default takes the maximum of each angle for each period
     :param delta_theta: The difference between each angle to take. Defaults to 2 degrees
     :param min_angle: The minimum angle in degrees to calculate from, 0 is due East
@@ -76,7 +73,7 @@ def get_rotations(
 
     thetas = np.deg2rad(np.arange(min_angle, max_angle, delta_theta))
     rotation_matrices = np.asarray([np.cos(thetas), np.sin(thetas)])
-    periods, nt, xy = spectral_displacements.shape
+    periods, nt, xy = accelerations.shape
     rotds = np.zeros((periods, thetas.size))
 
     # Magic number empirically determined from runs on Maui
@@ -85,7 +82,7 @@ def get_rotations(
 
     for period in range(0, periods, step):
         rotds[period : period + step] = func(
-            np.dot(spectral_displacements[period : period + step], rotation_matrices)
+            np.dot(accelerations[period : period + step], rotation_matrices)
         )
 
     return rotds
@@ -161,3 +158,14 @@ def get_geom(d1, d2):
     :return: geom value
     """
     return np.sqrt(d1 * d2)
+
+
+def get_euclidean_dist(d1, d2):
+    """
+    get euclidean distance from the 090 and 000 components
+    :param d1: 090
+    :param d2: 000
+    :return: euclidean distance
+    ----------
+    """
+    return np.sqrt(d1 ** 2 + d2 ** 2)

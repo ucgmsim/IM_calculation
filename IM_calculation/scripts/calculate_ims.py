@@ -125,7 +125,7 @@ def load_args():
         choices=list(constants.Components.iterate_str_values()),
         default=[constants.Components.cgeom.str_value],
         help="Please provide the velocity/acc component(s) you want to calculate eg.geom."
-        " Available compoents are: {} components. Default is all components".format(
+        " Available components are: {} components. Default is geom".format(
             ",".join(constants.Components.iterate_str_values())
         ),
     )
@@ -163,6 +163,25 @@ def load_args():
     )
 
     args = parser.parse_args()
+
+    if constants.Components.ceas.str_value in args.components:
+        wrong_ims = ""
+        if "FAS" not in args.im:
+            wrong_ims = ",".join(args.im)
+        else:
+            # there are IMs other than FAS but user only wants EAS
+            # without this check, the code still runs, but the non-FAS IMs
+            # won't be shown in the output csv without a notice/warning
+            if len(args.im) > 1 and len(args.components) == 1:
+                args.im.remove("FAS")
+                wrong_ims = ",".join(args.im)
+        if wrong_ims:
+            parser.error(
+                "The specified IMs need non-EAS components to proceed: {}".format(
+                    wrong_ims
+                )
+            )
+
     calc.validate_input_path(parser, args.input_path, args.file_type)
     return args
 
@@ -201,8 +220,8 @@ def main():
     else:
         components = args.components
         advanced_im_config = None
-    # multiprocessor
 
+    # multiprocessor
     calc.compute_measures_multiprocess(
         args.input_path,
         file_type,
