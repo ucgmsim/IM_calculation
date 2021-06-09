@@ -46,7 +46,8 @@ def test_sed_im(component_name, expected_im):
         raise
 
     waveform, meta = read_ascii(path, meta=True)
-    velocity = acc2vel(waveform, dt=meta["dt"]) * 980.665
+    # waveform in g -> cm/s^2
+    velocity = acc2vel(waveform * 980.665, dt=meta["dt"])
     times = np.arange(meta["nt"], dtype=np.float32)
     times *= meta["dt"]
     im = get_specific_energy_density_nd(velocity, times)
