@@ -6,6 +6,7 @@ from glob import glob
 import os
 
 import numpy as np
+import pytest
 
 from IM_calculation.IM.intensity_measures import get_specific_energy_density_nd
 from qcore.timeseries import acc2vel, read_ascii
@@ -18,6 +19,7 @@ waveforms = [
     if os.path.splitext(path)[1] in [".000", ".090", ".ver"]
 ]
 components = list(map(os.path.basename, waveforms))
+# results taken from seismo signal
 results = {
     "HALS.090": 0.81750,
     "HALS.000": 1.51869,
@@ -31,19 +33,22 @@ results = {
 }
 
 
-def test_sed_im():
-    for known in results:
-        try:
-            path = waveforms[components.index(known)]
-        except ValueError:
-            # missing test data
-            print(f"Missing waveform data for {known}.")
-            raise
+@pytest.mark.parametrize(
+    "component_name, expected_im",
+    list(results.items()),
+)
+def test_sed_im(component_name, expected_im):
+    try:
+        path = waveforms[components.index(component_name)]
+    except ValueError:
+        # missing test data
+        print(f"Missing waveform data for {component_name}.")
+        raise
 
-        waveform, meta = read_ascii(path, meta=True)
-        velocity = acc2vel(waveform, dt=meta["dt"]) * 980.665
-        times = np.arange(meta["nt"], dtype=np.float32)
-        times *= meta["dt"]
-        im = get_specific_energy_density_nd(velocity, times)
+    waveform, meta = read_ascii(path, meta=True)
+    velocity = acc2vel(waveform, dt=meta["dt"]) * 980.665
+    times = np.arange(meta["nt"], dtype=np.float32)
+    times *= meta["dt"]
+    im = get_specific_energy_density_nd(velocity, times)
 
-        assert np.isclose(im, results[known], rtol=0.005)
+    assert np.isclose(im, expected_im, rtol=0.005)
