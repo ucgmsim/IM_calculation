@@ -1,4 +1,6 @@
 import argparse
+import datetime
+from enum import Enum, auto
 import glob
 import os
 import subprocess
@@ -11,6 +13,21 @@ from IM_calculation.IM.intensity_measures import get_geom
 
 DEFAULT_OPEN_SEES_PATH = "OpenSees"
 DF_INDEX_NAME = "component"
+
+TIME_FORMAT = "%Y-%m-%d %H:%M:%S"
+
+
+class run_status(Enum):
+    not_started = 0
+    finished = 1
+    not_converged = 2
+    crashed = 3
+    not_finished = 4
+
+
+class time_type(Enum):
+    start_time = auto()
+    end_time = auto()
 
 
 def parse_args():
@@ -42,6 +59,16 @@ def parse_args():
     args = parser.parse_args()
 
     return args
+
+
+def datetime_to_file(t_value, t_type, out_dir):
+    #    print(f'{t_value} {type(t_type)} {t_type}')
+    # convert format
+    t_value = t_value.strftime(TIME_FORMAT)
+
+    f_name = os.path.join(out_dir, t_type)
+    with open(f_name, "w") as f:
+        f.write(t_value)
 
 
 def main(args, im_name, run_script):
@@ -78,7 +105,18 @@ def main(args, im_name, run_script):
         ]
 
         print(" ".join(script))
+        # for debug purpose, track the starting and ending time of OpenSees call
+        # saves starting time
+        datetime_to_file(
+            datetime.datetime.now(), time_type.start_time.name, component_outdir
+        )
+
         subprocess.run(script)
+
+        # save the ending time
+        datetime_to_file(
+            datetime.datetime.now(), time_type.end_time.name, component_outdir
+        )
 
         # check for success message after a run
         # marked as failed if any component fail
