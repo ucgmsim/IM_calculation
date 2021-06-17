@@ -53,7 +53,7 @@ def parse_args():
     return args
 
 
-def datetime_to_file(t_value, t_type, out_dir):
+def datetime_to_file(t_value, t_type: str, out_dir):
     # convert format
     t_value = t_value.strftime(TIME_FORMAT)
 
