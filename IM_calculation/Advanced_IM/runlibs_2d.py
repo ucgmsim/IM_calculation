@@ -54,7 +54,6 @@ def parse_args():
 
 
 def datetime_to_file(t_value, t_type, out_dir):
-    #    print(f'{t_value} {type(t_type)} {t_type}')
     # convert format
     t_value = t_value.strftime(TIME_FORMAT)
 
