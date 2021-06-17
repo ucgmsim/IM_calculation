@@ -17,17 +17,9 @@ DF_INDEX_NAME = "component"
 TIME_FORMAT = "%Y-%m-%d %H:%M:%S"
 
 
-class run_status(Enum):
-    not_started = 0
-    finished = 1
-    not_converged = 2
-    crashed = 3
-    not_finished = 4
-
-
 class time_type(Enum):
-    start_time = auto()
-    end_time = auto()
+    start_time = 0
+    end_time = 1
 
 
 def parse_args():
