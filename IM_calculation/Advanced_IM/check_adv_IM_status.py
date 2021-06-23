@@ -107,6 +107,17 @@ def check_log(list_folders, model, components, df_model, break_on_fail=False):
                 # all logs showed "Failed", analysis was unable to converge
                 station_component_status = analysis_status.not_converged.value
             elif (
+                (
+                    time_list[time_type.timed_out.value] is not None
+                    or time_list[time_type.end_time.value] is not None
+                )
+                and time_list[time_type.start_time.value] is None
+                or time_list.count(None) == 0
+            ):
+                # something went wrong, start_time not found but other logs exist
+                # or all 3 logs were found
+                station_component_status = analysis_status.unknown.value
+            elif (
                 time_list[time_type.start_time.value] is not None
                 and time_list[time_type.end_time.value] is not None
             ):
@@ -127,17 +138,6 @@ def check_log(list_folders, model, components, df_model, break_on_fail=False):
             ):
                 # only start_time exist = wct timed out
                 station_component_status = analysis_status.not_finished.value
-            elif (
-                (
-                    time_list[time_type.timed_out.value] is not None
-                    or time_list[time_type.end_time.value] is not None
-                )
-                and time_list[time_type.start_time.value] is None
-                or time_list.count(None) == 0
-            ):
-                # something went wrong, start_time not found but other logs exist
-                # or all 3 logs were found
-                station_component_status = analysis_status.unknown.value
             elif time_list.count(None) == len(time_type):
                 # else not started
                 station_component_status = analysis_status.not_started.value
