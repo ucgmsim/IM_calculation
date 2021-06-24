@@ -23,8 +23,9 @@ class analysis_status(Enum):
     finished = 1
     not_converged = 2
     not_finished = 3
-    crashed = 4
-    unknown = 5
+    timed_out = 4
+    crashed = 5
+    unknown = 6
 
 
 COLUMN_NAMES = [
@@ -105,20 +106,39 @@ def check_log(list_folders, model, components, df_model, break_on_fail=False):
             elif check_status(component_outdir, check_fail=True):
                 # all logs showed "Failed", analysis was unable to converge
                 station_component_status = analysis_status.not_converged.value
-            elif time_list.count(None) == 0:
+            elif (
+                (
+                    time_list[time_type.timed_out.value] is not None
+                    or time_list[time_type.end_time.value] is not None
+                )
+                and time_list[time_type.start_time.value] is None
+                or time_list.count(None) == 0
+            ):
+                # something went wrong, start_time not found but other logs exist
+                # or all 3 logs were found
+                station_component_status = analysis_status.unknown.value
+            elif (
+                time_list[time_type.start_time.value] is not None
+                and time_list[time_type.end_time.value] is not None
+            ):
                 # if start and end are there, but no data = crashed
                 station_component_status = analysis_status.crashed.value
-            elif (time_list.count(None) == 1) and (
+            elif (
+                time_list[time_type.start_time.value] is not None
+                and time_list[time_type.timed_out.value] is not None
+            ):
+                # opensees call timedout ( not wct)
+                station_component_status = analysis_status.timed_out.value
+                # overwrites end_time
+                time_list[time_type.end_time.value] = time_list[
+                    time_type.timed_out.value
+                ]
+            elif (time_list.count(None) == 2) and (
                 time_list[time_type.start_time.value] is not None
             ):
                 # only start_time exist = wct timed out
                 station_component_status = analysis_status.not_finished.value
-            elif (time_list.count(None) == 1) and (
-                time_list[time_type.start_time.value] is None
-            ):
-                # something went wrong, only end_time was found
-                station_component_status = analysis_status.unknown.value
-            else:
+            elif time_list.count(None) == len(time_type):
                 # else not started
                 station_component_status = analysis_status.not_started.value
             comp_mask = (df_model["station"] == station_name) & (
@@ -203,12 +223,12 @@ def main(im_calc_dir, adv_im_model, components, simple_check=False, station_file
         # check if any status >= 3 or != 0
         if df["status"].ge(analysis_status.not_finished.value).any():
             print(f"{model_name} have errors. Please check the status.csv")
-            result_code = result_code | 0b01
+            result_code = result_code | 0b10
         if df["status"].eq(analysis_status.not_started.value).any():
             print(
                 f"{model_name} has some stations that havent been analysed. Please check status.csv"
             )
-            result_code = result_code | 0b10
+            result_code = result_code | 0b01
         # sort index by status
         df.sort_values("status", inplace=True, ascending=False)
         # map status(int) to string before saving as csv
