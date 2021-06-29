@@ -1,4 +1,6 @@
 import argparse
+import datetime
+from enum import Enum, auto
 import glob
 import os
 import subprocess
@@ -11,6 +13,14 @@ from IM_calculation.IM.intensity_measures import get_geom
 
 DEFAULT_OPEN_SEES_PATH = "OpenSees"
 DF_INDEX_NAME = "component"
+
+TIME_FORMAT = "%Y-%m-%d %H:%M:%S"
+
+
+class time_type(Enum):
+    start_time = 0
+    end_time = 1
+    timed_out = 2
 
 
 def parse_args():
@@ -39,9 +49,25 @@ def parse_args():
         help="Path to OpenSees binary",
     )
 
+    parser.add_argument(
+        "--timeout_threshold", default=None, help="the timeout value in seconds"
+    )
+
     args = parser.parse_args()
 
     return args
+
+
+def datetime_to_file(t_value, t_type: str, out_dir):
+    # convert format
+    t_value = t_value.strftime(TIME_FORMAT)
+
+    f_name = os.path.join(out_dir, t_type)
+    with open(f_name, "w") as f:
+        f.write(t_value)
+
+
+# def save_timeout_value(component_outdir, timeout_threshold, datetime.datetime.now()):
 
 
 def main(args, im_name, run_script):
@@ -78,7 +104,21 @@ def main(args, im_name, run_script):
         ]
 
         print(" ".join(script))
-        subprocess.run(script)
+        # for debug purpose, track the starting and ending time of OpenSees call
+        # saves starting time
+        datetime_to_file(
+            datetime.datetime.now(), time_type.start_time.name, component_outdir
+        )
+
+        try:
+            subprocess.run(script, timeout=int(args.timeout_threshold))
+        except subprocess.TimeoutExpired:
+            # timeouted. save to timed_out instead of end_time
+            end_time_type = time_type.timed_out.name
+        else:
+            # save the ending time
+            end_time_type = time_type.end_time.name
+        datetime_to_file(datetime.datetime.now(), end_time_type, component_outdir)
 
         # check for success message after a run
         # marked as failed if any component fail

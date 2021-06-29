@@ -23,7 +23,20 @@ from IM_calculation.IM.computeFAS import get_fourier_spectrum
 
 G = 981.0
 DEFAULT_IMS = ("PGA", "PGV", "CAV", "AI", "Ds575", "Ds595", "MMI", "pSA")
-ALL_IMS = ("PGA", "PGV", "CAV", "AI", "Ds575", "Ds595", "MMI", "pSA", "FAS", "SDI")
+ALL_IMS = (
+    "PGA",
+    "PGV",
+    "CAV",
+    "AI",
+    "Ds575",
+    "Ds595",
+    "MMI",
+    "pSA",
+    "SED",
+    "FAS",
+    "SDI",
+)
+
 
 MULTI_VALUE_IMS = ("pSA", "FAS", "SDI")
 
@@ -167,6 +180,7 @@ def compute_measure_single(
         ),
         "FAS": (calc_FAS, (DT, accelerations, im_options, result, station_name)),
         "AI": (calc_AI, (accelerations, G, times)),
+        "SED": (calc_SED, (velocities, times)),
         "MMI": (calc_MMI, (velocities,)),
         "Ds595": (calc_DS, (accelerations, DT, 5, 95)),
         "Ds575": (calc_DS, (accelerations, DT, 5, 75)),
@@ -237,6 +251,18 @@ def calc_MMI(waveform, im, comps_to_store, comps_to_calculate):
     if check_rotd(comps_to_store):
         func = lambda x: intensity_measures.calculate_MMI_nd(np.squeeze(x))
         rotd = calculate_rotd(waveform, comps_to_store, func=func)
+        values.update(rotd)
+    return values
+
+
+def calc_SED(velocities, times, im, comps_to_store, comps_to_calculate):
+    value = intensity_measures.get_specific_energy_density_nd(velocities, times)
+    values = array_to_dict(value, comps_to_calculate, im, comps_to_store)
+    if check_rotd(comps_to_store):
+        func = lambda x: intensity_measures.get_specific_energy_density_nd(
+            np.squeeze(x), times=times
+        )
+        rotd = calculate_rotd(velocities, comps_to_store, func=func)
         values.update(rotd)
     return values
 
