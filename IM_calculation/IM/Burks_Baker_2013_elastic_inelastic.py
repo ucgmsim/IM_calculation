@@ -123,16 +123,14 @@ def Bilinear_Newmark_withTH(
 
         a[i + 1] = (p[i + 1] - c * v[i + 1] - fs[i + 1]) / m
 
-    Sd = np.max(np.abs(d), axis=0)
-    # Sv = Sd * (2 * np.pi / period)
-    # Sa = Sd * (2 * np.pi / period) ** 2
-    #
+    # Sd = np.max(np.abs(d), axis=0) # maximum displacement
+    # Sv = Sd * (2 * np.pi / period) # velocity
+    # Sa = Sd * (2 * np.pi / period) ** 2 # acceleration
 
     # Hd = d
     # Hv = v
     # Ha = a
     # Hfs = fs
-    # else:
 
     return d  # return all displacements, not just the maximum Sd. This is to compute rotd if needed
 

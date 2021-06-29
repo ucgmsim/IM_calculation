@@ -342,12 +342,16 @@ def calculate_SDI(
     dy=0.1765,
     dt=0.005,  # analysis time step
 ):
-    SDIs = intensity_measures.get_SDI_nd(
+    # Get displacements by Burks_Baker_2013. Has shape (len(periods), nt-1, len(comps))
+    displacements = intensity_measures.get_SDI_nd(
         accelerations, im_options[im], waveform_acc.NT, DT, z, alpha, dy, dt
     )
 
+    # Calculate the maximums of the basic components and pass this to array_to_dict which calculates geom too
+    # Store the SDI im values in the format dict(component: List(im_values))
+    # Where the im_values in the component dictionaries correspond to the periods in the periods list
     sdi_values = array_to_dict(
-        np.max(np.abs(SDIs), axis=1),
+        np.max(np.abs(displacements), axis=1),
         comps_to_calculate,
         im,
         comps_to_store,
@@ -355,7 +359,7 @@ def calculate_SDI(
 
     if check_rotd(comps_to_store):
         # Only run if any of the given components are selected (Non empty intersection)
-        sdi_values.update(calculate_rotd(SDIs, comps_to_store))
+        sdi_values.update(calculate_rotd(displacements, comps_to_store))
 
     for comp in comps_to_store:
         if comp.str_value in sdi_values:

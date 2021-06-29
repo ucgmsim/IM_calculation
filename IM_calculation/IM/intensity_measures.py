@@ -64,12 +64,14 @@ def get_SDI_nd(acceleration, period, NT, DT, z, alpha, dy, dt):
     if acceleration.ndim != 1:
         ts, dims = acceleration.shape
         Nstep = calculate_Nstep(DT, NT)
-        SDIs = np.zeros((period.size, Nstep - 1, dims))
+        displacements = np.zeros((period.size, Nstep - 1, dims))
 
         for i in range(dims):
-            SDIs[:, :, i] = get_SDI(acceleration[:, i], period, DT, z, alpha, dy, dt)
+            displacements[:, :, i] = get_SDI(
+                acceleration[:, i], period, DT, z, alpha, dy, dt
+            )
 
-        return SDIs
+        return displacements
     else:
         return get_SDI(acceleration, period, NT, DT, z, alpha, dy, dt)
 
