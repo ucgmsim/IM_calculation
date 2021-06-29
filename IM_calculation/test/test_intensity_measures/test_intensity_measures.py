@@ -132,9 +132,6 @@ def test_get_arias_intensity_nd(set_up):
     function = "get_arias_intensity_nd"
     for root_path in set_up:
         acc, times = get_common_vals(root_path, function)
-        with open(os.path.join(root_path, INPUT, function + "_g.P"), "rb") as load_file:
-            g = pickle.load(load_file)
-
         test_output = intensity_measures.get_arias_intensity_nd(acc, times)
 
         with open(
