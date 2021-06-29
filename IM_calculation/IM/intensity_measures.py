@@ -5,7 +5,7 @@ from qcore import timeseries
 from IM_calculation.IM.Burks_Baker_2013_elastic_inelastic import Bilinear_Newmark_withTH
 
 DELTA_T = 0.005
-G = 981.0
+G = 981.0  # cm/s^2
 
 
 def get_max_nd(data):
@@ -49,13 +49,7 @@ def get_spectral_acceleration_nd(acceleration, period, NT, DT):
 def get_SDI(acceleration, period, DT, z, alpha, dy, dt):
 
     return Bilinear_Newmark_withTH(
-        period,
-        z,
-        dy,
-        alpha,
-        acceleration * G / 100,  # Input is in m/s^2
-        DT,
-        dt,
+        period, z, dy, alpha, acceleration * G / 100, DT, dt  # Input is in m/s^2
     ).T
 
 

@@ -18,10 +18,10 @@ from qcore.im import order_im_cols_df
 
 from IM_calculation.Advanced_IM import advanced_IM_factory
 from IM_calculation.IM import read_waveform, intensity_measures
+from IM_calculation.IM.intensity_measures import G
 from IM_calculation.IM.computeFAS import get_fourier_spectrum
 
 
-G = 981.0
 DEFAULT_IMS = ("PGA", "PGV", "CAV", "AI", "Ds575", "Ds595", "MMI", "pSA")
 ALL_IMS = (
     "PGA",
@@ -364,8 +364,8 @@ def calculate_SDI(
     comps_to_store,
     comps_to_calculate,
     z=0.05,  # damping ratio
-    alpha=0.05,  # strain hardening ratios
-    dy=0.1765,
+    alpha=0.05,  # strain hardening ratio
+    dy=0.1765,  # strain hardening ratio
     dt=0.005,  # analysis time step
 ):
     # Get displacements by Burks_Baker_2013. Has shape (len(periods), nt-1, len(comps))
@@ -377,10 +377,7 @@ def calculate_SDI(
     # Store the SDI im values in the format dict(component: List(im_values))
     # Where the im_values in the component dictionaries correspond to the periods in the periods list
     sdi_values = array_to_dict(
-        np.max(np.abs(displacements), axis=1),
-        comps_to_calculate,
-        im,
-        comps_to_store,
+        np.max(np.abs(displacements), axis=1), comps_to_calculate, im, comps_to_store
     )
 
     if check_rotd(comps_to_store):
