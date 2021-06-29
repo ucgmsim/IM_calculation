@@ -197,10 +197,11 @@ def main():
     im_options = {}
 
     valid_periods = calc.validate_period(args.period, args.extended_period)
-    for periodic_im in ["pSA", "SDI"]:
-        if periodic_im in im:
-            im_options[periodic_im] = valid_periods
-
+    if "pSA" in im:
+        im_options["pSA"] = valid_periods
+    if "SDI" in im:
+        im_options["SDI"] = valid_periods
+    
     if "FAS" in im:
         im_options["FAS"] = calc.validate_fas_frequency(args.fas_frequency)
 
