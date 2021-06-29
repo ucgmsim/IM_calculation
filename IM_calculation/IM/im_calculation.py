@@ -179,7 +179,7 @@ def compute_measure_single(
             (DT, accelerations, im_options, result, station_name, waveform_acc),
         ),
         "FAS": (calc_FAS, (DT, accelerations, im_options, result, station_name)),
-        "AI": (calc_AI, (accelerations, G, times)),
+        "AI": (calc_AI, (accelerations, times)),
         "SED": (calc_SED, (velocities, times)),
         "MMI": (calc_MMI, (velocities,)),
         "Ds595": (calc_DS, (accelerations, DT, 5, 95)),
@@ -267,12 +267,12 @@ def calc_SED(velocities, times, im, comps_to_store, comps_to_calculate):
     return values
 
 
-def calc_AI(accelerations, G, times, im, comps_to_store, comps_to_calculate):
-    value = intensity_measures.get_arias_intensity_nd(accelerations, G, times)
+def calc_AI(accelerations, times, im, comps_to_store, comps_to_calculate):
+    value = intensity_measures.get_arias_intensity_nd(accelerations, times)
     values = array_to_dict(value, comps_to_calculate, im, comps_to_store)
     if check_rotd(comps_to_store):
         func = lambda x: intensity_measures.get_arias_intensity_nd(
-            np.squeeze(x), g=G, times=times
+            np.squeeze(x), times=times
         )
         rotd = calculate_rotd(accelerations, comps_to_store, func=func)
         values.update(rotd)

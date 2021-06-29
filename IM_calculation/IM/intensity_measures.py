@@ -126,10 +126,10 @@ def get_cumulative_abs_velocity_nd(acceleration, times):
     return np.trapz(np.abs(acceleration), times, axis=0)
 
 
-def get_arias_intensity_nd(acceleration, g, times):
-    acc_in_cms = acceleration * g
+def get_arias_intensity_nd(acceleration, times):
+    acc_in_cms = acceleration * G
     integrand = acc_in_cms ** 2
-    return np.pi / (2 * g) * np.trapz(integrand, times, axis=0)
+    return np.pi / (2 * G) * np.trapz(integrand, times, axis=0)
 
 
 def get_specific_energy_density_nd(velocity, times):
