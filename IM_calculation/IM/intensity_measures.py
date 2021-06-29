@@ -2,8 +2,10 @@ import numpy as np
 
 from IM_calculation.IM.rspectra_calculations import rspectra as rspectra
 from qcore import timeseries
+from IM_calculation.IM.Burks_Baker_2013_elastic_inelastic import Bilinear_Newmark_withTH
 
 DELTA_T = 0.005
+G = 981.0  # cm/s^2
 
 
 def get_max_nd(data):
@@ -42,6 +44,30 @@ def get_spectral_acceleration_nd(acceleration, period, NT, DT):
         return accelerations
     else:
         return get_spectral_acceleration(acceleration, period, NT, DT)
+
+
+def get_SDI(acceleration, period, DT, z, alpha, dy, dt):
+
+    return Bilinear_Newmark_withTH(
+        period, z, dy, alpha, acceleration * G / 100, DT, dt  # Input is in m/s^2
+    ).T
+
+
+def get_SDI_nd(acceleration, period, NT, DT, z, alpha, dy, dt):
+    # SDI
+    if acceleration.ndim != 1:
+        ts, dims = acceleration.shape
+        Nstep = calculate_Nstep(DT, NT)
+        displacements = np.zeros((period.size, Nstep - 1, dims))
+
+        for i in range(dims):
+            displacements[:, :, i] = get_SDI(
+                acceleration[:, i], period, DT, z, alpha, dy, dt
+            )
+
+        return displacements
+    else:
+        return get_SDI(acceleration, period, NT, DT, z, alpha, dy, dt)
 
 
 def calculate_Nstep(DT, NT):
@@ -100,10 +126,10 @@ def get_cumulative_abs_velocity_nd(acceleration, times):
     return np.trapz(np.abs(acceleration), times, axis=0)
 
 
-def get_arias_intensity_nd(acceleration, g, times):
-    acc_in_cms = acceleration * g
+def get_arias_intensity_nd(acceleration, times):
+    acc_in_cms = acceleration * G
     integrand = acc_in_cms ** 2
-    return np.pi / (2 * g) * np.trapz(integrand, times, axis=0)
+    return np.pi / (2 * G) * np.trapz(integrand, times, axis=0)
 
 
 def get_specific_energy_density_nd(velocity, times):

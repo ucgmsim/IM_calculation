@@ -18,10 +18,10 @@ from qcore.im import order_im_cols_df
 
 from IM_calculation.Advanced_IM import advanced_IM_factory
 from IM_calculation.IM import read_waveform, intensity_measures
+from IM_calculation.IM.intensity_measures import G
 from IM_calculation.IM.computeFAS import get_fourier_spectrum
-from IM_calculation.IM.Burks_Baker_2013_elastic_inelastic import Bilinear_Newmark_withTH
 
-G = 981.0
+
 DEFAULT_IMS = ("PGA", "PGV", "CAV", "AI", "Ds575", "Ds595", "MMI", "pSA")
 ALL_IMS = (
     "PGA",
@@ -34,10 +34,11 @@ ALL_IMS = (
     "pSA",
     "SED",
     "FAS",
-    "IESD",
+    "SDI",
 )
 
-MULTI_VALUE_IMS = ("pSA", "FAS", "IESD")
+
+MULTI_VALUE_IMS = ("pSA", "FAS", "SDI")
 
 FAS_FREQUENCY = np.logspace(-1, 2, num=100, base=10.0)
 
@@ -173,12 +174,12 @@ def compute_measure_single(
             calculate_pSAs,
             (DT, accelerations, im_options, result, station_name, waveform_acc),
         ),
-        "IESD": (
-            calculate_IESD,
+        "SDI": (
+            calculate_SDI,
             (DT, accelerations, im_options, result, station_name, waveform_acc),
         ),
         "FAS": (calc_FAS, (DT, accelerations, im_options, result, station_name)),
-        "AI": (calc_AI, (accelerations, G, times)),
+        "AI": (calc_AI, (accelerations, times)),
         "SED": (calc_SED, (velocities, times)),
         "MMI": (calc_MMI, (velocities,)),
         "Ds595": (calc_DS, (accelerations, DT, 5, 95)),
@@ -266,12 +267,12 @@ def calc_SED(velocities, times, im, comps_to_store, comps_to_calculate):
     return values
 
 
-def calc_AI(accelerations, G, times, im, comps_to_store, comps_to_calculate):
-    value = intensity_measures.get_arias_intensity_nd(accelerations, G, times)
+def calc_AI(accelerations, times, im, comps_to_store, comps_to_calculate):
+    value = intensity_measures.get_arias_intensity_nd(accelerations, times)
     values = array_to_dict(value, comps_to_calculate, im, comps_to_store)
     if check_rotd(comps_to_store):
         func = lambda x: intensity_measures.get_arias_intensity_nd(
-            np.squeeze(x), g=G, times=times
+            np.squeeze(x), times=times
         )
         rotd = calculate_rotd(accelerations, comps_to_store, func=func)
         values.update(rotd)
@@ -352,7 +353,7 @@ def calculate_pSAs(
                 ][i]
 
 
-def calculate_IESD(
+def calculate_SDI(
     DT,
     accelerations,
     im_options,
@@ -363,25 +364,33 @@ def calculate_IESD(
     comps_to_store,
     comps_to_calculate,
     z=0.05,  # damping ratio
-    alpha=0.05,  # strain hardening ratios
-    dy=0.025,  # strain hardening ratios
+    alpha=0.05,  # strain hardening ratio
+    dy=0.1765,  # strain hardening ratio
     dt=0.005,  # analysis time step
 ):
+    # Get displacements by Burks_Baker_2013. Has shape (len(periods), nt-1, len(comps))
+    displacements = intensity_measures.get_SDI_nd(
+        accelerations, im_options[im], waveform_acc.NT, DT, z, alpha, dy, dt
+    )
 
-    acc_values = array_to_dict(accelerations, comps_to_calculate, im, comps_to_store)
+    # Calculate the maximums of the basic components and pass this to array_to_dict which calculates geom too
+    # Store the SDI im values in the format dict(component: List(im_values))
+    # Where the im_values in the component dictionaries correspond to the periods in the periods list
+    sdi_values = array_to_dict(
+        np.max(np.abs(displacements), axis=1), comps_to_calculate, im, comps_to_store
+    )
+
+    if check_rotd(comps_to_store):
+        # Only run if any of the given components are selected (Non empty intersection)
+        sdi_values.update(calculate_rotd(displacements, comps_to_store))
+
     for comp in comps_to_store:
-        if comp.str_value in acc_values:
-            Sd = Bilinear_Newmark_withTH(
-                np.array(im_options[im]),
-                z,
-                dy,
-                alpha,
-                acc_values[comp.str_value],
-                waveform_acc.DT,
-                dt,
-            )
+        if comp.str_value in sdi_values:
             for i, val in enumerate(im_options[im]):
-                result[(station_name, comp.str_value)][f"{im}_{str(val)}"] = Sd[i]
+                result[(station_name, comp.str_value)][f"{im}_{str(val)}"] = (
+                    sdi_values[comp.str_value][i]
+                    * 100  # Burks & Baker returns m, but output is stored in cm
+                )
 
 
 def get_bbseis(input_path, file_type, selected_stations):
