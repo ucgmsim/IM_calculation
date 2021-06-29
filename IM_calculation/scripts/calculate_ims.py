@@ -201,7 +201,6 @@ def main():
         im_options["pSA"] = valid_periods
     if "SDI" in im:
         im_options["SDI"] = valid_periods
-    
     if "FAS" in im:
         im_options["FAS"] = calc.validate_fas_frequency(args.fas_frequency)
 
