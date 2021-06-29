@@ -365,8 +365,9 @@ def calculate_SDI(
         if comp.str_value in sdi_values:
             for i, val in enumerate(im_options[im]):
                 result[(station_name, comp.str_value)][f"{im}_{str(val)}"] = (
-                    sdi_values[comp.str_value][i] * 100
-                )  # output in cm
+                    sdi_values[comp.str_value][i]
+                    * 100  # Burks & Baker returns m, but output is stored in cm
+                )
 
 
 def get_bbseis(input_path, file_type, selected_stations):
