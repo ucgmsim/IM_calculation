@@ -19,13 +19,13 @@ from qcore.im import order_im_cols_df
 from IM_calculation.Advanced_IM import advanced_IM_factory
 from IM_calculation.IM import read_waveform, intensity_measures
 from IM_calculation.IM.computeFAS import get_fourier_spectrum
-from IM_calculation.IM.Burks_Baker_2013_elastic_inelastic import Bilinear_Newmark_withTH
+
 
 G = 981.0
 DEFAULT_IMS = ("PGA", "PGV", "CAV", "AI", "Ds575", "Ds595", "MMI", "pSA")
-ALL_IMS = ("PGA", "PGV", "CAV", "AI", "Ds575", "Ds595", "MMI", "pSA", "FAS", "IESD")
+ALL_IMS = ("PGA", "PGV", "CAV", "AI", "Ds575", "Ds595", "MMI", "pSA", "FAS", "SDI")
 
-MULTI_VALUE_IMS = ("pSA", "FAS", "IESD")
+MULTI_VALUE_IMS = ("pSA", "FAS", "SDI")
 
 FAS_FREQUENCY = np.logspace(-1, 2, num=100, base=10.0)
 
@@ -161,8 +161,8 @@ def compute_measure_single(
             calculate_pSAs,
             (DT, accelerations, im_options, result, station_name, waveform_acc),
         ),
-        "IESD": (
-            calculate_IESD,
+        "SDI": (
+            calculate_SDI,
             (DT, accelerations, im_options, result, station_name, waveform_acc),
         ),
         "FAS": (calc_FAS, (DT, accelerations, im_options, result, station_name)),
@@ -327,7 +327,7 @@ def calculate_pSAs(
                 ][i]
 
 
-def calculate_IESD(
+def calculate_SDI(
     DT,
     accelerations,
     im_options,
@@ -339,24 +339,30 @@ def calculate_IESD(
     comps_to_calculate,
     z=0.05,  # damping ratio
     alpha=0.05,  # strain hardening ratios
-    dy = 0.1765,
+    dy=0.1765,
     dt=0.005,  # analysis time step
 ):
+    SDIs = intensity_measures.get_SDI_nd(
+        accelerations, im_options[im], waveform_acc.NT, DT, z, alpha, dy, dt
+    )
 
-    acc_values = array_to_dict(accelerations, comps_to_calculate, im, comps_to_store)
+    sdi_values = array_to_dict(
+        np.max(np.abs(SDIs), axis=1),
+        comps_to_calculate,
+        im,
+        comps_to_store,
+    )
+
+    if check_rotd(comps_to_store):
+        # Only run if any of the given components are selected (Non empty intersection)
+        sdi_values.update(calculate_rotd(SDIs, comps_to_store))
+
     for comp in comps_to_store:
-        if comp.str_value in acc_values:
-            Sd = Bilinear_Newmark_withTH(
-                np.array(im_options[im]),
-                z,
-                dy,
-                alpha,
-                acc_values[comp.str_value]*G/100,#Input is in m/s^2
-                waveform_acc.DT,
-                dt,
-            )
+        if comp.str_value in sdi_values:
             for i, val in enumerate(im_options[im]):
-                result[(station_name, comp.str_value)][f"{im}_{str(val)}"] = Sd[i]*100 #output in cm
+                result[(station_name, comp.str_value)][f"{im}_{str(val)}"] = (
+                    sdi_values[comp.str_value][i] * 100
+                )  # output in cm
 
 
 def get_bbseis(input_path, file_type, selected_stations):

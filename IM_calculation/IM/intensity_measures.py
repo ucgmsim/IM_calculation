@@ -2,8 +2,10 @@ import numpy as np
 
 from IM_calculation.IM.rspectra_calculations import rspectra as rspectra
 from qcore import timeseries
+from IM_calculation.IM.Burks_Baker_2013_elastic_inelastic import Bilinear_Newmark_withTH
 
 DELTA_T = 0.005
+G = 981.0
 
 
 def get_max_nd(data):
@@ -42,6 +44,34 @@ def get_spectral_acceleration_nd(acceleration, period, NT, DT):
         return accelerations
     else:
         return get_spectral_acceleration(acceleration, period, NT, DT)
+
+
+def get_SDI(acceleration, period, DT, z, alpha, dy, dt):
+
+    return Bilinear_Newmark_withTH(
+        period,
+        z,
+        dy,
+        alpha,
+        acceleration * G / 100,  # Input is in m/s^2
+        DT,
+        dt,
+    ).T
+
+
+def get_SDI_nd(acceleration, period, NT, DT, z, alpha, dy, dt):
+    # SDI
+    if acceleration.ndim != 1:
+        ts, dims = acceleration.shape
+        Nstep = calculate_Nstep(DT, NT)
+        SDIs = np.zeros((period.size, Nstep - 1, dims))
+
+        for i in range(dims):
+            SDIs[:, :, i] = get_SDI(acceleration[:, i], period, DT, z, alpha, dy, dt)
+
+        return SDIs
+    else:
+        return get_SDI(acceleration, period, NT, DT, z, alpha, dy, dt)
 
 
 def calculate_Nstep(DT, NT):

@@ -134,7 +134,7 @@ def Bilinear_Newmark_withTH(
     # Hfs = fs
     # else:
 
-    return Sd  # , Sv, Sa, Hd, Hv, Ha, Hfs
+    return d  # return all displacements, not just the maximum Sd. This is to compute rotd if needed
 
 
 #
