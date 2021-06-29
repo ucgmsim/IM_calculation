@@ -105,17 +105,25 @@ def get_rotations(
 
     thetas = np.deg2rad(np.arange(min_angle, max_angle, delta_theta))
     rotation_matrices = np.asarray([np.cos(thetas), np.sin(thetas)])
-    periods, nt, xy = accelerations.shape
+    *rem, nt, xy = accelerations.shape
+    periods = 1
+
+    if len(rem) > 0:
+        periods = rem[0]
+
     rotds = np.zeros((periods, thetas.size))
 
     # Magic number empirically determined from runs on Maui
     step = int(np.floor(86000000 / (thetas.size * nt)))
     step = np.min([np.max([step, 1]), periods])
 
-    for period in range(0, periods, step):
-        rotds[period : period + step] = func(
-            np.dot(accelerations[period : period + step], rotation_matrices)
-        )
+    if periods == 1:
+        rotds = func(np.dot(accelerations, rotation_matrices))
+    else:
+        for period in range(0, periods, step):
+            rotds[period : period + step] = func(
+                np.dot(accelerations[period : period + step], rotation_matrices)
+            )
 
     return rotds
 
@@ -128,6 +136,11 @@ def get_arias_intensity_nd(acceleration, g, times):
     acc_in_cms = acceleration * g
     integrand = acc_in_cms ** 2
     return np.pi / (2 * g) * np.trapz(integrand, times, axis=0)
+
+
+def get_specific_energy_density_nd(velocity, times):
+    integrand = velocity ** 2
+    return np.trapz(integrand, times, axis=0)
 
 
 def calculate_MMI_nd(velocities):
