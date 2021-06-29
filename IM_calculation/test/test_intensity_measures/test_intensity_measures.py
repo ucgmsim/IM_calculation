@@ -135,7 +135,7 @@ def test_get_arias_intensity_nd(set_up):
         with open(os.path.join(root_path, INPUT, function + "_g.P"), "rb") as load_file:
             g = pickle.load(load_file)
 
-        test_output = intensity_measures.get_arias_intensity_nd(acc, g, times)
+        test_output = intensity_measures.get_arias_intensity_nd(acc, times)
 
         with open(
             os.path.join(root_path, OUTPUT, function + "_ret_val.P"), "rb"
