@@ -68,7 +68,9 @@ def Bilinear_Newmark_withTH(
     # % Interpolate p=-ag*m (linearly)
     p = -ag * m
     tg = np.linspace(0, ag.size - 1, ag.size) * dtg
-    t = np.linspace(0, tg[-1], int(tg[-1] / dt) + 1)  # num of steps increased from tg
+    t = np.linspace(
+        0, tg[-1], int(np.ceil(tg[-1] / dt)) + 1
+    )  # num of steps increased from tg
     p = np.interp(t, tg, p)  # interpolate for t
 
     lp = p.size
@@ -132,7 +134,9 @@ def Bilinear_Newmark_withTH(
     # Ha = a
     # Hfs = fs
 
-    return d  # return all displacements, not just the maximum Sd. This is to compute rotd if needed
+    return (
+        d
+    )  # return all displacements, not just the maximum Sd. This is to compute rotd if needed
 
 
 #
