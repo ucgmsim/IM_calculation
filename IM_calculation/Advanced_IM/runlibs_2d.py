@@ -89,7 +89,7 @@ def main(args, im_name, run_script):
                 f"{getattr(args,component.str_value)} failed to converged in previous run."
             )
             model_converged = False
-            break
+            continue
         # chech if successfully ran previously
         # skip this component if success
         if check_status(component_outdir):
@@ -111,7 +111,10 @@ def main(args, im_name, run_script):
         )
 
         try:
-            subprocess.run(script, timeout=int(args.timeout_threshold))
+            subprocess.run(
+                script,
+                timeout=int(args.timeout_threshold) if args.timeout_threshold else None,
+            )
         except subprocess.TimeoutExpired:
             # timeouted. save to timed_out instead of end_time
             end_time_type = time_type.timed_out.name
@@ -127,7 +130,6 @@ def main(args, im_name, run_script):
                 f"{component_outdir} failed to converge, skipping rest of the components"
             )
             model_converged = False
-            break
 
     station_name = os.path.basename(getattr(args, component_list[0].str_value)).split(
         "."
