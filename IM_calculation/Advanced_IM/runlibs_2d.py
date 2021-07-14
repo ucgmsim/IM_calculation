@@ -50,7 +50,10 @@ def parse_args():
     )
 
     parser.add_argument(
-        "--timeout_threshold", default=None, help="the timeout value in seconds"
+        "--timeout_threshold",
+        type=int,
+        default=None,
+        help="the timeout value in seconds",
     )
 
     args = parser.parse_args()
@@ -111,10 +114,7 @@ def main(args, im_name, run_script):
         )
 
         try:
-            subprocess.run(
-                script,
-                timeout=int(args.timeout_threshold) if args.timeout_threshold else None,
-            )
+            subprocess.run(script, timeout=args.timeout_threshold)
         except subprocess.TimeoutExpired:
             # timeouted. save to timed_out instead of end_time
             end_time_type = time_type.timed_out.name
