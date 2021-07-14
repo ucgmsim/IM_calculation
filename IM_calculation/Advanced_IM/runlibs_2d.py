@@ -92,6 +92,7 @@ def main(args, im_name, run_script):
                 f"{getattr(args,component.str_value)} failed to converged in previous run."
             )
             model_converged = False
+            # continue to check other components, as we should run all components even if one is not_converged
             continue
         # chech if successfully ran previously
         # skip this component if success
@@ -126,8 +127,10 @@ def main(args, im_name, run_script):
         # check for success message after a run
         # marked as failed if any component fail
         if not check_status(component_outdir):
+            # even if not conveged, script should still run other compoents, except geom.
+            # setting the mode_converge will prevent calculating geom and aggregate csv.
             print(
-                f"{component_outdir} failed to converge, skipping rest of the components"
+                f"{component_outdir} failed to converge. calculate geom and aggregate csv will be skipped"
             )
             model_converged = False
 
