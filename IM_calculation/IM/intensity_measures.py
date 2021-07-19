@@ -58,10 +58,14 @@ def get_SDI_nd(acceleration, period, NT, DT, z, alpha, dy, dt):
     if acceleration.ndim != 1:
         ts, dims = acceleration.shape
         Nstep = calculate_Nstep(DT, NT)
-        displacements = np.zeros((period.size, Nstep, dims))
+        displacements = None
 
         for i in range(dims):
             res = get_SDI(acceleration[:, i], period, DT, z, alpha, dy, dt)
+            if (
+                displacements is None
+            ):  # shape of displacements is determined after the first call
+                displacements = np.zeros((*res.shape, dims))
             displacements[:, :, i] = res
 
         return displacements
