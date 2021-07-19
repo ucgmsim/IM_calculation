@@ -78,7 +78,6 @@ optional arguments:
                         csvs
   -u {cm/s^2,g}, --units {cm/s^2,g}
                         The units that input acceleration files are in
-                        
 ```
 
 To create submission script for slurm workflow, refer to the script under gm_sim_workflow repository:
