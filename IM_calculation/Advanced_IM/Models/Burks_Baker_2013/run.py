@@ -10,7 +10,7 @@ import pandas as pd
 
 from IM_calculation.Advanced_IM import runlibs_2d
 from IM_calculation.IM.intensity_measures import get_geom
-from IM_calculation.IM import read_waveform, intensity_measures
+from IM_calculation.IM import intensity_measures
 
 from qcore.timeseries import read_ascii
 from qcore import constants
