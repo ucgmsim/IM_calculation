@@ -71,7 +71,7 @@ optional arguments:
                         components. Default is ellipsis
   -np PROCESS, --process PROCESS
                         Please provide the number of processors. Default is 2
-  --real_stats_only     Please add '-r' to indicate if you want to consider real stations only                        
+  --real_stats_only     Please add '--real_stats_only' to consider real stations only                        
   -s, --simple_output   Please add '-s' to indicate if you want to output the
                         big summary csv only(no single station csvs). Default
                         outputting both single station and the big summary
