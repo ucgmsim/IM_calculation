@@ -1,5 +1,5 @@
 """
-Python script to run a 3D waveform through Taghavi_Miranda_2005 and store the outputs to a txt file
+Python script to run a 3D waveform through Burks_Baker_2013_elastic_inelastic and store the outputs to a txt file
 """
 
 import logging
@@ -16,10 +16,11 @@ from IM_calculation.IM import read_waveform, intensity_measures
 from qcore.timeseries import read_ascii
 from qcore import constants
 from qcore.im import order_im_cols_df
+from qcore.constants import Components
 
 model_dir = os.path.dirname(__file__)
 
-COMPONENT = ["090", "000"]
+component_list = [Components.c000, Components.c090]
 
 STORIES = 10
 
@@ -57,7 +58,9 @@ def main(comp_000, comp_090, output_dir):
                     displacements = intensity_measures.get_SDI_nd(
                         accelerations, period, NT, DT, z, alpha, dy, dt
                     )
-                    sdi_values = np.max(np.abs(displacements), axis=1)
+                    sdi_values = (
+                        np.max(np.abs(displacements), axis=1) * 100
+                    )  # Burks & Baker returns m, but output is stored in cm
                     im_names = []
                     for t in period:
                         im_name = f"SDI_{t}_dy{dy}"  # we only vary dy at the moment
@@ -67,13 +70,11 @@ def main(comp_000, comp_090, output_dir):
                             ordered_columns_dict[t] = []
                         ordered_columns_dict[t].append(im_name)
 
-                    for i, component in enumerate(COMPONENT):
-                        if component not in results:
-                            results[component] = {}
+                    for i, component in enumerate(component_list):
+                        if component.str_value not in results:
+                            results[component.str_value] = {}
                         for j, im_name in enumerate(im_names):
-                            results[component][im_name] = (
-                                sdi_values[j, i] * 100
-                            )  # Burks & Baker returns m, but output is stored in cm
+                            results[component.str_value][im_name] = sdi_values[j, i]
 
     ordered_columns = []
     for t in period:
@@ -84,11 +85,18 @@ def main(comp_000, comp_090, output_dir):
     im_csv_fname = os.path.join(output_dir, "Burks_Baker_2013.csv")
     df = pd.DataFrame.from_dict(results, orient="index")
     df.index.name = "component"
-    geom = pd.Series(get_geom(df.loc["000"], df.loc["090"]), name="geom")
+    geom = pd.Series(
+        get_geom(df.loc[Components.c000.str_value], df.loc[Components.c090.str_value]),
+        name=Components.cgeom.str_value,
+    )
     df = df.append(geom)
     df[ordered_columns].to_csv(im_csv_fname)
 
 
 if __name__ == "__main__":
     args = runlibs_2d.parse_args()
-    main(args.comp_000, args.comp_090, args.output_dir)
+    main(
+        getattr(args, Components.c000.str_value),
+        getattr(args, Components.c090.str_value),
+        args.output_dir,
+    )

@@ -27,15 +27,15 @@ def parse_args():
     parser = argparse.ArgumentParser()
 
     parser.add_argument(
-        f"comp_{Components.c000.str_value}",
+        Components.c000.str_value,
         help="filepath to a station's 000 waveform ascii file",
     )
     parser.add_argument(
-        f"comp_{Components.c090.str_value}",
+        Components.c090.str_value,
         help="filepath to a station's 090 waveform ascii file",
     )
     parser.add_argument(
-        f"comp_{Components.cver.str_value}",
+        Components.cver.str_value,
         help="filepath to a station's ver waveform ascii file",
     )
     parser.add_argument(
