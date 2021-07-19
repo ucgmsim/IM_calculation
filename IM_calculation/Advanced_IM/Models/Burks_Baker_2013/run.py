@@ -10,12 +10,10 @@ import pandas as pd
 
 from IM_calculation.Advanced_IM import runlibs_2d
 from IM_calculation.IM.intensity_measures import get_geom
-from IM_calculation.IM.Burks_Baker_2013_elastic_inelastic import Bilinear_Newmark_withTH
 from IM_calculation.IM import read_waveform, intensity_measures
 
 from qcore.timeseries import read_ascii
 from qcore import constants
-from qcore.im import order_im_cols_df
 from qcore.constants import Components
 
 model_dir = os.path.dirname(__file__)
