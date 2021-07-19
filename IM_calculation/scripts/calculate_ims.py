@@ -140,7 +140,7 @@ def load_args():
     parser.add_argument(
         "--real_stats_only",
         action="store_true",
-        help="Please add '-r' to indicate if you want to consider real stations only",
+        help="Please add '--real_stats_only' to consider real stations only",
     )
 
     parser.add_argument(
