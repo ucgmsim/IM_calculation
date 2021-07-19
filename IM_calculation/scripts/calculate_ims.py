@@ -136,6 +136,13 @@ def load_args():
         type=int,
         help="Please provide the number of processors. Default is 1",
     )
+
+    parser.add_argument(
+        "--real_stats_only",
+        action="store_true",
+        help="Please add '-r' to indicate if you want to consider real stations only",
+    )
+
     parser.add_argument(
         "-s",
         "--simple_output",
@@ -238,6 +245,7 @@ def main():
         simple_output=args.simple_output,
         units=args.units,
         advanced_im_config=advanced_im_config,
+        real_only=args.real_stats_only,
     )
 
     print("Calculations are output to {}".format(args.output_path))
