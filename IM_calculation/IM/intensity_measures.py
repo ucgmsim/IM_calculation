@@ -57,7 +57,6 @@ def get_SDI_nd(acceleration, period, NT, DT, z, alpha, dy, dt):
     # SDI
     if acceleration.ndim != 1:
         ts, dims = acceleration.shape
-        Nstep = calculate_Nstep(DT, NT)
         displacements = None
 
         for i in range(dims):
