@@ -68,12 +68,16 @@ def Bilinear_Newmark_withTH(
     # % Interpolate p=-ag*m (linearly)
     p = -ag * m
 
-    tg = np.arange(
-        0, ag.size * dtg, dtg, dtype=float
+    tg = np.linspace(
+        0, ag.size * dtg - dtg, ag.size, dtype=float
     )  # Creating [ 0, dtg, 2*dtg.... (ag.size-1)*dtg ].
-    t = np.arange(
-        0, ag.size * dtg, dt, dtype=float
-    )  # For the same begin and end, create a range spaced by dt. num of steps increased from tg
+    t = np.linspace(
+        0, ag.size * dtg - dt, int(np.ceil((ag.size * dtg) / dt)), dtype=float
+    )  # For the same begin and end, create a range spaced by dt.
+    # the following two lines are more readable version, but the above is more relable with a non-interger step
+    # tg = np.arange(0, ag.size * dtg, dtg, dtype=float)
+    # t = np.arange(0, ag.size * dtg, dt, dtype=float)
+
     p = np.interp(t, tg, p)  # interpolate for t
 
     lp = p.size
