@@ -2,6 +2,8 @@
 Python script to run a 3D waveform through Burks_Baker_2013_elastic_inelastic and store the outputs to a txt file
 """
 
+import argparse
+
 import logging
 import os
 
@@ -11,6 +13,7 @@ import pandas as pd
 from IM_calculation.Advanced_IM import runlibs_2d
 from IM_calculation.IM.intensity_measures import get_geom
 from IM_calculation.IM import intensity_measures
+from IM_calculation.IM import im_calculation
 
 from qcore.timeseries import read_ascii
 from qcore import constants
@@ -19,7 +22,7 @@ from qcore.constants import Components
 model_dir = os.path.dirname(__file__)
 
 component_list = [Components.c000, Components.c090]
-
+rotd_comps = [Components.crotd50, Components.crotd100, Components.crotd100_50]
 STORIES = 10
 
 z_list = [0.05]  # damping ratio
@@ -29,7 +32,7 @@ dt_list = [0.005]
 period = np.array(constants.DEFAULT_PSA_PERIODS)
 
 
-def main(comp_000, comp_090, output_dir):
+def main(comp_000, comp_090, rotd, output_dir):
 
     os.makedirs(output_dir, exist_ok=True)
 
@@ -41,23 +44,26 @@ def main(comp_000, comp_090, output_dir):
     waveforms = {}
     waveforms["000"], meta = read_ascii(comp_000, meta=True)
     waveforms["090"] = read_ascii(comp_090)
-    DT = meta["dt"]
+    DT = np.float32(meta["dt"]) # to match the behaviour of basic SDI
     NT = meta["nt"]
 
     results = {}
 
-    accelerations = np.array((waveforms["090"], waveforms["000"])).T
+    accelerations = np.array((waveforms["000"], waveforms["090"])).T
     ordered_columns_dict = {}
 
     for z in z_list:
         for dt in dt_list:
             for alpha in alpha_list:
                 for dy in dy_list:
-                    displacements = intensity_measures.get_SDI_nd(
-                        accelerations, period, NT, DT, z, alpha, dy, dt
+                    displacements = (
+                        intensity_measures.get_SDI_nd(
+                            accelerations, period, NT, DT, z, alpha, dy, dt
+                        )
+                        * 100
                     )
-                    sdi_values = (
-                        np.max(np.abs(displacements), axis=1) * 100
+                    sdi_values = np.max(
+                        np.abs(displacements), axis=1
                     )  # Burks & Baker returns m, but output is stored in cm
                     im_names = []
                     for t in period:
@@ -73,6 +79,18 @@ def main(comp_000, comp_090, output_dir):
                             results[component.str_value] = {}
                         for j, im_name in enumerate(im_names):
                             results[component.str_value][im_name] = sdi_values[j, i]
+                    if not rotd:
+                        continue
+                    rotd_values = im_calculation.calculate_rotd(
+                        displacements, rotd_comps
+                    )
+                    for component in rotd_comps:
+                        if component.str_value not in results:
+                            results[component.str_value] = {}
+                        for j, im_name in enumerate(im_names):
+                            results[component.str_value][im_name] = rotd_values[
+                                component.str_value
+                            ][j]
 
     ordered_columns = []
     for t in period:
@@ -87,14 +105,31 @@ def main(comp_000, comp_090, output_dir):
         get_geom(df.loc[Components.c000.str_value], df.loc[Components.c090.str_value]),
         name=Components.cgeom.str_value,
     )
+
     df = df.append(geom)
+    new_index = component_list + [Components.cgeom]
+    if rotd:
+        new_index += rotd_comps
+    df = df.reindex([c.str_value for c in new_index])
     df[ordered_columns].to_csv(im_csv_fname)
 
 
+def parse_args():
+    # extended switch returns parser to allow extra arguments to be added
+    # SDI doesn't need ver component
+    parser = runlibs_2d.parse_args(extended=True, ver=False)
+    parser.add_argument("--rotd", action="store_true", help="compute rotd component")
+
+    args = parser.parse_args()
+
+    return args
+
+
 if __name__ == "__main__":
-    args = runlibs_2d.parse_args()
+    args = parse_args()
     main(
         getattr(args, Components.c000.str_value),
         getattr(args, Components.c090.str_value),
+        args.rotd,
         args.output_dir,
     )
