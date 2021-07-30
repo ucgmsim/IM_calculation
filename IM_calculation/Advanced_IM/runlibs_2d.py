@@ -25,7 +25,7 @@ class time_type(Enum):
 
 def parse_args(extended=False, ver=True):
     # if an Adv IM has extra arguments, set extended=True, which returns parser
-    # add extra ones to the returned parser
+    # Then add extra arguments to the returned parser
 
     parser = argparse.ArgumentParser()
 
