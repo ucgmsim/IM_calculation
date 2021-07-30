@@ -5,7 +5,7 @@ Python script to run a 3D waveform through Burks_Baker_2013_elastic_inelastic an
 import argparse
 
 import logging
-import os
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -19,8 +19,6 @@ from qcore.timeseries import read_ascii
 from qcore import constants
 from qcore.constants import Components
 
-model_dir = os.path.dirname(__file__)
-
 component_list = [Components.c000, Components.c090]
 rotd_comps = [Components.crotd50, Components.crotd100, Components.crotd100_50]
 STORIES = 10
@@ -32,11 +30,20 @@ dt_list = [0.005]
 period = np.array(constants.DEFAULT_PSA_PERIODS)
 
 
-def main(comp_000, comp_090, rotd, output_dir):
+def main(comp_000: Path, comp_090: Path, rotd: bool, output_dir: Path):
+    """
 
-    os.makedirs(output_dir, exist_ok=True)
+    Parameters
+    ----------
+    comp_000 : Path to 000 component waveform file
+    comp_090 : Path to 090 component waveform file
+    rotd : True if rotd components need to be computed
+    output_dir : Path to the output directory
+    """
 
-    log_file = os.path.join(output_dir, "log")
+    output_dir.mkdir(exist_ok=True)
+
+    log_file = output_dir / "log"
     logging.basicConfig(
         format="%(asctime)s %(message)s", filename=log_file, level=logging.DEBUG
     )
@@ -44,7 +51,7 @@ def main(comp_000, comp_090, rotd, output_dir):
     waveforms = {}
     waveforms["000"], meta = read_ascii(comp_000, meta=True)
     waveforms["090"] = read_ascii(comp_090)
-    DT = np.float32(meta["dt"]) # to match the behaviour of basic SDI
+    DT = np.float32(meta["dt"])  # to match the behaviour of basic SDI
     NT = meta["nt"]
 
     results = {}
@@ -62,9 +69,7 @@ def main(comp_000, comp_090, rotd, output_dir):
                         )
                         * 100  # Burks & Baker returns m, but output is stored in cm
                     )
-                    sdi_values = np.max(
-                        np.abs(displacements), axis=1
-                    )
+                    sdi_values = np.max(np.abs(displacements), axis=1)
                     im_names = []
                     for t in period:
                         im_name = f"SDI_{t}_dy{dy}"  # we only vary dy at the moment
@@ -98,7 +103,7 @@ def main(comp_000, comp_090, rotd, output_dir):
             ordered_columns_dict[t]
         )  # order by period first, then by dy
 
-    im_csv_fname = os.path.join(output_dir, "Burks_Baker_2013.csv")
+    im_csv_fname = output_dir / "Burks_Baker_2013.csv"
     df = pd.DataFrame.from_dict(results, orient="index")
     df.index.name = "component"
     geom = pd.Series(
@@ -128,8 +133,8 @@ def parse_args():
 if __name__ == "__main__":
     args = parse_args()
     main(
-        getattr(args, Components.c000.str_value),
-        getattr(args, Components.c090.str_value),
+        Path(getattr(args, Components.c000.str_value)),
+        Path(getattr(args, Components.c090.str_value)),
         args.rotd,
-        args.output_dir,
+        Path(args.output_dir),
     )
