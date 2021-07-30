@@ -60,7 +60,7 @@ def main(comp_000, comp_090, rotd, output_dir):
                         intensity_measures.get_SDI_nd(
                             accelerations, period, NT, DT, z, alpha, dy, dt
                         )
-                        * 100 # Burks & Baker returns m, but output is stored in cm
+                        * 100  # Burks & Baker returns m, but output is stored in cm
                     )
                     sdi_values = np.max(
                         np.abs(displacements), axis=1
