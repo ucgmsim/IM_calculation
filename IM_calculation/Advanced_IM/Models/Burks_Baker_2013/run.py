@@ -72,9 +72,9 @@ def main(comp_000: Path, comp_090: Path, rotd: bool, output_dir: Path):
                     sdi_values = np.max(np.abs(displacements), axis=1)
                     im_names = []
                     for t in period:
-                        im_name = f"SDI_{t}_dy{dy}"  # we only vary dy at the moment
+                        im_name = f"SDI_{t}_dy{dy}_a{alpha}_dt{dt}_z{z}"
                         im_names.append(im_name)
-                        # for each period, we will have a list of im_names varying dy. to help ordering columns later
+                        # for each period, we will have a list of im_names varying dy,alpha,dt and z, to help ordering columns later
                         if t not in ordered_columns_dict:
                             ordered_columns_dict[t] = []
                         ordered_columns_dict[t].append(im_name)
@@ -101,7 +101,7 @@ def main(comp_000: Path, comp_090: Path, rotd: bool, output_dir: Path):
     for t in period:
         ordered_columns.extend(
             ordered_columns_dict[t]
-        )  # order by period first, then by dy
+        )  # order by period first, then by dy, alpha, dt and z
 
     im_csv_fname = output_dir / "Burks_Baker_2013.csv"
     df = pd.DataFrame.from_dict(results, orient="index")
