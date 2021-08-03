@@ -16,7 +16,8 @@ pipeline {
                 cd /tmp/${env.JOB_NAME}
                 rm -rf qcore
                 git clone https://github.com/ucgmsim/qcore.git
-                pip install --no-deps ./qcore/
+		cd qcore
+                python setup.py install --no-data --user --no-deps
 		mkdir -p ${env.WORKSPACE}/${env.JOB_NAME}/IM/rspectra_calculations/
 		mkdir -p ${env.WORKSPACE}/${env.JOB_NAME}/IM/iesdr_calculation/
 		ln -s $HOME/data/testing/${env.JOB_NAME}/rspectra.cpython-37m-x86_64-linux-gnu.so ${env.WORKSPACE}/${env.JOB_NAME}/IM/rspectra_calculations/
