@@ -31,9 +31,7 @@ class Waveform:
 
 
 def read_ascii_file(
-    comp_files,
-    comp=(Components.c090, Components.c000),
-    wave_type=None,
+    comp_files, comp=(Components.c090, Components.c000), wave_type=None,
 ):
     waveform = Waveform()
     waveform.wave_type = wave_type
