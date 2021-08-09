@@ -17,7 +17,6 @@ import IM_calculation.IM.im_calculation as calc
 from IM_calculation.Advanced_IM import advanced_IM_factory
 from qcore import utils
 from qcore import constants
-from IM_calculation.IM.im_calculation import check_rotd
 
 
 def load_args():
