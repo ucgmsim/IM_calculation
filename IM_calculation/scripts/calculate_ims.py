@@ -221,11 +221,11 @@ def main():
     if args.advanced_ims is not None:
         components = advanced_IM_factory.COMP_DICT.keys()
         extra_flags = {}
-        # TODO: this could utilize check_rotd(), but adds extra complexity handling enums..
         # TODO: more elegant solution could be desired if more IMs need special care
         for adv_im in args.advanced_ims:
             extra_flags[adv_im] = []
             if adv_im == "Burks_Baker_2013":
+                # TODO: this could utilize check_rotd(), but adds extra complexity handling enums..
                 if set(["rotd50", "rotd100", "rotd100_50"]).intersection(
                     args.components
                 ):
