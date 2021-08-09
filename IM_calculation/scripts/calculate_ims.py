@@ -17,6 +17,7 @@ import IM_calculation.IM.im_calculation as calc
 from IM_calculation.Advanced_IM import advanced_IM_factory
 from qcore import utils
 from qcore import constants
+from IM_calculation.IM.im_calculation import check_rotd
 
 
 def load_args():
@@ -220,9 +221,15 @@ def main():
     station_names = args.station_names
     if args.advanced_ims is not None:
         components = advanced_IM_factory.COMP_DICT.keys()
+        extra_flags = []
+        if "Burks_Baker_2013" in args.advanced_ims and set(
+            ["rotd50", "rotd100", "rotd100_50"]
+        ).intersection(args.components):
+            extra_flags.append("--rotd")
         advanced_im_config = advanced_IM_factory.advanced_im_config(
-            args.advanced_ims, args.advanced_im_config, args.OpenSees_path
+            args.advanced_ims, args.advanced_im_config, args.OpenSees_path, extra_flags
         )
+
     else:
         components = args.components
         advanced_im_config = None

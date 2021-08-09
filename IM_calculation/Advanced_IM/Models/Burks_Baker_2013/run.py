@@ -41,7 +41,7 @@ def main(comp_000: Path, comp_090: Path, rotd: bool, output_dir: Path):
     output_dir : Path to the output directory
     """
 
-    output_dir.mkdir(exist_ok=True)
+    output_dir.mkdir(parents=True, exist_ok=True)
 
     log_file = output_dir / "log"
     logging.basicConfig(

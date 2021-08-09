@@ -34,3 +34,4 @@ Taghavi_Miranda_2005:
 Burks_Baker_2013:
   script_location: 'Models/Burks_Baker_2013/run.py'
   timeout_threshold: null
+  required_components: ['000','090']
