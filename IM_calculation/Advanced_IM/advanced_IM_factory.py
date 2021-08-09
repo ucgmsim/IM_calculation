@@ -67,7 +67,7 @@ def compute_ims(accelerations, configuration, adv_im_out_dir):
                     ["--timeout_threshold", str(im_config["timeout_threshold"])]
                 )
             # add im specific flags
-            script.extend(configuration.extra_flags)
+            script.extend(configuration.extra_flags[im])
             print(" ".join(script))
             subprocess.run(script)
 

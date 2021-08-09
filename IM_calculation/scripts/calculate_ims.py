@@ -220,13 +220,16 @@ def main():
     station_names = args.station_names
     if args.advanced_ims is not None:
         components = advanced_IM_factory.COMP_DICT.keys()
-        extra_flags = []
+        extra_flags = {}
         # TODO: this could utilize check_rotd(), but adds extra complexity handling enums..
         # TODO: more elegant solution could be desired if more IMs need special care
-        if "Burks_Baker_2013" in args.advanced_ims and set(
-            ["rotd50", "rotd100", "rotd100_50"]
-        ).intersection(args.components):
-            extra_flags.append("--rotd")
+        for adv_im in args.advanced_ims:
+            extra_flags[adv_im] = []
+            if adv_im == "Burks_Baker_2013":
+                if set(["rotd50", "rotd100", "rotd100_50"]).intersection(
+                    args.components
+                ):
+                    extra_flags[adv_im].append("--rotd")
         advanced_im_config = advanced_IM_factory.advanced_im_config(
             args.advanced_ims, args.advanced_im_config, args.OpenSees_path, extra_flags
         )
