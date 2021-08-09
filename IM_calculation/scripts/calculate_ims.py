@@ -221,15 +221,20 @@ def main():
     if args.advanced_ims is not None:
         components = advanced_IM_factory.COMP_DICT.keys()
         extra_flags = {}
-        # TODO: more elegant solution could be desired if more IMs need special care
+        # TODO: when more IMs need special care, refactor the following block
         for adv_im in args.advanced_ims:
             extra_flags[adv_im] = []
-            if adv_im == "Burks_Baker_2013":
-                # TODO: this could utilize check_rotd(), but adds extra complexity handling enums..
-                if set(["rotd50", "rotd100", "rotd100_50"]).intersection(
-                    args.components
-                ):
+            # TODO: this could utilize check_rotd(), but adds extra complexity handling enums..
+            if set(["rotd50", "rotd100", "rotd100_50"]).intersection(args.components):
+                if adv_im == "Burks_Baker_2013":
                     extra_flags[adv_im].append("--rotd")
+                else:
+                    print(
+                        "rotd calculations are not available for {}: ignored".format(
+                            adv_im
+                        )
+                    )
+
         advanced_im_config = advanced_IM_factory.advanced_im_config(
             args.advanced_ims, args.advanced_im_config, args.OpenSees_path, extra_flags
         )
