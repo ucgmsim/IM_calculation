@@ -23,7 +23,10 @@ class time_type(Enum):
     timed_out = 2
 
 
-def parse_args():
+def parse_args(extended=False, ver=True):
+    # if an Adv IM has extra arguments, set extended=True, which returns parser
+    # Then add extra arguments to the returned parser
+
     parser = argparse.ArgumentParser()
 
     parser.add_argument(
@@ -34,10 +37,11 @@ def parse_args():
         Components.c090.str_value,
         help="filepath to a station's 090 waveform ascii file",
     )
-    parser.add_argument(
-        Components.cver.str_value,
-        help="filepath to a station's ver waveform ascii file",
-    )
+    if ver:
+        parser.add_argument(
+            Components.cver.str_value,
+            help="filepath to a station's ver waveform ascii file",
+        )
     parser.add_argument(
         "output_dir",
         help="Where the IM_csv file is written to. Also contains the temporary recorders output",
@@ -56,9 +60,10 @@ def parse_args():
         help="the timeout value in seconds",
     )
 
-    args = parser.parse_args()
-
-    return args
+    if not extended:
+        return parser.parse_args()
+    else:
+        return parser
 
 
 def datetime_to_file(t_value, t_type: str, out_dir):

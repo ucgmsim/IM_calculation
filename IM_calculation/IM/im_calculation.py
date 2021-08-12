@@ -12,7 +12,7 @@ from typing import List, Iterable
 import numpy as np
 import pandas as pd
 
-from qcore import timeseries, constants
+from qcore import timeseries, constants, shared
 from qcore.constants import Components
 from qcore.im import order_im_cols_df
 
@@ -369,9 +369,12 @@ def calculate_SDI(
     dt=0.005,  # analysis time step
 ):
     # Get displacements by Burks_Baker_2013. Has shape (len(periods), nt-1, len(comps))
-    displacements = intensity_measures.get_SDI_nd(
-        accelerations, im_options[im], waveform_acc.NT, DT, z, alpha, dy, dt
-    )
+    displacements = (
+        intensity_measures.get_SDI_nd(
+            accelerations, im_options[im], waveform_acc.NT, DT, z, alpha, dy, dt
+        )
+        * 100
+    )  # Burks & Baker returns m, but output is stored in cm
 
     # Calculate the maximums of the basic components and pass this to array_to_dict which calculates geom too
     # Store the SDI im values in the format dict(component: List(im_values))
@@ -387,17 +390,17 @@ def calculate_SDI(
     for comp in comps_to_store:
         if comp.str_value in sdi_values:
             for i, val in enumerate(im_options[im]):
-                result[(station_name, comp.str_value)][f"{im}_{str(val)}"] = (
-                    sdi_values[comp.str_value][i]
-                    * 100  # Burks & Baker returns m, but output is stored in cm
-                )
+                result[(station_name, comp.str_value)][f"{im}_{str(val)}"] = sdi_values[
+                    comp.str_value
+                ][i]
 
 
-def get_bbseis(input_path, file_type, selected_stations):
+def get_bbseis(input_path, file_type, selected_stations, real_only=False):
     """
     :param input_path: user input path to bb.bin or a folder containing ascii files
     :param file_type: binary or ascii
     :param selected_stations: list of user input stations
+    :param real_only: considers real stations only
     :return: bbseries, station_names
     """
     bbseries = None
@@ -423,7 +426,14 @@ def get_bbseis(input_path, file_type, selected_stations):
                 )
     else:
         return
-    return bbseries, list(station_names)
+    station_names = list(station_names)
+    if real_only:
+        station_names = [
+            stat_name
+            for stat_name in station_names
+            if not shared.is_virtual_station(stat_name)
+        ]
+    return bbseries, station_names
 
 
 def compute_measures_multiprocess(
@@ -443,6 +453,7 @@ def compute_measures_multiprocess(
     simple_output=False,
     units="g",
     advanced_im_config=None,
+    real_only=False,
 ):
     """
     using multiprocesses to compute measures.
@@ -462,6 +473,9 @@ def compute_measures_multiprocess(
     :param version:
     :param process:
     :param simple_output:
+    :param units:
+    :param advanced_im_config:
+    :param real_only:
     :return:
     """
     #  for running adv_im
@@ -474,7 +488,9 @@ def compute_measures_multiprocess(
         components_to_store,
     ) = constants.Components.get_comps_to_calc_and_store(comp)
 
-    bbseries, station_names = get_bbseis(input_path, file_type, station_names)
+    bbseries, station_names = get_bbseis(
+        input_path, file_type, station_names, real_only=real_only
+    )
     total_stations = len(station_names)
     # determine the size of each iteration base on num of processes and mem
     steps = get_steps(
