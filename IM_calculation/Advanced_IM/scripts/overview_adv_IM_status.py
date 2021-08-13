@@ -2,11 +2,10 @@
 # coding: utf-8
 
 import argparse
-import glob
-import os.path
-import pandas as pd
 from pathlib import Path
 import sys
+
+import pandas as pd
 
 from qcore import simulation_structure
 
@@ -27,7 +26,7 @@ PATTERN_TEMPLATE = {
 }
 
 
-def process(type, model, sim_root, outdir, pattern=None, verbose=False):
+def aggregate_status_files(type, model, sim_root, outdir, pattern=None, verbose=False):
     search_pattern = PATTERN_TEMPLATE.get(type, pattern) + f"/{model}_status.csv"
     print(f"Searching for {sim_root}/{search_pattern}")
 
@@ -47,7 +46,6 @@ def process(type, model, sim_root, outdir, pattern=None, verbose=False):
         event_status_df = pd.read_csv(event_status_file)
         event_status_dict[event_name] = {"total": 0}
         for status in ALL_STATUS:
-
             count = event_status_df["status"].value_counts().get(status, 0)
             event_status_dict[event_name][status] = count
             event_status_dict[event_name]["total"] += count
@@ -110,23 +108,20 @@ def main():
 
     args = parser.parse_args()
 
-    if not args.sim_root.is_dir():
-        raise AssertionError("Provide a valid directory path")
+    assert args.sim_root.is_dir(), "Provide a valid directory path"
 
     if args.type == "custom":
-        if args.pattern is None:
-            raise AssertionError("Type custom must have a search pattern")
-        else:
-            args.pattern = args.pattern.strip(
-                "/"
-            )  # remove leading or trailing "/" (if any)
+        assert args.pattern is not None, "Type custom must have a search pattern"
+        args.pattern = args.pattern.strip(
+            "/"
+        )  # remove leading or trailing "/" (if any)
     else:
         if args.pattern is not None:
             print(
                 f"Warning: Type {args.type} uses pre-defined search pattern - supplied one ignored"
             )
 
-    process(
+    aggregate_status_files(
         args.type, args.model, args.sim_root, args.outdir, args.pattern, args.verbose
     )
 
