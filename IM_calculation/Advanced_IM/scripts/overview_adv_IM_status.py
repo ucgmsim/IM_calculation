@@ -27,15 +27,15 @@ PATTERN_TEMPLATE = {
 }
 
 
-def process(type, model, path, outdir, pattern=None, verbose=False):
+def process(type, model, sim_root, outdir, pattern=None, verbose=False):
     search_pattern = PATTERN_TEMPLATE.get(type, pattern) + f"/{model}_status.csv"
-    print(f"Searching for {path}/{search_pattern}")
+    print(f"Searching for {sim_root}/{search_pattern}")
 
-    event_status_files = list(path.glob(search_pattern))
+    event_status_files = list(sim_root.glob(search_pattern))
 
     if len(event_status_files) == 0:
-        print(f"Error:No status files found at {path}")
-        print(f"Check the root_path, model and search pattern")
+        print(f"Error:No status files found at {sim_root}/{search_pattern}")
+        print(f"Check the sim_root, model and search pattern")
         sys.exit(0)
 
     event_status_dict = {}
@@ -80,7 +80,7 @@ def process(type, model, path, outdir, pattern=None, verbose=False):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "root_path",
+        "sim_root",
         type=Path,
         help="Root path of GM sim.ie. Parent directory of Runs or ObservedGroundMotions",
     )
@@ -110,7 +110,7 @@ def main():
 
     args = parser.parse_args()
 
-    if not args.root_path.is_dir():
+    if not args.sim_root.is_dir():
         raise AssertionError("Provide a valid directory path")
 
     if args.type == "custom":
@@ -127,7 +127,7 @@ def main():
             )
 
     process(
-        args.type, args.model, args.root_path, args.outdir, args.pattern, args.verbose
+        args.type, args.model, args.sim_root, args.outdir, args.pattern, args.verbose
     )
 
 
