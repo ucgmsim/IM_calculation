@@ -23,6 +23,17 @@ class time_type(Enum):
     timed_out = 2
 
 
+
+class analysis_status(Enum):
+    not_started = 0
+    finished = 1
+    not_converged = 2
+    not_finished = 3
+    timed_out = 4
+    crashed = 5
+    unknown = 6
+
+
 def parse_args(extended=False, ver=True):
     # if an Adv IM has extra arguments, set extended=True, which returns parser
     # Then add extra arguments to the returned parser

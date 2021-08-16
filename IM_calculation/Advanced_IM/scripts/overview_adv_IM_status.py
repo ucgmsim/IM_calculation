@@ -7,16 +7,12 @@ import sys
 
 import pandas as pd
 
+from IM_calculation.Advanced_IM.runlibs_2d import analysis_status
 from qcore import simulation_structure
 
-ALL_STATUS = [
-    "finished",
-    "not_started",
-    "not_converged",
-    "not_finished",
-    "timed_out",
-    "crashed",
-    "unknown",
+# want to show "finished" first
+ALL_STATUS = [analysis_status.finished.name] + [
+    analysis_status(x).name for x in analysis_status if x != analysis_status.finished
 ]
 TYPES = ["sim", "obs", "custom"]
 
