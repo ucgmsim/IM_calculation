@@ -22,6 +22,7 @@ class time_type(Enum):
     end_time = 1
     timed_out = 2
 
+
 class analysis_status(Enum):
     not_started = 0
     finished = 1
