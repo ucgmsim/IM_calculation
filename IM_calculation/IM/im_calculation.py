@@ -433,6 +433,7 @@ def get_bbseis(input_path, file_type, selected_stations, real_only=False):
             for stat_name in station_names
             if not shared.is_virtual_station(stat_name)
         ]
+    assert len(station_names) > 0, "No station is found"
     return bbseries, station_names
 
 
@@ -675,6 +676,7 @@ def get_steps(input_path, nps, total_stations, high_mem_usage=False):
     if high_mem_usage:
         estimated_mem *= MEM_FACTOR
     available_mem = nps * MEM_PER_CORE
+    assert estimated_mem > 0, f"Estimated memory is 0: Check {input_path}"
     batches = np.ceil(np.divide(estimated_mem, available_mem))
     steps = int(np.floor(np.divide(total_stations, batches)))
     if steps == 0:
