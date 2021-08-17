@@ -123,7 +123,13 @@ def parse_args():
     # extended switch returns parser to allow extra arguments to be added
     # SDI doesn't need ver component
     parser = runlibs_2d.parse_args(extended=True, ver=False)
-    parser.add_argument("--rotd", action="store_true", help="compute rotd component")
+    parser.add_argument(
+        "--norotd",
+        action="store_false",
+        default=True,
+        dest="rotd",
+        help="skip computing rotd component",
+    )
 
     args = parser.parse_args()
 

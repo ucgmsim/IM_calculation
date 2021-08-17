@@ -14,7 +14,7 @@ advanced_im_dir = os.path.dirname(__file__)
 CONFIG_FILE_NAME = os.path.join(advanced_im_dir, "advanced_im_config.yaml")
 
 advanced_im_config = namedtuple(
-    "advanced_im_config", ["IM_list", "config_file", "OpenSees_path", "extra_flags"]
+    "advanced_im_config", ["IM_list", "config_file", "OpenSees_path"]
 )
 COMP_DICT = {"090": 0, "000": 1, "ver": 2}
 
@@ -66,8 +66,6 @@ def compute_ims(accelerations, configuration, adv_im_out_dir):
                 script.extend(
                     ["--timeout_threshold", str(im_config["timeout_threshold"])]
                 )
-            # add im specific flags
-            script.extend(configuration.extra_flags[im])
             print(" ".join(script))
             subprocess.run(script)
 

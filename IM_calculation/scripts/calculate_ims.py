@@ -123,7 +123,6 @@ def load_args():
         "--components",
         nargs="+",
         choices=list(constants.Components.iterate_str_values()),
-        default=[constants.Components.cgeom.str_value],
         help="Please provide the velocity/acc component(s) you want to calculate eg.geom."
         " Available components are: {} components. Default is geom".format(
             ",".join(constants.Components.iterate_str_values())
@@ -171,6 +170,14 @@ def load_args():
 
     args = parser.parse_args()
 
+    if args.advanced_ims is not None and args.components is not None:
+        parser.error(
+            "-c (--components) and -a (--advanced_ims) can not be both specified"
+        )
+
+    if args.components is None:
+        args.components = [constants.Components.cgeom.str_value]
+
     if constants.Components.ceas.str_value in args.components:
         wrong_ims = ""
         if "FAS" not in args.im:
@@ -190,6 +197,7 @@ def load_args():
             )
 
     calc.validate_input_path(parser, args.input_path, args.file_type)
+
     return args
 
 
@@ -220,23 +228,8 @@ def main():
     station_names = args.station_names
     if args.advanced_ims is not None:
         components = advanced_IM_factory.COMP_DICT.keys()
-        extra_flags = {}
-        # TODO: when more IMs need special care, refactor the following block
-        for adv_im in args.advanced_ims:
-            extra_flags[adv_im] = []
-            # TODO: this could utilize check_rotd(), but adds extra complexity handling enums..
-            if set(["rotd50", "rotd100", "rotd100_50"]).intersection(args.components):
-                if adv_im == "Burks_Baker_2013":
-                    extra_flags[adv_im].append("--rotd")
-                else:
-                    print(
-                        "rotd calculations are not available for {}: ignored".format(
-                            adv_im
-                        )
-                    )
-
         advanced_im_config = advanced_IM_factory.advanced_im_config(
-            args.advanced_ims, args.advanced_im_config, args.OpenSees_path, extra_flags
+            args.advanced_ims, args.advanced_im_config, args.OpenSees_path
         )
 
     else:
