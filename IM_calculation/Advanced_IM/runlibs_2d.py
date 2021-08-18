@@ -1,20 +1,24 @@
 import argparse
 import datetime
-from enum import Enum, auto
+from enum import Enum
 import glob
 import os
 import subprocess
 
-import numpy as np
 import pandas as pd
 
 from qcore.constants import Components
+from qcore.utils import load_yaml
 from IM_calculation.IM.intensity_measures import get_geom
 
 DEFAULT_OPEN_SEES_PATH = "OpenSees"
 DF_INDEX_NAME = "component"
 
 TIME_FORMAT = "%Y-%m-%d %H:%M:%S"
+
+advanced_im_dir = os.path.dirname(__file__)
+CONFIG_FILE_NAME = os.path.join(advanced_im_dir, "advanced_im_config.yaml")
+im_config = load_yaml(CONFIG_FILE_NAME)
 
 
 class time_type(Enum):
@@ -33,25 +37,25 @@ class analysis_status(Enum):
     unknown = 6
 
 
-def parse_args(extended=False, ver=True):
+def parse_args(im_name=None, extended=False):
     # if an Adv IM has extra arguments, set extended=True, which returns parser
     # Then add extra arguments to the returned parser
 
+    # waveform components can be sometimes im_name specific
+    comp_list = ["000", "090", "ver"]
+    if im_name is not None:
+        try:
+            comp_list = im_config[im_name]["required_components"]
+        except KeyError:
+            pass  # stick to the default comp_list
+
     parser = argparse.ArgumentParser()
 
-    parser.add_argument(
-        Components.c000.str_value,
-        help="filepath to a station's 000 waveform ascii file",
-    )
-    parser.add_argument(
-        Components.c090.str_value,
-        help="filepath to a station's 090 waveform ascii file",
-    )
-    if ver:
+    for comp in comp_list:
         parser.add_argument(
-            Components.cver.str_value,
-            help="filepath to a station's ver waveform ascii file",
+            comp, help=f"filepath to a station's {comp} waveform ascii file"
         )
+
     parser.add_argument(
         "output_dir",
         help="Where the IM_csv file is written to. Also contains the temporary recorders output",

@@ -1,11 +1,9 @@
 from collections import namedtuple
-import numpy as np
 import pandas as pd
 import os
 import re
 import subprocess
 import tempfile
-import yaml
 
 from qcore.timeseries import seis2txt
 from qcore.utils import load_yaml
@@ -53,9 +51,7 @@ def compute_ims(accelerations, configuration, adv_im_out_dir):
                 os.path.join(advanced_im_dir, im_config["script_location"]),
             ]
             # waveform component sequence
-            comp_list = ["000", "090", "ver"]
-            if "required_components" in im_config:
-                comp_list = im_config["required_components"]
+            comp_list = im_config.get("required_components", ["000", "090", "ver"])
 
             script.extend([get_acc_filename(f_dir, station_name, x) for x in comp_list])
             script.extend([out_dir])
