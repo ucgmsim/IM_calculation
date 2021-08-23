@@ -12,7 +12,7 @@ if { $argc != 2 } {
 puts "Start Analyzing..."
 
 set run_flag 0
-set FEMs Sac_Steel_MF_9Story 
+set FEMs SAC_Steel_MF_9Story 
 
 puts "FEMs=$FEMs"
 puts " "
