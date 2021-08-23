@@ -87,7 +87,7 @@ if __name__ == "__main__":
     station_mask = np.ones(station_df.shape[0], dtype=bool)
     if args.fd_station_file:
         fd_stations_df = load_station_file(args.fd_station_file)
-        station_mask = np.isin(station_df.index.values, fd_stations_df)
+        station_mask = np.isin(station_df.index.values, fd_stations_df.index.values)
     elif args.stations:
         station_mask = np.isin(station_df.index.values, args.stations)
 
