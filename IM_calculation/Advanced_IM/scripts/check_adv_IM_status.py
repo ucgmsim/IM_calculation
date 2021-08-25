@@ -15,17 +15,12 @@ import pandas as pd
 
 from qcore import constants as const
 from qcore.formats import load_station_file
-from IM_calculation.Advanced_IM.runlibs_2d import check_status, TIME_FORMAT, time_type
-
-
-class analysis_status(Enum):
-    not_started = 0
-    finished = 1
-    not_converged = 2
-    not_finished = 3
-    timed_out = 4
-    crashed = 5
-    unknown = 6
+from IM_calculation.Advanced_IM.runlibs_2d import (
+    check_status,
+    analysis_status,
+    TIME_FORMAT,
+    time_type,
+)
 
 
 COLUMN_NAMES = [
