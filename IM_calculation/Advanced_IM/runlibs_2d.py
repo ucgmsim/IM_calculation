@@ -142,7 +142,7 @@ def main(args, im_name, run_script):
         # check for success message after a run
         # marked as failed if any component fail
         if not check_status(component_outdir):
-            # even if not conveged, script should still run other compoents, except geom.
+            # even if not converged, script should still run other components, except geom.
             # setting the mode_converge will prevent calculating geom and aggregate csv.
             print(
                 f"{component_outdir} failed to converge. calculate geom and aggregate csv will be skipped"

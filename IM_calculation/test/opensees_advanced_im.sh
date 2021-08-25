@@ -18,7 +18,7 @@ if [[ ! -f $runpy_path ]];then
 fi
 
 mag_catagory=${2:-small}
-waveform_dir=$DIR/waveforms/$mag_catagory/
+waveform_dir=$DIR/waveforms/${mag_catagory}_magnitude/
 station_name=`basename $waveform_dir/*.000 | cut -d. -f1`
 if [[ $? != 0 ]];then
     exit
