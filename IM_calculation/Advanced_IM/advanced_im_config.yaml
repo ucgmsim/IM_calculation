@@ -34,3 +34,13 @@ Taghavi_Miranda_2005:
 Burks_Baker_2013:
   script_location: 'Models/Burks_Baker_2013/run.py'
   timeout_threshold: null
+Haselton_RC_4Story:
+  script_location: 'Models/Haselton_RC_4Story/run.py'
+  timeout_threshold: null
+Haselton_RC_12Story:
+  script_location: 'Models/Haselton_RC_12Story/run.py'
+  timeout_threshold: null
+Haselton_RC_20Story:
+  script_location: 'Models/Haselton_RC_20Story/run.py'
+  timeout_threshold: null
+
