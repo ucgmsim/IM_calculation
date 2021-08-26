@@ -213,7 +213,7 @@ def main():
 
     # Create output dir
     utils.setup_dir(args.output_path)
-    if not args.simple_output:
+    if not args.simple_output and args.advanced_ims is None:
         utils.setup_dir(os.path.join(args.output_path, calc.OUTPUT_SUBFOLDER))
 
     # TODO: this may need to be updated to read file if the length of list becomes an issue
