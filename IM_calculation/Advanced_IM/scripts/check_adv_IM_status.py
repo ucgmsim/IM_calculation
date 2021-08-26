@@ -63,10 +63,11 @@ def parse_args():
     )
 
     parser.add_argument(
-        "--station_file",
+        "--stations",
         default=None,
+        nargs="+",
         type=str,
-        help="if set, script will only check for folder-names that match the station file",
+        help="list of stations to check",
     )
 
     # saves output
@@ -150,14 +151,14 @@ def check_log(list_folders, model, components, df_model, break_on_fail=False):
     return df_model
 
 
-def main(im_calc_dir, adv_im_model, components, simple_check=False, station_file=None):
+def main(im_calc_dir, adv_im_model, components, simple_check=False, stations=None):
 
     df_list = []
     for model in adv_im_model:
         csv_path = os.path.join(im_calc_dir, "{}.csv".format(model))
 
-        if station_file is not None:
-            station_list = load_station_file(station_file).index.tolist()
+        if stations is not None:
+            station_list = stations
         else:
             # glob for station folders
             # station_list = [ y for y in [os.path.join(im_calc_dir, x) for x in os.listdir(im_calc_dir)] if os.path.isdir(y) ]
@@ -216,12 +217,14 @@ def main(im_calc_dir, adv_im_model, components, simple_check=False, station_file
     result_code = 0b00
     for df, model_name in df_list:
         # check if any status >= 3 or != 0
-        if df["status"].ge(analysis_status.not_finished.value).any():
-            print(f"{model_name} have errors. Please check the status.csv")
+        df_ge_3 = df["status"].ge(analysis_status.not_finished.value)
+        if df_ge_3.any():
+            print(f"{model_name} errors count {df_ge_3.sum()}\n {df[df_ge_3]}")
             result_code = result_code | 0b10
-        if df["status"].eq(analysis_status.not_started.value).any():
+        df_eq_0 = df["status"].eq(analysis_status.not_started.value)
+        if df_eq_0.any():
             print(
-                f"{model_name} has some stations that havent been analysed. Please check status.csv"
+                f"{model_name} has {df_eq_0.sum()} stations that havent been analysed.\n {df[df_eq_0]}"
             )
             result_code = result_code | 0b01
         # sort index by status
@@ -230,6 +233,8 @@ def main(im_calc_dir, adv_im_model, components, simple_check=False, station_file
         df["status"] = df["status"].map(lambda x: analysis_status(x).name)
         status_csv_path = os.path.join(im_calc_dir, "{}_status.csv".format(model_name))
         df.to_csv(status_csv_path, header=True, index=True)
+    if result_code == 0b00:
+        print("All analysis completed without error")
     return result_code
 
 
@@ -240,6 +245,6 @@ if __name__ == "__main__":
         args.adv_im_model,
         args.components,
         simple_check=args.simple_check,
-        station_file=args.station_file,
+        stations=args.stations,
     )
     sys.exit(res)
