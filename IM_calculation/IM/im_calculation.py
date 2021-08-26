@@ -15,6 +15,7 @@ import pandas as pd
 from qcore import timeseries, constants, shared
 from qcore.constants import Components
 from qcore.im import order_im_cols_df
+from qcore.progress_tracker import ProgressTracker
 
 from IM_calculation.Advanced_IM import advanced_IM_factory
 from IM_calculation.IM import read_waveform, intensity_measures
@@ -502,9 +503,8 @@ def compute_measures_multiprocess(
     if not running_adv_im:
         all_results = []
 
-    with Pool(process) as p:
-        i = 0
-        while i < total_stations:
+    with Pool(process) as p, ProgressTracker(total_stations) as p_t:
+        for i in range(0, total_stations, steps):
             # read waveforms of stations
             # each iteration = steps size
             stations_to_run = station_names[i : i + steps]
@@ -517,7 +517,6 @@ def compute_measures_multiprocess(
                 file_type=file_type,
                 units=units,
             )
-            i += steps
             # only run basic im if and only if adv_im not going to run
             if running_adv_im:
                 adv_array_params = [
@@ -537,6 +536,7 @@ def compute_measures_multiprocess(
                     for waveform in waveforms
                 ]
                 all_results.extend(p.starmap(compute_measure_single, array_params))
+            p_t(i)
 
     if running_adv_im:
         # read, agg and store csv
