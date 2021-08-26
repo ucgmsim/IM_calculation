@@ -29,7 +29,7 @@ dy_list = [0.1765, 0.4, 0.6]  # strain hardening ratio
 dt_list = [0.005]
 period = np.array(constants.DEFAULT_PSA_PERIODS)
 
-im_name = Path(__file__).parent.name
+IM_NAME = Path(__file__).parent.name
 
 
 def main(comp_000: Path, comp_090: Path, rotd: bool, output_dir: Path):
@@ -105,7 +105,7 @@ def main(comp_000: Path, comp_090: Path, rotd: bool, output_dir: Path):
             ordered_columns_dict[t]
         )  # order by period first, then by dy, alpha, dt and z
 
-    im_csv_fname = output_dir / f"{im_name}.csv"
+    im_csv_fname = output_dir / f"{IM_NAME}.csv"
     df = pd.DataFrame.from_dict(results, orient="index")
     df.index.name = "component"
     geom = pd.Series(
@@ -124,7 +124,7 @@ def main(comp_000: Path, comp_090: Path, rotd: bool, output_dir: Path):
 def parse_args():
     # extended switch returns parser to allow extra arguments to be added
     # SDI doesn't need ver component
-    parser = runlibs_2d.parse_args(im_name, extended=True)
+    parser = runlibs_2d.parse_args(IM_NAME, extended=True)
     parser.add_argument(
         "--norotd",
         action="store_false",
