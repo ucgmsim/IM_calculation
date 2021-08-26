@@ -123,8 +123,7 @@ def main(comp_000: Path, comp_090: Path, rotd: bool, output_dir: Path):
 
 def parse_args():
     # extended switch returns parser to allow extra arguments to be added
-    # SDI doesn't need ver component
-    parser = runlibs_2d.parse_args(IM_NAME, extended=True)
+    parser = runlibs_2d.parse_args(extended=True)
     parser.add_argument(
         "--norotd",
         action="store_false",

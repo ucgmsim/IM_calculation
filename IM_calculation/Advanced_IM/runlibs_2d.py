@@ -8,7 +8,6 @@ import subprocess
 import pandas as pd
 
 from qcore.constants import Components
-from qcore.utils import load_yaml
 from IM_calculation.IM.intensity_measures import get_geom
 
 DEFAULT_OPEN_SEES_PATH = "OpenSees"
@@ -33,7 +32,7 @@ class analysis_status(Enum):
     unknown = 6
 
 
-def parse_args(im_name=None, extended=False):
+def parse_args(extended=False):
     # if an Adv IM has extra arguments, set extended=True, which returns parser
     # Then add extra arguments to the returned parser
 
