@@ -51,7 +51,7 @@ def compute_ims(accelerations, configuration, adv_im_out_dir):
                 os.path.join(advanced_im_dir, im_config["script_location"]),
             ]
             # waveform component sequence
-            comp_list = im_config.get("required_components", ["000", "090", "ver"])
+            comp_list = ["000", "090", "ver"]
 
             script.extend([get_acc_filename(f_dir, station_name, x) for x in comp_list])
             script.extend([out_dir])
