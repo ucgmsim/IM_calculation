@@ -16,10 +16,6 @@ DF_INDEX_NAME = "component"
 
 TIME_FORMAT = "%Y-%m-%d %H:%M:%S"
 
-advanced_im_dir = os.path.dirname(__file__)
-CONFIG_FILE_NAME = os.path.join(advanced_im_dir, "advanced_im_config.yaml")
-im_config = load_yaml(CONFIG_FILE_NAME)
-
 
 class time_type(Enum):
     start_time = 0
@@ -41,20 +37,23 @@ def parse_args(im_name=None, extended=False):
     # if an Adv IM has extra arguments, set extended=True, which returns parser
     # Then add extra arguments to the returned parser
 
-    # waveform components can be sometimes im_name specific
-    comp_list = ["000", "090", "ver"]
-    if im_name is not None:
-        try:
-            comp_list = im_config[im_name]["required_components"]
-        except KeyError:
-            pass  # stick to the default comp_list
-
     parser = argparse.ArgumentParser()
 
-    for comp in comp_list:
-        parser.add_argument(
-            comp, help=f"filepath to a station's {comp} waveform ascii file"
-        )
+    parser.add_argument(
+        Components.c000.str_value,
+        help="filepath to a station's 000 waveform ascii file",
+    )
+    parser.add_argument(
+        Components.c090.str_value,
+        help="filepath to a station's 090 waveform ascii file",
+    )
+
+    parser.add_argument(
+        Components.cver.str_value,
+        nargs="?",
+        default=None,
+        help="filepath to a station's ver waveform ascii file (not needed for some IMs)",
+    )
 
     parser.add_argument(
         "output_dir",

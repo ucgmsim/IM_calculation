@@ -140,6 +140,9 @@ def parse_args():
 
 if __name__ == "__main__":
     args = parse_args()
+
+    if args.ver is not None:
+        print(f"Info: Component ver is ignored: {args.ver}")
     main(
         Path(getattr(args, Components.c000.str_value)),
         Path(getattr(args, Components.c090.str_value)),
