@@ -58,10 +58,12 @@ def compute_ims(accelerations, configuration, adv_im_out_dir):
 
             script.extend(["--OpenSees_path", f"{configuration.OpenSees_path}"])
             # if timeout no None, add timeout
-            if im_config["timeout_threshold"] is not None:
+            if type(im_config["timeout_threshold"]) is int:
                 script.extend(
                     ["--timeout_threshold", str(im_config["timeout_threshold"])]
                 )
+            else:
+                print("invalid value for timeout_threshold. will use default value.")
             print(" ".join(script))
             subprocess.run(script)
 
