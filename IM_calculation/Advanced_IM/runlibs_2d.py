@@ -64,7 +64,10 @@ def parse_args(extended=False, ver=True):
     )
 
     parser.add_argument(
-        "--timeout_threshold", default=None, help="the timeout value in seconds"
+        "--timeout_threshold",
+        type=int,
+        default=None,
+        help="the timeout value in seconds",
     )
 
     if not extended:
@@ -104,7 +107,8 @@ def main(args, im_name, run_script):
                 f"{getattr(args,component.str_value)} failed to converged in previous run."
             )
             model_converged = False
-            break
+            # continue to check other components, as we should run all components even if one is not_converged
+            continue
         # chech if successfully ran previously
         # skip this component if success
         if check_status(component_outdir):
@@ -126,7 +130,7 @@ def main(args, im_name, run_script):
         )
 
         try:
-            subprocess.run(script, timeout=int(args.timeout_threshold))
+            subprocess.run(script, timeout=args.timeout_threshold)
         except subprocess.TimeoutExpired:
             # timeouted. save to timed_out instead of end_time
             end_time_type = time_type.timed_out.name
@@ -138,11 +142,12 @@ def main(args, im_name, run_script):
         # check for success message after a run
         # marked as failed if any component fail
         if not check_status(component_outdir):
+            # even if not converged, script should still run other components, except geom.
+            # setting the mode_converge will prevent calculating geom and aggregate csv.
             print(
-                f"{component_outdir} failed to converge, skipping rest of the components"
+                f"{component_outdir} failed to converge. calculate geom and aggregate csv will be skipped"
             )
             model_converged = False
-            break
 
     station_name = os.path.basename(getattr(args, component_list[0].str_value)).split(
         "."
