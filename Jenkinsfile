@@ -16,14 +16,11 @@ pipeline {
                 cd /tmp/${env.JOB_NAME}
                 rm -rf qcore
                 git clone https://github.com/ucgmsim/qcore.git
-		cd qcore
-                python setup.py install --no-data --user
-		mkdir -p ${env.WORKSPACE}/${env.JOB_NAME}/IM/rspectra_calculations/
-		mkdir -p ${env.WORKSPACE}/${env.JOB_NAME}/IM/iesdr_calculation/
-		ln -s $HOME/data/testing/${env.JOB_NAME}/rspectra.cpython-37m-x86_64-linux-gnu.so ${env.WORKSPACE}/${env.JOB_NAME}/IM/rspectra_calculations/
+		        mkdir -p ${env.WORKSPACE}/${env.JOB_NAME}/IM/rspectra_calculations/
+		        ln -s $HOME/data/testing/${env.JOB_NAME}/rspectra.cpython-37m-x86_64-linux-gnu.so ${env.WORKSPACE}/${env.JOB_NAME}/IM/rspectra_calculations/
                 ln -s $HOME/data/testing/${env.JOB_NAME}/sample0 ${env.WORKSPACE}/${env.JOB_NAME}/test
-		cd ${env.WORKSPACE}
-		python travis_setup.py
+        		cd ${env.WORKSPACE}
+		        python travis_setup.py
                 """
             }
         }
@@ -33,6 +30,7 @@ pipeline {
                 sh """
                 source /var/lib/jenkins/py3env/bin/activate
                 cd ${env.WORKSPACE}/${env.JOB_NAME}
+                PYTHONPATH=/tmp/${env.JOB_NAME}/qcore
                 pytest --black --ignore=test
                 cd test
                 pytest -vs
@@ -46,7 +44,6 @@ pipeline {
                 echo 'Tear down the environments'
                 sh """
                 rm -rf /tmp/${env.JOB_NAME}/*
-                docker container prune -f
                 """
             }
     }
