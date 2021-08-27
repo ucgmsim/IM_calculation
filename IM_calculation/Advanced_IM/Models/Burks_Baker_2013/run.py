@@ -29,6 +29,8 @@ dy_list = [0.1765, 0.4, 0.6]  # strain hardening ratio
 dt_list = [0.005]
 period = np.array(constants.DEFAULT_PSA_PERIODS)
 
+IM_NAME = Path(__file__).parent.name
+
 
 def main(comp_000: Path, comp_090: Path, rotd: bool, output_dir: Path):
     """
@@ -41,7 +43,7 @@ def main(comp_000: Path, comp_090: Path, rotd: bool, output_dir: Path):
     output_dir : Path to the output directory
     """
 
-    output_dir.mkdir(exist_ok=True)
+    output_dir.mkdir(parents=True, exist_ok=True)
 
     log_file = output_dir / "log"
     logging.basicConfig(
@@ -103,7 +105,7 @@ def main(comp_000: Path, comp_090: Path, rotd: bool, output_dir: Path):
             ordered_columns_dict[t]
         )  # order by period first, then by dy, alpha, dt and z
 
-    im_csv_fname = output_dir / "Burks_Baker_2013.csv"
+    im_csv_fname = output_dir / f"{IM_NAME}.csv"
     df = pd.DataFrame.from_dict(results, orient="index")
     df.index.name = "component"
     geom = pd.Series(
@@ -121,9 +123,14 @@ def main(comp_000: Path, comp_090: Path, rotd: bool, output_dir: Path):
 
 def parse_args():
     # extended switch returns parser to allow extra arguments to be added
-    # SDI doesn't need ver component
-    parser = runlibs_2d.parse_args(extended=True, ver=False)
-    parser.add_argument("--rotd", action="store_true", help="compute rotd component")
+    parser = runlibs_2d.parse_args(extended=True)
+    parser.add_argument(
+        "--norotd",
+        action="store_false",
+        default=True,
+        dest="rotd",
+        help="skip computing rotd component",
+    )
 
     args = parser.parse_args()
 
@@ -132,6 +139,9 @@ def parse_args():
 
 if __name__ == "__main__":
     args = parse_args()
+
+    if args.ver is not None:
+        print(f"Info: Component ver is ignored: {args.ver}")
     main(
         Path(getattr(args, Components.c000.str_value)),
         Path(getattr(args, Components.c090.str_value)),
