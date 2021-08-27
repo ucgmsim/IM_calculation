@@ -1,11 +1,10 @@
 import argparse
 import datetime
-from enum import Enum, auto
+from enum import Enum
 import glob
 import os
 import subprocess
 
-import numpy as np
 import pandas as pd
 
 from qcore.constants import Components
@@ -33,7 +32,7 @@ class analysis_status(Enum):
     unknown = 6
 
 
-def parse_args(extended=False, ver=True):
+def parse_args(extended=False):
     # if an Adv IM has extra arguments, set extended=True, which returns parser
     # Then add extra arguments to the returned parser
 
@@ -47,11 +46,14 @@ def parse_args(extended=False, ver=True):
         Components.c090.str_value,
         help="filepath to a station's 090 waveform ascii file",
     )
-    if ver:
-        parser.add_argument(
-            Components.cver.str_value,
-            help="filepath to a station's ver waveform ascii file",
-        )
+
+    parser.add_argument(
+        Components.cver.str_value,
+        nargs="?",
+        default=None,
+        help="filepath to a station's ver waveform ascii file (not needed for some IMs)",
+    )
+
     parser.add_argument(
         "output_dir",
         help="Where the IM_csv file is written to. Also contains the temporary recorders output",
