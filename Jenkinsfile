@@ -30,7 +30,7 @@ pipeline {
                 sh """
                 source /var/lib/jenkins/py3env/bin/activate
                 cd ${env.WORKSPACE}/${env.JOB_NAME}
-                PYTHONPATH=/tmp/${env.JOB_NAME}/${env.ghprbActualCommit}/qcore
+                export PYTHONPATH=/tmp/${env.JOB_NAME}/${env.ghprbActualCommit}/qcore:${env.WORKSPACE}/${env.JOB_NAME}
                 pytest --black --ignore=test
                 cd test
                 pytest -vs
