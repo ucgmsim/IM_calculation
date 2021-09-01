@@ -228,7 +228,7 @@ def calc_PG(waveform, im, comps_to_store, comps_to_calculate):
     value = intensity_measures.get_max_nd(waveform)
     values = array_to_dict(value, comps_to_calculate, im, comps_to_store)
     if check_rotd(comps_to_store):
-        rotd = calculate_rotd(waveform, comps_to_store)
+        rotd = calculate_rotd(waveform, comps_to_store, func=lambda x: np.max(np.abs(x), axis=0))
         sanitise_single_value_arrays(rotd)
         values.update(rotd)
     return values
