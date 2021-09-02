@@ -21,15 +21,12 @@ pipeline {
                     cd ${env.WORKSPACE}
                     echo "[ Install dependencies ]"
                     pip install -r requirements.txt
-    
+                    echo "[ Install qcore ]"
                     cd /tmp/${env.JOB_NAME}/${env.ghprbActualCommit}
                     rm -rf qcore
                     git clone https://github.com/ucgmsim/qcore.git
                     cd qcore
                     python setup.py install --no-data
-
-                    
-                    
                 """
             }
         }
@@ -43,7 +40,7 @@ pipeline {
                     echo "[ Python used ] : " `which python`
                     cd ${env.WORKSPACE}
                     echo "[ Installing ${env.JOB_NAME} ]"
-# full installation is not possible as it takes more than 3.0Gb for building
+# full installation is not possible as it takes more than 3.0Gb for building and kilss the server
 #                    python setup.py install
                     python setup.py build_ext --inplace
 		            python konno_setup.py
@@ -64,7 +61,7 @@ pipeline {
         always {
                 echo 'Tear down the environments'
                 sh """
-#                rm -rf /tmp/${env.JOB_NAME}/*
+                    rm -rf /tmp/${env.JOB_NAME}/*
                 """
             }
     }
