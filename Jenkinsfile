@@ -47,7 +47,7 @@ pipeline {
                     python setup.py build_ext --inplace
 		            python travis_setup.py
                     echo "[ Linking test data ]"
-                    rm ${env.WORKSPACE}/${env.JOB_NAME}/test/sample0
+                    rm -f ${env.WORKSPACE}/${env.JOB_NAME}/test/sample0
                     ln -s $HOME/data/testing/${env.JOB_NAME}/sample0 ${env.WORKSPACE}/${env.JOB_NAME}/test
                     echo "[ Run test now ]"
                     cd ${env.JOB_NAME}/test
@@ -61,7 +61,7 @@ pipeline {
         always {
                 echo 'Tear down the environments'
                 sh """
-                rm -rf /tmp/${env.JOB_NAME}/*
+#                rm -rf /tmp/${env.JOB_NAME}/*
                 """
             }
     }
