@@ -9,9 +9,11 @@ from distutils.command.build_py import build_py
 from distutils.extension import Extension
 
 import numpy
+import sys
 
 from Cython.Distutils import build_ext
 
+NO_KONNO_ARG = "--no-konno"
 
 class build_konno_matricies(build_py):
     """Post-installation for development mode."""
@@ -24,6 +26,11 @@ class build_konno_matricies(build_py):
         createKonnoMatrices(self.build_lib)
         build_py.run(self)
 
+CMD_CLASS={"build_ext": build_ext, "build_py": build_konno_matricies}
+if NO_KONNO_ARG in sys.argv:
+    print(f"Skip compiling konno: if necessary, try python konno_setup.py")
+    sys.argv.remove(NO_KONNO_ARG)
+    CMD_CLASS.pop("build_py")
 
 setup(
     name="IM-calc",
@@ -32,7 +39,7 @@ setup(
     url="https://github.com/ucgmsim/IM_calculation",
     description="IM calculation code",
     install_requires=["numpy>=1.14.3", "numba>=0.43.1", "Cython", "obspy", "pandas"],
-    cmdclass={"build_ext": build_ext, "build_py": build_konno_matricies},
+    cmdclass=CMD_CLASS,
     package_data={"": ["*.yaml"]},
     ext_modules=[
         Extension(

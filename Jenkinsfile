@@ -43,12 +43,15 @@ pipeline {
                     echo "[ Python used ] : " `which python`
                     cd ${env.WORKSPACE}
                     echo "[ Installing ${env.JOB_NAME} ]"
-   # full installation is not possible due to memory alloc failure (2.0Gib) for Konno 16385
+# full installation is not possible as it takes more than 3.0Gb for building
+#                    python setup.py install
                     python setup.py build_ext --inplace
-		            python travis_setup.py
+		            python konno_setup.py
                     echo "[ Linking test data ]"
                     rm -f ${env.WORKSPACE}/${env.JOB_NAME}/test/sample0
-                    ln -s $HOME/data/testing/${env.JOB_NAME}/sample0 ${env.WORKSPACE}/${env.JOB_NAME}/test
+                    mkdir -p ${env.WORKSPACE}/${env.JOB_NAME}/test/sample0
+                    ln -s $HOME/data/testing/${env.JOB_NAME}/sample0/input ${env.WORKSPACE}/${env.JOB_NAME}/test/sample0
+                    ln -s $HOME/data/testing/${env.JOB_NAME}/sample0/output ${env.WORKSPACE}/${env.JOB_NAME}/test/sample0
                     echo "[ Run test now ]"
                     cd ${env.JOB_NAME}/test
                     pytest -s
