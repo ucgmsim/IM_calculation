@@ -1,39 +1,56 @@
 pipeline {
     agent any
     stages {
-        stage('Install dependencies') {
-            steps {
-                echo 'Install dependencies on Jenkins server (maybe unnecessary if test runs inside Docker)'
 
+        stage('Settin up env') {
+            steps {
+                echo "[[ Start virtual environment ]]"
                 sh """
-                pwd
-                env
-                source /var/lib/jenkins/py3env/bin/activate
-                cd ${env.WORKSPACE}
-                pip install -r requirements.txt
-                echo ${env.JOB_NAME}
-                mkdir -p /tmp/${env.JOB_NAME}/${env.ghprbActualCommit}
-                cd /tmp/${env.JOB_NAME}/${env.ghprbActualCommit}
-                rm -rf qcore
-                git clone https://github.com/ucgmsim/qcore.git
-		        mkdir -p ${env.WORKSPACE}/${env.JOB_NAME}/IM/rspectra_calculations/
-		        ln -s $HOME/data/testing/${env.JOB_NAME}/rspectra.cpython-37m-x86_64-linux-gnu.so ${env.WORKSPACE}/${env.JOB_NAME}/IM/rspectra_calculations/
-                ln -s $HOME/data/testing/${env.JOB_NAME}/sample0 ${env.WORKSPACE}/${env.JOB_NAME}/test
-        		cd ${env.WORKSPACE}
-		        python travis_setup.py
+                    echo "[ Current directory ] : " `pwd`
+                    echo "[ Environment Variables ] "
+                    env
+# Each stage needs custom setting done again. By default /bin/python is used.
+                    source /var/lib/jenkins/py3env/bin/activate
+                    mkdir -p /tmp/${env.JOB_NAME}/${env.ghprbActualCommit}
+# I don't know how to create a variable within Jenkinsfile (please let me know)
+#                   export virtenv=/tmp/${env.JOB_NAME}/${env.ghprbActualCommit}/venv
+                    python -m venv /tmp/${env.JOB_NAME}/${env.ghprbActualCommit}/venv
+# activate new virtual env
+                    source /tmp/${env.JOB_NAME}/${env.ghprbActualCommit}/venv/bin/activate
+                    echo "[ Python used ] : " `which python`
+                    cd ${env.WORKSPACE}
+                    echo "[ Install dependencies ]"
+                    pip install -r requirements.txt
+    
+                    cd /tmp/${env.JOB_NAME}/${env.ghprbActualCommit}
+                    rm -rf qcore
+                    git clone https://github.com/ucgmsim/qcore.git
+                    cd qcore
+                    python setup.py install --no-data
+
+                    
+                    
                 """
             }
         }
+
         stage('Run regression tests') {
             steps {
-                echo 'Run pytest'
+                echo '[[ Run pytest ]]'
                 sh """
-                source /var/lib/jenkins/py3env/bin/activate
-                cd ${env.WORKSPACE}/${env.JOB_NAME}
-                export PYTHONPATH=/tmp/${env.JOB_NAME}/${env.ghprbActualCommit}/qcore:${env.WORKSPACE}/${env.JOB_NAME}
-                pytest --black --ignore=test
-                cd test
-                pytest -vs
+# activate virtual environment again
+                    source /tmp/${env.JOB_NAME}/${env.ghprbActualCommit}/venv/bin/activate
+                    echo "[ Python used ] : " `which python`
+                    cd ${env.WORKSPACE}
+                    echo "[ Installing ${env.JOB_NAME} ]"
+   # full installation is not possible due to memory alloc failure (2.0Gib) for Konno 16385
+                    python setup.py build_ext --inplace
+		            python travis_setup.py
+                    echo "[ Linking test data ]"
+                    ln -s $HOME/data/testing/${env.JOB_NAME}/sample0 ${env.WORKSPACE}/${env.JOB_NAME}/test
+                    echo "[ Run test now ]"
+                    cd ${env.JOB_NAME}/test
+                    pytest -s
                 """
             }
         }
