@@ -48,12 +48,13 @@ pipeline {
                     python setup.py build_ext --inplace
 		            python konno_setup.py
                     echo "[ Linking test data ]"
-                    rm -f ${env.WORKSPACE}/${env.JOB_NAME}/test/sample0
-                    mkdir -p ${env.WORKSPACE}/${env.JOB_NAME}/test/sample0
-                    ln -s $HOME/data/testing/${env.JOB_NAME}/sample0/input ${env.WORKSPACE}/${env.JOB_NAME}/test/sample0
-                    ln -s $HOME/data/testing/${env.JOB_NAME}/sample0/output ${env.WORKSPACE}/${env.JOB_NAME}/test/sample0
-                    echo "[ Run test now ]"
                     cd ${env.JOB_NAME}/test
+                    rm -f sample0
+                    mkdir sample0
+                    ln -s $HOME/data/testing/${env.JOB_NAME}/sample0/input sample0
+                    ln -s $HOME/data/testing/${env.JOB_NAME}/sample0/output sample0
+                    ls sample/*
+                    echo "[ Run test now ]"
                     pytest -s
                 """
             }
