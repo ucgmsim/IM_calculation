@@ -100,10 +100,17 @@ def check_rotd(comps_to_store: Iterable[Components]) -> bool:
 def calculate_rotd(
     accelerations,
     comps_to_store: List[Components],
-    func=lambda x: np.max(np.abs(x), axis=1),
+    func=lambda x: np.max(np.abs(x), axis=-2),
 ):
     """
     Calculates rotd for given accelerations
+
+    Multiplying the waveforms by the rotation matrices gives an array with shape either
+    (periods, nt, n_rotations) (for pSA) or (nt, n_rotations) (for single dimension IMs).
+    The max is taken over the second axis from the rear (nt),
+    so for pSA we get an array with shape (periods, n_rotations), while single dimension IMs gets (n_rotations)
+    Which is then taken the median for RotD50 and the maximum for RotD100
+
     :param accelerations: An array with shape [[periods.size,] nt, 2]
         where the first axis is optional and if present is equal to the number of periods in the intensity measure.
         nt is the number of timesteps in the original waveform
@@ -228,7 +235,7 @@ def calc_PG(waveform, im, comps_to_store, comps_to_calculate):
     value = intensity_measures.get_max_nd(waveform)
     values = array_to_dict(value, comps_to_calculate, im, comps_to_store)
     if check_rotd(comps_to_store):
-        rotd = calculate_rotd(waveform, comps_to_store, func=lambda x: np.max(np.abs(x), axis=0))
+        rotd = calculate_rotd(waveform, comps_to_store)
         sanitise_single_value_arrays(rotd)
         values.update(rotd)
     return values
