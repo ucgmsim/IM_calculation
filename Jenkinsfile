@@ -53,7 +53,6 @@ pipeline {
                     mkdir sample0
                     ln -s $HOME/data/testing/${env.JOB_NAME}/sample0/input sample0
                     ln -s $HOME/data/testing/${env.JOB_NAME}/sample0/output sample0
-                    ls sample/*
                     echo "[ Run test now ]"
                     pytest -s
                 """
