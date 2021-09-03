@@ -46,7 +46,7 @@ pipeline {
 		            python konno_setup.py
                     echo "[ Linking test data ]"
                     cd ${env.JOB_NAME}/test
-                    rm -f sample0
+                    rm -rf sample0
                     mkdir sample0
                     ln -s $HOME/data/testing/${env.JOB_NAME}/sample0/input sample0
                     ln -s $HOME/data/testing/${env.JOB_NAME}/sample0/output sample0
