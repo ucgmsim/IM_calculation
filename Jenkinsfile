@@ -40,8 +40,8 @@ pipeline {
                     echo "[ Python used ] : " `which python`
                     cd ${env.WORKSPACE}
                     echo "[ Installing ${env.JOB_NAME} ]"
-# full installation is not possible as it takes more than 3.0Gb for building and kilss the server
-#                    python setup.py install
+# full installation is not possible as it takes more than 3.0Gb for building and kills the server
+#                   python setup.py install
                     python setup.py build_ext --inplace
 		            python konno_setup.py
                     echo "[ Linking test data ]"
