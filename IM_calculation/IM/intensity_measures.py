@@ -78,7 +78,7 @@ def calculate_Nstep(DT, NT):
 
 def get_rotations(
     accelerations,
-    func=lambda x: np.max(np.abs(x), axis=1),
+    func=lambda x: np.max(np.abs(x), axis=-2),
     delta_theta: int = 1,
     min_angle: int = 0,
     max_angle: int = 180,
