@@ -1,6 +1,6 @@
 pytest>=3.5.0
 pytest-black
-numpy
+numpy==1.20
 scipy
 numba
 obspy
