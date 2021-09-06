@@ -299,8 +299,10 @@ class TestPickleTesting:
             actual_output_path = os.path.join(
                 root_path, OUTPUT, function + "_outfile.csv"
             )
+            expected_output = np.loadtxt(expected_output_path, delimiter=',',usecols=range(2,24), skiprows=1)
+            actual_output = np.loadtxt(actual_output_path, delimiter=',',usecols=range(2,24), skiprows=1)
 
-            assert filecmp.cmp(expected_output_path, actual_output_path)
+            assert np.isclose(expected_output, actual_output).all()
 
     def convert_to_results_dict(self, period, temp_result_dict, keep_ps=False):
         result_dict = {}
