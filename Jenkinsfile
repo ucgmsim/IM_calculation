@@ -1,5 +1,8 @@
 pipeline {
     agent any
+    environment {
+        TEMP_DIR="/tmp/${env.JOB_NAME}/${env.ghprbActualCommit}"
+    }
     stages {
 
         stage('Settin up env') {
@@ -11,18 +14,16 @@ pipeline {
                     env
 # Each stage needs custom setting done again. By default /bin/python is used.
                     source /var/lib/jenkins/py3env/bin/activate
-                    mkdir -p /tmp/${env.JOB_NAME}/${env.ghprbActualCommit}
-# I don't know how to create a variable within Jenkinsfile (please let me know)
-#                   export virtenv=/tmp/${env.JOB_NAME}/${env.ghprbActualCommit}/venv
-                    python -m venv /tmp/${env.JOB_NAME}/${env.ghprbActualCommit}/venv
+                    mkdir -p $TEMP_DIR
+                    python -m venv $TEMP_DIR/venv
 # activate new virtual env
-                    source /tmp/${env.JOB_NAME}/${env.ghprbActualCommit}/venv/bin/activate
+                    source $TEMP_DIR/venv/bin/activate
                     echo "[ Python used ] : " `which python`
                     cd ${env.WORKSPACE}
                     echo "[ Install dependencies ]"
                     pip install -r requirements.txt
                     echo "[ Install qcore ]"
-                    cd /tmp/${env.JOB_NAME}/${env.ghprbActualCommit}
+                    cd $TEMP_DIR
                     rm -rf qcore
                     git clone https://github.com/ucgmsim/qcore.git
                     cd qcore
@@ -36,7 +37,7 @@ pipeline {
                 echo '[[ Run pytest ]]'
                 sh """
 # activate virtual environment again
-                    source /tmp/${env.JOB_NAME}/${env.ghprbActualCommit}/venv/bin/activate
+                    source $TEMP_DIR/venv/bin/activate
                     echo "[ Python used ] : " `which python`
                     cd ${env.WORKSPACE}
                     echo "[ Installing ${env.JOB_NAME} ]"
@@ -61,7 +62,7 @@ pipeline {
         always {
                 echo 'Tear down the environments'
                 sh """
-                    rm -rf /tmp/${env.JOB_NAME}/*
+                    rm -rf $TEMP_DIR
                 """
             }
     }
