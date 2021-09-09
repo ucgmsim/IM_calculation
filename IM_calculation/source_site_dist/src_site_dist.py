@@ -4,7 +4,7 @@ import matplotlib.path as mpltPath
 import numba
 import numpy as np
 
-from qcore.geo import get_distances, ll_cross_track_dist, ll_bearing
+from qcore.geo import get_distances, ll_cross_along_track_dist, ll_bearing
 
 numba.config.THREADING_LAYER = "omp"
 h_dist_f = numba.njit(get_distances)
@@ -49,8 +49,38 @@ def calc_rrup_rjb(srf_points: np.ndarray, locations: np.ndarray):
     return rrups, rjb
 
 
-def calc_rx_ry(srf_points: np.ndarray, plane_infos: List[Dict], locations: np.ndarray):
-    """Calculates r_x distance using the cross track distance calculation"""
+def calc_rx_ry(
+    srf_points: np.ndarray, plane_infos: List[Dict], locations: np.ndarray, hypocentre_origin=False, type=2
+):
+    """
+    A wrapper script allowing external function calls to resolve to the correct location
+    :param srf_points: An array with shape (n, 3) giving the lon, lat, depth location of each subfault
+    :param plane_infos: A list of srf header dictionaries, as retrieved from qcore.srf.get_headers with idx=True
+    :param locations: An array with shape (m, 2) giving the lon, lat locations of each location to get Rx, Ry values for
+    :param type: Allows switching between the two GC types if desired
+    :param hypocentre_origin: If True sets the Ry origin/0 point to the fault trace projection of the hypocentre. If
+    false the most upstrike subfault of the first fault trace is used. Only used for GC2.
+    :return: An array with shape (m, 2) giving the Rx, Ry values for each of the given locations
+    """
+    if type == 1:
+        return calc_rx_ry_GC1(srf_points, plane_infos, locations)
+    elif type == 2:
+        return calc_rx_ry_GC2(srf_points, plane_infos, locations, hypocentre_origin=hypocentre_origin)
+    else:
+        raise ValueError(f"Invalid GC type. {type} not in {{1,2}}")
+
+
+def calc_rx_ry_GC1(
+    srf_points: np.ndarray, plane_infos: List[Dict], locations: np.ndarray
+):
+    """
+    Calculates Rx and Ry distances using the cross track and along track distance calculations
+    Uses the plane nearest to each of the given locations if there are multiple
+    :param srf_points: An array with shape (n, 3) giving the lon, lat, depth location of each subfault
+    :param plane_infos: A list of srf header dictionaries, as retrieved from qcore.srf.get_headers with idx=True
+    :param locations: An array with shape (m, 2) giving the lon, lat locations of each location to get Rx, Ry values for
+    :return: An array with shape (m, 2) giving the Rx, Ry values for each of the given locations
+    """
     r_x = np.empty(locations.shape[0])
     r_y = np.empty(locations.shape[0])
 
@@ -68,10 +98,6 @@ def calc_rx_ry(srf_points: np.ndarray, plane_infos: List[Dict], locations: np.nd
     # Get the top/bottom edges of each plane
     top_edges = [
         section[: header["nstrike"]]
-        for section, header in zip(pnt_sections, plane_infos)
-    ]
-    bottom_edges = [
-        section[-header["nstrike"] :]
         for section, header in zip(pnt_sections, plane_infos)
     ]
 
@@ -99,9 +125,7 @@ def calc_rx_ry(srf_points: np.ndarray, plane_infos: List[Dict], locations: np.nd
             plane_ix = 0
 
         up_strike_top_point = top_edges[plane_ix][0, :2]
-        up_strike_bottom_point = bottom_edges[plane_ix][0, :2]
         down_strike_top_point = top_edges[plane_ix][-1, :2]
-        down_strike_bottom_point = bottom_edges[plane_ix][-1, :2]
 
         # If the angle from the first point to the second point is not within 10 degrees of the strike,
         # then we should swap the two points
@@ -114,27 +138,74 @@ def calc_rx_ry(srf_points: np.ndarray, plane_infos: List[Dict], locations: np.nd
                 down_strike_top_point,
                 up_strike_top_point,
             )
-            up_strike_bottom_point, down_strike_bottom_point = (
-                down_strike_bottom_point,
-                up_strike_bottom_point,
-            )
 
-        r_x[iloc] = ll_cross_track_dist(
+        r_x[iloc], r_y[iloc] = ll_cross_along_track_dist(
             *up_strike_top_point, *down_strike_top_point, lon, lat
         )
 
-        up_strike_dist = ll_cross_track_dist(
-            *up_strike_top_point, *up_strike_bottom_point, lon, lat
-        )
-        down_strike_dist = ll_cross_track_dist(
-            *down_strike_top_point, *down_strike_bottom_point, lon, lat
-        )
+    return r_x, r_y
 
-        if np.sign(up_strike_dist) != np.sign(down_strike_dist):
-            # If the signs are different then the point is between the lines projected along the edges of the srf
-            r_y[iloc] = 0
-        else:
-            r_y[iloc] = np.min(np.abs([up_strike_dist, down_strike_dist]))
+
+def calc_rx_ry_GC2(
+    srf_points: np.ndarray,
+    plane_infos: List[Dict],
+    locations: np.ndarray,
+    hypocentre_origin=False,
+):
+    """
+    Calculates Rx and Ry distances using the cross track and along track distance calculations
+    If there are multiple fault planes the Rx, Ry values are calculated for each fault plane individually, then weighted
+    according to plane length and distance to the location
+    For one fault plane this is the same as the GC1 function
+    :param srf_points: An array with shape (n, 3) giving the lon, lat, depth location of each subfault
+    :param plane_infos: A list of srf header dictionaries, as retrieved from qcore.srf.get_headers with idx=True
+    :param locations: An array with shape (m, 2) giving the lon, lat locations of each location to get Rx, Ry values for
+    :param hypocentre_origin: If True sets the Ry origin/0 point to the fault trace projection of the hypocentre. If
+    false the most upstrike subfault of the first fault trace is used
+    :return: An array with shape (m, 2) giving the Rx, Ry values for each of the given locations
+    """
+    r_x = np.empty(locations.shape[0])
+    r_y = np.empty(locations.shape[0])
+
+    # Separate the srf points into the different plane traces
+    pnt_counts = [plane["nstrike"] * plane["ndip"] for plane in plane_infos]
+    pnt_counts.insert(0, 0)
+    pnt_counts = np.cumsum(pnt_counts)
+    pnt_sections = [
+        srf_points[pnt_counts[i] : pnt_counts[i] + header["nstrike"]]
+        for i, header in enumerate(plane_infos)
+    ]
+
+    origin_offset = 0
+    if hypocentre_origin:
+        # Our faults only use one hypocentre
+        # Will only use the first one found if there are multiple
+        for plane in plane_infos:
+            if plane["shyp"] == -999.9000:
+                origin_offset -= plane["length"]
+            else:
+                origin_offset -= plane["length"] / 2 + plane["shyp"]
+                break
+
+    for i, loc in enumerate(locations):
+        offset = origin_offset
+        weights = 0
+        r_x_values = 0
+        r_y_values = 0
+        for plane_points, plane_header in zip(pnt_sections, plane_infos):
+            r_x_p, r_y_p = calc_rx_ry_GC1(
+                plane_points, [plane_header], np.asarray([loc])
+            )
+            dists = h_dist_f(plane_points, loc[0], loc[1])
+            weight = np.sum(np.power(dists, -2))
+
+            weights += weight
+            r_x_values += weight * r_x_p
+            r_y_values += weight * (r_y_p + offset)
+            offset += plane_header["length"]
+
+        r_x[i] = r_x_values / weights
+        r_y[i] = r_y_values / weights
 
     return r_x, r_y
 
