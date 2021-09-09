@@ -50,7 +50,11 @@ def calc_rrup_rjb(srf_points: np.ndarray, locations: np.ndarray):
 
 
 def calc_rx_ry(
-    srf_points: np.ndarray, plane_infos: List[Dict], locations: np.ndarray, hypocentre_origin=False, type=2
+    srf_points: np.ndarray,
+    plane_infos: List[Dict],
+    locations: np.ndarray,
+    hypocentre_origin=False,
+    type=2,
 ):
     """
     A wrapper script allowing external function calls to resolve to the correct location
@@ -65,7 +69,9 @@ def calc_rx_ry(
     if type == 1:
         return calc_rx_ry_GC1(srf_points, plane_infos, locations)
     elif type == 2:
-        return calc_rx_ry_GC2(srf_points, plane_infos, locations, hypocentre_origin=hypocentre_origin)
+        return calc_rx_ry_GC2(
+            srf_points, plane_infos, locations, hypocentre_origin=hypocentre_origin
+        )
     else:
         raise ValueError(f"Invalid GC type. {type} not in {{1,2}}")
 
