@@ -38,7 +38,7 @@ BASIC_STATIONS = np.asarray(
     ]
 )
 BASIC_RX = np.asarray([0, 0, -50, -100])
-BASIC_RY = np.asarray([0, geo.ll_dist(0, 0, 0.5, 0), 0, 50])
+BASIC_RY = np.asarray([0, geo.ll_dist(0, 0, 0.5, 0), 0, -50])
 
 HOSSACK_SRF_POINTS = np.asarray(
     [
