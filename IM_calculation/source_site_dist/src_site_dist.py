@@ -203,7 +203,7 @@ def calc_rx_ry_GC2(
                 plane_points, [plane_header], np.asarray([loc])
             )
             dists = h_dist_f(plane_points, loc[0], loc[1])
-            # Mimimum distance of 1m to prevent nans/infs
+            # Mimimum distance of 0.001km to prevent nans/infs
             # A bit hacky but it works. Only needed when a location is directly on top of a subfault
             dists = np.maximum(dists, 0.001)
             weight = np.sum(np.power(dists, -2))
