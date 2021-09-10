@@ -28,7 +28,7 @@ def test_calc_rrub_rjb(set_up):
 
 
 BASIC_SRF_POINTS = np.asarray([[0, 0, 0], [1, 0, 0], [0, -1, 1], [1, -1, 1]])
-BASIC_SRF_HEADER = [{"nstrike": 2, "ndip": 2, "strike": 90.0}]
+BASIC_SRF_HEADER = [{"nstrike": 2, "ndip": 2, "strike": 90.0, "length": 2}]
 BASIC_STATIONS = np.asarray(
     [
         [0, 0, 0],
@@ -38,7 +38,7 @@ BASIC_STATIONS = np.asarray(
     ]
 )
 BASIC_RX = np.asarray([0, 0, -50, -100])
-BASIC_RY = np.asarray([0, 0, 0, 50])
+BASIC_RY = np.asarray([0, geo.ll_dist(0, 0, 0.5, 0), 0, -50])
 
 HOSSACK_SRF_POINTS = np.asarray(
     [
@@ -49,7 +49,7 @@ HOSSACK_SRF_POINTS = np.asarray(
     ]
 )
 HOSSACK_SRF_HEADER = [
-    {"nstrike": 2, "ndip": 2, "strike": 230.0}
+    {"nstrike": 2, "ndip": 2, "strike": 230.0, "length": 0.2}
 ]
 HOSSACK_STATIONS = np.asarray(
     [
@@ -71,7 +71,7 @@ HOSSACK_STATIONS = np.asarray(
     ]
 )
 HOSSACK_RX = np.asarray([9.1180, -9.1180, 1.9987])
-HOSSACK_RY = np.asarray([0.0, 0.0, 3.0383])
+HOSSACK_RY = np.asarray([1.666, 1.668, 6.6692])
 
 RELATIVE_TOLERANCE = 0.001  # 1m tolerance
 
