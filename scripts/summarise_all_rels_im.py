@@ -15,10 +15,10 @@ if __name__ == "__main__":
         type=os.path.abspath,
     )  # if set too deep, search will be slow.
     parser.add_argument(
-        "-faults",
+        "--faults",
         nargs="+",
         type=str,
-        help="List of faults to process",
+        help="List of faults to process, separated by spaces.",
         required=True,
     )
     parser.add_argument(
