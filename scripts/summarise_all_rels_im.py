@@ -1,9 +1,12 @@
-import pandas as pd
-import numpy as np
+import argparse
 import glob
 import os
 import sys
-import argparse
+
+import numpy as np
+import pandas as pd
+
+from qcore.formats import load_im_file_pd
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
@@ -81,27 +84,28 @@ if __name__ == "__main__":
 
         rel_im_dfs = []
         for c in im_csv_paths:
-            df = pd.read_csv(c, index_col=0)
+            df = load_im_file_pd(c)
             rel_im_dfs.append(df)
 
-        stations = list(set(rel_im_dfs[0].index))
+        stations = list(set(rel_im_dfs[0].index.get_level_values(0)))
         stations.sort()
+        components = list(set(rel_im_dfs[0].index.get_level_values(1)))
 
         # check IM types. If unspecified, use all IM_types
         wrong_im_count = 0
+
         if im_types is None:
             im_types = list(rel_im_dfs[0].columns)
-            im_types.remove("component")
-        else:
-            for im_type in im_types:
-                if im_type in rel_im_dfs[0].columns:
-                    pass
-                else:
-                    print("Error: Unknown IM type {}".format(im_type))
-                    wrong_im_count += 1
-            if wrong_im_count > 0:
-                print("Error: Fix IM types")
-                sys.exit(0)
+
+        for im_type in im_types:
+            if im_type in rel_im_dfs[0].columns:
+                pass
+            else:
+                print("Error: Unknown IM type {}".format(im_type))
+                wrong_im_count += 1
+        if wrong_im_count > 0:
+            print("Error: Fix IM types")
+            sys.exit(0)
 
         print(
             "Summarising IM values at {} stations from {} realisations for IM types {}".format(
@@ -109,14 +113,19 @@ if __name__ == "__main__":
             )
         )
         df_dict = {"station": stations, "component": ["geom"] * len(stations)}
+
+        #merged_df = pd.concat(rel_im_dfs, axis=0, keys=range(len(rel_im_dfs)))
+
         for im_type in im_types:
             print("...{}".format(im_type))
+
+
             im_val_concat = pd.concat(
-                [np.log(rel_im_dfs[i][im_type]) for i in range(len(rel_im_dfs))]
+                [np.log(rel_im_dfs[i][rel_im_dfs[i].index.get_level_values(1) == "geom"][im_type]) for i in range(len(rel_im_dfs))]
             )
 
-            log_mean_im = [np.exp(stat_fn(im_val_concat[k])) for k in stations]
-            log_stdev_im = [np.std(im_val_concat[k]) for k in stations]
+            log_mean_im = [np.exp(stat_fn(im_val_concat[im_val_concat.index.get_level_values(0) == k])) for k in stations]
+            log_stdev_im = [np.std(im_val_concat[im_val_concat.index.get_level_values(0) == k]) for k in stations]
             modified_im_name = (
                 im_type if im_type[0] != "p" else f"p{im_type[1:].replace('p', '.')}"
             )
