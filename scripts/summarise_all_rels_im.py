@@ -1,11 +1,12 @@
+from pathlib import Path
 import argparse
 import glob
-import os
 import sys
 
 import numpy as np
 import pandas as pd
 
+from IM_calculation.IM.im_calculation import ALL_IMS
 from qcore.formats import load_im_file_pd
 
 if __name__ == "__main__":
@@ -15,7 +16,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "csv_path",
         help="path to directory containing CSV files to recursively search",
-        type=os.path.abspath,
+        type=Path,
     )  # if set too deep, search will be slow.
     parser.add_argument(
         "--faults",
@@ -28,8 +29,8 @@ if __name__ == "__main__":
         "--median",
         dest="stat_fn",
         action="store_const",
-        const=np.median,
-        default=np.mean,
+        const="median",
+        default="mean",
         help="find median (default: mean)",
     )
     parser.add_argument(
@@ -37,26 +38,27 @@ if __name__ == "__main__":
         dest="im_types",
         nargs="+",
         type=str,
+        choices=ALL_IMS,
         help="list of IM types. all chosen if unspecified",
     )  # eg. --im PGV PGA
     parser.add_argument(
         "--output",
         dest="output_dir",
         help="path for the output CSV file to be saved",
-        default=os.path.curdir,
-        type=os.path.abspath,
+        default=Path.cwd(),
+        type=Path,
     )
 
     args = parser.parse_args()
 
-    csv_path = args.csv_path
+    csv_path = args.csv_path.absolute()
 
     faults = args.faults
-    stat_fn = args.stat_fn  # default: np.mean
+    stat_fn = args.stat_fn
     im_types = args.im_types
-    output_dir = args.output_dir
+    output_dir = args.output_dir.absolute()
 
-    if os.path.exists(csv_path) and os.path.isdir(csv_path):
+    if csv_path.exists() and csv_path.is_dir():
         print("Checked: CSV search directory {}".format(csv_path))
     else:
         print("Error: invalid path : {}".format(csv_path))
@@ -76,66 +78,40 @@ if __name__ == "__main__":
 
         print(im_csv_paths)
 
-        if os.path.exists(output_dir) and os.path.isdir(output_dir):
+        if output_dir.exists() and output_dir.is_dir():
             print("Checked: Output directory {}".format(output_dir))
         else:
-            os.mkdir(output_dir)
+            Path.mkdir(output_dir)
             print("Created: Output directory {}".format(output_dir))
 
         rel_im_dfs = []
         for c in im_csv_paths:
             df = load_im_file_pd(c)
-            rel_im_dfs.append(df)
+            rel_im_dfs.append(df[im_types])
 
         stations = list(set(rel_im_dfs[0].index.get_level_values(0)))
         stations.sort()
-        components = list(set(rel_im_dfs[0].index.get_level_values(1)))
-
         # check IM types. If unspecified, use all IM_types
         wrong_im_count = 0
-
-        if im_types is None:
-            im_types = list(rel_im_dfs[0].columns)
-
-        for im_type in im_types:
-            if im_type in rel_im_dfs[0].columns:
-                pass
-            else:
-                print("Error: Unknown IM type {}".format(im_type))
-                wrong_im_count += 1
-        if wrong_im_count > 0:
-            print("Error: Fix IM types")
-            sys.exit(0)
 
         print(
             "Summarising IM values at {} stations from {} realisations for IM types {}".format(
                 len(stations), len(rel_im_dfs), im_types
             )
         )
-        df_dict = {"station": stations, "component": ["geom"] * len(stations)}
 
-        #merged_df = pd.concat(rel_im_dfs, axis=0, keys=range(len(rel_im_dfs)))
+        merged_im_df = pd.concat(rel_im_dfs, axis=0, keys=range(len(rel_im_dfs)))
+        if stat_fn == "mean":
+            log_mean_im = np.exp(np.log(merged_im_df).mean(level=[1, 2]))
+        else:
+            log_mean_im = np.exp(np.log(merged_im_df).median(level=[1, 2]))
+        log_stdev_im = np.log(merged_im_df).std(level=[1, 2], ddof=0)
 
-        for im_type in im_types:
-            print("...{}".format(im_type))
+        log_stdev_im.columns = [f"{im}_sigma" for im in log_stdev_im.columns]
 
+        summary_df = pd.merge(log_mean_im, log_stdev_im, left_index=True, right_index=True)
 
-            im_val_concat = pd.concat(
-                [np.log(rel_im_dfs[i][rel_im_dfs[i].index.get_level_values(1) == "geom"][im_type]) for i in range(len(rel_im_dfs))]
-            )
+        output_file = output_dir / f"{fault_name}_log_{stat_fn}.csv"
 
-            log_mean_im = [np.exp(stat_fn(im_val_concat[im_val_concat.index.get_level_values(0) == k])) for k in stations]
-            log_stdev_im = [np.std(im_val_concat[im_val_concat.index.get_level_values(0) == k]) for k in stations]
-            modified_im_name = (
-                im_type if im_type[0] != "p" else f"p{im_type[1:].replace('p', '.')}"
-            )
-            df_dict[modified_im_name] = log_mean_im
-            df_dict[f"{modified_im_name}_sigma"] = log_stdev_im
-
-        log_mean_ims_df = pd.DataFrame(df_dict)
-        output_file = os.path.join(
-            output_dir, fault_name + "_log_{}.csv".format(stat_fn.__name__)
-        )
-
-        log_mean_ims_df.set_index("station").to_csv(output_file)
+        summary_df.to_csv(output_file)
         print("Completed...Written {}".format(output_file))
