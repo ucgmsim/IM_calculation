@@ -109,7 +109,9 @@ if __name__ == "__main__":
 
         log_stdev_im.columns = [f"{im}_sigma" for im in log_stdev_im.columns]
 
-        summary_df = pd.merge(log_mean_im, log_stdev_im, left_index=True, right_index=True)
+        summary_df = pd.merge(
+            log_mean_im, log_stdev_im, left_index=True, right_index=True
+        )
 
         output_file = output_dir / f"{fault_name}_log_{stat_fn}.csv"
 
