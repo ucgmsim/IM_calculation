@@ -6,7 +6,6 @@ import sys
 import numpy as np
 import pandas as pd
 
-from IM_calculation.IM.im_calculation import ALL_IMS
 from qcore.formats import load_im_file_pd
 
 if __name__ == "__main__":
@@ -38,7 +37,6 @@ if __name__ == "__main__":
         dest="im_types",
         nargs="+",
         type=str,
-        choices=ALL_IMS,
         help="list of IM types. all chosen if unspecified",
     )  # eg. --im PGV PGA
     parser.add_argument(
@@ -87,16 +85,20 @@ if __name__ == "__main__":
         rel_im_dfs = []
         for c in im_csv_paths:
             df = load_im_file_pd(c)
-            rel_im_dfs.append(df[im_types])
-
-        stations = list(set(rel_im_dfs[0].index.get_level_values(0)))
-        stations.sort()
-        # check IM types. If unspecified, use all IM_types
-        wrong_im_count = 0
+            if im_types:
+                assert set(df.columns).issuperset(im_types), (
+                    f"The following IMs aren't present in the IM csv: {', '.join(set(im_types).difference(df.columns))}"
+                    f"Available IMs: {', '.join(df.columns)}"
+                )
+                rel_im_dfs.append(df[im_types])
+            else:
+                rel_im_dfs.append(df)
 
         print(
-            "Summarising IM values at {} stations from {} realisations for IM types {}".format(
-                len(stations), len(rel_im_dfs), im_types
+            "Summarising IM values at {} stations from {} realisations for IM types: {}".format(
+                len(rel_im_dfs[0].index.unique(0)),
+                len(rel_im_dfs),
+                im_types if im_types else "All",
             )
         )
 
