@@ -88,7 +88,7 @@ if __name__ == "__main__":
             if im_types:
                 assert set(df.columns).issuperset(im_types), (
                     f"The following IMs aren't present in the IM csv: {', '.join(set(im_types).difference(df.columns))}"
-                    f"Available IMs: {', '.join(df.columns)}"
+                    f"\nAvailable IMs: {', '.join(df.columns)}"
                 )
                 rel_im_dfs.append(df[im_types])
             else:
@@ -105,8 +105,10 @@ if __name__ == "__main__":
         merged_im_df = pd.concat(rel_im_dfs, axis=0, keys=range(len(rel_im_dfs)))
         if stat_fn == "mean":
             log_mean_im = np.exp(np.log(merged_im_df).mean(level=[1, 2]))
-        else:
+        elif stat_fn == "median":
             log_mean_im = np.exp(np.log(merged_im_df).median(level=[1, 2]))
+        else:
+            raise Exception("Invalid average type set")
         log_stdev_im = np.log(merged_im_df).std(level=[1, 2], ddof=0)
 
         log_stdev_im.columns = [f"{im}_sigma" for im in log_stdev_im.columns]
