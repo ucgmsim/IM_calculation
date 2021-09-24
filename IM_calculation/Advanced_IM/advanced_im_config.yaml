@@ -43,4 +43,7 @@ Haselton_RC_12Story:
 Haselton_RC_20Story:
   script_location: 'Models/Haselton_RC_20Story/run.py'
   timeout_threshold: null
-
+SDOF_IMK:
+  script_location: 'Models/SDOF_IMK/run.py'
+  timeout_threshold: null
+  
