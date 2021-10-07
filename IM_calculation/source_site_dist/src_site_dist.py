@@ -184,13 +184,12 @@ def calc_rx_ry_GC2(
 
     origin_offset = 0
     if hypocentre_origin:
+        length = sum([plane["length"] for plane in plane_infos])
         # Our faults only use one hypocentre
         # Will only use the first one found if there are multiple
         for plane in plane_infos:
-            if plane["shyp"] == -999.9000:
-                origin_offset -= plane["length"]
-            else:
-                origin_offset -= plane["length"] / 2 + plane["shyp"]
+            if plane["shyp"] != -999.9000:
+                origin_offset = length / 2 + plane["shyp"]
                 break
 
     for i, loc in enumerate(locations):
