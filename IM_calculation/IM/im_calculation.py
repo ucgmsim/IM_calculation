@@ -159,6 +159,10 @@ def compute_measure_single(
     :return: {result[station_name]: {[im]: value or (period,value}}
     """
     waveform_acc, waveform_vel = waveform
+    station_name = waveform_acc.station_name
+    
+    print(f"Working on station {station_name}"
+    
     DT = waveform_acc.DT
     times = waveform_acc.times
 
@@ -169,9 +173,7 @@ def compute_measure_single(
         velocities = timeseries.acc2vel(accelerations, DT) * G
     else:
         velocities = waveform_vel.values
-
-    station_name = waveform_acc.station_name
-
+    
     result = {(station_name, comp.str_value): {} for comp in comps_to_store}
 
     im_functions = {
@@ -206,7 +208,7 @@ def compute_measure_single(
                 result[(station_name, comp.str_value)][im] = values_to_store[
                     comp.str_value
                 ]
-
+    print(f"Finished {station_name}")
     return result
 
 
