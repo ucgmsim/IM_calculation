@@ -189,7 +189,7 @@ def calc_rx_ry_GC2(
         # Will only use the first one found if there are multiple
         for plane in plane_infos:
             if plane["shyp"] != -999.9000:
-                origin_offset = length / 2 + plane["shyp"]
+                origin_offset = -(length / 2 + plane["shyp"])
                 break
 
     for i, loc in enumerate(locations):
