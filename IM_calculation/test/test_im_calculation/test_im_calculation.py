@@ -133,7 +133,7 @@ class TestPickleTesting:
             comps = [Components.from_str(x) for x in comps]
             str_comps = [Components.from_str(x) for x in str_comps]
             actual_result = calculate_ims.compute_measure_single(
-                waveform, ims, comps, im_options, str_comps
+                waveform, ims, comps, im_options, str_comps, (0,0)
             )
 
             with open(
