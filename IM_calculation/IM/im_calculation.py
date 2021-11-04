@@ -2,7 +2,6 @@ import csv
 import glob
 import os
 import sys
-
 from datetime import datetime
 from functools import partial
 from multiprocessing.pool import Pool
@@ -15,8 +14,8 @@ import pandas as pd
 from qcore import timeseries, constants, shared
 from qcore.constants import Components
 from qcore.im import order_im_cols_df
+from qcore.qclogging import get_basic_logger
 from qcore.progress_tracker import ProgressTracker
-
 from IM_calculation.Advanced_IM import advanced_IM_factory
 from IM_calculation.IM import read_waveform, intensity_measures
 from IM_calculation.IM.intensity_measures import G
@@ -150,12 +149,13 @@ def compute_adv_measure(waveform, advanced_im_config, output_dir):
 
 
 def compute_measure_single(
-    waveform, ims, comps_to_store, im_options, comps_to_calculate
+    waveform, ims, comps_to_store, im_options, comps_to_calculate, progress, logger=get_basic_logger()
 ):
     """
     Compute measures for a single station
     :param: a tuple consisting 5 params: waveform, ims, comp, period, str_comps
     waveform: a single tuple that contains (waveform_acc,waveform_vel)
+    progress: a tuple containing station number and total number of stations
     :return: {result[station_name]: {[im]: value or (period,value}}
     """
     waveform_acc, waveform_vel = waveform
@@ -171,6 +171,8 @@ def compute_measure_single(
         velocities = waveform_vel.values
 
     station_name = waveform_acc.station_name
+    station_i, n_stations = progress
+    logger.info(f"Processing {station_name} - {station_i} / {n_stations}")
 
     result = {(station_name, comp.str_value): {} for comp in comps_to_store}
 
@@ -463,6 +465,7 @@ def compute_measures_multiprocess(
     units="g",
     advanced_im_config=None,
     real_only=False,
+    logger=get_basic_logger()
 ):
     """
     using multiprocesses to compute measures.
@@ -539,8 +542,10 @@ def compute_measures_multiprocess(
                         sorted(components_to_store, key=lambda x: x.value),
                         im_options,
                         sorted(components_to_calculate, key=lambda x: x.value),
+                        (ii, total_stations),
+                        logger,
                     )
-                    for waveform in waveforms
+                    for ii, waveform in enumerate(waveforms, start=i+1)
                 ]
                 all_results.extend(p.starmap(compute_measure_single, array_params))
             p_t(i)
