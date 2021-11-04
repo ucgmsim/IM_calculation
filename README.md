@@ -1,5 +1,5 @@
 # IM_calculation
-[![Build Status](http://13.238.107.244:8080/job/IM_calculation/badge/icon?build=last:${params.ghprbActualCommit=master)](http://13.238.107.244:8080/job/IM_calculation)
+[![Build Status](https://quakecoresoft.canterbury.ac.nz/jenkins/job/IM_calculation/badge/icon?build=last:${params.ghprbActualCommit=master)](https://quakecoresoft.canterbury.ac.nz/jenkins/job/IM_calculation)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 To calculate rrups:
