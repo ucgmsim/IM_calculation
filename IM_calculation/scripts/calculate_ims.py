@@ -236,7 +236,9 @@ def main():
         advanced_im_config = None
 
     logger = qclogging.get_logger("IM_calc")
-    qclogging.add_general_file_handler(logger, os.path.join(args.output_path, f"{args.identifier}_im_calc.log"))
+    qclogging.add_general_file_handler(
+        logger, os.path.join(args.output_path, f"{args.identifier}_im_calc.log")
+    )
     logger.info("IM_Calc started")
 
     # multiprocessor
