@@ -473,7 +473,7 @@ def compute_measures_multiprocess(
     units="g",
     advanced_im_config=None,
     real_only=False,
-    logger=get_basic_logger(),
+    logger=qclogging.get_basic_logger(),
 ):
     """
     using multiprocesses to compute measures.
