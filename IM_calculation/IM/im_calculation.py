@@ -11,10 +11,9 @@ from typing import List, Iterable
 import numpy as np
 import pandas as pd
 
-from qcore import timeseries, constants, shared
+from qcore import timeseries, constants, shared, qclogging
 from qcore.constants import Components
 from qcore.im import order_im_cols_df
-from qcore import qclogging
 from qcore.progress_tracker import ProgressTracker
 from IM_calculation.Advanced_IM import advanced_IM_factory
 from IM_calculation.IM import read_waveform, intensity_measures
