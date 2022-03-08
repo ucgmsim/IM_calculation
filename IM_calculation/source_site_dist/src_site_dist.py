@@ -225,6 +225,7 @@ def calc_rx_ry_GC2_vectorised(
     origin_offsets: np.ndarray = np.asarray([0]),
 ):
     """
+    Vectorised version of the GC2 function along sites and hypocentre locations.
     Calculates Rx and Ry distances using the cross track and along track distance calculations
     If there are multiple fault planes the Rx, Ry values are calculated for each fault plane individually, then weighted
     according to plane length and distance to the location
@@ -233,8 +234,7 @@ def calc_rx_ry_GC2_vectorised(
     :param plane_infos: A list of srf header dictionaries, as retrieved from qcore.srf.get_headers with idx=True
     :param locations: An array with shape (m, 2) giving the lon, lat locations of each location to get Rx, Ry values for
     :param origin_offsets: An array with shape (o) with the along strike hypocentre locations from the centre of
-    the fault for multiple realisations. If not set then only one origin will be considered at the position of
-    the most upstrike subfault at the start.
+    the fault for multiple realisations. If not set then only one origin will be considered at the centre position.
     :return: Two arrays with shape (o, m) giving the Rx, Ry values for each of the given locations for each hypocentre
     """
     # Separate the srf points into the different plane traces
