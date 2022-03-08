@@ -218,6 +218,66 @@ def calc_rx_ry_GC2(
     return r_x, r_y
 
 
+def calc_rx_ry_GC2_vectorised(
+    srf_points: np.ndarray,
+    plane_infos: List[Dict],
+    locations: np.ndarray,
+    origin_offsets: np.ndarray = np.asarray([0]),
+):
+    """
+    Calculates Rx and Ry distances using the cross track and along track distance calculations
+    If there are multiple fault planes the Rx, Ry values are calculated for each fault plane individually, then weighted
+    according to plane length and distance to the location
+    For one fault plane this is the same as the GC1 function
+    :param srf_points: An array with shape (n, 3) giving the lon, lat, depth location of each subfault
+    :param plane_infos: A list of srf header dictionaries, as retrieved from qcore.srf.get_headers with idx=True
+    :param locations: An array with shape (m, 2) giving the lon, lat locations of each location to get Rx, Ry values for
+    :param origin_offsets: An array with shape (o) with the along strike hypocentre locations from the centre of
+    the fault for multiple realisations. If not set then only one origin will be considered at the position of
+    the most upstrike subfault at the start.
+    :return: Two arrays with shape (o, m) giving the Rx, Ry values for each of the given locations for each hypocentre
+    """
+    # Separate the srf points into the different plane traces
+    pnt_counts = [plane["nstrike"] * plane["ndip"] for plane in plane_infos]
+    pnt_counts.insert(0, 0)
+    pnt_counts = np.cumsum(pnt_counts)
+    pnt_sections = [
+        srf_points[pnt_counts[i] : pnt_counts[i] + header["nstrike"]]
+        for i, header in enumerate(plane_infos)
+    ]
+
+    # Adjust the offsets
+    length = sum([plane["length"] for plane in plane_infos])
+    origin_offsets = -(length / 2 + origin_offsets)
+
+    offsets = origin_offsets
+    weights = np.zeros(len(locations))
+    r_x_values = np.zeros((len(offsets), len(locations)))
+    r_y_values = np.zeros((len(offsets), len(locations)))
+    for plane_points, plane_header in zip(pnt_sections, plane_infos):
+        r_x_p, r_y_p = calc_rx_ry_GC1(plane_points, [plane_header], locations)
+        dists = np.asarray(
+            [h_dist_f(plane_points, loc[0], loc[1]) for loc in locations]
+        )
+        # Mimimum distance of 0.001km to prevent nans/infs
+        # A bit hacky but it works. Only needed when a location is directly on top of a subfault
+        dists = np.maximum(dists, 0.001)
+        weights_p = np.sum(np.power(dists, -2), axis=1)
+
+        weights += weights_p
+        r_x_values[:] += weights_p * r_x_p
+        # Reshape to allow broadcasting of the offsets to create the (offsets, locations) shape matrix
+        r_y_values[:] += weights_p * (
+            r_y_p.reshape(len(locations), 1).T + offsets.reshape(len(offsets), 1)
+        )
+        offsets += plane_header["length"]
+
+    r_x = r_x_values / weights
+    r_y = r_y_values / weights
+
+    return r_x, r_y
+
+
 def calc_backarc(srf_points: np.ndarray, locations: np.ndarray):
     """
     This is a crude approximation of stations that are on the backarc. Defined by source-site lines that cross the
