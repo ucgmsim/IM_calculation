@@ -10,13 +10,12 @@ command:
 
 import argparse
 import os
-import pandas as pd
-import glob
 
 import IM_calculation.IM.im_calculation as calc
 from IM_calculation.Advanced_IM import advanced_IM_factory
-from qcore import utils
 from qcore import constants
+from qcore import utils
+from qcore import qclogging
 
 
 def load_args():
@@ -236,6 +235,12 @@ def main():
         components = args.components
         advanced_im_config = None
 
+    logger = qclogging.get_logger("IM_calc")
+    qclogging.add_general_file_handler(
+        logger, os.path.join(args.output_path, f"{args.identifier}_im_calc.log")
+    )
+    logger.info("IM_Calc started")
+
     # multiprocessor
     calc.compute_measures_multiprocess(
         args.input_path,
@@ -255,6 +260,7 @@ def main():
         units=args.units,
         advanced_im_config=advanced_im_config,
         real_only=args.real_stats_only,
+        logger=logger,
     )
 
     print("Calculations are output to {}".format(args.output_path))
