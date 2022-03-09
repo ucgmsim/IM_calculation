@@ -218,14 +218,14 @@ def calc_rx_ry_GC2(
     return r_x, r_y
 
 
-def calc_rx_ry_GC2_vectorised(
+def calc_rx_ry_GC2_multi_hypocentre(
     srf_points: np.ndarray,
     plane_infos: List[Dict],
     locations: np.ndarray,
     origin_offsets: np.ndarray = np.asarray([0]),
 ):
     """
-    Vectorised version of the GC2 function along sites and hypocentre locations.
+    Vectorised version of the GC2 function along multiple hypocentre locations.
     Calculates Rx and Ry distances using the cross track and along track distance calculations
     If there are multiple fault planes the Rx, Ry values are calculated for each fault plane individually, then weighted
     according to plane length and distance to the location
@@ -256,9 +256,7 @@ def calc_rx_ry_GC2_vectorised(
     r_y_values = np.zeros((len(offsets), len(locations)))
     for plane_points, plane_header in zip(pnt_sections, plane_infos):
         r_x_p, r_y_p = calc_rx_ry_GC1(plane_points, [plane_header], locations)
-        dists = np.asarray(
-            [h_dist_f(plane_points, loc[0], loc[1]) for loc in locations]
-        )
+        dists = h_dist_f(plane_points, locations[:, 0], locations[:, 1])
         # Mimimum distance of 0.001km to prevent nans/infs
         # A bit hacky but it works. Only needed when a location is directly on top of a subfault
         dists = np.maximum(dists, 0.001)
@@ -268,7 +266,7 @@ def calc_rx_ry_GC2_vectorised(
         r_x_values[:] += weights_p * r_x_p
         # Reshape to allow broadcasting of the offsets to create the (offsets, locations) shape matrix
         r_y_values[:] += weights_p * (
-            r_y_p.reshape(len(locations), 1).T + offsets.reshape(len(offsets), 1)
+            r_y_p.reshape(1, len(locations)) + offsets.reshape(len(offsets), 1)
         )
         offsets += plane_header["length"]
 
