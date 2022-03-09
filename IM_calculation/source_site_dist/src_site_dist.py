@@ -4,7 +4,7 @@ import matplotlib.path as mpltPath
 import numba
 import numpy as np
 
-from qcore.geo import get_distances, ll_cross_along_track_dist, ll_bearing
+from qcore.geo import get_distances, get_multiple_distances, ll_cross_along_track_dist, ll_bearing
 
 numba.config.THREADING_LAYER = "omp"
 h_dist_f = numba.njit(get_distances)
@@ -256,7 +256,7 @@ def calc_rx_ry_GC2_multi_hypocentre(
     r_y_values = np.zeros((len(offsets), len(locations)))
     for plane_points, plane_header in zip(pnt_sections, plane_infos):
         r_x_p, r_y_p = calc_rx_ry_GC1(plane_points, [plane_header], locations)
-        dists = h_dist_f(plane_points, locations[:, 0], locations[:, 1])
+        dists = get_multiple_distances(plane_points, locations[:, 0], locations[:, 1])
         # Mimimum distance of 0.001km to prevent nans/infs
         # A bit hacky but it works. Only needed when a location is directly on top of a subfault
         dists = np.maximum(dists, 0.001)
