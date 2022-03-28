@@ -3,13 +3,7 @@ from typing import List, Dict
 import matplotlib.path as mpltPath
 import numpy as np
 
-from qcore.geo import (
-    get_distances,
-    get_multiple_distances,
-    ll_cross_along_track_dist,
-    ll_bearing,
-)
-
+from qcore import geo
 
 VOLCANIC_FRONT_COORDS = [(175.508, -39.364), (177.199, -37.73)]
 VOLCANIC_FRONT_LINE = mpltPath.Path(VOLCANIC_FRONT_COORDS)
@@ -34,15 +28,18 @@ def calc_rrup_rjb(srf_points: np.ndarray, locations: np.ndarray):
     rjb : np.ndarray
         The rjb distance for the locations, shape/order same as locations
     """
-    rrups = np.empty(locations.shape[0])
-    rjb = np.empty(locations.shape[0])
+    rrups = np.empty(locations.shape[0], dtype=np.float32)
+    rjb = np.empty(locations.shape[0], dtype=np.float32)
+
+    srf_points = srf_points.astype(np.float32)
+    locations = locations.astype(np.float32)
 
     # Size limit for memory capacity
-    size = 5000
+    size = 1000
     split_locations = np.split(locations, np.arange(size, locations.shape[0], size))
 
     for ix, cur_locations in enumerate(split_locations):
-        h_dist = get_multiple_distances(
+        h_dist = geo.get_distances(
             srf_points, cur_locations[:, 0], cur_locations[:, 1]
         )
 
@@ -124,7 +121,7 @@ def calc_rx_ry_GC1(
             # Get cumulative number of points in each plane
 
             # Get the closest point in the fault
-            h_dist = get_distances(srf_points, lon, lat)
+            h_dist = geo.get_distances(srf_points, lon, lat)
 
             # Get the index of closest fault plane point
             point_ix = np.argmin(h_dist)
@@ -145,7 +142,7 @@ def calc_rx_ry_GC1(
         # If the angle from the first point to the second point is not within 10 degrees of the strike,
         # then we should swap the two points
         if not np.isclose(
-            ll_bearing(*up_strike_top_point, *down_strike_top_point),
+            geo.ll_bearing(*up_strike_top_point, *down_strike_top_point),
             plane_infos[plane_ix]["strike"],
             atol=10,
         ):
@@ -154,7 +151,7 @@ def calc_rx_ry_GC1(
                 up_strike_top_point,
             )
 
-        r_x[iloc], r_y[iloc] = ll_cross_along_track_dist(
+        r_x[iloc], r_y[iloc] = geo.ll_cross_along_track_dist(
             *up_strike_top_point, *down_strike_top_point, lon, lat
         )
 
@@ -210,7 +207,7 @@ def calc_rx_ry_GC2(
             r_x_p, r_y_p = calc_rx_ry_GC1(
                 plane_points, [plane_header], np.asarray([loc])
             )
-            dists = get_distances(plane_points, loc[0], loc[1])
+            dists = geo.get_distances(plane_points, loc[0], loc[1])
             # Mimimum distance of 0.001km to prevent nans/infs
             # A bit hacky but it works. Only needed when a location is directly on top of a subfault
             dists = np.maximum(dists, 0.001)
@@ -265,7 +262,7 @@ def calc_rx_ry_GC2_multi_hypocentre(
     r_y_values = np.zeros((len(offsets), len(locations)))
     for plane_points, plane_header in zip(pnt_sections, plane_infos):
         r_x_p, r_y_p = calc_rx_ry_GC1(plane_points, [plane_header], locations)
-        dists = get_multiple_distances(plane_points, locations[:, 0], locations[:, 1])
+        dists = geo.get_distances(plane_points, locations[:, 0], locations[:, 1])
         # Mimimum distance of 0.001km to prevent nans/infs
         # A bit hacky but it works. Only needed when a location is directly on top of a subfault
         dists = np.maximum(dists, 0.001)
