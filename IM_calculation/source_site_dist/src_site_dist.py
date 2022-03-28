@@ -1,19 +1,20 @@
 from typing import List, Dict
 
 import matplotlib.path as mpltPath
-import numba
 import numpy as np
 
-from qcore.geo import get_distances, get_multiple_distances, ll_cross_along_track_dist, ll_bearing
+from qcore.geo import (
+    get_distances,
+    get_multiple_distances,
+    ll_cross_along_track_dist,
+    ll_bearing,
+)
 
-numba.config.THREADING_LAYER = "omp"
-h_dist_f = numba.njit(get_distances)
 
 VOLCANIC_FRONT_COORDS = [(175.508, -39.364), (177.199, -37.73)]
 VOLCANIC_FRONT_LINE = mpltPath.Path(VOLCANIC_FRONT_COORDS)
 
 
-@numba.jit(parallel=True)
 def calc_rrup_rjb(srf_points: np.ndarray, locations: np.ndarray):
     """Calculates rrup and rjb distance
 
@@ -36,15 +37,23 @@ def calc_rrup_rjb(srf_points: np.ndarray, locations: np.ndarray):
     rrups = np.empty(locations.shape[0])
     rjb = np.empty(locations.shape[0])
 
-    for loc_ix in numba.prange(locations.shape[0]):
-        h_dist = h_dist_f(srf_points, locations[loc_ix, 0], locations[loc_ix, 1])
+    # Size limit for memory capacity
+    size = 5000
+    split_locations = np.split(locations, np.arange(size, locations.shape[0], size))
 
-        v_dist = srf_points[:, 2] - locations[loc_ix, 2]
+    for ix, cur_locations in enumerate(split_locations):
+        h_dist = get_multiple_distances(
+            srf_points, cur_locations[:, 0], cur_locations[:, 1]
+        )
 
-        d = np.sqrt(h_dist ** 2 + v_dist ** 2)
+        v_dist = srf_points[:, 2, np.newaxis] - cur_locations[:, 2]
 
-        rrups[loc_ix] = np.min(d)
-        rjb[loc_ix] = np.min(h_dist)
+        d = np.sqrt(h_dist ** 2 + v_dist.T ** 2)
+
+        start_ix = size * ix
+        end_ix = start_ix + cur_locations.shape[0]
+        rrups[start_ix:end_ix] = np.min(d, axis=1)
+        rjb[start_ix:end_ix] = np.min(h_dist, axis=1)
 
     return rrups, rjb
 
@@ -115,7 +124,7 @@ def calc_rx_ry_GC1(
             # Get cumulative number of points in each plane
 
             # Get the closest point in the fault
-            h_dist = h_dist_f(srf_points, lon, lat)
+            h_dist = get_distances(srf_points, lon, lat)
 
             # Get the index of closest fault plane point
             point_ix = np.argmin(h_dist)
@@ -201,7 +210,7 @@ def calc_rx_ry_GC2(
             r_x_p, r_y_p = calc_rx_ry_GC1(
                 plane_points, [plane_header], np.asarray([loc])
             )
-            dists = h_dist_f(plane_points, loc[0], loc[1])
+            dists = get_distances(plane_points, loc[0], loc[1])
             # Mimimum distance of 0.001km to prevent nans/infs
             # A bit hacky but it works. Only needed when a location is directly on top of a subfault
             dists = np.maximum(dists, 0.001)
