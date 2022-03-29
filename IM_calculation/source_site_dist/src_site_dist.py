@@ -9,7 +9,9 @@ VOLCANIC_FRONT_COORDS = [(175.508, -39.364), (177.199, -37.73)]
 VOLCANIC_FRONT_LINE = mpltPath.Path(VOLCANIC_FRONT_COORDS)
 
 
-def calc_rrup_rjb(srf_points: np.ndarray, locations: np.ndarray):
+def calc_rrup_rjb(
+    srf_points: np.ndarray, locations: np.ndarray, n_stations_per_iter: int = 1000
+):
     """Calculates rrup and rjb distance
 
     Parameters
@@ -20,6 +22,9 @@ def calc_rrup_rjb(srf_points: np.ndarray, locations: np.ndarray):
     locations: np.ndarray
         The locations for which to calculate the distances,
         format (lon, lat, depth)
+    n_stations_per_iter: int
+        Number of stations to iterate over, default to 1000.
+        Change based on memory requirements
 
     Returns
     -------
@@ -34,20 +39,20 @@ def calc_rrup_rjb(srf_points: np.ndarray, locations: np.ndarray):
     srf_points = srf_points.astype(np.float32)
     locations = locations.astype(np.float32)
 
-    # Size limit for memory capacity
-    size = 1000
-    split_locations = np.split(locations, np.arange(size, locations.shape[0], size))
+    # Split locations by a given limit for memory capacity
+    split_locations = np.split(
+        locations,
+        np.arange(n_stations_per_iter, locations.shape[0], n_stations_per_iter),
+    )
 
     for ix, cur_locations in enumerate(split_locations):
-        h_dist = geo.get_distances(
-            srf_points, cur_locations[:, 0], cur_locations[:, 1]
-        )
+        h_dist = geo.get_distances(srf_points, cur_locations[:, 0], cur_locations[:, 1])
 
         v_dist = srf_points[:, 2, np.newaxis] - cur_locations[:, 2]
 
         d = np.sqrt(h_dist ** 2 + v_dist.T ** 2)
 
-        start_ix = size * ix
+        start_ix = n_stations_per_iter * ix
         end_ix = start_ix + cur_locations.shape[0]
         rrups[start_ix:end_ix] = np.min(d, axis=1)
         rjb[start_ix:end_ix] = np.min(h_dist, axis=1)
@@ -169,6 +174,7 @@ def calc_rx_ry_GC2(
     If there are multiple fault planes the Rx, Ry values are calculated for each fault plane individually, then weighted
     according to plane length and distance to the location
     For one fault plane this is the same as the GC1 function
+    Wrapper that calls calc_rx_ry_GC2_multi_hypocentre
     :param srf_points: An array with shape (n, 3) giving the lon, lat, depth location of each subfault
     :param plane_infos: A list of srf header dictionaries, as retrieved from qcore.srf.get_headers with idx=True
     :param locations: An array with shape (m, 2) giving the lon, lat locations of each location to get Rx, Ry values for
@@ -176,52 +182,20 @@ def calc_rx_ry_GC2(
     false the most upstrike subfault of the first fault trace is used
     :return: An array with shape (m, 2) giving the Rx, Ry values for each of the given locations
     """
-    r_x = np.empty(locations.shape[0])
-    r_y = np.empty(locations.shape[0])
-
-    # Separate the srf points into the different plane traces
-    pnt_counts = [plane["nstrike"] * plane["ndip"] for plane in plane_infos]
-    pnt_counts.insert(0, 0)
-    pnt_counts = np.cumsum(pnt_counts)
-    pnt_sections = [
-        srf_points[pnt_counts[i] : pnt_counts[i] + header["nstrike"]]
-        for i, header in enumerate(plane_infos)
-    ]
-
     origin_offset = 0
+    # Changes the offset from the centre if hypocentre_origin is specified
+    # Is extracted from the plane_infos
     if hypocentre_origin:
-        length = sum([plane["length"] for plane in plane_infos])
         # Our faults only use one hypocentre
         # Will only use the first one found if there are multiple
         for plane in plane_infos:
             if plane["shyp"] != -999.9000:
-                origin_offset = -(length / 2 + plane["shyp"])
+                origin_offset = plane["shyp"]
                 break
-
-    for i, loc in enumerate(locations):
-        offset = origin_offset
-        weights = 0
-        r_x_values = 0
-        r_y_values = 0
-        for plane_points, plane_header in zip(pnt_sections, plane_infos):
-            r_x_p, r_y_p = calc_rx_ry_GC1(
-                plane_points, [plane_header], np.asarray([loc])
-            )
-            dists = geo.get_distances(plane_points, loc[0], loc[1])
-            # Mimimum distance of 0.001km to prevent nans/infs
-            # A bit hacky but it works. Only needed when a location is directly on top of a subfault
-            dists = np.maximum(dists, 0.001)
-            weight = np.sum(np.power(dists, -2))
-
-            weights += weight
-            r_x_values += weight * r_x_p
-            r_y_values += weight * (r_y_p + offset)
-            offset += plane_header["length"]
-
-        r_x[i] = r_x_values / weights
-        r_y[i] = r_y_values / weights
-
-    return r_x, r_y
+    r_x, r_y = calc_rx_ry_GC2_multi_hypocentre(
+        srf_points, plane_infos, locations, origin_offsets=np.asarray([origin_offset])
+    )
+    return r_x[0], r_y[0]
 
 
 def calc_rx_ry_GC2_multi_hypocentre(
@@ -231,7 +205,7 @@ def calc_rx_ry_GC2_multi_hypocentre(
     origin_offsets: np.ndarray = np.asarray([0]),
 ):
     """
-    Vectorised version of the GC2 function along multiple hypocentre locations.
+    Vectorised version of the GC2 calculation along multiple hypocentre locations.
     Calculates Rx and Ry distances using the cross track and along track distance calculations
     If there are multiple fault planes the Rx, Ry values are calculated for each fault plane individually, then weighted
     according to plane length and distance to the location
