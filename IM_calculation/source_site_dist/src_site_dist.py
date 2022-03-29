@@ -192,6 +192,10 @@ def calc_rx_ry_GC2(
             if plane["shyp"] != -999.9000:
                 origin_offset = plane["shyp"]
                 break
+    else:
+        # Sets the origin not in the centre but at the start of the trace
+        length = sum([plane["length"] for plane in plane_infos])
+        origin_offset = -(length / 2)
     r_x, r_y = calc_rx_ry_GC2_multi_hypocentre(
         srf_points, plane_infos, locations, origin_offsets=np.asarray([origin_offset])
     )
