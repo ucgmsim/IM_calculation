@@ -1,6 +1,5 @@
 pytest>=3.5.0
 pytest-black
-numba>=0.54.0
 scipy
 obspy
 pandas
