@@ -1,54 +1,104 @@
-import argparse
 import glob
 import os
+import shutil
 import subprocess
+from datetime import datetime
 
 import numpy as np
 import pandas as pd
+from qcore.constants import Components
 
-from IM_calculation.Advanced_IM import runlibs_2d
+from IM_calculation.Advanced_IM.runlibs_2d import (
+    check_status,
+    datetime_to_file,
+    time_type,
+    parse_args,
+)
 
-model_dir = os.path.dirname(__file__)
+BASIC_HORIZONTAL_COMPONENTS = [Components.c000, Components.c090]
+IM_NAME = "Spear_3D_Model"
+SCRIPT_LOCATION = os.path.dirname(__file__)
 
 
-def main(comp_000, comp_090, output_dir, OpenSees_path):
+def main(NS_component, EW_component, OpenSees_path, output_dir, im_name, run_script, timeout_threshold):
+    os.makedirs(output_dir, exist_ok=True)
 
-    if not os.path.exists(output_dir):
-        os.makedirs(args.output_dir)
+    model_converged = True
+
+    # check for all failed from log
+    if check_status(output_dir, check_fail=True):
+        print(f"Model failed to converged in previous run.")
+        model_converged = False
+        return
+    # check if successfully ran previously
+    # skip this component if success
+    if check_status(output_dir):
+        print(f"Model completed in preivous run")
+        return
+
 
     script = [
         OpenSees_path,
-        os.path.join(model_dir, "Run_script.tcl"),
-        comp_000,
-        comp_090,
+        run_script,
+        NS_component,
+        EW_component,
         output_dir,
     ]
 
     print(" ".join(script))
+    # for debug purpose, track the starting and ending time of OpenSees call
+    # saves starting time
+    datetime_to_file(datetime.now(), time_type.start_time.name, output_dir)
 
-    subprocess.run(script)
+    try:
+        subprocess.run(script, timeout=timeout_threshold)
+    except subprocess.TimeoutExpired:
+        # timeouted. save to timed_out instead of end_time
+        end_time_type = time_type.timed_out.name
+    else:
+        # save the ending time
+        end_time_type = time_type.end_time.name
+    datetime_to_file(datetime.now(), end_time_type, output_dir)
 
-    im_name = "Spear_3D_Model"
-    # create CSV for norm
-    # replaced by calculate_geom(). keeping these line for references
-    # component='norm'
-    # component_dir = args.output_dir
-    # create_im_csv(args.output_dir, im_name, component, component_dir, remove_gravity = False)
+    # check for success message after a run
+    # marked as failed if any component fail
+    if not check_status(output_dir):
+        # even if not converged, script should still run other components, except geom.
+        # setting the mode_converge will prevent calculating geom and aggregate csv.
+        print(f"{output_dir} failed to converge.")
+        model_converged = False
 
-    # create CSV for each component
-    for component in ["000", "090"]:
-        component_dir = os.path.join(output_dir, component)
+    else:
+        status_file = glob.glob(os.path.join(output_dir, "Analysis_*"))[0]
+        for comp in BASIC_HORIZONTAL_COMPONENTS:
+            shutil.copy(status_file, os.path.join(output_dir, comp.str_value))
 
-        create_im_csv(
-            output_dir, im_name, component, component_dir, check_converge=False
-        )
-    # create a geom csv
-    calculate_geom(output_dir, im_name)
+    station_name = os.path.basename(NS_component).split(".")[0]
+    # skip creating csv if any component has zero success count
+    if model_converged:
+        comp_out_dir = output_dir
+        for component in BASIC_HORIZONTAL_COMPONENTS:
+            component_dir = os.path.join(comp_out_dir, component.str_value)
 
-    # calculate the disp&drift Norm from records from 000 and 090
-    calculate_norm(im_name, output_dir)
+            create_im_csv(
+                comp_out_dir,
+                im_name,
+                component.str_value,
+                component_dir,
+                check_converge=False,
+            )
 
-    agg_csv(output_dir, im_name)
+        calculate_geom(comp_out_dir, im_name)
+        calculate_norm(im_name, comp_out_dir)
+
+        agg_csv(comp_out_dir, im_name)
+        print(f"analysis completed for {station_name}")
+    else:
+        im_csv_failed_name = os.path.join(output_dir, f"{im_name}_failed.csv")
+        with open(im_csv_failed_name, "w") as f:
+            f.write("status\n")
+            f.write("failed")
+        print(f"failed to converge for {station_name}")
 
 
 # calc norm
@@ -88,7 +138,7 @@ def calculate_norm(im_name, output_dir, print_header=True):
     value_dict = {}
 
     # read data from recordings
-    for recorder_name in ["disp", "drift", "accl"]:
+    for recorder_name in ["env_disp", "env_drift", "env_accl"]:
         # find recorder in 000 first
         # read all 2nd coloumn
         recorder_dir = os.path.join(dir_000, recorder_name)
@@ -129,6 +179,7 @@ def calculate_norm(im_name, output_dir, print_header=True):
 
     value_dict = {component: value_dict}
     result_df = pd.DataFrame.from_dict(value_dict, orient="index")
+    result_df.index.name = "component"
 
     cols = list(result_df.columns)
     cols.sort()
@@ -146,13 +197,13 @@ def calculate_geom(output_dir, im_name):
     output_dir: folder that contains adv_im_comp.csv. used to grab data from 000, 090.
     im_name: adv_im model name
     """
-    df_000 = pd.read_csv(
-        os.path.join(output_dir, f"{im_name}_000.csv"), dtype={"component": str}
-    )
-    df_090 = pd.read_csv(
-        os.path.join(output_dir, f"{im_name}_090.csv"), dtype={"component": str}
-    )
-    #
+
+    c000_path = os.path.join(output_dir, f"{im_name}_000.csv")
+    c090_path = os.path.join(output_dir, f"{im_name}_090.csv")
+
+    df_000 = pd.read_csv(c000_path, dtype={"component": str})
+    df_090 = pd.read_csv(c090_path, dtype={"component": str})
+
     ims = df_000.append(df_090)
     ims.set_index("component", inplace=True)
 
@@ -163,7 +214,9 @@ def calculate_geom(output_dir, im_name):
         im_geom = im_geom.append(line)
         im_geom.index.name = "component"
     else:
-        raise (ValueError("Error: no 000 or 090 found in csv"))
+        raise ValueError(
+            f"Error: no 000 or 090 found in csvs: {c000_path}, {c090_path}"
+        )
     cols = list(im_geom.columns)
     cols.sort()
     im_csv_fname = os.path.join(output_dir, f"{im_name}_geom.csv")
@@ -176,14 +229,12 @@ def agg_csv(output_dir, im_name, print_header=True):
     000,090, geom, norm
     """
     # read all df
-    # im_csv_glob = os.path.join(output_dir, im_name + "_*" + ".csv")
     df = pd.DataFrame()
     df.index.name = "component"
     for component in ["000", "090", "geom", "norm"]:
         component_csv_fname = os.path.join(output_dir, f"{im_name}_{component}.csv")
         df = df.append(pd.read_csv(component_csv_fname, dtype={"component": str}))
     df.set_index("component", inplace=True)
-    # im_csvs = glob.glob(im_csv_glob)
     cols = list(df.columns)
     cols.sort()
     df.to_csv(
@@ -283,7 +334,18 @@ def read_out_file(file, success=True):
         return float("NaN")
 
 
-if __name__ == "__main__":
+def top_level():
 
-    args = runlibs_2d.parse_args()
-    main(args.comp_000, args.comp_090, args.output_dir, args.OpenSees_path)
+    args = parse_args()
+
+    im_name = IM_NAME
+    run_script = os.path.join(SCRIPT_LOCATION, "Run_script.tcl")
+
+    NS_component = getattr(args, Components.c000.str_value)
+    EW_component = getattr(args, Components.c090.str_value)
+
+    main(NS_component, EW_component, args.OpenSees_path, args.output_dir, im_name, run_script, args.timeout_threshold)
+
+
+if __name__ == "__main__":
+    top_level()
