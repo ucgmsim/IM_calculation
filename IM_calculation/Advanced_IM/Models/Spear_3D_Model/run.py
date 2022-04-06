@@ -50,6 +50,11 @@ def main(NS_component, EW_component, OpenSees_path, output_dir, im_name, run_scr
     # saves starting time
     datetime_to_file(datetime.now(), time_type.start_time.name, output_dir)
 
+
+    for comp in BASIC_HORIZONTAL_COMPONENTS:
+        # Give the sub components start times
+        shutil.copy(os.path.join(output_dir, time_type.start_time.name), os.path.join(output_dir, comp.str_value))
+
     try:
         subprocess.run(script, timeout=timeout_threshold)
     except subprocess.TimeoutExpired:
@@ -59,6 +64,10 @@ def main(NS_component, EW_component, OpenSees_path, output_dir, im_name, run_scr
         # save the ending time
         end_time_type = time_type.end_time.name
     datetime_to_file(datetime.now(), end_time_type, output_dir)
+
+    for comp in BASIC_HORIZONTAL_COMPONENTS:
+        # Give the sub components end times
+        shutil.copy(os.path.join(output_dir, end_time_type), os.path.join(output_dir, comp.str_value))
 
     # check for success message after a run
     # marked as failed if any component fail
@@ -99,6 +108,9 @@ def main(NS_component, EW_component, OpenSees_path, output_dir, im_name, run_scr
             f.write("status\n")
             f.write("failed")
         print(f"failed to converge for {station_name}")
+        for comp in BASIC_HORIZONTAL_COMPONENTS:
+            shutil.copy(im_csv_failed_name, os.path.join(output_dir, comp.str_value))
+
 
 
 # calc norm
