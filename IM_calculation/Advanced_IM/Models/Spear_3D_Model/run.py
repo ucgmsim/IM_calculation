@@ -8,109 +8,96 @@ import numpy as np
 import pandas as pd
 from qcore.constants import Components
 
-from IM_calculation.Advanced_IM.runlibs_2d import (
-    check_status,
-    datetime_to_file,
-    time_type,
-    parse_args,
-)
+from IM_calculation.Advanced_IM import runlibs_2d
 
 BASIC_HORIZONTAL_COMPONENTS = [Components.c000, Components.c090]
 IM_NAME = "Spear_3D_Model"
 SCRIPT_LOCATION = os.path.dirname(__file__)
 
 
-def main(NS_component, EW_component, OpenSees_path, output_dir, im_name, run_script, timeout_threshold):
+def main(c000_filepath, c090_filepath, OpenSees_path, output_dir, im_name, run_script, timeout_threshold):
     os.makedirs(output_dir, exist_ok=True)
 
-    model_converged = True
-
     # check for all failed from log
-    if check_status(output_dir, check_fail=True):
+    if runlibs_2d.check_status(output_dir, check_fail=True):
+        # Non convergence
         print(f"Model failed to converged in previous run.")
-        model_converged = False
         return
+
     # check if successfully ran previously
     # skip this component if success
-    if check_status(output_dir):
+    if runlibs_2d.check_status(output_dir):
         print(f"Model completed in preivous run")
         return
-
 
     script = [
         OpenSees_path,
         run_script,
-        NS_component,
-        EW_component,
+        c000_filepath,
+        c090_filepath,
         output_dir,
     ]
 
     print(" ".join(script))
     # for debug purpose, track the starting and ending time of OpenSees call
     # saves starting time
-    datetime_to_file(datetime.now(), time_type.start_time.name, output_dir)
-
+    runlibs_2d.datetime_to_file(datetime.now(), runlibs_2d.time_type.start_time.name, output_dir)
 
     for comp in BASIC_HORIZONTAL_COMPONENTS:
         # Give the sub components start times
-        shutil.copy(os.path.join(output_dir, time_type.start_time.name), os.path.join(output_dir, comp.str_value))
+        os.makedirs(os.path.join(output_dir, comp.str_value), exist_ok=True)
+        shutil.copy(os.path.join(output_dir, runlibs_2d.time_type.start_time.name), os.path.join(output_dir, comp.str_value))
 
     try:
         subprocess.run(script, timeout=timeout_threshold)
     except subprocess.TimeoutExpired:
         # timeouted. save to timed_out instead of end_time
-        end_time_type = time_type.timed_out.name
+        end_time_type = runlibs_2d.time_type.timed_out.name
     else:
         # save the ending time
-        end_time_type = time_type.end_time.name
-    datetime_to_file(datetime.now(), end_time_type, output_dir)
+        end_time_type = runlibs_2d.time_type.end_time.name
+
+    runlibs_2d.datetime_to_file(datetime.now(), end_time_type, output_dir)
 
     for comp in BASIC_HORIZONTAL_COMPONENTS:
         # Give the sub components end times
         shutil.copy(os.path.join(output_dir, end_time_type), os.path.join(output_dir, comp.str_value))
+        # Copy anaylsis status files into individual components so the status check script can find them
+        # Hack for 3d model in a 2d world
+        for file in glob.glob(os.path.join(output_dir, "Analysis_*")):
+            shutil.copy(file, os.path.join(output_dir, comp.str_value))
 
     # check for success message after a run
     # marked as failed if any component fail
-    if not check_status(output_dir):
-        # even if not converged, script should still run other components, except geom.
-        # setting the mode_converge will prevent calculating geom and aggregate csv.
-        print(f"{output_dir} failed to converge.")
-        model_converged = False
+    station_name = os.path.basename(c000_filepath).split(".")[0]
 
-    else:
-        status_file = glob.glob(os.path.join(output_dir, "Analysis_*"))[0]
-        for comp in BASIC_HORIZONTAL_COMPONENTS:
-            shutil.copy(status_file, os.path.join(output_dir, comp.str_value))
+    if not runlibs_2d.check_status(output_dir):
+        print(f"{output_dir} failed to converge for {station_name}.")
 
-    station_name = os.path.basename(NS_component).split(".")[0]
-    # skip creating csv if any component has zero success count
-    if model_converged:
-        comp_out_dir = output_dir
-        for component in BASIC_HORIZONTAL_COMPONENTS:
-            component_dir = os.path.join(comp_out_dir, component.str_value)
-
-            create_im_csv(
-                comp_out_dir,
-                im_name,
-                component.str_value,
-                component_dir,
-                check_converge=False,
-            )
-
-        calculate_geom(comp_out_dir, im_name)
-        calculate_norm(im_name, comp_out_dir)
-
-        agg_csv(comp_out_dir, im_name)
-        print(f"analysis completed for {station_name}")
-    else:
         im_csv_failed_name = os.path.join(output_dir, f"{im_name}_failed.csv")
+
         with open(im_csv_failed_name, "w") as f:
             f.write("status\n")
             f.write("failed")
-        print(f"failed to converge for {station_name}")
+
         for comp in BASIC_HORIZONTAL_COMPONENTS:
             shutil.copy(im_csv_failed_name, os.path.join(output_dir, comp.str_value))
 
+    else:
+        for component in BASIC_HORIZONTAL_COMPONENTS:
+            create_im_csv(
+                output_dir,
+                im_name,
+                component.str_value,
+                os.path.join(output_dir, component.str_value),
+                check_converge=False,
+            )
+
+        calculate_geom(output_dir, im_name)
+        calculate_norm(im_name, output_dir)
+
+        agg_csv(output_dir, im_name)
+        print(f"analysis completed for {station_name}")
 
 
 # calc norm
@@ -348,7 +335,7 @@ def read_out_file(file, success=True):
 
 def top_level():
 
-    args = parse_args()
+    args = runlibs_2d.parse_args()
 
     im_name = IM_NAME
     run_script = os.path.join(SCRIPT_LOCATION, "Run_script.tcl")
