@@ -340,10 +340,10 @@ def top_level():
     im_name = IM_NAME
     run_script = os.path.join(SCRIPT_LOCATION, "Run_script.tcl")
 
-    NS_component = getattr(args, Components.c000.str_value)
-    EW_component = getattr(args, Components.c090.str_value)
+    c000_component = getattr(args, Components.c000.str_value)
+    c090_component = getattr(args, Components.c090.str_value)
 
-    main(NS_component, EW_component, args.OpenSees_path, args.output_dir, im_name, run_script, args.timeout_threshold)
+    main(c000_component, c090_component, args.OpenSees_path, args.output_dir, im_name, run_script, args.timeout_threshold)
 
 
 if __name__ == "__main__":
