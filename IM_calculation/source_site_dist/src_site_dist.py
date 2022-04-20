@@ -46,7 +46,7 @@ def calc_rrup_rjb(
     )
 
     for ix, cur_locations in enumerate(split_locations):
-        h_dist = geo.get_distances(srf_points, cur_locations[:, 0], cur_locations[:, 1])
+        h_dist = np.atleast_2d(geo.get_distances(srf_points, cur_locations[:, 0], cur_locations[:, 1]))
 
         v_dist = srf_points[:, 2, np.newaxis] - cur_locations[:, 2]
 
@@ -240,11 +240,12 @@ def calc_rx_ry_GC2_multi_hypocentre(
     weights = np.zeros(len(locations))
     r_x_values = np.zeros((len(offsets), len(locations)))
     r_y_values = np.zeros((len(offsets), len(locations)))
+
     for plane_points, plane_header in zip(pnt_sections, plane_infos):
         r_x_p, r_y_p = calc_rx_ry_GC1(plane_points, [plane_header], locations)
-        dists = geo.get_distances(plane_points, locations[:, 0], locations[:, 1])
-        # Mimimum distance of 0.001km to prevent nans/infs
-        # A bit hacky but it works. Only needed when a location is directly on top of a subfault
+        dists = np.atleast_2d(geo.get_distances(plane_points, locations[:, 0], locations[:, 1]))
+        # Minimum distance of 0.001km to prevent nans/infs
+        # A bit hacky, but it works. Only needed when a location is directly on top of a subfault
         dists = np.maximum(dists, 0.001)
         weights_p = np.sum(np.power(dists, -2), axis=1)
 
