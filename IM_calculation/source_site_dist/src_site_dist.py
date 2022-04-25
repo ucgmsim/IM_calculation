@@ -185,8 +185,8 @@ def calc_rx_ry_GC2(
     origin_offset = 0
     # Changes the offset from the centre if hypocentre_origin is specified
     # Is extracted from the plane_infos
-    length = sum([plane["length"] for plane in plane_infos])
     if hypocentre_origin:
+        length = sum([plane["length"] for plane in plane_infos])
         # Our faults only use one hypocentre
         # Will only use the first one found if there are multiple
         for plane in plane_infos:
@@ -194,9 +194,6 @@ def calc_rx_ry_GC2(
             if plane["shyp"] != -999.9000:
                 origin_offset += plane["shyp"] - plane["length"] / 2
                 break
-        origin_offset -= length / 2
-    else:
-        # Sets the origin not in the centre but at the start of the trace
         origin_offset -= length / 2
     r_x, r_y = calc_rx_ry_GC2_multi_hypocentre(
         srf_points, plane_infos, locations, origin_offsets=np.asarray([origin_offset])
