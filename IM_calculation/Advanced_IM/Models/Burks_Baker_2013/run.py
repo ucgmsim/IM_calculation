@@ -65,13 +65,21 @@ def main(comp_000: Path, comp_090: Path, rotd: bool, output_dir: Path):
         for dt in dt_list:
             for alpha in alpha_list:
                 for dy in dy_list:
-                    displacements = (
-                        intensity_measures.get_SDI_nd(
-                            accelerations, period, NT, DT, z, alpha, dy, dt
+                    for i in range(0,181):
+                        theta = i*np.pi / 180
+                        rotD_comp = accelerations[0]*np.cos(theta)+accelerations[1]*np.sin(theta)
+                        t_end =NT*DT
+                        t = np.arange(DT, t_end, DT)
+                        ag_rotd = rotD_comp*g / 100
+
+                        displacements = (
+                            intensity_measures.get_SDI_nd(
+                                ag_rotd, period, NT, DT, z, alpha, dy, dt
+                            ) # Binlinear_Newmark_withTH(period,z,dy, alpha, accelerations/100*G,DT,dt)
+                            * 100  # Burks & Baker returns m, but output is stored in cm
                         )
-                        * 100  # Burks & Baker returns m, but output is stored in cm
-                    )
                     sdi_values = np.max(np.abs(displacements), axis=1)
+
                     im_names = []
                     for t in period:
                         im_name = f"SDI_{t}_dy{dy}_a{alpha}_dt{dt}_z{z}"
@@ -88,6 +96,7 @@ def main(comp_000: Path, comp_090: Path, rotd: bool, output_dir: Path):
                             results[component.str_value][im_name] = sdi_values[j, i]
                     if not rotd:
                         continue
+
                     rotd_values = im_calculation.calculate_rotd(
                         displacements, rotd_comps
                     )
