@@ -24,10 +24,12 @@ rotd_comps = [Components.crotd50, Components.crotd100, Components.crotd100_50]
 STORIES = 10
 
 z_list = [0.05]  # damping ratio
-alpha_list = [0.05]  # strain hardening ratio
-dy_list = [0.1765, 0.4, 0.6]  # strain hardening ratio
+alpha_list = [0.0001]  # strain hardening ratio
+dy_list = [0.21278]  # strain hardening ratio
 dt_list = [0.005]
-period = np.array(constants.DEFAULT_PSA_PERIODS)
+g = 9.81
+#period = np.array(constants.DEFAULT_PSA_PERIODS)
+period = np.array([2.038])
 
 IM_NAME = Path(__file__).parent.name
 
@@ -61,25 +63,27 @@ def main(comp_000: Path, comp_090: Path, rotd: bool, output_dir: Path):
     accelerations = np.array((waveforms["000"], waveforms["090"])).T
     ordered_columns_dict = {}
 
+    sd_rotd_list=[]
     for z in z_list:
         for dt in dt_list:
             for alpha in alpha_list:
                 for dy in dy_list:
                     for i in range(0,181):
                         theta = i*np.pi / 180
-                        rotD_comp = accelerations[0]*np.cos(theta)+accelerations[1]*np.sin(theta)
-                        t_end =NT*DT
-                        t = np.arange(DT, t_end, DT)
-                        ag_rotd = rotD_comp*g / 100
+                        rotD_comp = accelerations[:,0]*np.cos(theta)+accelerations[:,1]*np.sin(theta)
+                        ag_rotd = rotD_comp*g #/ 100
 
                         displacements = (
                             intensity_measures.get_SDI_nd(
-                                ag_rotd, period, NT, DT, z, alpha, dy, dt
+                                ag_rotd, period, DT, z, alpha, dy, dt
                             ) # Binlinear_Newmark_withTH(period,z,dy, alpha, accelerations/100*G,DT,dt)
-                            * 100  # Burks & Baker returns m, but output is stored in cm
+                            #* 100  # Burks & Baker returns m, but output is stored in cm
                         )
-                    sdi_values = np.max(np.abs(displacements), axis=1)
-
+                        sdi_values = np.max(np.abs(displacements), axis=1)
+                        sd_rotd_list.append(sdi_values[0])
+                    rotd_values = im_calculation.calculate_rotd(
+                        sd_rotd_list, rotd_comps, is_input_rotd=True
+                    )
                     im_names = []
                     for t in period:
                         im_name = f"SDI_{t}_dy{dy}_a{alpha}_dt{dt}_z{z}"
@@ -97,9 +101,9 @@ def main(comp_000: Path, comp_090: Path, rotd: bool, output_dir: Path):
                     if not rotd:
                         continue
 
-                    rotd_values = im_calculation.calculate_rotd(
-                        displacements, rotd_comps
-                    )
+                    # rotd_values = im_calculation.calculate_rotd(
+                    #     displacements, rotd_comps
+                    # )
                     for component in rotd_comps:
                         if component.str_value not in results:
                             results[component.str_value] = {}

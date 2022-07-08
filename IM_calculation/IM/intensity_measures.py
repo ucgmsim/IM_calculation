@@ -53,7 +53,7 @@ def get_SDI(acceleration, period, DT, z, alpha, dy, dt):
     ).T
 
 
-def get_SDI_nd(acceleration, period, NT, DT, z, alpha, dy, dt):
+def get_SDI_nd(acceleration, period, DT, z, alpha, dy, dt):
     # SDI
     if acceleration.ndim != 1:
         ts, dims = acceleration.shape
@@ -69,7 +69,7 @@ def get_SDI_nd(acceleration, period, NT, DT, z, alpha, dy, dt):
 
         return displacements
     else:
-        return get_SDI(acceleration, period, NT, DT, z, alpha, dy, dt)
+        return get_SDI(acceleration, period, DT, z, alpha, dy, dt)
 
 
 def calculate_Nstep(DT, NT):
