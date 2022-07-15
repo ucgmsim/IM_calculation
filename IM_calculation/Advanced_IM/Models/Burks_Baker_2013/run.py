@@ -28,8 +28,8 @@ alpha_list = [0.0001]  # strain hardening ratio
 dy_list = [0.21278]  # strain hardening ratio
 dt_list = [0.005]
 g = 9.81
-#period = np.array(constants.DEFAULT_PSA_PERIODS)
-period = np.array([2.038])
+
+period = np.array([0.5, 3.0])
 
 IM_NAME = Path(__file__).parent.name
 
@@ -62,27 +62,23 @@ def main(comp_000: Path, comp_090: Path, rotd: bool, output_dir: Path):
 
     accelerations = np.array((waveforms["000"], waveforms["090"])).T
     ordered_columns_dict = {}
+    sd_rotd_list = []
 
-    sd_rotd_list=[]
+
     for z in z_list:
         for dt in dt_list:
             for alpha in alpha_list:
                 for dy in dy_list:
-                    for i in range(0,181):
-                        theta = i*np.pi / 180
-                        rotD_comp = accelerations[:,0]*np.cos(theta)+accelerations[:,1]*np.sin(theta)
 
-                        displacements = (
-                            intensity_measures.get_SDI_nd(
-                                rotD_comp, period, DT, z, alpha, dy, dt
-                            ) # Binlinear_Newmark_withTH(period,z,dy, alpha, accelerations/100*G,DT,dt)
-                            #* 100  # Burks & Baker returns m, but output is stored in cm
+                    # for 000, 090 comps
+                    displacements = (
+                        intensity_measures.get_SDI_nd(
+                            accelerations, period, DT, z, alpha, dy, dt
                         )
-                        sdi_values = np.max(np.abs(displacements), axis=1)
-                        sd_rotd_list.append(sdi_values[0])
-                    rotd_values = im_calculation.calculate_rotd(
-                        sd_rotd_list, rotd_comps, is_input_rotd=True
+                        * 100  # Burks & Baker returns m, but output is stored in cm
                     )
+                    sdi_values = np.max(np.abs(displacements), axis=1)
+
                     im_names = []
                     for t in period:
                         im_name = f"SDI_{t}_dy{dy}_a{alpha}_dt{dt}_z{z}"
@@ -97,12 +93,25 @@ def main(comp_000: Path, comp_090: Path, rotd: bool, output_dir: Path):
                             results[component.str_value] = {}
                         for j, im_name in enumerate(im_names):
                             results[component.str_value][im_name] = sdi_values[j, i]
-                    if not rotd:
-                        continue
 
-                    # rotd_values = im_calculation.calculate_rotd(
-                    #     displacements, rotd_comps
-                    # )
+                    # computing non-linear rotd
+                    for i in range(0,181):
+                        theta = i*np.pi / 180
+                        rotd_acc = accelerations[:,0]*np.cos(theta)+accelerations[:,1]*np.sin(theta)
+
+                        displacements = (
+                            intensity_measures.get_SDI_nd(
+                                rotd_acc, period, DT, z, alpha, dy, dt
+                            )
+                            * 100  # Burks & Baker returns m, but output is stored in cm
+                        )
+                        sdi_values = np.max(np.abs(displacements), axis=1)
+                        sd_rotd_list.append(sdi_values)
+
+                    rotd_values = im_calculation.calculate_rotd(
+                        np.array(sd_rotd_list).T, rotd_comps, is_input_rotd=True
+                    )
+
                     for component in rotd_comps:
                         if component.str_value not in results:
                             results[component.str_value] = {}
