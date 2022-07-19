@@ -38,7 +38,7 @@ BASIC_STATIONS = np.asarray(
     ]
 )
 BASIC_RX = np.asarray([0, 0, -50, -100])
-BASIC_RY = np.asarray([0, geo.ll_dist(0, 0, 0.5, 0), 0, -50])
+BASIC_RY = np.asarray([-1, geo.ll_dist(0, 0, 0.5, 0)-1, -1, -51])
 
 HOSSACK_SRF_POINTS = np.asarray(
     [
@@ -71,7 +71,7 @@ HOSSACK_STATIONS = np.asarray(
     ]
 )
 HOSSACK_RX = np.asarray([9.1180, -9.1180, 1.9987])
-HOSSACK_RY = np.asarray([1.666, 1.668, 6.6692])
+HOSSACK_RY = np.asarray([1.56658241, 1.5680196 , 6.56920416])
 
 RELATIVE_TOLERANCE = 0.001  # 1m tolerance
 
