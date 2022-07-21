@@ -95,11 +95,36 @@ def check_rotd(comps_to_store: Iterable[Components]) -> bool:
     )
 
 
+def get_rotd_components_dict(
+        rotd,
+        comps_to_store:  List[Components]
+):
+
+    """
+    Compute median and max for given rotd and return the result as a dictionary with the comps_to_store as keys
+     
+    :param rotd:  An array of shape [periods.size, nt, (max_angle-min_angle)/delta_theta] containing rotd values
+    :param comps_to_store: A list of components to store
+    :return: A dictionary with the comps_to_store as keys, and 1d arrays of shape [periods.size] containing the rotd values
+    """
+    value_dict = {}
+
+    rotd50 = np.median(rotd, axis=-1)
+    rotd100 = np.max(rotd, axis=-1)
+
+    if Components.crotd50 in comps_to_store:
+        value_dict[Components.crotd50.str_value] = rotd50
+    if Components.crotd100 in comps_to_store:
+        value_dict[Components.crotd100.str_value] = rotd100
+    if Components.crotd100_50 in comps_to_store:
+        value_dict[Components.crotd100_50.str_value] = rotd100 / rotd50
+
+    return value_dict
+
 def calculate_rotd(
     accelerations,
     comps_to_store: List[Components],
     func=lambda x: np.max(np.abs(x), axis=-2),
-    is_input_rotd=False
 ):
     """
     Calculates rotd for given accelerations
@@ -117,23 +142,12 @@ def calculate_rotd(
     :param func: The function to apply to the rotated waveforms. Defaults to taking the maximum absolute value across all rotations (used by PGA, PGV, pSA)
     :return: A dictionary with the comps_to_store as keys, and 1d arrays of shape [periods.size] containing the rotd values
     """
+
     # Selects the first two basic components. get_comps_to_calc_and_store makes sure that the first two are 000 and 090
-    if is_input_rotd:
-        rotd = accelerations
-    else:
-        rotd = intensity_measures.get_rotations(accelerations[..., [0, 1]], func=func)
-    value_dict = {}
+    rotd = intensity_measures.get_rotations(accelerations[..., [0, 1]], func=func)
 
-    rotd50 = np.median(rotd, axis=-1)
-    rotd100 = np.max(rotd, axis=-1)
+    return get_rotd_components_dict(rotd,comps_to_store)
 
-    if Components.crotd50 in comps_to_store:
-        value_dict[Components.crotd50.str_value] = rotd50
-    if Components.crotd100 in comps_to_store:
-        value_dict[Components.crotd100.str_value] = rotd100
-    if Components.crotd100_50 in comps_to_store:
-        value_dict[Components.crotd100_50.str_value] = rotd100 / rotd50
-    return value_dict
 
 
 def compute_adv_measure(waveform, advanced_im_config, output_dir):

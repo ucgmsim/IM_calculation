@@ -94,22 +94,19 @@ def main(comp_000: Path, comp_090: Path, rotd: bool, output_dir: Path):
                         for j, im_name in enumerate(im_names):
                             results[component.str_value][im_name] = sdi_values[j, i]
 
+
                     # computing non-linear rotd
-                    for i in range(0,181):
-                        theta = i*np.pi / 180
-                        rotd_acc = accelerations[:,0]*np.cos(theta)+accelerations[:,1]*np.sin(theta)
+                    rotd_accs = intensity_measures.get_rotations(accelerations[..., [0, 1]], max_angle=180, func=lambda x: x)
 
-                        displacements = (
-                            intensity_measures.get_SDI_nd(
-                                rotd_acc, period, DT, z, alpha, dy, dt
-                            )
-                            * 100  # Burks & Baker returns m, but output is stored in cm
+                    displacements_array = (
+                        intensity_measures.get_SDI_nd(
+                            rotd_accs, period, DT, z, alpha, dy, dt
                         )
-                        sdi_values = np.max(np.abs(displacements), axis=1)
-                        sd_rotd_list.append(sdi_values)
+                        * 100
+                    )
 
-                    rotd_values = im_calculation.calculate_rotd(
-                        np.array(sd_rotd_list).T, rotd_comps, is_input_rotd=True
+                    rotd_values = im_calculation.get_rotd_components_dict(
+                        np.max(np.abs(displacements_array), axis=1), rotd_comps
                     )
 
                     for component in rotd_comps:
