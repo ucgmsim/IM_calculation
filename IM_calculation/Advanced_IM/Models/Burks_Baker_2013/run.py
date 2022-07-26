@@ -96,18 +96,8 @@ def main(comp_000: Path, comp_090: Path, rotd: bool, output_dir: Path):
 
 
                     # computing non-linear rotd
-                    rotd_accs = intensity_measures.get_rotations(accelerations[..., [0, 1]], max_angle=180, func=lambda x: x)
-
-                    displacements_array = (
-                        intensity_measures.get_SDI_nd(
-                            rotd_accs, period, DT, z, alpha, dy, dt
-                        )
-                        * 100
-                    )
-
-                    rotd_values = im_calculation.get_rotd_components_dict(
-                        np.max(np.abs(displacements_array), axis=1), rotd_comps
-                    )
+                    func = lambda x: np.max(np.abs(intensity_measures.get_SDI_nd(x, period, DT, z, alpha, dy, dt) * 100), axis=1)
+                    rotd_values = im_calculation.calculate_rotd(accelerations[..., [0, 1]],rotd_comps, func=func)
 
                     for component in rotd_comps:
                         if component.str_value not in results:
