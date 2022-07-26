@@ -56,14 +56,11 @@ def main(comp_000: Path, comp_090: Path, rotd: bool, output_dir: Path):
     waveforms["000"], meta = read_ascii(comp_000, meta=True)
     waveforms["090"] = read_ascii(comp_090)
     DT = np.float32(meta["dt"])  # to match the behaviour of basic SDI
-    NT = meta["nt"]
 
     results = {}
 
     accelerations = np.array((waveforms["000"], waveforms["090"])).T
     ordered_columns_dict = {}
-    sd_rotd_list = []
-
 
     for z in z_list:
         for dt in dt_list:
