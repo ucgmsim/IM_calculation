@@ -93,8 +93,8 @@ def main(comp_000: Path, comp_090: Path, rotd: bool, output_dir: Path):
                             results[component.str_value] = {}
                         for j, im_name in enumerate(im_names):
                             results[component.str_value][im_name] = sdi_values[j, i]
-
-
+                    if not rotd:
+                        continue
                     # computing non-linear rotd
                     func = lambda x: np.max(np.abs(intensity_measures.get_SDI_nd(x, period, DT, z, alpha, dy, dt) * 100), axis=1)
                     rotd_values = im_calculation.calculate_rotd(accelerations[..., [0, 1]],rotd_comps, func=func)
