@@ -62,6 +62,7 @@ def main(comp_000: Path, comp_090: Path, rotd: bool, output_dir: Path):
     accelerations = np.array((waveforms["000"], waveforms["090"])).T
     ordered_columns_dict = {}
 
+    #TODO: replace the quad for loop with itertools.product (Would reduce the indentation by 3 levels)
     for z in z_list:
         for dt in dt_list:
             for alpha in alpha_list:
