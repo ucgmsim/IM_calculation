@@ -27,7 +27,6 @@ z_list = [0.05]  # damping ratio
 alpha_list = [0.0001]  # strain hardening ratio
 dy_list = [0.21278]  # strain hardening ratio
 dt_list = [0.005]
-g = 9.81
 
 period = np.array([0.5, 3.0])
 
