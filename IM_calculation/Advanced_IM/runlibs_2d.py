@@ -5,6 +5,7 @@ import glob
 import os
 import subprocess
 
+import numpy as np
 import pandas as pd
 
 from qcore.constants import Components
@@ -89,15 +90,50 @@ def datetime_to_file(t_value, t_type: str, out_dir):
 
 # def save_timeout_value(component_outdir, timeout_threshold, datetime.datetime.now()):
 
+def run_and_check(run_script, comp_paths, output_dir, opensees_path, timeout):
+    model_converged = True
+
+    script = [opensees_path, run_script] + comp_paths + [output_dir]
+
+    print(" ".join(script))
+    # for debug purpose, track the starting and ending time of OpenSees call
+    # saves starting time
+    datetime_to_file(
+        datetime.datetime.now(), time_type.start_time.name, output_dir
+    )
+
+    try:
+        subprocess.run(script, timeout=timeout)
+    except subprocess.TimeoutExpired:
+        # timed-out. save to timed_out instead of end_time
+        end_time_type = time_type.timed_out.name
+    else:
+        # save the ending time
+        end_time_type = time_type.end_time.name
+    datetime_to_file(datetime.datetime.now(), end_time_type, output_dir)
+
+    # check for success message after a run
+    # marked as failed if any component fail
+    if not check_status(output_dir):
+        # even if not converged, script should still run other components, except geom.
+        # setting the mode_converge will prevent calculating geom and aggregate csv.
+        print(
+            f"{output_dir} failed to converge. calculate geom and aggregate csv will be skipped"
+        )
+        model_converged = False
+
+    return model_converged
+
 
 def main(args, im_name, run_script):
     output_dir = args.output_dir
     os.makedirs(output_dir, exist_ok=True)
     # list of component to run
-    # TODO: make this an arg if future model needs vairable list of components
+    # TODO: make this an arg if future model needs variable list of components
     component_list = [Components.c000, Components.c090]
 
     model_converged = True
+
     for component in component_list:
         component_outdir = os.path.join(output_dir, component.str_value)
         # check if folder exist, if not create it (opensees does not create the folder and will crash)
@@ -111,45 +147,13 @@ def main(args, im_name, run_script):
             model_converged = False
             # continue to check other components, as we should run all components even if one is not_converged
             continue
-        # chech if successfully ran previously
+        # check if previous run was successful
         # skip this component if success
         if check_status(component_outdir):
-            print(f"{getattr(args, component.str_value)} completed in preivous run")
+            print(f"{getattr(args, component.str_value)} completed in previous run")
             continue
 
-        script = [
-            args.OpenSees_path,
-            run_script,
-            getattr(args, component.str_value),
-            component_outdir,
-        ]
-
-        print(" ".join(script))
-        # for debug purpose, track the starting and ending time of OpenSees call
-        # saves starting time
-        datetime_to_file(
-            datetime.datetime.now(), time_type.start_time.name, component_outdir
-        )
-
-        try:
-            subprocess.run(script, timeout=args.timeout_threshold)
-        except subprocess.TimeoutExpired:
-            # timeouted. save to timed_out instead of end_time
-            end_time_type = time_type.timed_out.name
-        else:
-            # save the ending time
-            end_time_type = time_type.end_time.name
-        datetime_to_file(datetime.datetime.now(), end_time_type, component_outdir)
-
-        # check for success message after a run
-        # marked as failed if any component fail
-        if not check_status(component_outdir):
-            # even if not converged, script should still run other components, except geom.
-            # setting the mode_converge will prevent calculating geom and aggregate csv.
-            print(
-                f"{component_outdir} failed to converge. calculate geom and aggregate csv will be skipped"
-            )
-            model_converged = False
+        model_converged = run_and_check(run_script, [getattr(args, component.str_value)] , component_outdir, args.OpenSees_path, args.timeout_threshold)
 
     station_name = os.path.basename(getattr(args, component_list[0].str_value)).split(
         "."
@@ -202,6 +206,7 @@ def check_status(component_outdir, check_fail=False):
         for f in analysis_files:
             with open(f) as fp:
                 contents = fp.read()
+                #TODO: may need to modify like below if contents contains multiple occurences of "Failed"
                 result = result and (contents.strip() == keyword)
     else:
         keyword = "Successful"
@@ -209,7 +214,8 @@ def check_status(component_outdir, check_fail=False):
         for f in analysis_files:
             with open(f) as fp:
                 contents = fp.read()
-                result = result or (contents.strip() == keyword)
+                # if contents is meant to contain multiple occurrences of "Successful" keyword (eg. SDOF_IMK_RotD),
+                result = result or np.alltrue(np.array([x == keyword for x in contents.strip().split()]))
     return result
 
 
