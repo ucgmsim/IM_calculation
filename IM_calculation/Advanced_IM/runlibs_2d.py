@@ -214,8 +214,9 @@ def check_status(component_outdir, check_fail=False):
         for f in analysis_files:
             with open(f) as fp:
                 contents = fp.read()
-                # if contents is meant to contain multiple occurrences of "Successful" keyword (eg. SDOF_IMK_RotD),
-                result = result or np.alltrue(np.array([x == keyword for x in contents.strip().split()]))
+                # if contents is meant to contain a sequence of multiple results (eg. SDOF_IMK_RotD)
+                # we want all of them to be "Successful"
+                result = result or np.all(np.array([x == keyword for x in contents.strip().split()]))
     return result
 
 
