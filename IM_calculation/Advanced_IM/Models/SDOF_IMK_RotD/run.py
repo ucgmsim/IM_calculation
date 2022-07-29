@@ -27,7 +27,7 @@ def main():
     run_script = os.path.join(SCRIPT_LOCATION, "Run_script.tcl")
 
     output_dir = Path(args.output_dir)
-    output_dir.mkdir(exist_ok=True)
+    output_dir.mkdir(exist_ok=True, parents=True)
 
 
     results = {}
