@@ -94,6 +94,19 @@ def check_rotd(comps_to_store: Iterable[Components]) -> bool:
         )
     )
 
+def get_rotd_components_dict(rotd, comps_to_store: List[Components]):
+    value_dict = {}
+
+    rotd50 = np.median(rotd, axis=-1)
+    rotd100 = np.max(rotd, axis=-1)
+
+    if Components.crotd50 in comps_to_store:
+        value_dict[Components.crotd50.str_value] = rotd50
+    if Components.crotd100 in comps_to_store:
+        value_dict[Components.crotd100.str_value] = rotd100
+    if Components.crotd100_50 in comps_to_store:
+        value_dict[Components.crotd100_50.str_value] = rotd100 / rotd50
+    return value_dict
 
 def calculate_rotd(
     accelerations,
@@ -118,19 +131,8 @@ def calculate_rotd(
     """
     # Selects the first two basic components. get_comps_to_calc_and_store makes sure that the first two are 000 and 090
     rotd = intensity_measures.get_rotations(accelerations[..., [0, 1]], func=func)
-    value_dict = {}
 
-    rotd50 = np.median(rotd, axis=-1)
-    rotd100 = np.max(rotd, axis=-1)
-
-    if Components.crotd50 in comps_to_store:
-        value_dict[Components.crotd50.str_value] = rotd50
-    if Components.crotd100 in comps_to_store:
-        value_dict[Components.crotd100.str_value] = rotd100
-    if Components.crotd100_50 in comps_to_store:
-        value_dict[Components.crotd100_50.str_value] = rotd100 / rotd50
-    return value_dict
-
+    return get_rotd_components_dict(rotd,comps_to_store)
 
 def compute_adv_measure(waveform, advanced_im_config, output_dir):
     """
