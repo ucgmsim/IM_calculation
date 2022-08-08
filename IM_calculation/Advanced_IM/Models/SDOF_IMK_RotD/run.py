@@ -40,7 +40,7 @@ def main():
 
     with open(os.path.join(output_dir, "max_rotD_resp.txt"), "r") as f:
         data = f.readlines()
-    rotd_values = im_calculation.get_rotd_components_dict([float(x) for x in data[0].split(" ")], rotd_comps)
+    rotd_values = im_calculation.get_rotd_components_dict([float(x) for x in data[0].split()], rotd_comps)
 
     for component in rotd_comps:
         if component.str_value not in results:
