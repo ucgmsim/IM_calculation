@@ -27,7 +27,6 @@ z_list = [0.05]  # damping ratio
 alpha_list = [0.0001]  # strain hardening ratio
 dy_list = [0.21278]  # strain hardening ratio
 dt_list = [0.005]
-g = 9.81
 
 period = np.array([0.5, 3.0])
 
@@ -56,15 +55,13 @@ def main(comp_000: Path, comp_090: Path, rotd: bool, output_dir: Path):
     waveforms["000"], meta = read_ascii(comp_000, meta=True)
     waveforms["090"] = read_ascii(comp_090)
     DT = np.float32(meta["dt"])  # to match the behaviour of basic SDI
-    NT = meta["nt"]
 
     results = {}
 
     accelerations = np.array((waveforms["000"], waveforms["090"])).T
     ordered_columns_dict = {}
-    sd_rotd_list = []
 
-
+    #TODO: replace the quad for loop with itertools.product (Would reduce the indentation by 3 levels)
     for z in z_list:
         for dt in dt_list:
             for alpha in alpha_list:
@@ -93,21 +90,11 @@ def main(comp_000: Path, comp_090: Path, rotd: bool, output_dir: Path):
                             results[component.str_value] = {}
                         for j, im_name in enumerate(im_names):
                             results[component.str_value][im_name] = sdi_values[j, i]
-
-
+                    if not rotd:
+                        continue
                     # computing non-linear rotd
-                    rotd_accs = intensity_measures.get_rotations(accelerations[..., [0, 1]], max_angle=180, func=lambda x: x)
-
-                    displacements_array = (
-                        intensity_measures.get_SDI_nd(
-                            rotd_accs, period, DT, z, alpha, dy, dt
-                        )
-                        * 100
-                    )
-
-                    rotd_values = im_calculation.get_rotd_components_dict(
-                        np.max(np.abs(displacements_array), axis=1), rotd_comps
-                    )
+                    func = lambda x: np.max(np.abs(intensity_measures.get_SDI_nd(x, period, DT, z, alpha, dy, dt) * 100), axis=1)
+                    rotd_values = im_calculation.calculate_rotd(accelerations[..., [0, 1]],rotd_comps, func=func)
 
                     for component in rotd_comps:
                         if component.str_value not in results:
