@@ -31,9 +31,9 @@ def get_spectral_acceleration(acceleration, period, NT, DT, Nstep, delta_t=DELTA
 
 def get_spectral_acceleration_nd(acceleration, period, NT, DT):
     # pSA
+    delta_t = min(DT, DELTA_T)
     if acceleration.ndim != 1:
         ts, dims = acceleration.shape
-        delta_t = min(DT, DELTA_T)
         Nstep = calculate_Nstep(DT, NT, delta_t)
         accelerations = np.zeros((period.size, Nstep, dims))
 
@@ -44,7 +44,7 @@ def get_spectral_acceleration_nd(acceleration, period, NT, DT):
 
         return accelerations
     else:
-        return get_spectral_acceleration(acceleration, period, NT, DT)
+        return get_spectral_acceleration(acceleration, period, NT, DT, delta_t)
 
 
 def get_SDI(acceleration, period, DT, z, alpha, dy, dt):
