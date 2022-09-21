@@ -555,6 +555,8 @@ def compute_measures_multiprocess(
                     for ii, waveform in enumerate(waveforms, start=i + 1)
                 ]
                 all_results.extend(p.starmap(compute_measure_single, array_params))
+                # for i in array_params:
+                #     all_results.extend(compute_measure_single(*i))
             p_t(i)
 
     if running_adv_im:

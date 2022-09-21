@@ -31,7 +31,8 @@ def get_spectral_acceleration(acceleration, period, NT, DT, Nstep, delta_t=DELTA
 
 def get_spectral_acceleration_nd(acceleration, period, NT, DT):
     # pSA
-    delta_t = min(DT, DELTA_T)
+    delta_t = min(float(str(DT)), DELTA_T)
+    print(delta_t, DT, DELTA_T)
     if acceleration.ndim != 1:
         ts, dims = acceleration.shape
         Nstep = calculate_Nstep(DT, NT, delta_t)
