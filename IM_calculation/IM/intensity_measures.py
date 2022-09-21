@@ -12,7 +12,7 @@ def get_max_nd(data):
     return np.max(np.abs(data), axis=0)
 
 
-def get_spectral_acceleration(acceleration, period, NT, DT, Nstep):
+def get_spectral_acceleration(acceleration, period, NT, DT, Nstep, delta_t=DELTA_T):
     # pSA
     c = 0.05
     M = 1.0
@@ -24,21 +24,22 @@ def get_spectral_acceleration(acceleration, period, NT, DT, Nstep):
 
     # interpolation additions
     t_orig = np.arange(NT + 1) * DT
-    t_solve = np.arange(Nstep) * DELTA_T
+    t_solve = np.arange(Nstep) * delta_t
     acc_step = np.interp(t_solve, t_orig, acc_step)
-    return rspectra.Response_Spectra(acc_step, DELTA_T, c, period, M, gamma, beta)
+    return rspectra.Response_Spectra(acc_step, delta_t, c, period, M, gamma, beta)
 
 
 def get_spectral_acceleration_nd(acceleration, period, NT, DT):
     # pSA
     if acceleration.ndim != 1:
         ts, dims = acceleration.shape
-        Nstep = calculate_Nstep(DT, NT)
+        delta_t = min(DT, DELTA_T)
+        Nstep = calculate_Nstep(DT, NT, delta_t)
         accelerations = np.zeros((period.size, Nstep, dims))
 
         for i in range(dims):
             accelerations[:, :, i] = get_spectral_acceleration(
-                acceleration[:, i], period, NT, DT, Nstep
+                acceleration[:, i], period, NT, DT, Nstep, delta_t
             )
 
         return accelerations
@@ -72,8 +73,8 @@ def get_SDI_nd(acceleration, period, NT, DT, z, alpha, dy, dt):
         return get_SDI(acceleration, period, NT, DT, z, alpha, dy, dt)
 
 
-def calculate_Nstep(DT, NT):
-    return NT * int(round(DT / DELTA_T))
+def calculate_Nstep(DT, NT, delta_t=DELTA_T):
+    return NT * int(round(DT / delta_t))
 
 
 def get_rotations(
