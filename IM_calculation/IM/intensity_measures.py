@@ -31,8 +31,10 @@ def get_spectral_acceleration(acceleration, period, NT, DT, Nstep, delta_t=DELTA
 
 def get_spectral_acceleration_nd(acceleration, period, NT, DT):
     # pSA
+    # Uses string conversion to convert from a float32 to a python float while retaining prescision
+    # https://stackoverflow.com/questions/41967222/how-to-retain-precision-when-converting-from-float32-to-float
     delta_t = min(float(str(DT)), DELTA_T)
-    print(delta_t, DT, DELTA_T)
+
     if acceleration.ndim != 1:
         ts, dims = acceleration.shape
         Nstep = calculate_Nstep(DT, NT, delta_t)
