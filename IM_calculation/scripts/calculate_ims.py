@@ -11,11 +11,14 @@ command:
 import argparse
 import os
 
+from mpi4py import MPI
+
 import IM_calculation.IM.im_calculation as calc
 from IM_calculation.Advanced_IM import advanced_IM_factory
 from qcore import constants
 from qcore import utils
 from qcore import qclogging
+from qcore import MPIFileHandler
 
 
 def load_args():
@@ -201,7 +204,26 @@ def load_args():
 
 
 def main():
-    args = load_args()
+    comm = MPI.COMM_WORLD
+    rank = comm.Get_rank()
+    size = comm.Get_size()
+    master = 0
+    is_master = not rank
+
+    logger = qclogging.get_logger("IM_calc_rank_%i" % comm.rank)
+    logger.setLevel(qclogging.VERYVERBOSE)
+
+    # collect required arguments
+    args = None
+    if is_master:
+        try:
+            args = load_args()
+        except SystemExit as e:
+            # invalid arguments or -h
+            print("arg parse error occured:", e)
+            comm.Abort()
+
+    args = comm.bcast(args, root=master)
 
     file_type = calc.FILE_TYPE_DICT[args.file_type]
     run_type = calc.META_TYPE_DICT[args.run_type]
@@ -219,9 +241,10 @@ def main():
         im_options["FAS"] = calc.validate_fas_frequency(args.fas_frequency)
 
     # Create output dir
-    utils.setup_dir(args.output_path)
-    if not args.simple_output and args.advanced_ims is None:
-        utils.setup_dir(os.path.join(args.output_path, calc.OUTPUT_SUBFOLDER))
+    if is_master:
+        utils.setup_dir(args.output_path)
+        if not args.simple_output and args.advanced_ims is None:
+            utils.setup_dir(os.path.join(args.output_path, calc.OUTPUT_SUBFOLDER))
 
     # TODO: this may need to be updated to read file if the length of list becomes an issue
     station_names = args.station_names
@@ -235,11 +258,17 @@ def main():
         components = args.components
         advanced_im_config = None
 
-    logger = qclogging.get_logger("IM_calc")
-    qclogging.add_general_file_handler(
-        logger, os.path.join(args.output_path, f"{args.identifier}_im_calc.log")
+    mh = MPIFileHandler.MPIFileHandler(
+        os.path.join(os.path.dirname(args.out_file), "BB.log")
     )
-    logger.info("IM_Calc started")
+    formatter = qclogging.Formatter("%(asctime)s:%(name)s:%(levelname)s:%(message)s")
+    mh.setFormatter(formatter)
+    logger.addHandler(mh)
+    # logger = qclogging.get_logger("IM_calc")
+    # qclogging.add_general_file_handler(
+    #     logger, os.path.join(args.output_path, f"{args.identifier}_im_calc.log")
+    # )
+    # logger.info("IM_Calc started")
 
     # multiprocessor
     calc.compute_measures_multiprocess(

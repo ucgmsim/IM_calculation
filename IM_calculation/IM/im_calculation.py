@@ -566,6 +566,118 @@ def compute_measures_multiprocess(
     generate_metadata(output, identifier, rupture, run_type, version)
 
 
+def compute_measures_mpi(
+    input_path,
+    file_type,
+    wave_type,
+    station_names,
+    ims=DEFAULT_IMS,
+    comp=None,
+    im_options=None,
+    output=None,
+    identifier=None,
+    rupture=None,
+    run_type=None,
+    version=None,
+    process=1,
+    simple_output=False,
+    units="g",
+    advanced_im_config=None,
+    real_only=False,
+    logger=qclogging.get_basic_logger(),
+):
+    """
+    using multiprocesses to compute measures.
+    Calls compute_measure_single() to compute measures for a single station
+    write results to csvs and an imcalc.info meta data file
+    :param input_path:
+    :param file_type:
+    :param wave_type:
+    :param station_names:
+    :param ims:
+    :param comp:
+    :param im_options:
+    :param output:
+    :param identifier:
+    :param rupture:
+    :param run_type:
+    :param version:
+    :param process:
+    :param simple_output:
+    :param units:
+    :param advanced_im_config:
+    :param real_only:
+    :return:
+    """
+    #  for running adv_im
+    running_adv_im = (advanced_im_config is not None) and (
+        advanced_im_config.IM_list is not None
+    )
+
+    (
+        components_to_calculate,
+        components_to_store,
+    ) = constants.Components.get_comps_to_calc_and_store(comp)
+
+    bbseries, station_names = get_bbseis(
+        input_path, file_type, station_names, real_only=real_only
+    )
+    total_stations = len(station_names)
+    # determine the size of each iteration base on num of processes and mem
+    steps = get_steps(
+        input_path, process, total_stations, "FAS" in ims and bbseries.nt > 32768
+    )
+
+    # initialize result list for basic IM
+    if not running_adv_im:
+        all_results = []
+
+    with Pool(process) as p, ProgressTracker(total_stations) as p_t:
+        for i in range(0, total_stations, steps):
+            # read waveforms of stations
+            # each iteration = steps size
+            stations_to_run = station_names[i : i + steps]
+            waveforms = read_waveform.read_waveforms(
+                input_path,
+                bbseries,
+                stations_to_run,
+                components_to_calculate,
+                wave_type=wave_type,
+                file_type=file_type,
+                units=units,
+            )
+            # only run basic im if and only if adv_im not going to run
+            if running_adv_im:
+                adv_array_params = [
+                    (waveform, advanced_im_config, output) for waveform in waveforms
+                ]
+                # calculate IM for stations in this iteration
+                p.starmap(compute_adv_measure, adv_array_params)
+            else:
+                array_params = [
+                    (
+                        waveform,
+                        sorted(ims),
+                        sorted(components_to_store, key=lambda x: x.value),
+                        im_options,
+                        sorted(components_to_calculate, key=lambda x: x.value),
+                        (ii, total_stations),
+                        logger.name,
+                    )
+                    for ii, waveform in enumerate(waveforms, start=i + 1)
+                ]
+                all_results.extend(p.starmap(compute_measure_single, array_params))
+            p_t(i)
+
+    if running_adv_im:
+        # read, agg and store csv
+        advanced_IM_factory.agg_csv(advanced_im_config, station_names, output)
+    else:
+        all_result_dict = ChainMap(*all_results)
+        write_result(all_result_dict, output, identifier, simple_output)
+    generate_metadata(output, identifier, rupture, run_type, version)
+
+
 def get_result_filepath(output_folder, arg_identifier, suffix):
     return os.path.join(output_folder, "{}{}".format(arg_identifier, suffix))
 
