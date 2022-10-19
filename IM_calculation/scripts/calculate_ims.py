@@ -276,6 +276,8 @@ def main():
     logger.addHandler(mh)
     logger.info("IM_Calc started")
 
+    logger.info(f"PROCESS INFO rank: {rank} size:{size}")
+
     # MPI
     calc.compute_measures_mpi(
         args.input_path,
