@@ -10,6 +10,7 @@ command:
 
 import argparse
 import os
+import logging
 
 from mpi4py import MPI
 
@@ -139,6 +140,14 @@ def load_args():
     )
 
     parser.add_argument(
+        "-nd",
+        "--nodes",
+        default=1,
+        type=int,
+        help="Please provide the number of processors. Default is 1",
+    )
+
+    parser.add_argument(
         "--real_stats_only",
         action="store_true",
         help="Please add '--real_stats_only' to consider real stations only",
@@ -210,8 +219,8 @@ def main():
     master = 0
     is_master = not rank
 
-    logger = qclogging.get_logger("IM_calc_rank_%i" % comm.rank)
-    logger.setLevel(qclogging.VERYVERBOSE)
+    logger = logging.getLogger("IM_calc_rank_%i" % comm.rank)
+    logger.setLevel(logging.DEBUG)
 
     # collect required arguments
     args = None
@@ -243,6 +252,7 @@ def main():
     # Create output dir
     if is_master:
         utils.setup_dir(args.output_path)
+        utils.setup_dir(os.path.join(args.output_path, "stations"))
         if not args.simple_output and args.advanced_ims is None:
             utils.setup_dir(os.path.join(args.output_path, calc.OUTPUT_SUBFOLDER))
 
@@ -259,21 +269,20 @@ def main():
         advanced_im_config = None
 
     mh = MPIFileHandler.MPIFileHandler(
-        os.path.join(os.path.dirname(args.out_file), "BB.log")
+        os.path.join(os.path.dirname(args.output_path), f"{args.identifier}_im_calc.log")
     )
-    formatter = qclogging.Formatter("%(asctime)s:%(name)s:%(levelname)s:%(message)s")
+    formatter = logging.Formatter("%(asctime)s:%(name)s:%(levelname)s:%(message)s")
     mh.setFormatter(formatter)
     logger.addHandler(mh)
-    # logger = qclogging.get_logger("IM_calc")
-    # qclogging.add_general_file_handler(
-    #     logger, os.path.join(args.output_path, f"{args.identifier}_im_calc.log")
-    # )
-    # logger.info("IM_Calc started")
+    logger.info("IM_Calc started")
 
-    # multiprocessor
-    calc.compute_measures_multiprocess(
+    # MPI
+    calc.compute_measures_mpi(
         args.input_path,
         file_type,
+        comm,
+        rank,
+        size,
         wave_type=None,
         station_names=station_names,
         ims=im,

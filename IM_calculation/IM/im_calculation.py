@@ -8,6 +8,7 @@ from multiprocessing.pool import Pool
 from collections import ChainMap
 from typing import List, Iterable
 
+from mpi4py import MPI
 import numpy as np
 import pandas as pd
 
@@ -569,6 +570,9 @@ def compute_measures_multiprocess(
 def compute_measures_mpi(
     input_path,
     file_type,
+    comm,
+    rank,
+    size,
     wave_type,
     station_names,
     ims=DEFAULT_IMS,
@@ -609,6 +613,9 @@ def compute_measures_mpi(
     :param real_only:
     :return:
     """
+    master = 0
+    is_master = not rank
+
     #  for running adv_im
     running_adv_im = (advanced_im_config is not None) and (
         advanced_im_config.IM_list is not None
@@ -619,28 +626,50 @@ def compute_measures_mpi(
         components_to_store,
     ) = constants.Components.get_comps_to_calc_and_store(comp)
 
-    bbseries, station_names = get_bbseis(
-        input_path, file_type, station_names, real_only=real_only
-    )
-    total_stations = len(station_names)
-    # determine the size of each iteration base on num of processes and mem
-    steps = get_steps(
-        input_path, process, total_stations, "FAS" in ims and bbseries.nt > 32768
-    )
+    bbseries, station_names = None, None
+    if is_master:
+        bbseries, station_names = get_bbseis(
+            input_path, file_type, station_names, real_only=real_only
+        )
+    bbseries = comm.bcast(bbseries, root=master)
+    station_names = comm.bcast(station_names, root=master)
 
-    # initialize result list for basic IM
-    if not running_adv_im:
-        all_results = []
+    # Check which stations to run against non-zero station files already
+    # in the station output directory
+    station_path = os.path.join(output, "stations")
+    stations_set = set(station_names)
+    found_stations = {
+        os.path.splitext(f)[0]
+        for f in os.listdir(station_path)
+        if os.stat(os.path.join(station_path, f)).st_size > 0
+    }
+    stations_to_run = list(stations_set.difference(found_stations))
 
-    with Pool(process) as p, ProgressTracker(total_stations) as p_t:
-        for i in range(0, total_stations, steps):
-            # read waveforms of stations
-            # each iteration = steps size
-            stations_to_run = station_names[i : i + steps]
-            waveforms = read_waveform.read_waveforms(
+    status = MPI.Status()
+    if is_master:
+        nslaves = size - 1
+        while nslaves:
+            station = comm.recv(source=MPI.ANY_SOURCE, status=status)
+            slave_id = status.Get_source()
+            logger.info(f"from rank: {slave_id} completed: {station}")
+            # next job
+            if len(stations_to_run) > 0:
+                station = stations_to_run.pop(-1)
+                comm.send(obj=station, dest=slave_id)
+            else:
+                comm.send(obj=StopIteration, dest=slave_id)
+                nslaves -= 1
+        logger.info("All stations complete")
+    else:
+        station_completed = False
+        for station in iter(
+            lambda: comm.sendrecv(station_completed, dest=master), StopIteration
+        ):
+            logger.info(f"Station to compute: {station}")
+            waveform = read_waveform.read_waveforms(
                 input_path,
                 bbseries,
-                stations_to_run,
+                station,
                 components_to_calculate,
                 wave_type=wave_type,
                 file_type=file_type,
@@ -648,34 +677,26 @@ def compute_measures_mpi(
             )
             # only run basic im if and only if adv_im not going to run
             if running_adv_im:
-                adv_array_params = [
-                    (waveform, advanced_im_config, output) for waveform in waveforms
-                ]
-                # calculate IM for stations in this iteration
-                p.starmap(compute_adv_measure, adv_array_params)
+                compute_adv_measure(waveform, advanced_im_config, output)
             else:
-                array_params = [
-                    (
-                        waveform,
-                        sorted(ims),
-                        sorted(components_to_store, key=lambda x: x.value),
-                        im_options,
-                        sorted(components_to_calculate, key=lambda x: x.value),
-                        (ii, total_stations),
-                        logger.name,
-                    )
-                    for ii, waveform in enumerate(waveforms, start=i + 1)
-                ]
-                all_results.extend(p.starmap(compute_measure_single, array_params))
-            p_t(i)
-
-    if running_adv_im:
-        # read, agg and store csv
-        advanced_IM_factory.agg_csv(advanced_im_config, station_names, output)
-    else:
-        all_result_dict = ChainMap(*all_results)
-        write_result(all_result_dict, output, identifier, simple_output)
-    generate_metadata(output, identifier, rupture, run_type, version)
+                result_dict = compute_measure_single(
+                    waveform,
+                    sorted(ims),
+                    sorted(components_to_store, key=lambda x: x.value),
+                    im_options,
+                    sorted(components_to_calculate, key=lambda x: x.value),
+                    (stations_to_run.index(station), len(stations_to_run)),
+                    logger.name,
+                )
+                write_result(result_dict, station_path, station, simple_output)
+    if is_master:
+        if running_adv_im:
+            # read, agg and store csv
+            advanced_IM_factory.agg_csv(advanced_im_config, station_names, output)
+        else:
+            all_station_data = read_station_output(station_path)
+            all_station_data.to_csv(os.path.join(output, identifier, ".csv"))
+        generate_metadata(output, identifier, rupture, run_type, version)
 
 
 def get_result_filepath(output_folder, arg_identifier, suffix):
@@ -710,6 +731,20 @@ def write_result(result_dict, output_folder, identifier, simple_output):
                 output_folder, OUTPUT_SUBFOLDER, "{}_{}.csv".format(identifier, station)
             )
             sub_frame.to_csv(station_csv)
+
+
+def read_station_output(station_directory):
+    """
+    Reads the csv files in the station directory and compiles them together to one dataframe
+    """
+    output_df = None
+    for file_name in os.listdir(station_directory):
+        station_df = pd.read_csv(os.path.join(station_directory, file_name))
+        if output_df is None:
+            output_df = station_df
+        else:
+            pd.concat([output_df, station_df])
+    return output_df
 
 
 def generate_metadata(output_folder, identifier, rupture, run_type, version):
