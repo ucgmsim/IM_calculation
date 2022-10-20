@@ -650,21 +650,21 @@ def compute_measures_mpi(
     if is_master:
         nslaves = size - 1
         while nslaves:
-            station = comm.recv(source=MPI.ANY_SOURCE, status=status)
+            comm.recv(source=MPI.ANY_SOURCE, status=status)
             slave_id = status.Get_source()
-            logger.info(f"from rank: {slave_id} completed: {station}")
+            logger.info(f"Received info from rank: {slave_id}")
             # next job
             if len(stations_to_run) > 0:
                 station = stations_to_run.pop(-1)
+                logger.info(f"Sending station {station} to {slave_id}")
                 comm.send(obj=station, dest=slave_id)
             else:
                 comm.send(obj=StopIteration, dest=slave_id)
                 nslaves -= 1
         logger.info("All stations complete")
     else:
-        station_completed = False
         for station in iter(
-            lambda: comm.sendrecv(station_completed, dest=master), StopIteration
+            lambda: comm.sendrecv(None, dest=master), StopIteration
         ):
             logger.info(f"Station to compute: {station}")
             waveform = read_waveform.read_waveforms(
@@ -676,6 +676,7 @@ def compute_measures_mpi(
                 file_type=file_type,
                 units=units,
             )
+            logger.info(f"Finished reading waveform: {station}")
             # only run basic im if and only if adv_im not going to run
             if running_adv_im:
                 compute_adv_measure(waveform, advanced_im_config, output)
@@ -689,9 +690,10 @@ def compute_measures_mpi(
                     (stations_to_run.index(station), len(stations_to_run)),
                     logger.name,
                 )
+                logger.info(f"Computed single measure: {station}")
                 write_result(result_dict, station_path, station, simple_output)
     if is_master:
-        print("Completed computation")
+        logger.info("Completed computation")
         if running_adv_im:
             # read, agg and store csv
             advanced_IM_factory.agg_csv(advanced_im_config, station_names, output)
