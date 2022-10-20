@@ -303,10 +303,9 @@ def main():
         real_only=args.real_stats_only,
         logger=logger,
     )
-
-    print("Calculations are output to {}".format(args.output_path))
+    if is_master:
+        print("Calculations are output to {}".format(args.output_path))
 
 
 if __name__ == "__main__":
-    print("Hello world")
-    # main()
+    main()

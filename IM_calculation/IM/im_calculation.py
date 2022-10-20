@@ -691,6 +691,7 @@ def compute_measures_mpi(
                 )
                 write_result(result_dict, station_path, station, simple_output)
     if is_master:
+        print("Completed computation")
         if running_adv_im:
             # read, agg and store csv
             advanced_IM_factory.agg_csv(advanced_im_config, station_names, output)
