@@ -12,14 +12,24 @@ import argparse
 import os
 import logging
 
-from mpi4py import MPI
-
 import IM_calculation.IM.im_calculation as calc
 from IM_calculation.Advanced_IM import advanced_IM_factory
 from qcore import constants
 from qcore import utils
 from qcore import qclogging
-from qcore import MPIFileHandler
+
+
+if __name__ == "__main__":
+    from mpi4py import MPI
+    from qcore import MPIFileHandler
+    comm = MPI.COMM_WORLD
+    rank = comm.Get_rank()
+    size = comm.Get_size()
+    master = 0
+    is_master = not rank
+
+    logger = logging.getLogger("IM_calc_rank_%i" % comm.rank)
+    logger.setLevel(logging.DEBUG)
 
 
 def load_args():
@@ -213,15 +223,6 @@ def load_args():
 
 
 def main():
-    comm = MPI.COMM_WORLD
-    rank = comm.Get_rank()
-    size = comm.Get_size()
-    master = 0
-    is_master = not rank
-
-    logger = logging.getLogger("IM_calc_rank_%i" % comm.rank)
-    logger.setLevel(logging.DEBUG)
-
     # collect required arguments
     args = None
     if is_master:

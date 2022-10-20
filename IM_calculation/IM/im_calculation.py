@@ -2,6 +2,7 @@ import csv
 import glob
 import os
 import sys
+import shutil
 from datetime import datetime
 from functools import partial
 from multiprocessing.pool import Pool
@@ -696,6 +697,7 @@ def compute_measures_mpi(
         else:
             all_station_data = read_station_output(station_path)
             all_station_data.to_csv(os.path.join(output, identifier, ".csv"))
+            shutil.rmtree(station_path)
         generate_metadata(output, identifier, rupture, run_type, version)
 
 
