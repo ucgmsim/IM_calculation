@@ -156,7 +156,7 @@ def compute_measure_single(
     im_options,
     comps_to_calculate,
     progress,
-    logger_name=qclogging.get_basic_logger().name,
+    logger=qclogging.get_basic_logger(),
 ):
     """
     Compute measures for a single station
@@ -165,8 +165,8 @@ def compute_measure_single(
     progress: a tuple containing station number and total number of stations
     :return: {result[station_name]: {[im]: value or (period,value}}
     """
-    logger = qclogging.get_logger(logger_name)
-
+    logger.info("Computing single measure")
+    logger.info(f"Waveform: {waveform}")
     waveform_acc, waveform_vel = waveform
     DT = waveform_acc.DT
     times = waveform_acc.times
@@ -178,7 +178,7 @@ def compute_measure_single(
         velocities = timeseries.acc2vel(accelerations, DT) * G
     else:
         velocities = waveform_vel.values
-
+    logger.info("Got waveform measures")
     station_name = waveform_acc.station_name
     station_i, n_stations = progress
     logger.info(f"Processing {station_name} - {station_i} / {n_stations}")
@@ -205,6 +205,8 @@ def compute_measure_single(
         "Ds575": (calc_DS, (accelerations, DT, 5, 75)),
     }
 
+    logger.info("Set IM functions")
+
     for im in set(ims).intersection(im_functions.keys()):
         # print(im)
         func, args = im_functions[im]
@@ -217,6 +219,7 @@ def compute_measure_single(
                 result[(station_name, comp.str_value)][im] = values_to_store[
                     comp.str_value
                 ]
+    logger.info("Finished IM functions")
 
     return result
 
@@ -688,7 +691,7 @@ def compute_measures_mpi(
                     im_options,
                     sorted(components_to_calculate, key=lambda x: x.value),
                     (stations_to_run.index(station), len(stations_to_run)),
-                    logger.name,
+                    logger,
                 )
                 logger.info(f"Computed single measure: {station}")
                 write_result(result_dict, station_path, station, simple_output)
