@@ -165,64 +165,55 @@ def compute_measure_single(
     progress: a tuple containing station number and total number of stations
     :return: {result[station_name]: {[im]: value or (period,value}}
     """
-    logger.info("Computing single measure")
-    logger.info(f"Waveform: {waveform}")
-    try:
-        waveform_acc, waveform_vel = waveform
-        DT = waveform_acc.DT
-        times = waveform_acc.times
+    waveform_acc, waveform_vel = waveform
+    DT = waveform_acc.DT
+    times = waveform_acc.times
 
-        accelerations = waveform_acc.values
+    accelerations = waveform_acc.values
 
-        if waveform_vel is None:
-            # integrating g to cm/s
-            velocities = timeseries.acc2vel(accelerations, DT) * G
-        else:
-            velocities = waveform_vel.values
-        logger.info("Got waveform measures")
-        station_name = waveform_acc.station_name
-        station_i, n_stations = progress
-        logger.info(f"Processing {station_name} - {station_i} / {n_stations}")
+    if waveform_vel is None:
+        # integrating g to cm/s
+        velocities = timeseries.acc2vel(accelerations, DT) * G
+    else:
+        velocities = waveform_vel.values
 
-        result = {(station_name, comp.str_value): {} for comp in comps_to_store}
+    station_name = waveform_acc.station_name
+    station_i, n_stations = progress
+    logger.info(f"Processing {station_name} - {station_i} / {n_stations}")
 
-        im_functions = {
-            "PGV": (calc_PG, (velocities,)),
-            "PGA": (calc_PG, (accelerations,)),
-            "CAV": (calc_CAV, (accelerations, times)),
-            "pSA": (
-                calculate_pSAs,
-                (DT, accelerations, im_options, result, station_name, waveform_acc),
-            ),
-            "SDI": (
-                calculate_SDI,
-                (DT, accelerations, im_options, result, station_name, waveform_acc),
-            ),
-            "FAS": (calc_FAS, (DT, accelerations, im_options, result, station_name)),
-            "AI": (calc_AI, (accelerations, times)),
-            "SED": (calc_SED, (velocities, times)),
-            "MMI": (calc_MMI, (velocities,)),
-            "Ds595": (calc_DS, (accelerations, DT, 5, 95)),
-            "Ds575": (calc_DS, (accelerations, DT, 5, 75)),
-        }
+    result = {(station_name, comp.str_value): {} for comp in comps_to_store}
 
-        logger.info("Set IM functions")
+    im_functions = {
+        "PGV": (calc_PG, (velocities,)),
+        "PGA": (calc_PG, (accelerations,)),
+        "CAV": (calc_CAV, (accelerations, times)),
+        "pSA": (
+            calculate_pSAs,
+            (DT, accelerations, im_options, result, station_name, waveform_acc),
+        ),
+        "SDI": (
+            calculate_SDI,
+            (DT, accelerations, im_options, result, station_name, waveform_acc),
+        ),
+        "FAS": (calc_FAS, (DT, accelerations, im_options, result, station_name)),
+        "AI": (calc_AI, (accelerations, times)),
+        "SED": (calc_SED, (velocities, times)),
+        "MMI": (calc_MMI, (velocities,)),
+        "Ds595": (calc_DS, (accelerations, DT, 5, 95)),
+        "Ds575": (calc_DS, (accelerations, DT, 5, 75)),
+    }
 
-        for im in set(ims).intersection(im_functions.keys()):
-            # print(im)
-            func, args = im_functions[im]
-            values_to_store = func(*args, im, comps_to_store, comps_to_calculate)
-            if values_to_store is None:
-                # value storing has been handled by the called function
-                continue
-            for comp in comps_to_store:
-                if comp.str_value in values_to_store:
-                    result[(station_name, comp.str_value)][im] = values_to_store[
-                        comp.str_value
-                    ]
-    except Exception as e:
-        logger.debug(f"ERROR {e}")
-    logger.info("Finished IM functions")
+    for im in set(ims).intersection(im_functions.keys()):
+        func, args = im_functions[im]
+        values_to_store = func(*args, im, comps_to_store, comps_to_calculate)
+        if values_to_store is None:
+            # value storing has been handled by the called function
+            continue
+        for comp in comps_to_store:
+            if comp.str_value in values_to_store:
+                result[(station_name, comp.str_value)][im] = values_to_store[
+                    comp.str_value
+                ]
 
     return result
 
@@ -658,7 +649,6 @@ def compute_measures_mpi(
         while nslaves:
             comm.recv(source=MPI.ANY_SOURCE, status=status)
             slave_id = status.Get_source()
-            logger.info(f"Received info from rank: {slave_id}")
             # next job
             if len(stations_to_run) > 0:
                 station = stations_to_run.pop(-1)
@@ -682,7 +672,6 @@ def compute_measures_mpi(
                 file_type=file_type,
                 units=units,
             )
-            logger.info(f"Finished reading waveform: {station}")
             # only run basic im if and only if adv_im not going to run
             if running_adv_im:
                 compute_adv_measure(waveforms, advanced_im_config, output)
@@ -696,18 +685,20 @@ def compute_measures_mpi(
                     (stations_to_run.index(station), len(stations_to_run)),
                     logger,
                 )
-                logger.info(f"Computed single measure: {station}")
                 write_result(result_dict, station_path, station, simple_output)
     if is_master:
-        logger.info("Completed computation")
-        if running_adv_im:
-            # read, agg and store csv
-            advanced_IM_factory.agg_csv(advanced_im_config, station_names, output)
-        else:
-            all_station_data = read_station_output(station_path)
-            all_station_data.to_csv(os.path.join(output, identifier, ".csv"))
-            shutil.rmtree(station_path)
-        generate_metadata(output, identifier, rupture, run_type, version)
+        try:
+            logger.info("Completed computation")
+            if running_adv_im:
+                # read, agg and store csv
+                advanced_IM_factory.agg_csv(advanced_im_config, station_names, output)
+            else:
+                all_station_data = read_station_output(station_path)
+                all_station_data.to_csv(os.path.join(output, identifier, ".csv"))
+                shutil.rmtree(station_path)
+            generate_metadata(output, identifier, rupture, run_type, version)
+        except Exception as e:
+            logger.debug(f"Error {e}")
 
 
 def get_result_filepath(output_folder, arg_identifier, suffix):
