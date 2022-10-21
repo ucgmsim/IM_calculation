@@ -694,7 +694,7 @@ def compute_measures_mpi(
                 advanced_IM_factory.agg_csv(advanced_im_config, station_names, output)
             else:
                 all_station_data = read_station_output(station_path)
-                all_station_data.to_csv(os.path.join(output, identifier, ".csv"))
+                all_station_data.to_csv(get_result_filepath(output, identifier, ".csv"))
                 shutil.rmtree(station_path)
             generate_metadata(output, identifier, rupture, run_type, version)
         except Exception as e:
