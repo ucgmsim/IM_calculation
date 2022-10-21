@@ -673,7 +673,7 @@ def compute_measures_mpi(
             lambda: comm.sendrecv(None, dest=master), StopIteration
         ):
             logger.info(f"Station to compute: {station}")
-            waveform = read_waveform.read_waveforms(
+            waveforms = read_waveform.read_waveforms(
                 input_path,
                 bbseries,
                 [station],
@@ -685,10 +685,10 @@ def compute_measures_mpi(
             logger.info(f"Finished reading waveform: {station}")
             # only run basic im if and only if adv_im not going to run
             if running_adv_im:
-                compute_adv_measure(waveform, advanced_im_config, output)
+                compute_adv_measure(waveforms, advanced_im_config, output)
             else:
                 result_dict = compute_measure_single(
-                    waveform,
+                    waveforms[0],
                     sorted(ims),
                     sorted(components_to_store, key=lambda x: x.value),
                     im_options,
