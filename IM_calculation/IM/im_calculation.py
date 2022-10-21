@@ -167,58 +167,61 @@ def compute_measure_single(
     """
     logger.info("Computing single measure")
     logger.info(f"Waveform: {waveform}")
-    waveform_acc, waveform_vel = waveform
-    DT = waveform_acc.DT
-    times = waveform_acc.times
+    try:
+        waveform_acc, waveform_vel = waveform
+        DT = waveform_acc.DT
+        times = waveform_acc.times
 
-    accelerations = waveform_acc.values
+        accelerations = waveform_acc.values
 
-    if waveform_vel is None:
-        # integrating g to cm/s
-        velocities = timeseries.acc2vel(accelerations, DT) * G
-    else:
-        velocities = waveform_vel.values
-    logger.info("Got waveform measures")
-    station_name = waveform_acc.station_name
-    station_i, n_stations = progress
-    logger.info(f"Processing {station_name} - {station_i} / {n_stations}")
+        if waveform_vel is None:
+            # integrating g to cm/s
+            velocities = timeseries.acc2vel(accelerations, DT) * G
+        else:
+            velocities = waveform_vel.values
+        logger.info("Got waveform measures")
+        station_name = waveform_acc.station_name
+        station_i, n_stations = progress
+        logger.info(f"Processing {station_name} - {station_i} / {n_stations}")
 
-    result = {(station_name, comp.str_value): {} for comp in comps_to_store}
+        result = {(station_name, comp.str_value): {} for comp in comps_to_store}
 
-    im_functions = {
-        "PGV": (calc_PG, (velocities,)),
-        "PGA": (calc_PG, (accelerations,)),
-        "CAV": (calc_CAV, (accelerations, times)),
-        "pSA": (
-            calculate_pSAs,
-            (DT, accelerations, im_options, result, station_name, waveform_acc),
-        ),
-        "SDI": (
-            calculate_SDI,
-            (DT, accelerations, im_options, result, station_name, waveform_acc),
-        ),
-        "FAS": (calc_FAS, (DT, accelerations, im_options, result, station_name)),
-        "AI": (calc_AI, (accelerations, times)),
-        "SED": (calc_SED, (velocities, times)),
-        "MMI": (calc_MMI, (velocities,)),
-        "Ds595": (calc_DS, (accelerations, DT, 5, 95)),
-        "Ds575": (calc_DS, (accelerations, DT, 5, 75)),
-    }
+        im_functions = {
+            "PGV": (calc_PG, (velocities,)),
+            "PGA": (calc_PG, (accelerations,)),
+            "CAV": (calc_CAV, (accelerations, times)),
+            "pSA": (
+                calculate_pSAs,
+                (DT, accelerations, im_options, result, station_name, waveform_acc),
+            ),
+            "SDI": (
+                calculate_SDI,
+                (DT, accelerations, im_options, result, station_name, waveform_acc),
+            ),
+            "FAS": (calc_FAS, (DT, accelerations, im_options, result, station_name)),
+            "AI": (calc_AI, (accelerations, times)),
+            "SED": (calc_SED, (velocities, times)),
+            "MMI": (calc_MMI, (velocities,)),
+            "Ds595": (calc_DS, (accelerations, DT, 5, 95)),
+            "Ds575": (calc_DS, (accelerations, DT, 5, 75)),
+        }
 
-    logger.info("Set IM functions")
+        logger.info("Set IM functions")
 
-    for im in set(ims).intersection(im_functions.keys()):
-        # print(im)
-        func, args = im_functions[im]
-        values_to_store = func(*args, im, comps_to_store, comps_to_calculate)
-        if values_to_store is None:
-            # value storing has been handled by the called function
-            continue
-        for comp in comps_to_store:
-            if comp.str_value in values_to_store:
-                result[(station_name, comp.str_value)][im] = values_to_store[
-                    comp.str_value
-                ]
+        for im in set(ims).intersection(im_functions.keys()):
+            # print(im)
+            func, args = im_functions[im]
+            values_to_store = func(*args, im, comps_to_store, comps_to_calculate)
+            if values_to_store is None:
+                # value storing has been handled by the called function
+                continue
+            for comp in comps_to_store:
+                if comp.str_value in values_to_store:
+                    result[(station_name, comp.str_value)][im] = values_to_store[
+                        comp.str_value
+                    ]
+    except Exception as e:
+        logger.debug(f"ERROR {e}")
     logger.info("Finished IM functions")
 
     return result
