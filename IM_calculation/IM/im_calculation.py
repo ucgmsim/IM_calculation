@@ -670,7 +670,7 @@ def compute_measures_mpi(
             waveform = read_waveform.read_waveforms(
                 input_path,
                 bbseries,
-                station,
+                [station],
                 components_to_calculate,
                 wave_type=wave_type,
                 file_type=file_type,
