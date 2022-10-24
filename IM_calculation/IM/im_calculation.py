@@ -745,7 +745,7 @@ def read_station_output(station_directory):
         if output_df is None:
             output_df = station_df
         else:
-            pd.concat([output_df, station_df])
+            output_df = pd.concat([output_df, station_df])
     return output_df
 
 
