@@ -694,7 +694,7 @@ def compute_measures_mpi(
                 advanced_IM_factory.agg_csv(advanced_im_config, station_names, output)
             else:
                 all_station_data = read_station_output(station_path)
-                all_station_data.to_csv(get_result_filepath(output, identifier, ".csv"))
+                all_station_data.to_csv(get_result_filepath(output, identifier, ".csv"), index=False)
                 shutil.rmtree(station_path)
             generate_metadata(output, identifier, rupture, run_type, version)
         except Exception as e:
@@ -741,7 +741,7 @@ def read_station_output(station_directory):
     """
     output_df = None
     for file_name in os.listdir(station_directory):
-        station_df = pd.read_csv(os.path.join(station_directory, file_name))
+        station_df = pd.read_csv(os.path.join(station_directory, file_name), index_col=0)
         if output_df is None:
             output_df = station_df
         else:
