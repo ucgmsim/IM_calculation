@@ -564,7 +564,10 @@ def compute_measures_mpi(
             # only run basic im if and only if adv_im not going to run
             if running_adv_im:
                 print("Running Adv Measures")
-                compute_adv_measure(waveforms, advanced_im_config, output)
+                try:
+                    compute_adv_measure(waveforms, advanced_im_config, output)
+                except Exception as e:
+                    print(f"Error {e}")
                 print("Finished Adv Measures")
             else:
                 result_dict = compute_measure_single(
