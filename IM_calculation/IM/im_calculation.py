@@ -142,8 +142,9 @@ def compute_adv_measure(waveform, advanced_im_config, output_dir):
     :param output_dir: Directory where output folders are contained. Structure is /path/to/output_dir/station/im_name
     :return:
     """
-
+    print(waveform)
     waveform_acc = waveform[0]
+    print(waveform_acc)
     station_name = waveform_acc.station_name
     adv_im_out_dir = os.path.join(output_dir, station_name)
     advanced_IM_factory.compute_ims(waveform_acc, advanced_im_config, adv_im_out_dir)
@@ -551,7 +552,7 @@ def compute_measures_mpi(
     else:
         for station in iter(lambda: comm.sendrecv(None, dest=master), StopIteration):
             logger.info(f"Station to compute: {station}")
-            waveforms = read_waveform.read_waveforms(
+            waveform = read_waveform.read_waveforms(
                 input_path,
                 bbseries,
                 [station],
@@ -559,19 +560,19 @@ def compute_measures_mpi(
                 wave_type=wave_type,
                 file_type=file_type,
                 units=units,
-            )
+            )[0]
             print("Finished waveform readings")
             # only run basic im if and only if adv_im not going to run
             if running_adv_im:
                 print("Running Adv Measures")
                 try:
-                    compute_adv_measure(waveforms, advanced_im_config, output)
+                    compute_adv_measure(waveform, advanced_im_config, output)
                 except Exception as e:
                     print(f"Error {e}")
                 print("Finished Adv Measures")
             else:
                 result_dict = compute_measure_single(
-                    waveforms[0],
+                    waveform,
                     sorted(ims),
                     sorted(components_to_store, key=lambda x: x.value),
                     im_options,
