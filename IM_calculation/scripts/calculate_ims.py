@@ -16,12 +16,12 @@ import IM_calculation.IM.im_calculation as calc
 from IM_calculation.Advanced_IM import advanced_IM_factory
 from qcore import constants
 from qcore import utils
-from qcore import qclogging
 
 
 if __name__ == "__main__":
     from mpi4py import MPI
     from qcore import MPIFileHandler
+
     comm = MPI.COMM_WORLD
     rank = comm.Get_rank()
     size = comm.Get_size()
@@ -270,14 +270,15 @@ def main():
         advanced_im_config = None
 
     mh = MPIFileHandler.MPIFileHandler(
-        os.path.join(os.path.dirname(args.output_path), f"{args.identifier}_im_calc.log")
+        os.path.join(
+            os.path.dirname(args.output_path), f"{args.identifier}_im_calc.log"
+        )
     )
     formatter = logging.Formatter("%(asctime)s:%(name)s:%(levelname)s:%(message)s")
     mh.setFormatter(formatter)
     logger.addHandler(mh)
-    logger.info("IM_Calc started")
-
-    logger.info(f"PROCESS INFO rank: {rank} size:{size}")
+    if is_master:
+        logger.info("IM_Calc started")
 
     # MPI
     calc.compute_measures_mpi(
@@ -296,7 +297,6 @@ def main():
         rupture=args.rupture,
         run_type=run_type,
         version=args.version,
-        process=args.process,
         simple_output=args.simple_output,
         units=args.units,
         advanced_im_config=advanced_im_config,
