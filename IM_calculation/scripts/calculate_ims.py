@@ -232,80 +232,82 @@ def main():
             # invalid arguments or -h
             print("arg parse error occured:", e)
             comm.Abort()
+    try:
+        args = comm.bcast(args, root=master)
 
-    args = comm.bcast(args, root=master)
+        file_type = calc.FILE_TYPE_DICT[args.file_type]
+        run_type = calc.META_TYPE_DICT[args.run_type]
 
-    file_type = calc.FILE_TYPE_DICT[args.file_type]
-    run_type = calc.META_TYPE_DICT[args.run_type]
+        im = args.im
 
-    im = args.im
+        im_options = {}
 
-    im_options = {}
+        valid_periods = calc.validate_period(args.period, args.extended_period)
+        if "pSA" in im:
+            im_options["pSA"] = valid_periods
+        if "SDI" in im:
+            im_options["SDI"] = valid_periods
+        if "FAS" in im:
+            im_options["FAS"] = calc.validate_fas_frequency(args.fas_frequency)
 
-    valid_periods = calc.validate_period(args.period, args.extended_period)
-    if "pSA" in im:
-        im_options["pSA"] = valid_periods
-    if "SDI" in im:
-        im_options["SDI"] = valid_periods
-    if "FAS" in im:
-        im_options["FAS"] = calc.validate_fas_frequency(args.fas_frequency)
+        # Create output dir
+        if is_master:
+            utils.setup_dir(args.output_path)
+            utils.setup_dir(os.path.join(args.output_path, "stations"))
+            if not args.simple_output and args.advanced_ims is None:
+                utils.setup_dir(os.path.join(args.output_path, calc.OUTPUT_SUBFOLDER))
 
-    # Create output dir
-    if is_master:
-        utils.setup_dir(args.output_path)
-        utils.setup_dir(os.path.join(args.output_path, "stations"))
-        if not args.simple_output and args.advanced_ims is None:
-            utils.setup_dir(os.path.join(args.output_path, calc.OUTPUT_SUBFOLDER))
+        # TODO: this may need to be updated to read file if the length of list becomes an issue
+        station_names = args.station_names
+        if args.advanced_ims is not None:
+            components = advanced_IM_factory.COMP_DICT.keys()
+            advanced_im_config = advanced_IM_factory.advanced_im_config(
+                args.advanced_ims, args.advanced_im_config, args.OpenSees_path
+            )
 
-    # TODO: this may need to be updated to read file if the length of list becomes an issue
-    station_names = args.station_names
-    if args.advanced_ims is not None:
-        components = advanced_IM_factory.COMP_DICT.keys()
-        advanced_im_config = advanced_IM_factory.advanced_im_config(
-            args.advanced_ims, args.advanced_im_config, args.OpenSees_path
+        else:
+            components = args.components
+            advanced_im_config = None
+
+        mh = MPIFileHandler.MPIFileHandler(
+            os.path.join(
+                os.path.dirname(args.output_path), f"{args.identifier}_im_calc.log"
+            )
         )
+        formatter = logging.Formatter("%(asctime)s:%(name)s:%(levelname)s:%(message)s")
+        mh.setFormatter(formatter)
+        logger.addHandler(mh)
+        if is_master:
+            logger.info("IM_Calc started")
+            logger.info(f"Args station {len(station_names)}")
 
-    else:
-        components = args.components
-        advanced_im_config = None
-
-    mh = MPIFileHandler.MPIFileHandler(
-        os.path.join(
-            os.path.dirname(args.output_path), f"{args.identifier}_im_calc.log"
+        # MPI
+        calc.compute_measures_mpi(
+            args.input_path,
+            file_type,
+            comm,
+            rank,
+            size,
+            wave_type=None,
+            station_names=station_names,
+            ims=im,
+            comp=components,
+            im_options=im_options,
+            output=args.output_path,
+            identifier=args.identifier,
+            rupture=args.rupture,
+            run_type=run_type,
+            version=args.version,
+            simple_output=args.simple_output,
+            units=args.units,
+            advanced_im_config=advanced_im_config,
+            real_only=args.real_stats_only,
+            logger=logger,
         )
-    )
-    formatter = logging.Formatter("%(asctime)s:%(name)s:%(levelname)s:%(message)s")
-    mh.setFormatter(formatter)
-    logger.addHandler(mh)
-    if is_master:
-        logger.info("IM_Calc started")
-        logger.info(f"Args station {len(station_names)}")
-
-    # MPI
-    calc.compute_measures_mpi(
-        args.input_path,
-        file_type,
-        comm,
-        rank,
-        size,
-        wave_type=None,
-        station_names=station_names,
-        ims=im,
-        comp=components,
-        im_options=im_options,
-        output=args.output_path,
-        identifier=args.identifier,
-        rupture=args.rupture,
-        run_type=run_type,
-        version=args.version,
-        simple_output=args.simple_output,
-        units=args.units,
-        advanced_im_config=advanced_im_config,
-        real_only=args.real_stats_only,
-        logger=logger,
-    )
-    if is_master:
-        print("Calculations are output to {}".format(args.output_path))
+        if is_master:
+            print("Calculations are output to {}".format(args.output_path))
+    except Exception as e:
+        logger.error(f"Error {e}")
 
 
 if __name__ == "__main__":
