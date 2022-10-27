@@ -520,8 +520,8 @@ def compute_measures_mpi(
         bbseries, station_names = get_bbseis(
             input_path, file_type, station_names, real_only=real_only
         )
+        logger.info(f"STATION COUNT {len(station_names)}")
     bbseries = comm.bcast(bbseries, root=master)
-    logger.info(f"STATION COUNT {len(station_names)}")
     station_names = comm.bcast(station_names, root=master)
 
     # Check which stations to run against non-zero station files already
