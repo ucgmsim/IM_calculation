@@ -521,6 +521,7 @@ def compute_measures_mpi(
             input_path, file_type, station_names, real_only=real_only
         )
     bbseries = comm.bcast(bbseries, root=master)
+    logger.info(f"STATION COUNT {len(station_names)}")
     station_names = comm.bcast(station_names, root=master)
 
     # Check which stations to run against non-zero station files already
@@ -640,6 +641,8 @@ def read_station_output(station_directory):
         station_df = pd.read_csv(
             os.path.join(station_directory, file_name), index_col=0
         )
+        station_name = os.path.splitext(file_name)[0]
+        station_df.insert(0, "station", station_name)
         if output_df is None:
             output_df = station_df
         else:

@@ -279,6 +279,7 @@ def main():
     logger.addHandler(mh)
     if is_master:
         logger.info("IM_Calc started")
+        logger.info(f"Args station {len(station_names)}")
 
     # MPI
     calc.compute_measures_mpi(
