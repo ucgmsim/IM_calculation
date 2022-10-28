@@ -142,9 +142,7 @@ def compute_adv_measure(waveform, advanced_im_config, output_dir):
     :param output_dir: Directory where output folders are contained. Structure is /path/to/output_dir/station/im_name
     :return:
     """
-    print(waveform)
     waveform_acc = waveform[0]
-    print(waveform_acc)
     station_name = waveform_acc.station_name
     adv_im_out_dir = os.path.join(output_dir, station_name)
     advanced_IM_factory.compute_ims(waveform_acc, advanced_im_config, adv_im_out_dir)

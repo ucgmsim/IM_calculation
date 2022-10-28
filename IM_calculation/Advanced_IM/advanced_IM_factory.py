@@ -41,7 +41,6 @@ def compute_ims(accelerations, configuration, adv_im_out_dir):
     with tempfile.TemporaryDirectory() as f:
         f_dir = os.path.join(f, "")  # ensure has a trailing slash on filename
         save_waveform_to_tmp_files(f_dir, accelerations, station_name)
-        print("Starting for loop")
         for im in configuration.IM_list:
             out_dir = os.path.join(adv_im_out_dir, im)
 
