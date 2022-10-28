@@ -520,7 +520,6 @@ def compute_measures_mpi(
         bbseries, station_names = get_bbseis(
             input_path, file_type, station_names, real_only=real_only
         )
-        logger.info(f"STATION COUNT {len(station_names)}")
     bbseries = comm.bcast(bbseries, root=master)
     station_names = comm.bcast(station_names, root=master)
 
@@ -562,15 +561,9 @@ def compute_measures_mpi(
                 file_type=file_type,
                 units=units,
             )[0]
-            print("Finished waveform readings")
             # only run basic im if and only if adv_im not going to run
             if running_adv_im:
-                print("Running Adv Measures")
-                try:
-                    compute_adv_measure(waveform, advanced_im_config, output)
-                except Exception as e:
-                    print(f"Error {e}")
-                print("Finished Adv Measures")
+                compute_adv_measure(waveform, advanced_im_config, output)
             else:
                 result_dict = compute_measure_single(
                     waveform,
@@ -583,7 +576,6 @@ def compute_measures_mpi(
                 )
                 write_result(result_dict, station_path, station, simple_output)
     if is_master:
-        print("Finished MPI computation")
         if running_adv_im:
             # read, agg and store csv
             advanced_IM_factory.agg_csv(advanced_im_config, station_names, output)
@@ -593,9 +585,7 @@ def compute_measures_mpi(
                 get_result_filepath(output, identifier, ".csv"), index=False
             )
             shutil.rmtree(station_path)
-        print("Agged csv")
         generate_metadata(output, identifier, rupture, run_type, version)
-        print("generated Metadata")
 
 
 def get_result_filepath(output_folder, arg_identifier, suffix):
