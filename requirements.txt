@@ -4,5 +4,6 @@ scipy
 obspy
 pandas
 PyYAML
+mpi4py
 Scipy
 Cython
