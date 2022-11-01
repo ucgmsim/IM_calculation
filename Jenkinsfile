@@ -52,9 +52,7 @@ pipeline {
                     ln -s $HOME/data/testing/${env.JOB_NAME}/sample0/input sample0
                     ln -s $HOME/data/testing/${env.JOB_NAME}/sample0/output sample0
                     echo "[ Run test now ]"
-                    pytest -s
-                    cd test_im_calculation
-                    mpirun -n 2 python -m pytest --with-mpi
+                    mpirun -n 2 python test_im_calculation/test_im_calculation.py -m pytest --with-mpi
                 """
             }
         }
