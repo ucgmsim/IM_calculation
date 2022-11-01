@@ -44,6 +44,7 @@ def test_validate_period(test_period, test_extended, expected_period):
 
 
 @pytest.mark.parametrize("test_path, test_file_type", [("asdf", "b"), (FAKE_DIR, "b")])
+@pytest.mark.mpi_skip
 def test_validate_input_path_fail(test_path, test_file_type):
     with pytest.raises(SystemExit):
         calculate_ims.validate_input_path(PARSER, test_path, test_file_type)
@@ -67,6 +68,7 @@ def convert_str_comps_to_enum(expected_result):
 
 
 class TestPickleTesting:
+    @pytest.mark.mpi_skip
     def test_convert_str_comp(self, set_up):
         function = "convert_str_comp"
         for root_path in set_up:
@@ -90,6 +92,7 @@ class TestPickleTesting:
             assert [x.str_value for x in int_comp] == expected_int_comp
             assert [x.str_value for x in str_comp] == expected_str_comp
 
+    @pytest.mark.mpi_skip
     def test_array_to_dict(self, set_up):
         function = "array_to_dict"
         for root_path in set_up:
@@ -123,6 +126,7 @@ class TestPickleTesting:
 
             assert actual_value_dict == expected_value_dict
 
+    @pytest.mark.mpi_skip
     def test_compute_measure_single(self, set_up):
         function = "compute_measure_single"
         for root_path in set_up:
@@ -149,6 +153,7 @@ class TestPickleTesting:
 
             compare_dicts(actual_result, actual_expected_result)
 
+    @pytest.mark.mpi_skip
     def test_get_bbseis(self, set_up):
         function = "get_bbseis"
         for root_path in set_up:
@@ -242,6 +247,7 @@ class TestPickleTesting:
                 simple_output=simple_output,
             )
 
+    @pytest.mark.mpi_skip
     def test_get_result_filepath(self, set_up):
         function = "get_result_filepath"
         for root_path in set_up:
@@ -269,6 +275,7 @@ class TestPickleTesting:
 
             assert actual_ret_val == expected_ret_val
 
+    @pytest.mark.mpi_skip
     def test_write_result(self, set_up):
         function = "write_result"
         for root_path in set_up:
@@ -319,6 +326,7 @@ class TestPickleTesting:
 
             assert np.isclose(expected_output, actual_output).all()
 
+    @pytest.mark.mpi_skip
     def convert_to_results_dict(self, period, temp_result_dict, keep_ps=False):
         result_dict = {}
         for station in sorted(temp_result_dict):
@@ -344,6 +352,7 @@ class TestPickleTesting:
                         ][im][comp]
         return result_dict
 
+    @pytest.mark.mpi_skip
     def test_generate_metadata(self, set_up):
         function = "generate_metadata"
         for root_path in set_up:
@@ -381,6 +390,7 @@ class TestPickleTesting:
 
             filecmp.cmp(actual_output_path, expected_output_path)
 
+    @pytest.mark.mpi_skip
     def test_validate_input_path(self, set_up):
         function = "validate_input_path"
         for root_path in set_up:
@@ -393,6 +403,7 @@ class TestPickleTesting:
             calculate_ims.validate_input_path(PARSER, arg_input, arg_file_type)
             # Function does not return anything, only raises errors through the parser
 
+    @pytest.mark.mpi_skip
     def test_validate_period(self, set_up):
         function = "validate_period"
         for root_path in set_up:
@@ -417,6 +428,7 @@ class TestPickleTesting:
 
             assert (actual_period == expected_period).all()
 
+    @pytest.mark.mpi_skip
     def test_get_steps(self, set_up):
         function = "get_steps"
         for root_path in set_up:
