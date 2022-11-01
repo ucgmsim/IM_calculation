@@ -168,6 +168,7 @@ class TestPickleTesting:
 
             assert actual_converted_stations == expected_converted_stations
 
+    @pytest.mark.mpi(min_size=2)
     def test_compute_measures_multiprocess(self, set_up):
         from mpi4py import MPI
 
