@@ -47,8 +47,6 @@ FILE_TYPE_DICT = {"a": "ascii", "b": "binary"}
 META_TYPE_DICT = {"s": "simulated", "o": "observed", "u": "unknown"}
 RUNNAME_DEFAULT = "all_station_ims"
 
-OUTPUT_SUBFOLDER = "stations"
-
 MEM_PER_CORE = 7.5e8
 MEM_FACTOR = 4
 
@@ -622,7 +620,7 @@ def write_result(result_dict, output_folder, identifier, simple_output):
         # For each subframe with the same station write it to csv
         for station, sub_frame in results_dataframe.groupby(level=0):
             station_csv = os.path.join(
-                output_folder, OUTPUT_SUBFOLDER, "{}_{}.csv".format(identifier, station)
+                output_folder, "{}_{}.csv".format(identifier, station)
             )
             sub_frame.to_csv(station_csv)
 
