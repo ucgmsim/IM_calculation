@@ -223,10 +223,6 @@ class TestPickleTesting:
             rank = comm.Get_rank()
             size = comm.Get_size()
 
-            print("Output in test")
-            print(output)
-            print(root_path)
-
             calculate_ims.compute_measures_mpi(
                 input_path,
                 file_type,
