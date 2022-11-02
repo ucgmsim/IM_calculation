@@ -532,6 +532,13 @@ def compute_measures_mpi(
     }
     stations_to_run = list(stations_set.difference(found_stations))
 
+    print("In Compute output")
+    print(output)
+    print(station_path)
+    logger.info("Output in compute")
+    logger.info(output)
+    logger.info(station_path)
+
     status = MPI.Status()
     if is_master:
         nslaves = size - 1
