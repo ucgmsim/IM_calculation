@@ -2,6 +2,7 @@ import argparse
 import filecmp
 import os
 import pickle
+from pathlib import Path
 
 import pytest
 import numpy as np
@@ -217,8 +218,7 @@ class TestPickleTesting:
                 simple_output = pickle.load(load_file)
             station_names = ["099A"]
             output = root_path
-            os.makedirs(os.path.join(output, "stations"), exist_ok=True)
-            assert os.path.exists(os.path.join(output, "stations"))
+            (Path(output) / "stations").mkdir(exist_ok=True)
 
             comm = MPI.COMM_WORLD
             rank = comm.Get_rank()

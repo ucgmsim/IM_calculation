@@ -5,8 +5,7 @@ import sys
 import shutil
 from datetime import datetime
 from functools import partial
-from multiprocessing.pool import Pool
-from collections import ChainMap
+from pathlib import Path
 from typing import List, Iterable
 
 from mpi4py import MPI
@@ -16,7 +15,6 @@ import pandas as pd
 from qcore import timeseries, constants, shared, qclogging
 from qcore.constants import Components
 from qcore.im import order_im_cols_df
-from qcore.progress_tracker import ProgressTracker
 from IM_calculation.Advanced_IM import advanced_IM_factory
 from IM_calculation.IM import read_waveform, intensity_measures
 from IM_calculation.IM.intensity_measures import G
@@ -521,12 +519,10 @@ def compute_measures_mpi(
 
     # Check which stations to run against non-zero station files already
     # in the station output directory
-    station_path = os.path.join(output, "stations")
+    station_path = Path(output) / "stations"
     stations_set = set(station_names)
     found_stations = {
-        os.path.splitext(f)[0]
-        for f in os.listdir(station_path)
-        if os.stat(os.path.join(station_path, f)).st_size > 0
+        file.stem for file in station_path.iterdir() if file.stat().st_size > 0
     }
     stations_to_run = list(stations_set.difference(found_stations))
 
@@ -624,14 +620,9 @@ def read_station_output(station_directory):
     Reads the csv files in the station directory and compiles them together to one dataframe
     """
     output_df = None
-    for file_name in os.listdir(station_directory):
-        print("Reading test")
-        assert os.path.exists(os.path.join(station_directory, file_name))
-        station_df = pd.read_csv(
-            os.path.join(station_directory, file_name), index_col=0
-        )
-        station_name = os.path.splitext(file_name)[0]
-        station_df.insert(0, "station", station_name)
+    for file in station_directory.iterdir():
+        station_df = pd.read_csv(file, index_col=0)
+        station_df.insert(0, "station", file.stem)
         if output_df is None:
             output_df = station_df
         else:

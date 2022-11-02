@@ -11,6 +11,7 @@ command:
 import argparse
 import os
 import logging
+from pathlib import Path
 
 import IM_calculation.IM.im_calculation as calc
 from IM_calculation.Advanced_IM import advanced_IM_factory
@@ -252,9 +253,9 @@ def main():
     # Create output dir
     if is_master:
         utils.setup_dir(args.output_path)
-        utils.setup_dir(os.path.join(args.output_path, "stations"))
+        utils.setup_dir(Path(args.output_path) / "stations")
         if not args.simple_output and args.advanced_ims is None:
-            utils.setup_dir(os.path.join(args.output_path, calc.OUTPUT_SUBFOLDER))
+            utils.setup_dir(Path(args.output_path) / calc.OUTPUT_SUBFOLDER)
 
     # TODO: this may need to be updated to read file if the length of list becomes an issue
     station_names = args.station_names
@@ -269,9 +270,7 @@ def main():
         advanced_im_config = None
 
     mh = MPIFileHandler.MPIFileHandler(
-        os.path.join(
-            os.path.dirname(args.output_path), f"{args.identifier}_im_calc.log"
-        )
+            Path(args.output_path).parent / f"{args.identifier}_im_calc.log"
     )
     formatter = logging.Formatter("%(asctime)s:%(name)s:%(levelname)s:%(message)s")
     mh.setFormatter(formatter)
