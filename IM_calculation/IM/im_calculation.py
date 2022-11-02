@@ -583,7 +583,7 @@ def compute_measures_mpi(
             # read, agg and store csv
             advanced_IM_factory.agg_csv(advanced_im_config, station_names, output)
         else:
-            all_station_data = read_station_output(station_path)
+            all_station_data = read_station_output(station_path, simple_output)
             all_station_data.to_csv(
                 get_result_filepath(output, identifier, ".csv"), index=False
             )
@@ -625,12 +625,16 @@ def write_result(result_dict, output_folder, identifier, simple_output):
             sub_frame.to_csv(station_csv)
 
 
-def read_station_output(station_directory):
+def read_station_output(station_directory, simple_output):
     """
     Reads the csv files in the station directory and compiles them together to one dataframe
     """
     output_df = None
     for file_name in os.listdir(station_directory):
+        print("Reading test")
+        print(file_name)
+        print(station_directory)
+        print(simple_output)
         station_df = pd.read_csv(
             os.path.join(station_directory, file_name), index_col=0
         )
