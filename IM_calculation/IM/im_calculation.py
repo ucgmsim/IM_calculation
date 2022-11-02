@@ -45,6 +45,8 @@ FILE_TYPE_DICT = {"a": "ascii", "b": "binary"}
 META_TYPE_DICT = {"s": "simulated", "o": "observed", "u": "unknown"}
 RUNNAME_DEFAULT = "all_station_ims"
 
+OUTPUT_SUBFOLDER = "stations"
+
 MEM_PER_CORE = 7.5e8
 MEM_FACTOR = 4
 
