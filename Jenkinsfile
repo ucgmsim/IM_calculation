@@ -42,7 +42,8 @@ pipeline {
                     cd ${env.WORKSPACE}
                     echo "[ Installing ${env.JOB_NAME} ]"
 # full installation is not possible as it takes more than 3.0Gb for building and kills the server
-                    pip install ../${env.JOB_NAME}
+#                   python setup.py install
+                    python setup.py build_ext --inplace
 		            python konno_setup.py
                     echo "[ Linking test data ]"
                     cd ${env.JOB_NAME}/test
@@ -51,7 +52,7 @@ pipeline {
                     ln -s $HOME/data/testing/${env.JOB_NAME}/sample0/input sample0
                     ln -s $HOME/data/testing/${env.JOB_NAME}/sample0/output sample0
                     echo "[ Run test now ]"
-                    mpirun -n 2 python test_im_calculation/test_im_calculation.py -m pytest -k test_compute_measures_multiprocess -s --with-mpi
+                    pytest -k test_compute_measure_single -s
                 """
             }
         }
