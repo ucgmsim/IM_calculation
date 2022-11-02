@@ -171,7 +171,6 @@ class TestPickleTesting:
     @pytest.mark.mpi(min_size=2)
     def test_compute_measures_multiprocess(self, set_up):
         from mpi4py import MPI
-        MPI.Init()
 
         function = "compute_measures_multiprocess"
         for root_path in set_up:
@@ -243,7 +242,6 @@ class TestPickleTesting:
                 version=version,
                 simple_output=simple_output,
             )
-        MPI.Finalize()
 
     def test_get_result_filepath(self, set_up):
         function = "get_result_filepath"
