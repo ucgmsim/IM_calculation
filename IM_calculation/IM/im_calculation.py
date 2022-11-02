@@ -582,6 +582,7 @@ def compute_measures_mpi(
             )
             shutil.rmtree(station_path)
         generate_metadata(output, identifier, rupture, run_type, version)
+    comm.Barrier()
 
 
 def get_result_filepath(output_folder, arg_identifier, suffix):
