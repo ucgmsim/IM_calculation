@@ -6,15 +6,17 @@ except ImportError:
 
 
 from qcore import timeseries
+from IM_calculation.IM.Burks_Baker_2013_elastic_inelastic import Bilinear_Newmark_withTH
 
 DELTA_T = 0.005
+G = 981.0  # cm/s^2
 
 
 def get_max_nd(data):
     return np.max(np.abs(data), axis=0)
 
 
-def get_spectral_acceleration(acceleration, period, NT, DT, Nstep):
+def get_spectral_acceleration(acceleration, period, NT, DT, Nstep, delta_t=DELTA_T):
     # pSA
     c = 0.05
     M = 1.0
@@ -26,35 +28,65 @@ def get_spectral_acceleration(acceleration, period, NT, DT, Nstep):
 
     # interpolation additions
     t_orig = np.arange(NT + 1) * DT
-    t_solve = np.arange(Nstep) * DELTA_T
+    t_solve = np.arange(Nstep) * delta_t
     acc_step = np.interp(t_solve, t_orig, acc_step)
-    return rspectra.Response_Spectra(acc_step, DELTA_T, c, period, M, gamma, beta)
+    return rspectra.Response_Spectra(acc_step, delta_t, c, period, M, gamma, beta)
 
 
 def get_spectral_acceleration_nd(acceleration, period, NT, DT):
     # pSA
+    # Uses string conversion to convert from a float32 to a python float while retaining prescision
+    # https://stackoverflow.com/questions/41967222/how-to-retain-precision-when-converting-from-float32-to-float
+    delta_t = min(float(str(DT)), DELTA_T)
+
     if acceleration.ndim != 1:
         ts, dims = acceleration.shape
-        Nstep = calculate_Nstep(DT, NT)
+        Nstep = calculate_Nstep(DT, NT, delta_t)
         accelerations = np.zeros((period.size, Nstep, dims))
 
         for i in range(dims):
             accelerations[:, :, i] = get_spectral_acceleration(
-                acceleration[:, i], period, NT, DT, Nstep
+                acceleration[:, i], period, NT, DT, Nstep, delta_t
             )
 
         return accelerations
     else:
-        return get_spectral_acceleration(acceleration, period, NT, DT)
+        return get_spectral_acceleration(acceleration, period, NT, DT, delta_t)
 
 
-def calculate_Nstep(DT, NT):
-    return NT * int(round(DT / DELTA_T))
+def get_SDI(acceleration, period, DT, z, alpha, dy, dt):
+
+    return Bilinear_Newmark_withTH(
+        period, z, dy, alpha, acceleration * G / 100, DT, dt  # Input is in m/s^2
+    ).T
+
+
+def get_SDI_nd(acceleration, period, DT, z, alpha, dy, dt):
+    # SDI
+    if acceleration.ndim != 1:
+        ts, dims = acceleration.shape
+        displacements = None
+
+        for i in range(dims):
+            res = get_SDI(acceleration[:, i], period, DT, z, alpha, dy, dt)
+            if (
+                displacements is None
+            ):  # shape of displacements is determined after the first call
+                displacements = np.zeros((*res.shape, dims))
+            displacements[:, :, i] = res
+
+        return displacements
+    else:
+        return get_SDI(acceleration, period, DT, z, alpha, dy, dt)
+
+
+def calculate_Nstep(DT, NT, delta_t=DELTA_T):
+    return NT * int(round(DT / delta_t))
 
 
 def get_rotations(
     accelerations,
-    func=lambda x: np.max(np.abs(x), axis=1),
+    func=lambda x: np.max(np.abs(x), axis=-2),
     delta_theta: int = 1,
     min_angle: int = 0,
     max_angle: int = 180,
@@ -77,17 +109,25 @@ def get_rotations(
 
     thetas = np.deg2rad(np.arange(min_angle, max_angle, delta_theta))
     rotation_matrices = np.asarray([np.cos(thetas), np.sin(thetas)])
-    periods, nt, xy = accelerations.shape
+    *rem, nt, xy = accelerations.shape
+    periods = 1
+
+    if len(rem) > 0:
+        periods = rem[0]
+
     rotds = np.zeros((periods, thetas.size))
 
     # Magic number empirically determined from runs on Maui
     step = int(np.floor(86000000 / (thetas.size * nt)))
     step = np.min([np.max([step, 1]), periods])
 
-    for period in range(0, periods, step):
-        rotds[period : period + step] = func(
-            np.dot(accelerations[period : period + step], rotation_matrices)
-        )
+    if periods == 1:
+        rotds = func(np.dot(accelerations, rotation_matrices))
+    else:
+        for period in range(0, periods, step):
+            rotds[period : period + step] = func(
+                np.dot(accelerations[period : period + step], rotation_matrices)
+            )
 
     return rotds
 
@@ -96,10 +136,15 @@ def get_cumulative_abs_velocity_nd(acceleration, times):
     return np.trapz(np.abs(acceleration), times, axis=0)
 
 
-def get_arias_intensity_nd(acceleration, g, times):
-    acc_in_cms = acceleration * g
+def get_arias_intensity_nd(acceleration, times):
+    acc_in_cms = acceleration * G
     integrand = acc_in_cms ** 2
-    return np.pi / (2 * g) * np.trapz(integrand, times, axis=0)
+    return np.pi / (2 * G) * np.trapz(integrand, times, axis=0)
+
+
+def get_specific_energy_density_nd(velocity, times):
+    integrand = velocity ** 2
+    return np.trapz(integrand, times, axis=0)
 
 
 def calculate_MMI_nd(velocities):

@@ -1,9 +1,10 @@
 import argparse
+import datetime
+from enum import Enum
 import glob
 import os
 import subprocess
 
-import numpy as np
 import pandas as pd
 
 from qcore.constants import Components
@@ -12,8 +13,29 @@ from IM_calculation.IM.intensity_measures import get_geom
 DEFAULT_OPEN_SEES_PATH = "OpenSees"
 DF_INDEX_NAME = "component"
 
+TIME_FORMAT = "%Y-%m-%d %H:%M:%S"
 
-def parse_args():
+
+class time_type(Enum):
+    start_time = 0
+    end_time = 1
+    timed_out = 2
+
+
+class analysis_status(Enum):
+    not_started = 0
+    finished = 1
+    not_converged = 2
+    not_finished = 3
+    timed_out = 4
+    crashed = 5
+    unknown = 6
+
+
+def parse_args(extended=False):
+    # if an Adv IM has extra arguments, set extended=True, which returns parser
+    # Then add extra arguments to the returned parser
+
     parser = argparse.ArgumentParser()
 
     parser.add_argument(
@@ -24,10 +46,14 @@ def parse_args():
         Components.c090.str_value,
         help="filepath to a station's 090 waveform ascii file",
     )
+
     parser.add_argument(
         Components.cver.str_value,
-        help="filepath to a station's ver waveform ascii file",
+        nargs="?",
+        default=None,
+        help="filepath to a station's ver waveform ascii file (not needed for some IMs)",
     )
+
     parser.add_argument(
         "output_dir",
         help="Where the IM_csv file is written to. Also contains the temporary recorders output",
@@ -39,9 +65,29 @@ def parse_args():
         help="Path to OpenSees binary",
     )
 
-    args = parser.parse_args()
+    parser.add_argument(
+        "--timeout_threshold",
+        type=int,
+        default=None,
+        help="the timeout value in seconds",
+    )
 
-    return args
+    if not extended:
+        return parser.parse_args()
+    else:
+        return parser
+
+
+def datetime_to_file(t_value, t_type: str, out_dir):
+    # convert format
+    t_value = t_value.strftime(TIME_FORMAT)
+
+    f_name = os.path.join(out_dir, t_type)
+    with open(f_name, "w") as f:
+        f.write(t_value)
+
+
+# def save_timeout_value(component_outdir, timeout_threshold, datetime.datetime.now()):
 
 
 def main(args, im_name, run_script):
@@ -63,7 +109,8 @@ def main(args, im_name, run_script):
                 f"{getattr(args,component.str_value)} failed to converged in previous run."
             )
             model_converged = False
-            break
+            # continue to check other components, as we should run all components even if one is not_converged
+            continue
         # chech if successfully ran previously
         # skip this component if success
         if check_status(component_outdir):
@@ -78,16 +125,31 @@ def main(args, im_name, run_script):
         ]
 
         print(" ".join(script))
-        subprocess.run(script)
+        # for debug purpose, track the starting and ending time of OpenSees call
+        # saves starting time
+        datetime_to_file(
+            datetime.datetime.now(), time_type.start_time.name, component_outdir
+        )
+
+        try:
+            subprocess.run(script, timeout=args.timeout_threshold)
+        except subprocess.TimeoutExpired:
+            # timeouted. save to timed_out instead of end_time
+            end_time_type = time_type.timed_out.name
+        else:
+            # save the ending time
+            end_time_type = time_type.end_time.name
+        datetime_to_file(datetime.datetime.now(), end_time_type, component_outdir)
 
         # check for success message after a run
         # marked as failed if any component fail
         if not check_status(component_outdir):
+            # even if not converged, script should still run other components, except geom.
+            # setting the mode_converge will prevent calculating geom and aggregate csv.
             print(
-                f"{component_outdir} failed to converge, skipping rest of the components"
+                f"{component_outdir} failed to converge. calculate geom and aggregate csv will be skipped"
             )
             model_converged = False
-            break
 
     station_name = os.path.basename(getattr(args, component_list[0].str_value)).split(
         "."

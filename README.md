@@ -1,5 +1,5 @@
 # IM_calculation
-[![Build Status](http://13.238.107.244:8080/job/IM_calculation/badge/icon?build=last:${params.ghprbActualCommit=master)](http://13.238.107.244:8080/job/IM_calculation)
+[![Build Status](https://quakecoresoft.canterbury.ac.nz/jenkins/job/IM_calculation/badge/icon?build=last:${params.ghprbActualCommit=master)](https://quakecoresoft.canterbury.ac.nz/jenkins/job/IM_calculation)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 To calculate rrups:
@@ -71,13 +71,13 @@ optional arguments:
                         components. Default is ellipsis
   -np PROCESS, --process PROCESS
                         Please provide the number of processors. Default is 2
+  --real_stats_only     Please add '--real_stats_only' to consider real stations only                        
   -s, --simple_output   Please add '-s' to indicate if you want to output the
                         big summary csv only(no single station csvs). Default
                         outputting both single station and the big summary
                         csvs
   -u {cm/s^2,g}, --units {cm/s^2,g}
                         The units that input acceleration files are in
-
 ```
 
 To create submission script for slurm workflow, refer to the script under gm_sim_workflow repository:

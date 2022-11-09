@@ -1,11 +1,9 @@
 from collections import namedtuple
-import numpy as np
 import pandas as pd
 import os
 import re
 import subprocess
 import tempfile
-import yaml
 
 from qcore.timeseries import seis2txt
 from qcore.utils import load_yaml
@@ -54,11 +52,18 @@ def compute_ims(accelerations, configuration, adv_im_out_dir):
             ]
             # waveform component sequence
             comp_list = ["000", "090", "ver"]
+
             script.extend([get_acc_filename(f_dir, station_name, x) for x in comp_list])
             script.extend([out_dir])
 
             script.extend(["--OpenSees_path", f"{configuration.OpenSees_path}"])
-
+            # if timeout no None, add timeout
+            if type(im_config["timeout_threshold"]) is int:
+                script.extend(
+                    ["--timeout_threshold", str(im_config["timeout_threshold"])]
+                )
+            else:
+                print("invalid value for timeout_threshold. will use default value.")
             print(" ".join(script))
             subprocess.run(script)
 

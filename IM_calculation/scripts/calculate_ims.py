@@ -10,13 +10,12 @@ command:
 
 import argparse
 import os
-import pandas as pd
-import glob
 
 import IM_calculation.IM.im_calculation as calc
 from IM_calculation.Advanced_IM import advanced_IM_factory
-from qcore import utils
 from qcore import constants
+from qcore import utils
+from qcore import qclogging
 
 
 def load_args():
@@ -87,7 +86,7 @@ def load_args():
         default=constants.DEFAULT_PSA_PERIODS,
         type=float,
         help="Please provide pSA period(s) separated by a space. eg: "
-        "0.02 0.05 0.1. Default periods are: {} (also used for IESD).".format(
+        "0.02 0.05 0.1. Default periods are: {} (also used for SDI).".format(
             ",".join(str(v) for v in constants.DEFAULT_PSA_PERIODS)
         ),
     )
@@ -95,7 +94,7 @@ def load_args():
         "-e",
         "--extended_period",
         action="store_true",
-        help="Please add '-e' to indicate the use of extended(100) pSA periods (also used for IESDR)."
+        help="Please add '-e' to indicate the use of extended(100) pSA periods (also used for SDI)."
         "Default not using",
     )
     parser.add_argument(
@@ -123,7 +122,6 @@ def load_args():
         "--components",
         nargs="+",
         choices=list(constants.Components.iterate_str_values()),
-        default=[constants.Components.cgeom.str_value],
         help="Please provide the velocity/acc component(s) you want to calculate eg.geom."
         " Available components are: {} components. Default is geom".format(
             ",".join(constants.Components.iterate_str_values())
@@ -136,6 +134,13 @@ def load_args():
         type=int,
         help="Please provide the number of processors. Default is 1",
     )
+
+    parser.add_argument(
+        "--real_stats_only",
+        action="store_true",
+        help="Please add '--real_stats_only' to consider real stations only",
+    )
+
     parser.add_argument(
         "-s",
         "--simple_output",
@@ -164,6 +169,14 @@ def load_args():
 
     args = parser.parse_args()
 
+    if args.advanced_ims is not None and args.components is not None:
+        parser.error(
+            "-c (--components) and -a (--advanced_ims) can not be both specified"
+        )
+
+    if args.components is None:
+        args.components = [constants.Components.cgeom.str_value]
+
     if constants.Components.ceas.str_value in args.components:
         wrong_ims = ""
         if "FAS" not in args.im:
@@ -183,6 +196,7 @@ def load_args():
             )
 
     calc.validate_input_path(parser, args.input_path, args.file_type)
+
     return args
 
 
@@ -196,18 +210,17 @@ def main():
 
     im_options = {}
 
+    valid_periods = calc.validate_period(args.period, args.extended_period)
     if "pSA" in im:
-        im_options["pSA"] = calc.validate_period(args.period, args.extended_period)
-
-    if "IESD" in im:
-        im_options["IESD"] = calc.validate_period(args.period, args.extended_period)
-
+        im_options["pSA"] = valid_periods
+    if "SDI" in im:
+        im_options["SDI"] = valid_periods
     if "FAS" in im:
         im_options["FAS"] = calc.validate_fas_frequency(args.fas_frequency)
 
     # Create output dir
     utils.setup_dir(args.output_path)
-    if not args.simple_output:
+    if not args.simple_output and args.advanced_ims is None:
         utils.setup_dir(os.path.join(args.output_path, calc.OUTPUT_SUBFOLDER))
 
     # TODO: this may need to be updated to read file if the length of list becomes an issue
@@ -217,9 +230,16 @@ def main():
         advanced_im_config = advanced_IM_factory.advanced_im_config(
             args.advanced_ims, args.advanced_im_config, args.OpenSees_path
         )
+
     else:
         components = args.components
         advanced_im_config = None
+
+    logger = qclogging.get_logger("IM_calc")
+    qclogging.add_general_file_handler(
+        logger, os.path.join(args.output_path, f"{args.identifier}_im_calc.log")
+    )
+    logger.info("IM_Calc started")
 
     # multiprocessor
     calc.compute_measures_multiprocess(
@@ -239,9 +259,11 @@ def main():
         simple_output=args.simple_output,
         units=args.units,
         advanced_im_config=advanced_im_config,
+        real_only=args.real_stats_only,
+        logger=logger,
     )
 
-    print("Calculations are outputted to {}".format(args.output_path))
+    print("Calculations are output to {}".format(args.output_path))
 
 
 if __name__ == "__main__":
