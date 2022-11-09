@@ -51,7 +51,7 @@ def Response_Spectra(acc,  dt,  xi, period,  m,  gamma,  beta):
         #SA[i_T] = np.max(np.abs(u2+acc))       #never used in Python code so removed
 
     #return SD, PSV, PSA, SV, SA
-    return PSA, u
+    return (u.T * w * w).T
 
 
 
