@@ -29,15 +29,10 @@ setup(
     packages=find_packages(),
     url="https://github.com/ucgmsim/IM_calculation",
     description="IM calculation code",
-    install_requires=["numpy>=1.14.3", "Cython", "obspy", "pandas"],
-    cmdclass={"build_ext": build_ext, "build_py": build_konno_matricies},
+    install_requires=["numpy>=1.14.3", "Numba", "obspy", "pandas"],
+    cmdclass={"build_py": build_konno_matricies},
     package_data={"": ["*.yaml"]},
-    ext_modules=[
-        Extension(
-            "IM_calculation.IM.rspectra_calculations.rspectra",
-            ["IM_calculation/IM/rspectra_calculations/rspectra.pyx"],
-        ),
-    ],
+    
     scripts=[
         "IM_calculation/scripts/calculate_ims.py",
         "IM_calculation/scripts/calculate_rrups_single.py",
