@@ -5,7 +5,7 @@ pipeline {
     }
     stages {
 
-        stage('Settin up env') {
+        stage('Setting up env') {
             steps {
                 echo "[[ Start virtual environment ]]"
                 sh """
