@@ -10,7 +10,7 @@ pipeline {
                 echo "[[ Start virtual environment ]]"
                 sh """
                     echo "[ Current directory ] : " `pwd`
-                    echo "[ Environment Variables ] "
+                    echo "[ Environment Variables ]"
                     env
 # Each stage needs custom setting done again. By default /bin/python is used.
                     source /home/qcadmin/py310/bin/activate
