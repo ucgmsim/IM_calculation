@@ -51,7 +51,7 @@ pipeline {
                     mkdir sample0
                     ln -s /home/qcadmin/data/testing/${env.JOB_NAME}/sample0/input sample0
                     ln -s /home/qcadmin/data/testing/${env.JOB_NAME}/sample0/output sample0
-                    echo "[ Run test now  ]"
+                    echo "[ Run test now ]"
                     pytest -s
                 """
             }
