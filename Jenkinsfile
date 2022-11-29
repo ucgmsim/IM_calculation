@@ -59,7 +59,7 @@ pipeline {
                     ln -s /home/qcadmin/data/testing/${env.JOB_NAME}/sample0/input sample0
                     ln -s /home/qcadmin/data/testing/${env.JOB_NAME}/sample0/output sample0
                     echo "[ Run MPI test now ]"
-                    mpirun -n 2 python -m pytest -k test_compute_measures_multiprocess -s --with-mpi
+                    mpirun -n 2 python -m pytest -k test_compute_measures_multiprocess -s --with-mpi --allow-run-as-root
                 """
             }
         }
