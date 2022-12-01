@@ -2,6 +2,8 @@ pipeline {
     agent any
     environment {
         TEMP_DIR="/tmp/${env.JOB_NAME}/${env.ghprbActualCommit}"
+        OMPI_ALLOW_RUN_AS_ROOT=1
+        OMPI_ALLOW_RUN_AS_ROOT_CONFIRM=1
     }
     stages {
 

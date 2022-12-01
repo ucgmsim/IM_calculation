@@ -9,7 +9,6 @@ command:
 """
 
 import argparse
-import os
 import logging
 from pathlib import Path
 
@@ -17,20 +16,7 @@ import IM_calculation.IM.im_calculation as calc
 from IM_calculation.Advanced_IM import advanced_IM_factory
 from qcore import constants
 from qcore import utils
-
-
-if __name__ == "__main__":
-    from mpi4py import MPI
-    from qcore import MPIFileHandler
-
-    comm = MPI.COMM_WORLD
-    rank = comm.Get_rank()
-    size = comm.Get_size()
-    master = 0
-    is_master = not rank
-
-    logger = logging.getLogger("IM_calc_rank_%i" % comm.rank)
-    logger.setLevel(logging.DEBUG)
+from qcore import qclogging
 
 
 def load_args():
@@ -57,6 +43,7 @@ def load_args():
         "-o",
         "--output_path",
         required=True,
+        type=Path,
         help="path to output folder that stores the computed measures. Folder name must "
         "not be inclusive.eg.home/tt/. Required parameter",
     )
@@ -224,16 +211,35 @@ def load_args():
 
 
 def main():
-    # collect required arguments
-    args = None
-    if is_master:
-        try:
-            args = load_args()
-        except SystemExit as e:
-            # invalid arguments or -h
-            print("arg parse error occured:", e)
-            comm.Abort()
-    args = comm.bcast(args, root=master)
+    try:
+        from mpi4py import MPI
+        from qcore import MPIFileHandler
+
+        use_mpi = True
+    except:
+        use_mpi = False
+
+    if use_mpi:
+        comm = MPI.COMM_WORLD
+        rank = comm.Get_rank()
+        server = 0
+        is_server = not rank
+
+        logger = logging.getLogger("IM_calc_rank_%i" % comm.rank)
+        logger.setLevel(logging.DEBUG)
+
+        # collect required arguments
+        args = None
+        if is_server:
+            try:
+                args = load_args()
+            except SystemExit as e:
+                # invalid arguments or -h
+                print("arg parse error occured:", e)
+                comm.Abort()
+        args = comm.bcast(args, root=server)
+    else:
+        args = load_args()
 
     file_type = calc.FILE_TYPE_DICT[args.file_type]
     run_type = calc.META_TYPE_DICT[args.run_type]
@@ -250,12 +256,17 @@ def main():
     if "FAS" in im:
         im_options["FAS"] = calc.validate_fas_frequency(args.fas_frequency)
 
-    # Create output dir
-    if is_master:
+    if use_mpi:
+        # Create output dir
+        if is_server:
+            utils.setup_dir(args.output_path / "stations")
+            if not args.simple_output and args.advanced_ims is None:
+                utils.setup_dir(args.output_path / calc.OUTPUT_SUBFOLDER)
+    else:
+        # Create output dir
         utils.setup_dir(args.output_path)
-        utils.setup_dir(Path(args.output_path) / "stations")
         if not args.simple_output and args.advanced_ims is None:
-            utils.setup_dir(Path(args.output_path) / calc.OUTPUT_SUBFOLDER)
+            utils.setup_dir(args.output_path / calc.OUTPUT_SUBFOLDER)
 
     # TODO: this may need to be updated to read file if the length of list becomes an issue
     station_names = args.station_names
@@ -264,44 +275,72 @@ def main():
         advanced_im_config = advanced_IM_factory.advanced_im_config(
             args.advanced_ims, args.advanced_im_config, args.OpenSees_path
         )
-
     else:
         components = args.components
         advanced_im_config = None
 
-    mh = MPIFileHandler.MPIFileHandler(
-            Path(args.output_path).parent / f"{args.identifier}_im_calc.log"
-    )
-    formatter = logging.Formatter("%(asctime)s:%(name)s:%(levelname)s:%(message)s")
-    mh.setFormatter(formatter)
-    logger.addHandler(mh)
-    if is_master:
+    if use_mpi:
+        mh = MPIFileHandler.MPIFileHandler(
+            args.output_path.parent / f"{args.identifier}_im_calc.log"
+        )
+        formatter = logging.Formatter("%(asctime)s:%(name)s:%(levelname)s:%(message)s")
+        mh.setFormatter(formatter)
+        logger.addHandler(mh)
+        if is_server:
+            logger.info("IM_Calc started")
+
+        # MPI
+        calc.compute_measures_mpi(
+            args.input_path,
+            file_type,
+            comm,
+            wave_type=None,
+            station_names=station_names,
+            ims=im,
+            comp=components,
+            im_options=im_options,
+            output=args.output_path,
+            identifier=args.identifier,
+            rupture=args.rupture,
+            run_type=run_type,
+            version=args.version,
+            simple_output=args.simple_output,
+            units=args.units,
+            advanced_im_config=advanced_im_config,
+            real_only=args.real_stats_only,
+            logger=logger,
+        )
+        if is_server:
+            print("Calculations are output to {}".format(args.output_path))
+    else:
+        logger = qclogging.get_logger("IM_calc")
+        qclogging.add_general_file_handler(
+            logger, args.output_path / f"{args.identifier}_im_calc.log"
+        )
         logger.info("IM_Calc started")
 
-    # MPI
-    calc.compute_measures_mpi(
-        args.input_path,
-        file_type,
-        comm,
-        rank,
-        size,
-        wave_type=None,
-        station_names=station_names,
-        ims=im,
-        comp=components,
-        im_options=im_options,
-        output=args.output_path,
-        identifier=args.identifier,
-        rupture=args.rupture,
-        run_type=run_type,
-        version=args.version,
-        simple_output=args.simple_output,
-        units=args.units,
-        advanced_im_config=advanced_im_config,
-        real_only=args.real_stats_only,
-        logger=logger,
-    )
-    if is_master:
+        # multiprocessor
+        calc.compute_measures_multiprocess(
+            args.input_path,
+            file_type,
+            wave_type=None,
+            station_names=station_names,
+            ims=im,
+            comp=components,
+            im_options=im_options,
+            output=args.output_path,
+            identifier=args.identifier,
+            rupture=args.rupture,
+            run_type=run_type,
+            version=args.version,
+            process=args.process,
+            simple_output=args.simple_output,
+            units=args.units,
+            advanced_im_config=advanced_im_config,
+            real_only=args.real_stats_only,
+            logger=logger,
+        )
+
         print("Calculations are output to {}".format(args.output_path))
 
 
