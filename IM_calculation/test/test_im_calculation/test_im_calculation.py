@@ -173,7 +173,7 @@ class TestPickleTesting:
     def test_compute_measures_mpi(self, set_up):
         from mpi4py import MPI
 
-        function = "compute_measures_mpi"
+        function = "compute_measures_multiprocess"
         for root_path in set_up:
             input_path = os.path.join(root_path, INPUT, "BB.bin")
             with open(
