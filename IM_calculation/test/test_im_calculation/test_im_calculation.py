@@ -9,7 +9,7 @@ from qcore.constants import Components
 
 import IM_calculation.IM.im_calculation as calculate_ims
 from qcore import utils, constants
-from IM_calculation.test.test_common_set_up import INPUT, OUTPUT, compare_dicts
+from IM_calculation.test.test_common_set_up import INPUT, OUTPUT, compare_dicts, set_up
 
 # This is a hack, to allow loading of the test pickle objects
 import sys
