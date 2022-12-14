@@ -2,8 +2,6 @@ pipeline {
     agent any
     environment {
         TEMP_DIR="/tmp/${env.JOB_NAME}/${env.ghprbActualCommit}"
-        OMPI_ALLOW_RUN_AS_ROOT=1
-        OMPI_ALLOW_RUN_AS_ROOT_CONFIRM=1
     }
     stages {
 
@@ -55,13 +53,6 @@ pipeline {
                     ln -s /home/qcadmin/data/testing/${env.JOB_NAME}/sample0/output sample0
                     echo "[ Run test now ]"
                     pytest -s
-                    echo "[ Linking test data ]"
-                    rm -rf sample0
-                    mkdir sample0
-                    ln -s /home/qcadmin/data/testing/${env.JOB_NAME}/sample0/input sample0
-                    ln -s /home/qcadmin/data/testing/${env.JOB_NAME}/sample0/output sample0
-                    echo "[ Run MPI test now ]"
-                    mpirun -n 2 python -m pytest -k test_compute_measures_mpi -s --with-mpi
                 """
             }
         }
