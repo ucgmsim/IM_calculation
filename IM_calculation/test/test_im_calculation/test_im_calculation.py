@@ -170,10 +170,10 @@ class TestPickleTesting:
             assert actual_converted_stations == expected_converted_stations
 
     @pytest.mark.mpi(min_size=2)
-    def test_compute_measures_multiprocess(self, set_up):
+    def test_compute_measures_mpi(self, set_up):
         from mpi4py import MPI
 
-        function = "compute_measures_multiprocess"
+        function = "compute_measures_mpi"
         for root_path in set_up:
             input_path = os.path.join(root_path, INPUT, "BB.bin")
             with open(
@@ -221,15 +221,11 @@ class TestPickleTesting:
             (Path(output) / "stations").mkdir(exist_ok=True)
 
             comm = MPI.COMM_WORLD
-            rank = comm.Get_rank()
-            size = comm.Get_size()
 
             calculate_ims.compute_measures_mpi(
                 input_path,
                 file_type,
                 comm,
-                rank,
-                size,
                 wave_type=wave_type,
                 station_names=station_names,
                 ims=ims,
