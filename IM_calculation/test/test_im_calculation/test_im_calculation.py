@@ -173,71 +173,65 @@ class TestPickleTesting:
     def test_compute_measures_mpi(self, set_up):
         from mpi4py import MPI
 
+        comm = MPI.COMM_WORLD
+        rank = comm.Get_rank()
+        server = 0
+        is_server = not rank
+
         function = "compute_measures_multiprocess"
         for root_path in set_up:
+
             input_path = os.path.join(root_path, INPUT, "BB.bin")
-            with open(
-                os.path.join(root_path, INPUT, function + "_file_type.P"), "rb"
-            ) as load_file:
-                file_type = pickle.load(load_file)
-            with open(
-                os.path.join(root_path, INPUT, function + "_wave_type.P"), "rb"
-            ) as load_file:
-                wave_type = pickle.load(load_file)
-            with open(
-                os.path.join(root_path, INPUT, function + "_ims.P"), "rb"
-            ) as load_file:
-                ims = pickle.load(load_file)
-            with open(
-                os.path.join(root_path, INPUT, function + "_comp.P"), "rb"
-            ) as load_file:
-                comp = pickle.load(load_file)
-            with open(
-                os.path.join(root_path, INPUT, function + "_period.P"), "rb"
-            ) as load_file:
-                period = pickle.load(load_file)
-            with open(
-                os.path.join(root_path, INPUT, function + "_identifier.P"), "rb"
-            ) as load_file:
-                identifier = pickle.load(load_file)
-            with open(
-                os.path.join(root_path, INPUT, function + "_rupture.P"), "rb"
-            ) as load_file:
-                rupture = pickle.load(load_file)
-            with open(
-                os.path.join(root_path, INPUT, function + "_run_type.P"), "rb"
-            ) as load_file:
-                run_type = pickle.load(load_file)
-            with open(
-                os.path.join(root_path, INPUT, function + "_version.P"), "rb"
-            ) as load_file:
-                version = pickle.load(load_file)
-            with open(
-                os.path.join(root_path, INPUT, function + "_simple_output.P"), "rb"
-            ) as load_file:
-                simple_output = pickle.load(load_file)
             station_names = ["099A"]
-            output = root_path
-            (Path(output) / "stations").mkdir(exist_ok=True)
-
-            comm = MPI.COMM_WORLD
-
-            calculate_ims.compute_measures_mpi(
-                input_path,
-                file_type,
-                comm,
-                wave_type=wave_type,
-                station_names=station_names,
-                ims=ims,
-                comp=comp,
-                im_options={"pSA": period},
-                output=output,
-                identifier=identifier,
-                rupture=rupture,
-                run_type=run_type,
-                version=version,
-                simple_output=simple_output,
-            )
+            args = {"input_path": input_path}
+            if is_server:
+                with open(
+                    os.path.join(root_path, INPUT, function + "_file_type.P"), "rb"
+                ) as load_file:
+                    args.update({"file_type": pickle.load(load_file)})
+                args.update({"comm": comm})
+                with open(
+                    os.path.join(root_path, INPUT, function + "_wave_type.P"), "rb"
+                ) as load_file:
+                    args.update({"wave_type": pickle.load(load_file)})
+                args.update({"station_names": station_names})
+                with open(
+                    os.path.join(root_path, INPUT, function + "_ims.P"), "rb"
+                ) as load_file:
+                    args.update({"ims": pickle.load(load_file)})
+                with open(
+                    os.path.join(root_path, INPUT, function + "_comp.P"), "rb"
+                ) as load_file:
+                    args.update({"comp": pickle.load(load_file)})
+                with open(
+                    os.path.join(root_path, INPUT, function + "_period.P"), "rb"
+                ) as load_file:
+                    args.update({"im_options": {"pSA": pickle.load(load_file)}})
+                args.update({"output": root_path})
+                with open(
+                    os.path.join(root_path, INPUT, function + "_identifier.P"), "rb"
+                ) as load_file:
+                    args.update({"identifier": pickle.load(load_file)})
+                with open(
+                    os.path.join(root_path, INPUT, function + "_rupture.P"), "rb"
+                ) as load_file:
+                    args.update({"rupture": pickle.load(load_file)})
+                with open(
+                    os.path.join(root_path, INPUT, function + "_run_type.P"), "rb"
+                ) as load_file:
+                    args.update({"run_type": pickle.load(load_file)})
+                with open(
+                    os.path.join(root_path, INPUT, function + "_version.P"), "rb"
+                ) as load_file:
+                    args.update({"version": pickle.load(load_file)})
+                with open(
+                    os.path.join(root_path, INPUT, function + "_simple_output.P"), "rb"
+                ) as load_file:
+                    args.update({"simple_output": pickle.load(load_file)})
+                (Path(root_path) / "stations").mkdir(exist_ok=True)
+            args = comm.bcast(args, root=server)
+            print(f"Rank {rank} args {args}")
+            calculate_ims.compute_measures_mpi(**args)
 
     def test_get_result_filepath(self, set_up):
         function = "get_result_filepath"
