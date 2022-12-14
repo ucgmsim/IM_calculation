@@ -149,6 +149,25 @@ class TestPickleTesting:
 
             compare_dicts(actual_result, actual_expected_result)
 
+    def test_get_bbseis(self, set_up):
+        function = "get_bbseis"
+        for root_path in set_up:
+            with open(
+                os.path.join(root_path, INPUT, function + "_selected_stations.P"), "rb"
+            ) as load_file:
+                stations = pickle.load(load_file)
+
+            actual_converted_stations = calculate_ims.get_bbseis(
+                os.path.join(root_path, INPUT, "BB.bin"), "binary", stations
+            )[1]
+
+            with open(
+                os.path.join(root_path, OUTPUT, function + "_station_names.P"), "rb"
+            ) as load_file:
+                expected_converted_stations = pickle.load(load_file)
+
+            assert actual_converted_stations == expected_converted_stations
+
     def test_compute_measures_multiprocess(self, set_up):
         function = "compute_measures_multiprocess"
         for root_path in set_up:
@@ -216,25 +235,6 @@ class TestPickleTesting:
                 process,
                 simple_output,
             )
-
-    def test_get_bbseis(self, set_up):
-        function = "get_bbseis"
-        for root_path in set_up:
-            with open(
-                os.path.join(root_path, INPUT, function + "_selected_stations.P"), "rb"
-            ) as load_file:
-                stations = pickle.load(load_file)
-
-            actual_converted_stations = calculate_ims.get_bbseis(
-                os.path.join(root_path, INPUT, "BB.bin"), "binary", stations
-            )[1]
-
-            with open(
-                os.path.join(root_path, OUTPUT, function + "_station_names.P"), "rb"
-            ) as load_file:
-                expected_converted_stations = pickle.load(load_file)
-
-            assert actual_converted_stations == expected_converted_stations
 
     def test_get_result_filepath(self, set_up):
         function = "get_result_filepath"
