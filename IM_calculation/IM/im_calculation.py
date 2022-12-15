@@ -684,7 +684,7 @@ def compute_measures_multiprocess(
                         im_options,
                         sorted(components_to_calculate, key=lambda x: x.value),
                         (ii, total_stations),
-                        logger.name,
+                        logger,
                     )
                     for ii, waveform in enumerate(waveforms, start=i + 1)
                 ]
