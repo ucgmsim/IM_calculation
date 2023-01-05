@@ -512,7 +512,7 @@ def compute_measures_mpi(
     ) = constants.Components.get_comps_to_calc_and_store(comp)
 
     bbseries = None
-    if server:
+    if is_server:
         bbseries, station_names = get_bbseis(
             input_path, file_type, station_names, real_only=real_only
         )
