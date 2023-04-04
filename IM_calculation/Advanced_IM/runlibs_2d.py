@@ -94,7 +94,7 @@ def main(args, im_name, run_script):
     output_dir = args.output_dir
     os.makedirs(output_dir, exist_ok=True)
     # list of component to run
-    # TODO: make this an arg if future model needs vairable list of components
+    # TODO: make this an arg if future model needs variable list of components
     component_list = [Components.c000, Components.c090]
 
     model_converged = True
