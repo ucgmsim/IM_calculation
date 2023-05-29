@@ -12,7 +12,6 @@ import numpy
 
 from Cython.Distutils import build_ext
 
-
 class build_konno_matricies(build_py):
     """Post-installation for development mode."""
 
@@ -24,14 +23,13 @@ class build_konno_matricies(build_py):
         createKonnoMatrices(self.build_lib)
         build_py.run(self)
 
-
 setup(
     name="IM-calc",
     version="19.5.1",
     packages=find_packages(),
     url="https://github.com/ucgmsim/IM_calculation",
     description="IM calculation code",
-    install_requires=["numpy>=1.14.3", "numba>=0.43.1", "Cython", "pandas"],
+    install_requires=["numpy>=1.14.3", "Cython", "obspy", "pandas"],
     cmdclass={"build_ext": build_ext, "build_py": build_konno_matricies},
     package_data={"": ["*.yaml"]},
     ext_modules=[

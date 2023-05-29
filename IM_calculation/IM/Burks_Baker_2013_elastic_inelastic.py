@@ -67,8 +67,17 @@ def Bilinear_Newmark_withTH(
 
     # % Interpolate p=-ag*m (linearly)
     p = -ag * m
-    tg = np.linspace(0, ag.size - 1, ag.size) * dtg
-    t = np.linspace(0, tg[-1], int(tg[-1] / dt) + 1)  # num of steps increased from tg
+
+    tg = np.linspace(
+        0, ag.size * dtg - dtg, ag.size, dtype=float
+    )  # Creating [ 0, dtg, 2*dtg.... (ag.size-1)*dtg ].
+    t = np.linspace(
+        0, ag.size * dtg - dt, int(np.ceil((ag.size * dtg) / dt)), dtype=float
+    )  # For the same begin and end, create a range spaced by dt.
+    # the following two lines are more readable version, but the above is more relable with a non-interger step
+    # tg = np.arange(0, ag.size * dtg, dtg, dtype=float)
+    # t = np.arange(0, ag.size * dtg, dt, dtype=float)
+
     p = np.interp(t, tg, p)  # interpolate for t
 
     lp = p.size
@@ -123,18 +132,17 @@ def Bilinear_Newmark_withTH(
 
         a[i + 1] = (p[i + 1] - c * v[i + 1] - fs[i + 1]) / m
 
-    Sd = np.max(np.abs(d), axis=0)
-    # Sv = Sd * (2 * np.pi / period)
-    # Sa = Sd * (2 * np.pi / period) ** 2
-    #
+    # Sd = np.max(np.abs(d), axis=0) # maximum displacement
+    # Sv = Sd * (2 * np.pi / period) # velocity
+    # Sa = Sd * (2 * np.pi / period) ** 2 # acceleration
 
     # Hd = d
     # Hv = v
     # Ha = a
     # Hfs = fs
-    # else:
 
-    return Sd  # , Sv, Sa, Hd, Hv, Ha, Hfs
+    # return all displacements, not just the maximum Sd. This is to compute rotd if needed
+    return d
 
 
 #

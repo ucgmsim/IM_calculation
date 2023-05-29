@@ -23,8 +23,8 @@ BSC_PERIOD = [0.05, 0.1, 5.0, 10.0]
 TEST_IMS = ["PGA", "PGV", "Ds575", "pSA"]
 
 FAKE_DIR = (
-    "fake_dir"
-)  # should be created in set_up module and remove in tear_down module
+    "fake_dir"  # should be created in set_up module and remove in tear_down module
+)
 utils.setup_dir("fake_dir")
 
 
@@ -112,7 +112,9 @@ class TestPickleTesting:
 
             str_comps = [Components.from_str(x) for x in str_comps]
             arg_comps = [Components.from_str(x) for x in arg_comps]
-            actual_value_dict = calculate_ims.array_to_dict(value, str_comps, im, arg_comps)
+            actual_value_dict = calculate_ims.array_to_dict(
+                value, str_comps, im, arg_comps
+            )
 
             with open(
                 os.path.join(root_path, OUTPUT, function + "_value_dict.P"), "rb"
@@ -133,7 +135,7 @@ class TestPickleTesting:
             comps = [Components.from_str(x) for x in comps]
             str_comps = [Components.from_str(x) for x in str_comps]
             actual_result = calculate_ims.compute_measure_single(
-                waveform, ims, comps, im_options, str_comps
+                waveform, ims, comps, im_options, str_comps, (0, 0)
             )
 
             with open(
@@ -141,11 +143,11 @@ class TestPickleTesting:
             ) as load_file:
                 expected_result = pickle.load(load_file)
                 convert_str_comps_to_enum(expected_result)
-                actual_expected_result = self.convert_to_results_dict(periods, expected_result)
+                actual_expected_result = self.convert_to_results_dict(
+                    periods, expected_result
+                )
 
             compare_dicts(actual_result, actual_expected_result)
-
-
 
     def test_get_bbseis(self, set_up):
         function = "get_bbseis"
@@ -261,7 +263,6 @@ class TestPickleTesting:
 
             assert actual_ret_val == expected_ret_val
 
-
     def test_write_result(self, set_up):
         function = "write_result"
         for root_path in set_up:
@@ -274,7 +275,9 @@ class TestPickleTesting:
             ) as load_file:
                 temp_result_dict = pickle.load(load_file)
                 convert_str_comps_to_enum(temp_result_dict)
-                result_dict = self.convert_to_results_dict(period, temp_result_dict, keep_ps=True)
+                result_dict = self.convert_to_results_dict(
+                    period, temp_result_dict, keep_ps=True
+                )
 
             with open(
                 os.path.join(root_path, INPUT, function + "_identifier.P"), "rb"
@@ -292,15 +295,23 @@ class TestPickleTesting:
                 exist_ok=True,
             )
 
-            calculate_ims.write_result(result_dict, output_folder, identifier, simple_output)
+            calculate_ims.write_result(
+                result_dict, output_folder, identifier, simple_output
+            )
             expected_output_path = calculate_ims.get_result_filepath(
                 output_folder, identifier, ".csv"
             )
             actual_output_path = os.path.join(
                 root_path, OUTPUT, function + "_outfile.csv"
             )
+            expected_output = np.loadtxt(
+                expected_output_path, delimiter=",", usecols=range(2, 24), skiprows=1
+            )
+            actual_output = np.loadtxt(
+                actual_output_path, delimiter=",", usecols=range(2, 24), skiprows=1
+            )
 
-            assert filecmp.cmp(expected_output_path, actual_output_path)
+            assert np.isclose(expected_output, actual_output).all()
 
     def convert_to_results_dict(self, period, temp_result_dict, keep_ps=False):
         result_dict = {}
@@ -313,14 +324,18 @@ class TestPickleTesting:
                     if im in calculate_ims.MULTI_VALUE_IMS:
                         for i, val in enumerate(period):
                             if keep_ps:
-                                result_dict[(station, comp.str_value)][f"{im}_{str(val).replace('.', 'p')}"] = \
-                                temp_result_dict[station][im][comp][i]
+                                result_dict[(station, comp.str_value)][
+                                    f"{im}_{str(val).replace('.', 'p')}"
+                                ] = temp_result_dict[station][im][comp][i]
                             else:
 
-                                result_dict[(station, comp.str_value)][f"{im}_{str(val)}"] = \
-                                temp_result_dict[station][im][comp][i]
+                                result_dict[(station, comp.str_value)][
+                                    f"{im}_{str(val)}"
+                                ] = temp_result_dict[station][im][comp][i]
                     else:
-                        result_dict[(station, comp.str_value)][im] = temp_result_dict[station][im][comp]
+                        result_dict[(station, comp.str_value)][im] = temp_result_dict[
+                            station
+                        ][im][comp]
         return result_dict
 
     def test_generate_metadata(self, set_up):

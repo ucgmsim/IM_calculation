@@ -2,30 +2,41 @@ import csv
 import glob
 import os
 import sys
-
+import shutil
 from datetime import datetime
 from functools import partial
-from multiprocessing.pool import Pool
-from collections import ChainMap
+from pathlib import Path
 from typing import List, Iterable
 
 import numpy as np
 import pandas as pd
 
-from qcore import timeseries, constants
+from qcore import timeseries, constants, shared, qclogging
 from qcore.constants import Components
 from qcore.im import order_im_cols_df
-
 from IM_calculation.Advanced_IM import advanced_IM_factory
 from IM_calculation.IM import read_waveform, intensity_measures
+from IM_calculation.IM.intensity_measures import G
 from IM_calculation.IM.computeFAS import get_fourier_spectrum
-from IM_calculation.IM.Burks_Baker_2013_elastic_inelastic import Bilinear_Newmark_withTH
 
-G = 981.0
+
 DEFAULT_IMS = ("PGA", "PGV", "CAV", "AI", "Ds575", "Ds595", "MMI", "pSA")
-ALL_IMS = ("PGA", "PGV", "CAV", "AI", "Ds575", "Ds595", "MMI", "pSA", "FAS", "IESD")
+ALL_IMS = (
+    "PGA",
+    "PGV",
+    "CAV",
+    "AI",
+    "Ds575",
+    "Ds595",
+    "MMI",
+    "pSA",
+    "SED",
+    "FAS",
+    "SDI",
+)
 
-MULTI_VALUE_IMS = ("pSA", "FAS", "IESD")
+
+MULTI_VALUE_IMS = ("pSA", "FAS", "SDI")
 
 FAS_FREQUENCY = np.logspace(-1, 2, num=100, base=10.0)
 
@@ -86,10 +97,17 @@ def check_rotd(comps_to_store: Iterable[Components]) -> bool:
 def calculate_rotd(
     accelerations,
     comps_to_store: List[Components],
-    func=lambda x: np.max(np.abs(x), axis=1),
+    func=lambda x: np.max(np.abs(x), axis=-2),
 ):
     """
     Calculates rotd for given accelerations
+
+    Multiplying the waveforms by the rotation matrices gives an array with shape either
+    (periods, nt, n_rotations) (for pSA) or (nt, n_rotations) (for single dimension IMs).
+    The max is taken over the second axis from the rear (nt),
+    so for pSA we get an array with shape (periods, n_rotations), while single dimension IMs gets (n_rotations)
+    Which is then taken the median for RotD50 and the maximum for RotD100
+
     :param accelerations: An array with shape [[periods.size,] nt, 2]
         where the first axis is optional and if present is equal to the number of periods in the intensity measure.
         nt is the number of timesteps in the original waveform
@@ -121,7 +139,6 @@ def compute_adv_measure(waveform, advanced_im_config, output_dir):
     :param output_dir: Directory where output folders are contained. Structure is /path/to/output_dir/station/im_name
     :return:
     """
-
     waveform_acc = waveform[0]
     station_name = waveform_acc.station_name
     adv_im_out_dir = os.path.join(output_dir, station_name)
@@ -129,12 +146,19 @@ def compute_adv_measure(waveform, advanced_im_config, output_dir):
 
 
 def compute_measure_single(
-    waveform, ims, comps_to_store, im_options, comps_to_calculate
+    waveform,
+    ims,
+    comps_to_store,
+    im_options,
+    comps_to_calculate,
+    progress,
+    logger=qclogging.get_basic_logger(),
 ):
     """
     Compute measures for a single station
     :param: a tuple consisting 5 params: waveform, ims, comp, period, str_comps
     waveform: a single tuple that contains (waveform_acc,waveform_vel)
+    progress: a tuple containing station number and total number of stations
     :return: {result[station_name]: {[im]: value or (period,value}}
     """
     waveform_acc, waveform_vel = waveform
@@ -150,6 +174,8 @@ def compute_measure_single(
         velocities = waveform_vel.values
 
     station_name = waveform_acc.station_name
+    station_i, n_stations = progress
+    logger.info(f"Processing {station_name} - {station_i} / {n_stations}")
 
     result = {(station_name, comp.str_value): {} for comp in comps_to_store}
 
@@ -161,19 +187,19 @@ def compute_measure_single(
             calculate_pSAs,
             (DT, accelerations, im_options, result, station_name, waveform_acc),
         ),
-        "IESD": (
-            calculate_IESD,
+        "SDI": (
+            calculate_SDI,
             (DT, accelerations, im_options, result, station_name, waveform_acc),
         ),
         "FAS": (calc_FAS, (DT, accelerations, im_options, result, station_name)),
-        "AI": (calc_AI, (accelerations, G, times)),
+        "AI": (calc_AI, (accelerations, times)),
+        "SED": (calc_SED, (velocities, times)),
         "MMI": (calc_MMI, (velocities,)),
         "Ds595": (calc_DS, (accelerations, DT, 5, 95)),
         "Ds575": (calc_DS, (accelerations, DT, 5, 75)),
     }
 
     for im in set(ims).intersection(im_functions.keys()):
-        # print(im)
         func, args = im_functions[im]
         values_to_store = func(*args, im, comps_to_store, comps_to_calculate)
         if values_to_store is None:
@@ -241,12 +267,24 @@ def calc_MMI(waveform, im, comps_to_store, comps_to_calculate):
     return values
 
 
-def calc_AI(accelerations, G, times, im, comps_to_store, comps_to_calculate):
-    value = intensity_measures.get_arias_intensity_nd(accelerations, G, times)
+def calc_SED(velocities, times, im, comps_to_store, comps_to_calculate):
+    value = intensity_measures.get_specific_energy_density_nd(velocities, times)
+    values = array_to_dict(value, comps_to_calculate, im, comps_to_store)
+    if check_rotd(comps_to_store):
+        func = lambda x: intensity_measures.get_specific_energy_density_nd(
+            np.squeeze(x), times=times
+        )
+        rotd = calculate_rotd(velocities, comps_to_store, func=func)
+        values.update(rotd)
+    return values
+
+
+def calc_AI(accelerations, times, im, comps_to_store, comps_to_calculate):
+    value = intensity_measures.get_arias_intensity_nd(accelerations, times)
     values = array_to_dict(value, comps_to_calculate, im, comps_to_store)
     if check_rotd(comps_to_store):
         func = lambda x: intensity_measures.get_arias_intensity_nd(
-            np.squeeze(x), g=G, times=times
+            np.squeeze(x), times=times
         )
         rotd = calculate_rotd(accelerations, comps_to_store, func=func)
         values.update(rotd)
@@ -327,7 +365,7 @@ def calculate_pSAs(
                 ][i]
 
 
-def calculate_IESD(
+def calculate_SDI(
     DT,
     accelerations,
     im_options,
@@ -338,32 +376,43 @@ def calculate_IESD(
     comps_to_store,
     comps_to_calculate,
     z=0.05,  # damping ratio
-    alpha=0.05,  # strain hardening ratios
-    dy=0.025,  # strain hardening ratios
+    alpha=0.05,  # strain hardening ratio
+    dy=0.1765,  # strain hardening ratio
     dt=0.005,  # analysis time step
 ):
+    # Get displacements by Burks_Baker_2013. Has shape (len(periods), nt-1, len(comps))
+    displacements = (
+        intensity_measures.get_SDI_nd(
+            accelerations, im_options[im], waveform_acc.NT, DT, z, alpha, dy, dt
+        )
+        * 100
+    )  # Burks & Baker returns m, but output is stored in cm
 
-    acc_values = array_to_dict(accelerations, comps_to_calculate, im, comps_to_store)
+    # Calculate the maximums of the basic components and pass this to array_to_dict which calculates geom too
+    # Store the SDI im values in the format dict(component: List(im_values))
+    # Where the im_values in the component dictionaries correspond to the periods in the periods list
+    sdi_values = array_to_dict(
+        np.max(np.abs(displacements), axis=1), comps_to_calculate, im, comps_to_store
+    )
+
+    if check_rotd(comps_to_store):
+        # Only run if any of the given components are selected (Non empty intersection)
+        sdi_values.update(calculate_rotd(displacements, comps_to_store))
+
     for comp in comps_to_store:
-        if comp.str_value in acc_values:
-            Sd = Bilinear_Newmark_withTH(
-                np.array(im_options[im]),
-                z,
-                dy,
-                alpha,
-                acc_values[comp.str_value],
-                waveform_acc.DT,
-                dt,
-            )
+        if comp.str_value in sdi_values:
             for i, val in enumerate(im_options[im]):
-                result[(station_name, comp.str_value)][f"{im}_{str(val)}"] = Sd[i]
+                result[(station_name, comp.str_value)][f"{im}_{str(val)}"] = sdi_values[
+                    comp.str_value
+                ][i]
 
 
-def get_bbseis(input_path, file_type, selected_stations):
+def get_bbseis(input_path, file_type, selected_stations, real_only=False):
     """
     :param input_path: user input path to bb.bin or a folder containing ascii files
     :param file_type: binary or ascii
     :param selected_stations: list of user input stations
+    :param real_only: considers real stations only
     :return: bbseries, station_names
     """
     bbseries = None
@@ -389,7 +438,149 @@ def get_bbseis(input_path, file_type, selected_stations):
                 )
     else:
         return
-    return bbseries, list(station_names)
+    station_names = list(station_names)
+    if real_only:
+        station_names = [
+            stat_name
+            for stat_name in station_names
+            if not shared.is_virtual_station(stat_name)
+        ]
+    assert len(station_names) > 0, "No station is found"
+    return bbseries, station_names
+
+
+def compute_measures_mpi(
+    input_path,
+    file_type,
+    comm,
+    wave_type,
+    station_names,
+    ims=DEFAULT_IMS,
+    comp=None,
+    im_options=None,
+    output=None,
+    identifier=None,
+    rupture=None,
+    run_type=None,
+    version=None,
+    simple_output=False,
+    units="g",
+    advanced_im_config=None,
+    real_only=False,
+    logger=qclogging.get_basic_logger(),
+):
+    """
+    using multiprocesses to compute measures.
+    Calls compute_measure_single() to compute measures for a single station
+    write results to csvs and an imcalc.info meta data file
+    :param input_path:
+    :param file_type:
+    :param comm:
+    :param wave_type:
+    :param station_names:
+    :param ims:
+    :param comp:
+    :param im_options:
+    :param output:
+    :param identifier:
+    :param rupture:
+    :param run_type:
+    :param version:
+    :param process:
+    :param simple_output:
+    :param units:
+    :param advanced_im_config:
+    :param real_only:
+    :return:
+    """
+    # MPI Imports
+    from mpi4py import MPI
+
+    rank = comm.Get_rank()
+    size = comm.Get_size()
+    server = 0
+    is_server = not rank
+
+    #  for running adv_im
+    running_adv_im = (advanced_im_config is not None) and (
+        advanced_im_config.IM_list is not None
+    )
+
+    (
+        components_to_calculate,
+        components_to_store,
+    ) = constants.Components.get_comps_to_calc_and_store(comp)
+
+    bbseries = None
+    if is_server:
+        bbseries, station_names = get_bbseis(
+            input_path, file_type, station_names, real_only=real_only
+        )
+    bbseries = comm.bcast(bbseries, root=server)
+    station_names = comm.bcast(station_names, root=server)
+
+    # Check which stations to run against non-zero station files already
+    # in the station output directory
+    station_path = Path(output) / "stations"
+    stations_set = set(station_names)
+    found_stations = {
+        file.stem for file in station_path.iterdir() if file.stat().st_size > 0
+    }
+    stations_to_run = list(stations_set.difference(found_stations))
+
+    status = MPI.Status()
+    if is_server:
+        nworkers = size - 1
+        while nworkers:
+            comm.recv(source=MPI.ANY_SOURCE, status=status)
+            worker_id = status.Get_source()
+            # next job
+            if len(stations_to_run) > 0:
+                station = stations_to_run.pop(-1)
+                logger.info(f"Sending station {station} to {worker_id}")
+                comm.send(obj=station, dest=worker_id)
+            else:
+                comm.send(obj=StopIteration, dest=worker_id)
+                nworkers -= 1
+        logger.info("All stations complete")
+    else:
+        for station in iter(lambda: comm.sendrecv(None, dest=server), StopIteration):
+            logger.info(f"Station to compute: {station}")
+            waveform = read_waveform.read_waveforms(
+                input_path,
+                bbseries,
+                [station],
+                components_to_calculate,
+                wave_type=wave_type,
+                file_type=file_type,
+                units=units,
+            )[0]
+            # only run basic im if and only if adv_im not going to run
+            if running_adv_im:
+                compute_adv_measure(waveform, advanced_im_config, output)
+            else:
+                result_dict = compute_measure_single(
+                    waveform,
+                    sorted(ims),
+                    sorted(components_to_store, key=lambda x: x.value),
+                    im_options,
+                    sorted(components_to_calculate, key=lambda x: x.value),
+                    (stations_to_run.index(station), len(stations_to_run)),
+                    logger,
+                )
+                write_result(result_dict, station_path, station, simple_output)
+    if is_server:
+        if running_adv_im:
+            # read, agg and store csv
+            advanced_IM_factory.agg_csv(advanced_im_config, station_names, output)
+        else:
+            all_station_data = read_station_output(station_path)
+            all_station_data.to_csv(
+                get_result_filepath(output, identifier, ".csv"), index=False
+            )
+            shutil.rmtree(station_path)
+        generate_metadata(output, identifier, rupture, run_type, version)
+    comm.Barrier()
 
 
 def compute_measures_multiprocess(
@@ -409,6 +600,8 @@ def compute_measures_multiprocess(
     simple_output=False,
     units="g",
     advanced_im_config=None,
+    real_only=False,
+    logger=qclogging.get_basic_logger(),
 ):
     """
     using multiprocesses to compute measures.
@@ -428,8 +621,16 @@ def compute_measures_multiprocess(
     :param version:
     :param process:
     :param simple_output:
+    :param units:
+    :param advanced_im_config:
+    :param real_only:
     :return:
     """
+    # Multiprocess imports
+    from multiprocessing.pool import Pool
+    from collections import ChainMap
+    from qcore.progress_tracker import ProgressTracker
+
     #  for running adv_im
     running_adv_im = (advanced_im_config is not None) and (
         advanced_im_config.IM_list is not None
@@ -440,7 +641,9 @@ def compute_measures_multiprocess(
         components_to_store,
     ) = constants.Components.get_comps_to_calc_and_store(comp)
 
-    bbseries, station_names = get_bbseis(input_path, file_type, station_names)
+    bbseries, station_names = get_bbseis(
+        input_path, file_type, station_names, real_only=real_only
+    )
     total_stations = len(station_names)
     # determine the size of each iteration base on num of processes and mem
     steps = get_steps(
@@ -451,9 +654,8 @@ def compute_measures_multiprocess(
     if not running_adv_im:
         all_results = []
 
-    with Pool(process) as p:
-        i = 0
-        while i < total_stations:
+    with Pool(process) as p, ProgressTracker(total_stations) as p_t:
+        for i in range(0, total_stations, steps):
             # read waveforms of stations
             # each iteration = steps size
             stations_to_run = station_names[i : i + steps]
@@ -466,7 +668,6 @@ def compute_measures_multiprocess(
                 file_type=file_type,
                 units=units,
             )
-            i += steps
             # only run basic im if and only if adv_im not going to run
             if running_adv_im:
                 adv_array_params = [
@@ -482,10 +683,13 @@ def compute_measures_multiprocess(
                         sorted(components_to_store, key=lambda x: x.value),
                         im_options,
                         sorted(components_to_calculate, key=lambda x: x.value),
+                        (ii, total_stations),
+                        logger,
                     )
-                    for waveform in waveforms
+                    for ii, waveform in enumerate(waveforms, start=i + 1)
                 ]
                 all_results.extend(p.starmap(compute_measure_single, array_params))
+            p_t(i)
 
     if running_adv_im:
         # read, agg and store csv
@@ -525,9 +729,24 @@ def write_result(result_dict, output_folder, identifier, simple_output):
         # For each subframe with the same station write it to csv
         for station, sub_frame in results_dataframe.groupby(level=0):
             station_csv = os.path.join(
-                output_folder, OUTPUT_SUBFOLDER, "{}_{}.csv".format(identifier, station)
+                output_folder, "{}_{}.csv".format(identifier, station)
             )
             sub_frame.to_csv(station_csv)
+
+
+def read_station_output(station_directory):
+    """
+    Reads the csv files in the station directory and compiles them together to one dataframe
+    """
+    output_df = None
+    for file in station_directory.iterdir():
+        station_df = pd.read_csv(file, index_col=0)
+        station_df.insert(0, "station", file.stem)
+        if output_df is None:
+            output_df = station_df
+        else:
+            output_df = pd.concat([output_df, station_df])
+    return output_df
 
 
 def generate_metadata(output_folder, identifier, rupture, run_type, version):
@@ -625,6 +844,7 @@ def get_steps(input_path, nps, total_stations, high_mem_usage=False):
     if high_mem_usage:
         estimated_mem *= MEM_FACTOR
     available_mem = nps * MEM_PER_CORE
+    assert estimated_mem > 0, f"Estimated memory is 0: Check {input_path}"
     batches = np.ceil(np.divide(estimated_mem, available_mem))
     steps = int(np.floor(np.divide(total_stations, batches)))
     if steps == 0:

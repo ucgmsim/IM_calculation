@@ -31,9 +31,7 @@ class Waveform:
 
 
 def read_ascii_file(
-    comp_files,
-    comp=(Components.c090, Components.c000),
-    wave_type=None,
+    comp_files, comp=(Components.c090, Components.c000), wave_type=None
 ):
     waveform = Waveform()
     waveform.wave_type = wave_type
@@ -55,7 +53,7 @@ def read_ascii_file(
     comp_files_list = list(zip(*[comp_files[cf] for cf in comp]))
     for line in comp_files_list:
         a = [x.split() for x in line]
-        line_values = np.array(a, np.float).transpose()
+        line_values = np.array(a, np.float64).transpose()
         n_vals = len(line_values)
         values[i : i + n_vals] = line_values
         i += n_vals
@@ -76,9 +74,9 @@ def read_ascii_header(fid):
     # force dtype to be float32 to match qcore.BBSeis as well as EMOD3D
     DT = np.float32(header2[1])
 
-    hour = np.float(header2[2])
-    minutes = np.float(header2[3])
-    seconds = np.float(header2[4])
+    hour = np.float64(header2[2])
+    minutes = np.float64(header2[3])
+    seconds = np.float64(header2[4])
 
     time_offset = hour * 60.0 ** 2 + minutes * 60.0 + seconds
 
