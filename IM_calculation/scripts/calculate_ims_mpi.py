@@ -9,13 +9,13 @@ command:
 """
 
 import argparse
-import os
+import logging
+from pathlib import Path
 
 import IM_calculation.IM.im_calculation as calc
 from IM_calculation.Advanced_IM import advanced_IM_factory
 from qcore import constants
 from qcore import utils
-from qcore import qclogging
 
 
 def load_args():
@@ -42,6 +42,7 @@ def load_args():
         "-o",
         "--output_path",
         required=True,
+        type=Path,
         help="path to output folder that stores the computed measures. Folder name must "
         "not be inclusive.eg.home/tt/. Required parameter",
     )
@@ -122,14 +123,6 @@ def load_args():
         ),
     )
     parser.add_argument(
-        "-np",
-        "--process",
-        default=1,
-        type=int,
-        help="Please provide the number of processors. Default is 1",
-    )
-
-    parser.add_argument(
         "--real_stats_only",
         action="store_true",
         help="Please add '--real_stats_only' to consider real stations only",
@@ -195,7 +188,27 @@ def load_args():
 
 
 def main():
-    args = load_args()
+    from mpi4py import MPI
+    from qcore import MPIFileHandler
+
+    comm = MPI.COMM_WORLD
+    rank = comm.Get_rank()
+    server = 0
+    is_server = not rank
+
+    logger = logging.getLogger("IM_calc_rank_%i" % comm.rank)
+    logger.setLevel(logging.DEBUG)
+
+    # collect required arguments
+    args = None
+    if is_server:
+        try:
+            args = load_args()
+        except SystemExit as e:
+            # invalid arguments or -h
+            print("arg parse error occured:", e)
+            comm.Abort()
+    args = comm.bcast(args, root=server)
 
     file_type = calc.FILE_TYPE_DICT[args.file_type]
     run_type = calc.META_TYPE_DICT[args.run_type]
@@ -213,9 +226,10 @@ def main():
         im_options["FAS"] = calc.validate_fas_frequency(args.fas_frequency)
 
     # Create output dir
-    utils.setup_dir(args.output_path)
-    if not args.simple_output and args.advanced_ims is None:
-        utils.setup_dir(os.path.join(args.output_path, calc.OUTPUT_SUBFOLDER))
+    if is_server:
+        utils.setup_dir(args.output_path / "stations")
+        if not args.simple_output and args.advanced_ims is None:
+            utils.setup_dir(args.output_path / calc.OUTPUT_SUBFOLDER)
 
     # TODO: this may need to be updated to read file if the length of list becomes an issue
     station_names = args.station_names
@@ -224,21 +238,24 @@ def main():
         advanced_im_config = advanced_IM_factory.advanced_im_config(
             args.advanced_ims, args.advanced_im_config, args.OpenSees_path
         )
-
     else:
         components = args.components
         advanced_im_config = None
 
-    logger = qclogging.get_logger("IM_calc")
-    qclogging.add_general_file_handler(
-        logger, os.path.join(args.output_path, f"{args.identifier}_im_calc.log")
+    mh = MPIFileHandler.MPIFileHandler(
+        args.output_path.parent / f"{args.identifier}_im_calc.log"
     )
-    logger.info("IM_Calc started")
+    formatter = logging.Formatter("%(asctime)s:%(name)s:%(levelname)s:%(message)s")
+    mh.setFormatter(formatter)
+    logger.addHandler(mh)
+    if is_server:
+        logger.info("IM_Calc started")
 
-    # multiprocessor
-    calc.compute_measures_multiprocess(
+    # MPI
+    calc.compute_measures_mpi(
         args.input_path,
         file_type,
+        comm,
         wave_type=None,
         station_names=station_names,
         ims=im,
@@ -249,15 +266,14 @@ def main():
         rupture=args.rupture,
         run_type=run_type,
         version=args.version,
-        process=args.process,
         simple_output=args.simple_output,
         units=args.units,
         advanced_im_config=advanced_im_config,
         real_only=args.real_stats_only,
         logger=logger,
     )
-
-    print("Calculations are output to {}".format(args.output_path))
+    if is_server:
+        print("Calculations are output to {}".format(args.output_path))
 
 
 if __name__ == "__main__":
