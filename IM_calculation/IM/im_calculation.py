@@ -151,13 +151,16 @@ def compute_measure_single(
     comps_to_store,
     im_options,
     comps_to_calculate,
-    progress,
+    progress = None,
     logger=qclogging.get_basic_logger(),
 ):
     """
     Compute measures for a single station
-    :param: a tuple consisting 5 params: waveform, ims, comp, period, str_comps
     waveform: a single tuple that contains (waveform_acc,waveform_vel)
+    ims: a list of intensity measures
+    comps_to_store: the IM components to compute and store (e.g. rotd50, geom, etc.)
+    im_options: a dictionary of options for each IM
+    comps_to_calculate: the IM components of the input waveforms (e.g. 000, 090)
     progress: a tuple containing station number and total number of stations
     :return: {result[station_name]: {[im]: value or (period,value}}
     """
@@ -174,8 +177,9 @@ def compute_measure_single(
         velocities = waveform_vel.values
 
     station_name = waveform_acc.station_name
-    station_i, n_stations = progress
-    logger.info(f"Processing {station_name} - {station_i} / {n_stations}")
+    if progress is not None:
+        station_i, n_stations = progress
+        logger.info(f"Processing {station_name} - {station_i} / {n_stations}")
 
     result = {(station_name, comp.str_value): {} for comp in comps_to_store}
 

@@ -1,3 +1,4 @@
+from pathlib import Path
 import numpy as np
 import os
 
@@ -29,19 +30,18 @@ def createKonnoMatrices(install_directory, num_to_gen: int = 7):
 
 
 def main():
-    curr_dir = os.path.dirname(__file__)
-    os.makedirs(os.path.join(curr_dir, "KO_matrices"), exist_ok=True)
+    output_dir = Path(__file__).parent.parent / "IM" / "KO_matrices"
+    output_dir.mkdir(exist_ok=True)
 
     for i in range(7):
-        # n = [512, 1024, 2048, 4096, 8192, 16384, 32768]
         n = 512 * 2 ** i
-        file_name = os.path.join(curr_dir, "KO_matrices", f"KO_{n}.npy")
-        print(file_name)
-        if not os.path.exists(file_name):
+        cur_ffp = output_dir / f"KO_{n}.npy"
+        print(cur_ffp)
+        if not cur_ffp.exists():
             print(f"Generating Konno {n}")
-            np.save(file_name, createKonnoMatrix_single(n * 2))
+            np.save(str(cur_ffp), createKonnoMatrix_single(n * 2))
         else:
-            print(f"Skipping Konno {n}")
+            print(f"Skipping Konno {n} as it already exists")
 
 
 if __name__ == "__main__":
