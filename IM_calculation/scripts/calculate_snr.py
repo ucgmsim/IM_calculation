@@ -6,7 +6,7 @@ import numpy as np
 from scipy.interpolate import interp1d
 
 import IM_calculation.IM.im_calculation as calc
-import IM_calculation.IM.snr as snr
+import IM_calculation.IM.snr_calculation as snr_calc
 import IM_calculation.IM.computeFAS as computeFAS
 from qcore.constants import Components
 
@@ -103,7 +103,7 @@ waveform = waveforms[0][0]
 tp = 2900  # Index of the start of the P-wave
 # plot_waveform(waveform, tp=tp)
 
-snr, Ds, Dn = snr.get_snr_from_waveform(waveform, tp)
+snr, Ds, Dn = snr_calc.get_snr_from_waveform(waveform, tp)
 
 
 

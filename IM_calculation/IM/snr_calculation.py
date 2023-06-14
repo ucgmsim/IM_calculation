@@ -32,7 +32,7 @@ def apply_taper(acc, percent=0.05):
 def get_snr_from_waveform(
     waveform,
     tp: float,
-    common_frequency_vector: np.asarray = np.logspace(0.05, 50, num=100, base=10.0),
+    common_frequency_vector: np.asarray = np.logspace(np.log(0.05), np.log(50), num=100, base=10.0),
 ):
     """
     Calculates the SNR of a waveform given a tp and common frequency vector
@@ -66,8 +66,6 @@ def get_snr_from_waveform(
     # Add the tapering to the signal and noise
     taper_signal_acc = apply_taper(signal_acc)
     taper_noise_acc = apply_taper(noise_acc)
-    # taper_signal_acc = signal_acc
-    # taper_noise_acc = noise_acc
 
     # Generate FFT for the signal and noise
     fas_signal, frequency_signal = computeFAS.generate_fa_spectrum(
@@ -82,8 +80,8 @@ def get_snr_from_waveform(
     konno_noise = computeFAS.get_konno_matrix(len(fas_noise))
 
     # Apply konno ohmachi smoothing
-    fa_smooth_signal = np.dot(fas_signal.T, konno_signal).T
-    fa_smooth_noise = np.dot(fas_noise.T, konno_noise).T
+    fa_smooth_signal = np.dot(np.abs(fas_signal.T), konno_signal).T
+    fa_smooth_noise = np.dot(np.abs(fas_noise.T), konno_noise).T
 
     # Interpolate at common frequencies
     inter_signal_f = interp1d(
