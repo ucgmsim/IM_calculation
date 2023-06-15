@@ -22,7 +22,7 @@ class build_konno_matricies(build_py):
             createKonnoMatrices,
         )
 
-        createKonnoMatrices(Path(__file__) / "IM_calculation" / "IM" / "KO_matrices")
+        createKonnoMatrices(Path(__file__).parent / "IM_calculation" / "IM" / "KO_matrices")
         build_py.run(self)
 
 
