@@ -13,6 +13,7 @@ import numpy
 
 from Cython.Distutils import build_ext
 
+
 class build_konno_matricies(build_py):
     """Post-installation for development mode."""
 
@@ -23,6 +24,7 @@ class build_konno_matricies(build_py):
 
         createKonnoMatrices(Path(__file__) / "IM_calculation" / "IM" / "KO_matrices")
         build_py.run(self)
+
 
 setup(
     name="IM-calc",

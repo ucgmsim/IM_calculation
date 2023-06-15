@@ -2,7 +2,7 @@ import numpy as np
 from scipy.interpolate import interp1d
 
 import IM_calculation.IM.computeFAS as computeFAS
-# from IM_calculation.IM.im_calculation.read_waveform import Waveform
+from IM_calculation.IM.read_waveform import Waveform
 
 
 def apply_taper(acc, percent=0.05):
@@ -30,9 +30,9 @@ def apply_taper(acc, percent=0.05):
 
 
 def get_snr_from_waveform(
-    waveform,
+    waveform: Waveform,
     tp: float,
-    common_frequency_vector: np.asarray = np.logspace(np.log(0.05), np.log(50), num=100, base=10.0),
+    common_frequency_vector: np.asarray = None,
 ):
     """
     Calculates the SNR of a waveform given a tp and common frequency vector
@@ -46,7 +46,7 @@ def get_snr_from_waveform(
         The index of the p-arrival
     common_frequency_vector : np.asarray, optional
         The frequency vector to use for the SNR calculation,
-        by default np.logspace(0.05, 50, num=100, base=10.0)
+        by default takes the frequencies from FAS
     """
     # Get the waveform values for comp 090 and times
     acc = waveform.values
@@ -62,6 +62,7 @@ def get_snr_from_waveform(
         print(
             f"Waveform {waveform.station_name} has noise duration of {noise_duration}s"
         )
+        return None, None, None, None, None, None
 
     # Add the tapering to the signal and noise
     taper_signal_acc = apply_taper(signal_acc)
@@ -83,19 +84,24 @@ def get_snr_from_waveform(
     fa_smooth_signal = np.dot(np.abs(fas_signal.T), konno_signal).T
     fa_smooth_noise = np.dot(np.abs(fas_noise.T), konno_noise).T
 
-    # Interpolate at common frequencies
-    inter_signal_f = interp1d(
-        frequency_signal, fa_smooth_signal, axis=0, fill_value="extrapolate"
-    )
-    inter_noise_f = interp1d(
-        frequency_noise, fa_smooth_noise, axis=0, fill_value="extrapolate"
-    )
-    inter_signal = inter_signal_f(common_frequency_vector)
-    inter_noise = inter_noise_f(common_frequency_vector)
+    if common_frequency_vector is not None:
+        # Interpolate at common frequencies
+        inter_signal_f = interp1d(
+            frequency_signal, fa_smooth_signal, axis=0, fill_value="extrapolate"
+        )
+        inter_noise_f = interp1d(
+            frequency_noise, fa_smooth_noise, axis=0, fill_value="extrapolate"
+        )
+        inter_signal = inter_signal_f(common_frequency_vector)
+        inter_noise = inter_noise_f(common_frequency_vector)
+    else:
+        inter_signal = fa_smooth_signal
+        inter_noise = fa_smooth_noise
 
     # Calculate the SNR
     snr = (inter_signal / np.sqrt(signal_duration)) / (
         inter_noise / np.sqrt(noise_duration)
     )
+    frequencies = frequency_signal if common_frequency_vector is None else common_frequency_vector
 
-    return snr, signal_duration, noise_duration
+    return snr, frequencies, fas_signal, fas_noise, signal_duration, noise_duration
