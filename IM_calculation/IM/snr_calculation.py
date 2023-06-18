@@ -5,7 +5,7 @@ import IM_calculation.IM.computeFAS as computeFAS
 from IM_calculation.IM.read_waveform import Waveform
 
 
-def apply_taper(acc, percent=0.05):
+def apply_taper(acc: np.ndarray, percent: float = 0.05):
     """
     Applies a hanning taper to the start and end of the acceleration
 
@@ -102,6 +102,8 @@ def get_snr_from_waveform(
     snr = (inter_signal / np.sqrt(signal_duration)) / (
         inter_noise / np.sqrt(noise_duration)
     )
-    frequencies = frequency_signal if common_frequency_vector is None else common_frequency_vector
+    frequencies = (
+        frequency_signal if common_frequency_vector is None else common_frequency_vector
+    )
 
     return snr, frequencies, fas_signal, fas_noise, signal_duration, noise_duration

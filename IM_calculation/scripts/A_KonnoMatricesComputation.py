@@ -1,6 +1,5 @@
 import argparse
 from pathlib import Path
-from typing import Union
 
 import numpy as np
 from obspy.signal.konnoohmachismoothing import calculate_smoothing_matrix
@@ -19,7 +18,7 @@ def createKonnoMatrix_single(ft_len: int, bandwidth: int = 20):
 
 
 def createKonnoMatrices(
-    install_directory: Union[str, Path], num_to_gen: int = 7, bandwidth: int = 20
+    install_directory: Path, num_to_gen: int = 7, bandwidth: int = 20
 ):
     """
     Creates several Konno Ohmachi matrices
@@ -27,7 +26,7 @@ def createKonnoMatrices(
     :param num_to_gen: Number of matrices to generate
     :param bandwidth: Bandwidth of Konno Ohmachi smoothing
     """
-    Path(install_directory).mkdir(exist_ok=True)
+    install_directory.mkdir(exist_ok=True)
     for i in range(num_to_gen):
         # n = [512, 1024, 2048, 4096, 8192, 16384, 32768]
         n = 512 * 2 ** i
