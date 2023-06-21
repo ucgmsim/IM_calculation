@@ -3,6 +3,7 @@ Install using pip, e.g. pip install ./IM_Calculation
 use --no-deps to prevent re-installation of dependencies
 use -I to force re-install
 """
+from pathlib import Path
 from setuptools import find_packages
 from distutils.core import setup
 from distutils.command.build_py import build_py
@@ -12,6 +13,7 @@ import numpy
 
 from Cython.Distutils import build_ext
 
+
 class build_konno_matricies(build_py):
     """Post-installation for development mode."""
 
@@ -20,8 +22,9 @@ class build_konno_matricies(build_py):
             createKonnoMatrices,
         )
 
-        createKonnoMatrices(self.build_lib)
+        createKonnoMatrices(Path(__file__).parent / "IM_calculation" / "IM" / "KO_matrices")
         build_py.run(self)
+
 
 setup(
     name="IM-calc",

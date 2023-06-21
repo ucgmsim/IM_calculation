@@ -2,7 +2,9 @@
 Generates the konno matrices in the IM directory
 """
 
-import os
+from pathlib import Path
 from IM_calculation.scripts.A_KonnoMatricesComputation import createKonnoMatrices
 
-createKonnoMatrices(os.getcwd(), num_to_gen=5)
+createKonnoMatrices(
+    Path(__file__).parent / "IM_calculation" / "IM" / "KO_matrices", num_to_gen=5
+)
