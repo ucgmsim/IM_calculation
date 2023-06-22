@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import numpy as np
 from scipy.interpolate import interp1d
 
@@ -32,6 +34,7 @@ def apply_taper(acc: np.ndarray, percent: float = 0.05):
 def get_snr_from_waveform(
     waveform: Waveform,
     tp: float,
+    ko_matrix_path: Path = None,
     common_frequency_vector: np.asarray = None,
 ):
     """
@@ -44,6 +47,8 @@ def get_snr_from_waveform(
         must have values and times attributes as well as DT defined
     tp : float
         The index of the p-arrival
+    ko_matrix_path : Path, optional
+        The path to the Ko matrices, by default None
     common_frequency_vector : np.asarray, optional
         The frequency vector to use for the SNR calculation,
         by default takes the frequencies from FAS
@@ -77,8 +82,8 @@ def get_snr_from_waveform(
     )
 
     # Get appropriate konno ohmachi matrix
-    konno_signal = computeFAS.get_konno_matrix(len(fas_signal))
-    konno_noise = computeFAS.get_konno_matrix(len(fas_noise))
+    konno_signal = computeFAS.get_konno_matrix(len(fas_signal), directory=ko_matrix_path)
+    konno_noise = computeFAS.get_konno_matrix(len(fas_noise), directory=ko_matrix_path)
 
     # Apply konno ohmachi smoothing
     fa_smooth_signal = np.dot(np.abs(fas_signal.T), konno_signal).T
