@@ -16,12 +16,16 @@ matrices = {}
 matrix_lock = Lock()
 
 
-def get_konno_matrix(size):
+def get_konno_matrix(size: int, directory: str = None):
+    if directory is None:
+        directory = os.path.join(
+                    os.path.dirname(__file__), "KO_matrices"
+                )
     with matrix_lock:
         if size not in matrices.keys():
             matrices[size] = np.load(
                 os.path.join(
-                    os.path.dirname(__file__), "KO_matrices", f"KO_{size - 1}.npy"
+                    directory, f"KO_{size - 1}.npy"
                 ),
                 mmap_mode="r",
             )
