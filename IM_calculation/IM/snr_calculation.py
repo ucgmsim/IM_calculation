@@ -81,13 +81,17 @@ def get_snr_from_waveform(
         taper_noise_acc, waveform.DT, len(taper_signal_acc)
     )
 
+    # Take the absolute value of the FAS
+    fas_signal = np.abs(fas_signal)
+    fas_noise = np.abs(fas_noise)
+
     # Get appropriate konno ohmachi matrix
     konno_signal = computeFAS.get_konno_matrix(len(fas_signal), directory=ko_matrix_path)
     konno_noise = computeFAS.get_konno_matrix(len(fas_noise), directory=ko_matrix_path)
 
     # Apply konno ohmachi smoothing
-    fa_smooth_signal = np.dot(np.abs(fas_signal.T), konno_signal).T
-    fa_smooth_noise = np.dot(np.abs(fas_noise.T), konno_noise).T
+    fa_smooth_signal = np.dot(fas_signal.T, konno_signal).T
+    fa_smooth_noise = np.dot(fas_noise.T, konno_noise).T
 
     if common_frequency_vector is not None:
         # Interpolate SNR at common frequencies
