@@ -86,7 +86,9 @@ def get_snr_from_waveform(
     fas_noise = np.abs(fas_noise)
 
     # Get appropriate konno ohmachi matrix
-    konno_signal = computeFAS.get_konno_matrix(len(fas_signal), directory=ko_matrix_path)
+    konno_signal = computeFAS.get_konno_matrix(
+        len(fas_signal), directory=ko_matrix_path
+    )
     konno_noise = computeFAS.get_konno_matrix(len(fas_noise), directory=ko_matrix_path)
 
     # Apply konno ohmachi smoothing
@@ -94,25 +96,15 @@ def get_snr_from_waveform(
     fa_smooth_noise = np.dot(fas_noise.T, konno_noise).T
 
     if common_frequency_vector is not None:
-        # Interpolate SNR at common frequencies
+        # Interpolate FAS at common frequencies
         inter_signal_f = interp1d(
-            frequency_signal, fa_smooth_signal, axis=0, fill_value="extrapolate"
+            frequency_signal, fa_smooth_signal, axis=0, bounds_error=False
         )
         inter_noise_f = interp1d(
-            frequency_noise, fa_smooth_noise, axis=0, fill_value="extrapolate"
+            frequency_noise, fa_smooth_noise, axis=0, bounds_error=False
         )
         inter_signal = inter_signal_f(common_frequency_vector)
         inter_noise = inter_noise_f(common_frequency_vector)
-
-        # Interpolate FAS at common frequencies
-        inter_fas_signal_f = interp1d(
-            frequency_signal, fas_signal, axis=0, fill_value="extrapolate"
-        )
-        inter_fas_noise_f = interp1d(
-            frequency_noise, fas_noise, axis=0, fill_value="extrapolate"
-        )
-        fas_signal = inter_fas_signal_f(common_frequency_vector)
-        fas_noise = inter_fas_noise_f(common_frequency_vector)
     else:
         inter_signal = fa_smooth_signal
         inter_noise = fa_smooth_noise
@@ -125,4 +117,4 @@ def get_snr_from_waveform(
         frequency_signal if common_frequency_vector is None else common_frequency_vector
     )
 
-    return snr, frequencies, fas_signal, fas_noise, signal_duration, noise_duration
+    return snr, frequencies, inter_signal, inter_noise, signal_duration, noise_duration
