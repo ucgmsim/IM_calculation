@@ -521,7 +521,7 @@ def compute_measures_mpi(
             input_path, file_type, station_names, real_only=real_only
         )
     bbseries = comm.bcast(bbseries, root=server)
-    station_names = comm.bcast(station_names, root=server)
+    station_names = comm.bcast(station_names, root=server) #perhaps not needed for workers
 
 
     # Check which stations to run against non-zero station files already
@@ -540,27 +540,27 @@ def compute_measures_mpi(
         while nworkers >= 0:
             worker_id = comm.recv(source=MPI.ANY_SOURCE, status=status)
             assert worker_id == status.Get_source()
-            logger.info(f"SERVER: rank {worker_id} wants a job")
+            logger.info(f"SERVER: rank_{worker_id} wants a job")
             # next job
             if len(stations_to_run) > 0:
                 station = stations_to_run.pop(-1)
-                logger.info(f"SERVER: Sending station {station} to {worker_id}")
+                logger.info(f"SERVER: Sending station {station} to rank_{worker_id}")
                 comm.send(obj=station, dest=worker_id)
             else:
-                comm.send(obj=StopIteration, dest=worker_id)
-                logger.info(f"SERVER: No job to give. Tell {worker_id} to stop")
+                logger.info(f"SERVER: No job to give. Tell rank_{worker_id} to stop")
+                comm.send(obj=None, dest=worker_id) #
                 nworkers -= 1
         logger.info("SERVER: All stations complete")
     else:
         while True:
-            logger.info(f"WORKER {rank}: requesting a job")
-            comm.send(rank, dest=server)
+            logger.info(f"WORKER rank_{rank}: requesting a job")
+            comm.send(obj=rank, dest=server)
             station = comm.recv(source=server)
-            if station == StopIteration:
-                logger.info(f"WORKER {rank}: was ordered to stop")
+            if station is None:
+                logger.info(f"WORKER rank_{rank}: was ordered to stop")
                 break
             else:
-                logger.info(f"WORKER {rank}: Station to compute: {station}")
+                logger.info(f"WORKER rank_{rank}: Station to compute: {station}")
                 waveform = read_waveform.read_waveforms(
                     input_path,
                     bbseries,
@@ -584,8 +584,8 @@ def compute_measures_mpi(
                         logger,
                     )
                     write_result(result_dict, station_path, station, simple_output)
-                logger.info(f"WORKER {rank}: done {station}")
-        logger.info(f"WORKER {rank}: no more job")
+                logger.info(f"WORKER rank_{rank}: done {station}")
+        logger.info(f"WORKER rank_{rank}: no more job")
 
     if is_server:
         if running_adv_im:
