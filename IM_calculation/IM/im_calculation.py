@@ -535,44 +535,56 @@ def compute_measures_mpi(
     status = MPI.Status()
     if is_server:
         nworkers = size - 1
-        while nworkers:
-            comm.recv(source=MPI.ANY_SOURCE, status=status)
-            worker_id = status.Get_source()
+        while nworkers >= 0:
+            worker_id = comm.recv(source=MPI.ANY_SOURCE, status=status)
+            assert worker_id == status.Get_source()
+            logger.info(f"SERVER: rank {worker_id} wants a job")
             # next job
             if len(stations_to_run) > 0:
                 station = stations_to_run.pop(-1)
-                logger.info(f"Sending station {station} to {worker_id}")
+                logger.info(f"SERVER: Sending station {station} to {worker_id}")
                 comm.send(obj=station, dest=worker_id)
             else:
                 comm.send(obj=StopIteration, dest=worker_id)
+                logger.info(f"SERVER: No job to give. Tell {worker_id} to stop")
                 nworkers -= 1
-        logger.info("All stations complete")
+        logger.info("SERVER: All stations complete")
     else:
-        for station in iter(lambda: comm.sendrecv(None, dest=server), StopIteration):
-            logger.info(f"Station to compute: {station}")
-            waveform = read_waveform.read_waveforms(
-                input_path,
-                bbseries,
-                [station],
-                components_to_calculate,
-                wave_type=wave_type,
-                file_type=file_type,
-                units=units,
-            )[0]
-            # only run basic im if and only if adv_im not going to run
-            if running_adv_im:
-                compute_adv_measure(waveform, advanced_im_config, output)
+        while True:
+            logger.info(f"WORKER {rank}: requesting a job")
+            comm.send(rank, dest=server)
+            station = comm.recv(source=server)
+            if station == StopIteration:
+                logger.info(f"WORKER {rank}: was ordered to stop")
+                break
             else:
-                result_dict = compute_measure_single(
-                    waveform,
-                    sorted(ims),
-                    sorted(components_to_store, key=lambda x: x.value),
-                    im_options,
-                    sorted(components_to_calculate, key=lambda x: x.value),
-                    (stations_to_run.index(station), len(stations_to_run)),
-                    logger,
-                )
-                write_result(result_dict, station_path, station, simple_output)
+                logger.info(f"WORKER {rank}: Station to compute: {station}")
+                waveform = read_waveform.read_waveforms(
+                    input_path,
+                    bbseries,
+                    [station],
+                    components_to_calculate,
+                    wave_type=wave_type,
+                    file_type=file_type,
+                    units=units,
+                )[0]
+                # only run basic im if and only if adv_im not going to run
+                if running_adv_im:
+                    compute_adv_measure(waveform, advanced_im_config, output)
+                else:
+                    result_dict = compute_measure_single(
+                        waveform,
+                        sorted(ims),
+                        sorted(components_to_store, key=lambda x: x.value),
+                        im_options,
+                        sorted(components_to_calculate, key=lambda x: x.value),
+                        (stations_to_run.index(station), len(stations_to_run)),
+                        logger,
+                    )
+                    write_result(result_dict, station_path, station, simple_output)
+                logger.info(f"WORKER {rank}: done {station}")
+        logger.info(f"WORKER {rank}: no more job")
+
     if is_server:
         if running_adv_im:
             # read, agg and store csv
@@ -584,7 +596,12 @@ def compute_measures_mpi(
             )
             shutil.rmtree(station_path)
         generate_metadata(output, identifier, rupture, run_type, version)
+    if is_server:
+        logger.info(f"SERVER: waiting at the barrier")
+    else:
+        logger.info(f"WORKER {rank}: waiting at the barrier")
     comm.Barrier()
+    logger.info(f"RANK {rank}: terminating")
 
 
 def compute_measures_multiprocess(
