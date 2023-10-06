@@ -523,6 +523,7 @@ def compute_measures_mpi(
     bbseries = comm.bcast(bbseries, root=server)
     station_names = comm.bcast(station_names, root=server)
 
+
     # Check which stations to run against non-zero station files already
     # in the station output directory
     station_path = Path(output) / "stations"
@@ -534,6 +535,7 @@ def compute_measures_mpi(
 
     status = MPI.Status()
     if is_server:
+        logger.info(f"SERVER: Total stations {len(station_names)} Stations previously computed {len(found_stations)} Stations to compute {len(stations_to_run)}")
         nworkers = size - 1
         while nworkers >= 0:
             worker_id = comm.recv(source=MPI.ANY_SOURCE, status=status)
