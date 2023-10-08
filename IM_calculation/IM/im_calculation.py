@@ -452,6 +452,12 @@ def get_bbseis(input_path, file_type, selected_stations, real_only=False):
     assert len(station_names) > 0, "No station is found"
     return bbseries, station_names
 
+def enum(*sequential, **named):
+    """Handy way to fake an enumerated type in Python
+    http://stackoverflow.com/questions/36932/how-can-i-represent-an-enum-in-python
+    """
+    enums = dict(zip(sequential, range(len(sequential))), **named)
+    return type('Enum', (), enums)
 
 def compute_measures_mpi(
     input_path,
@@ -532,36 +538,44 @@ def compute_measures_mpi(
         file.stem for file in station_path.iterdir() if file.stat().st_size > 0
     }
     stations_to_run = list(stations_set.difference(found_stations))
+    # Define MPI message tags
+    tags = enum('READY', 'DONE', 'EXIT', 'START')
 
     status = MPI.Status()
     if is_server:
         logger.info(f"SERVER: Total stations {len(station_names)} Stations previously computed {len(found_stations)} Stations to compute {len(stations_to_run)}")
         nworkers = size - 1
-        while nworkers >= 0:
+        closed_workers = 0
+        while nworkers > closed_workers:
             logger.info(f"SERVER: listening")
-            worker_id = comm.recv(source=MPI.ANY_SOURCE, status=status, tag=1)
-            #assert worker_id == status.Get_source()
+            data = comm.recv(source=MPI.ANY_SOURCE, tag=MPI.ANY_TAG, status=status)
+            worker_id = status.Get_source()
+            tag = status.Get_tag()
             logger.info(f"SERVER: rank_{worker_id} wants a job")
-            # next job
-            if len(stations_to_run) > 0:
-                station = stations_to_run.pop(-1)
-                logger.info(f"SERVER: Sending station {station} to rank_{worker_id}")
-                comm.send(obj=station, dest=worker_id, tag=2)
-            else:
-                logger.info(f"SERVER: No job to give. Tell rank_{worker_id} to stop")
-                comm.send(obj=None, dest=worker_id, tag=2) #
-                nworkers -= 1
+            if tag == tags.READY:
+                # next job
+                if len(stations_to_run) > 0:
+                    station = stations_to_run.pop(-1)
+                    logger.info(f"SERVER: Sending station {station} to rank_{worker_id}")
+                    comm.send(station, dest=worker_id, tag=tags.START)
+                else:
+                    logger.info(f"SERVER: No job to give. Tell rank_{worker_id} to stop")
+                    comm.send(None, dest=worker_id, tag=tags.EXIT) #
+                    # nworkers -= 1
+            elif tag == tags.DONE:
+                pass
+            elif tag == tags.EXIT:
+                closed_workers += 1
+
         logger.info("SERVER: All stations complete")
     else:
         while True:
             logger.info(f"WORKER rank_{rank}: requesting a job")
-            comm.send(obj=rank, dest=server, tag=1)
-            logger.info(f"WORKER rank_{rank}: listening to the server")
-            station = comm.recv(source=server, tag=2)
-            if station is None:
-                logger.info(f"WORKER rank_{rank}: was ordered to stop")
-                break
-            else:
+            comm.send(None, dest=server, tag=tags.READY)
+            #logger.info(f"WORKER rank_{rank}: listening to the server")
+            station = comm.recv(source=server, tag=MPI.ANY_TAG, status=status)
+            tag = status.Get_tag()
+            if tag == tags.START:
                 logger.info(f"WORKER rank_{rank}: Station to compute: {station}")
                 waveform = read_waveform.read_waveforms(
                     input_path,
@@ -587,7 +601,13 @@ def compute_measures_mpi(
                     )
                     write_result(result_dict, station_path, station, simple_output)
                 logger.info(f"WORKER rank_{rank}: done {station}")
+                comm.send(None, dest=server, tags=tags.DONE)
+            elif tag == tags.EXIT:
+                logger.info(f"WORKER rank_{rank}: was ordered to stop")
+                break
+
         logger.info(f"WORKER rank_{rank}: no more job")
+        comm.send(None, dest=server, tag=tags.EXIT)
 
     if is_server:
         if running_adv_im:
