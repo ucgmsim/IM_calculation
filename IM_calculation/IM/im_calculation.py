@@ -551,9 +551,9 @@ def compute_measures_mpi(
             data = comm.recv(source=MPI.ANY_SOURCE, tag=MPI.ANY_TAG, status=status)
             worker_id = status.Get_source()
             tag = status.Get_tag()
-            logger.info(f"SERVER: rank_{worker_id} wants a job")
             if tag == tags.READY:
                 # next job
+                logger.info(f"SERVER: rank_{worker_id} wants a job")
                 if len(stations_to_run) > 0:
                     station = stations_to_run.pop(-1)
                     logger.info(f"SERVER: Sending station {station} to rank_{worker_id}")
@@ -563,9 +563,10 @@ def compute_measures_mpi(
                     comm.send(None, dest=worker_id, tag=tags.EXIT) #
                     # nworkers -= 1
             elif tag == tags.DONE:
-                pass
+                logger.info(f"SERVER: rank_{worker_id} says it's done a job")
             elif tag == tags.EXIT:
                 closed_workers += 1
+                logger.info(f"SERVER: rank_{worker_id} says it's Exiting")
 
         logger.info("SERVER: All stations complete")
     else:
