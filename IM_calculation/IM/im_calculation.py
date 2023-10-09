@@ -509,7 +509,7 @@ def compute_measures_mpi(
     rank = comm.Get_rank()
     size = comm.Get_size()
     server = 0
-    is_server = not rank
+    is_server = (rank == 0)
 
     #  for running adv_im
     running_adv_im = (advanced_im_config is not None) and (
