@@ -549,24 +549,29 @@ def compute_measures_mpi(
         while nworkers > closed_workers:
             logger.info(f"SERVER: listening")
             data = comm.recv(source=MPI.ANY_SOURCE, tag=MPI.ANY_TAG, status=status)
+
             worker_id = status.Get_source()
             tag = status.Get_tag()
+            logger.info(f"SERVER: listening done rank_{worker_id} {tag}")
+
             if tag == tags.READY:
                 # next job
-                logger.info(f"SERVER: rank_{worker_id} wants a job")
+                logger.info(f"SERVER: rank_{worker_id} is READY")
                 if len(stations_to_run) > 0:
                     station = stations_to_run.pop(0)
-                    logger.info(f"SERVER: Sending station {station} to rank_{worker_id}")
+                    logger.info(f"SERVER: Sending rank_{worker_id} START {station}")
                     comm.send(station, dest=worker_id, tag=tags.START)
+                    logger.info(f"SERVER: Sent to rank_{worker_id} START")
                 else:
-                    logger.info(f"SERVER: No job to give. Tell rank_{worker_id} to stop")
+                    logger.info(f"SERVER: Sending rank_{worker_id} EXIT")
                     comm.send(None, dest=worker_id, tag=tags.EXIT) #
+                    logger.info(f"SERVER: Sent to rank_{worker_id} EXIT")
                     # nworkers -= 1
             elif tag == tags.DONE:
-                logger.info(f"SERVER: rank_{worker_id} says it's done a job ({data} stats)")
+                logger.info(f"SERVER: rank_{worker_id} says it's DONE ({data} stats)")
             elif tag == tags.EXIT:
                 closed_workers += 1
-                logger.info(f"SERVER: rank_{worker_id} says it's Exiting ({data} stats)")
+                logger.info(f"SERVER: rank_{worker_id} says it's EXITing ({data} stats)")
 
         logger.info("SERVER: All stations complete")
     else:
@@ -599,7 +604,7 @@ def compute_measures_mpi(
                         sorted(components_to_store, key=lambda x: x.value),
                         im_options,
                         sorted(components_to_calculate, key=lambda x: x.value),
-                        (stations_to_run.index(station), len(stations_to_run)),
+                        None, #(stations_to_run.index(station), len(stations_to_run)), #temporarily suppressing logging
                         logger,
                     )
                     write_result(result_dict, station_path, station, simple_output)
@@ -626,7 +631,8 @@ def compute_measures_mpi(
     if is_server:
         logger.info(f"SERVER: waiting at the barrier")
     else:
-        logger.info(f"WORKER {rank}: waiting at the barrier")
+        # logger.info(f"WORKER {rank}: waiting at the barrier")
+        pass
     comm.Barrier()
     logger.info(f"RANK {rank}: terminating")
 
