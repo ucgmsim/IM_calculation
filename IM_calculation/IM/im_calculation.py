@@ -611,7 +611,7 @@ def compute_measures_mpi(
                     )
                     write_result(result_dict, station_path, station, simple_output)
             #    logger.info(f"WORKER rank_{rank}: done {station} total {num_stats_done} stats")
-                comm.send(num_stats_done, dest=server, tags=tags.DONE)
+                comm.send(num_stats_done, dest=server, tag=tags.DONE)
             elif tag == tags.EXIT:
             #    logger.info(f"WORKER rank_{rank}: was ordered to stop")
                 break
