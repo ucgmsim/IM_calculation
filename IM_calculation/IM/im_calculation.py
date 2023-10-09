@@ -544,6 +544,7 @@ def compute_measures_mpi(
     status = MPI.Status()
     if is_server:
         logger.info(f"SERVER: Total stations {len(station_names)} Stations previously computed {len(found_stations)} Stations to compute {len(stations_to_run)}")
+        logger.info("f:SERVER: num procs {size}")
         nworkers = size - 1
         closed_workers = 0
         while nworkers > closed_workers:
