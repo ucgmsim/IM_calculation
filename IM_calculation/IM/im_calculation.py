@@ -548,35 +548,36 @@ def compute_measures_mpi(
         nworkers = size - 1
         closed_workers = 0
         while nworkers > closed_workers:
-            logger.info(f"SERVER: listening")
+            logger.info(f"SERVER: start listening")
             data = comm.recv(source=MPI.ANY_SOURCE, tag=MPI.ANY_TAG, status=status)
 
             worker_id = status.Get_source()
             tag = status.Get_tag()
-            logger.info(f"SERVER: listening done rank_{worker_id} {tag}")
+            logger.info(f"SERVER: end listening rank_{worker_id} {tag}")
 
             if tag == tags.READY:
                 # next job
                 logger.info(f"SERVER: rank_{worker_id} is READY")
                 if len(stations_to_run) > 0:
                     station = stations_to_run.pop(0)
-                    logger.info(f"SERVER: Sending rank_{worker_id} START {station}")
+                    logger.info(f"SERVER: start Sending rank_{worker_id} START {station}")
                     comm.send(station, dest=worker_id, tag=tags.START)
-                    logger.info(f"SERVER: Sent to rank_{worker_id} START")
+                    logger.info(f"SERVER: end Sending rank_{worker_id} START")
                 else:
-                    logger.info(f"SERVER: Sending rank_{worker_id} EXIT")
+                    logger.info(f"SERVER: start Sending rank_{worker_id} EXIT")
                     comm.send(None, dest=worker_id, tag=tags.EXIT) #
-                    logger.info(f"SERVER: Sent to rank_{worker_id} EXIT")
+                    logger.info(f"SERVER: end Sending rank_{worker_id} EXIT")
                     # nworkers -= 1
             elif tag == tags.DONE:
-                logger.info(f"SERVER: rank_{worker_id} says it's DONE ({data} stats)")
+                logger.info(f"SERVER: rank_{worker_id} saying DONE ({data} stats)")
             elif tag == tags.EXIT:
                 closed_workers += 1
-                logger.info(f"SERVER: rank_{worker_id} says it's EXITing ({data} stats)")
+                logger.info(f"SERVER: rank_{worker_id} saying EXITing ({data} stats)")
 
         logger.info("SERVER: All stations complete")
     else:
         num_stats_done = 0
+        print(f"rank {rank}")
         while True:
             #logger.info(f"WORKER rank_{rank}: requesting a job")
             comm.send(None, dest=server, tag=tags.READY)
