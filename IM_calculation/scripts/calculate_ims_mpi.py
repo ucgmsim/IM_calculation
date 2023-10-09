@@ -194,7 +194,7 @@ def main():
     comm = MPI.COMM_WORLD
     rank = comm.Get_rank()
     server = 0
-    is_server = not rank
+    is_server = (rank == server)
 
     logger = logging.getLogger("IM_calc_rank_%i" % comm.rank)
     logger.setLevel(logging.DEBUG)
@@ -249,8 +249,9 @@ def main():
     mh.setFormatter(formatter)
     logger.addHandler(mh)
     if is_server:
-        logger.info("IM_Calc started")
+        logger.info(f"SERVER: IM_Calc started")
 
+    logger.info(f"WORKER rank_{rank}: Initializing")
     # MPI
     calc.compute_measures_mpi(
         args.input_path,
