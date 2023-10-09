@@ -555,7 +555,7 @@ def compute_measures_mpi(
                 # next job
                 logger.info(f"SERVER: rank_{worker_id} wants a job")
                 if len(stations_to_run) > 0:
-                    station = stations_to_run.pop(-1)
+                    station = stations_to_run.pop(0)
                     logger.info(f"SERVER: Sending station {station} to rank_{worker_id}")
                     comm.send(station, dest=worker_id, tag=tags.START)
                 else:
@@ -563,21 +563,23 @@ def compute_measures_mpi(
                     comm.send(None, dest=worker_id, tag=tags.EXIT) #
                     # nworkers -= 1
             elif tag == tags.DONE:
-                logger.info(f"SERVER: rank_{worker_id} says it's done a job")
+                logger.info(f"SERVER: rank_{worker_id} says it's done a job ({data} stats)")
             elif tag == tags.EXIT:
                 closed_workers += 1
-                logger.info(f"SERVER: rank_{worker_id} says it's Exiting")
+                logger.info(f"SERVER: rank_{worker_id} says it's Exiting ({data} stats)")
 
         logger.info("SERVER: All stations complete")
     else:
+        num_stats_done = 0
         while True:
-            logger.info(f"WORKER rank_{rank}: requesting a job")
+            #logger.info(f"WORKER rank_{rank}: requesting a job")
             comm.send(None, dest=server, tag=tags.READY)
             #logger.info(f"WORKER rank_{rank}: listening to the server")
             station = comm.recv(source=server, tag=MPI.ANY_TAG, status=status)
             tag = status.Get_tag()
             if tag == tags.START:
-                logger.info(f"WORKER rank_{rank}: Station to compute: {station}")
+            #    logger.info(f"WORKER rank_{rank}: Station to compute: {station}")
+                num_stats_done += 1
                 waveform = read_waveform.read_waveforms(
                     input_path,
                     bbseries,
@@ -601,14 +603,14 @@ def compute_measures_mpi(
                         logger,
                     )
                     write_result(result_dict, station_path, station, simple_output)
-                logger.info(f"WORKER rank_{rank}: done {station}")
-                comm.send(None, dest=server, tags=tags.DONE)
+            #    logger.info(f"WORKER rank_{rank}: done {station} total {num_stats_done} stats")
+                comm.send(num_stats_done, dest=server, tags=tags.DONE)
             elif tag == tags.EXIT:
-                logger.info(f"WORKER rank_{rank}: was ordered to stop")
+            #    logger.info(f"WORKER rank_{rank}: was ordered to stop")
                 break
 
-        logger.info(f"WORKER rank_{rank}: no more job")
-        comm.send(None, dest=server, tag=tags.EXIT)
+        #logger.info(f"WORKER rank_{rank}: no more job")
+        comm.send(num_stats_done, dest=server, tag=tags.EXIT)
 
     if is_server:
         if running_adv_im:
