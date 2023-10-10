@@ -550,13 +550,13 @@ def compute_measures_mpi(
     if is_server:
         logger.info(f"SERVER: Total stations {len(station_names)} Stations previously computed {len(found_stations)} Stations to compute {len(stations_to_run)}")
         logger.info(f"SERVER: num procs {size}")
-        first_stats = stations_to_run[:size]
+        first_stat = stations_to_run[:size]
     #    stations_to_run = stations_to_run[size:] + first_stats[0]
     else:
-        first_stats = None
+        first_stat = None
 
-    stat = comm.scatter(first_stats, root = 0)
-    logfile.write(f"rank {rank} received {stat}")
+    first_stat = comm.scatter(first_stat, root = 0)
+    logfile.write(f"rank {rank} received {first_stat}")
 
     logfile.close()
     #
