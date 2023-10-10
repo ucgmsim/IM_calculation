@@ -543,27 +543,36 @@ def compute_measures_mpi(
     }
     stations_to_run = list(stations_set.difference(found_stations))
     # Define MPI message tags
-    tags = enum('DONE', 'EXIT', 'START')
+    tags = enum('HANDSHAKE', 'DONE', 'EXIT', 'START')
 
     status = MPI.Status()
 
     stdout_log = output.parent / f"{identifier}_im_calc_{rank}.log"
 
 
-
+    # initial communication
     if is_server:
         logger.info(f"SERVER: Total stations {len(station_names)} Stations previously computed {len(found_stations)} Stations to compute {len(stations_to_run)}")
         logger.info(f"SERVER: num procs {size}")
-        station = stations_to_run[:size]
+        for i in range(size-1):
+            worker_id = i+1
+            try:
+                station = stations_to_run[i]
+            except IndexError:
+                station = None
+
+            comm.send(station,dest=worker_id, tag=tags.HANDSHAKE)
+            rank = comm.recv(source=worker_id, tag=tags.HANDSHAKE)
+            logger.info(f"SERVER: rank_{rank} has its first statioin {station}")
+        stations_to_run = stations_to_run[size-1:]
 
     else:
-        station = None
+        station = comm.recv(source=server, tags=tags.HANDSHAKE)
+        comm.send(rank, dest=server, tags=tags.HANDSHAKE)
+        mylog(stdout_log, f"rank {rank} received {station}")
 
-    station = comm.scatter(station, root = 0)
-    mylog(stdout_log, f"rank {rank} received {station}")
 
     if is_server:
-        stations_to_run = [station] + stations_to_run[size:]  # server returns its allocated station to the list
         nworkers = size - 1
         closed_workers = 0
         while nworkers > closed_workers:
