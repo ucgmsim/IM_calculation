@@ -577,7 +577,9 @@ def compute_measures_mpi(
         logger.info("SERVER: All stations complete")
     else:
         num_stats_done = 0
-        print(f"rank {rank}")
+        stdout_log = output.parent / f"{identifier}_im_calc_{rank}.log"
+        with open(stdout_log, "a") as f:
+            f.write(f"WORKER rank_{rank}: Entering loop\n")
         while True:
             #logger.info(f"WORKER rank_{rank}: requesting a job")
             comm.send(None, dest=server, tag=tags.READY)
