@@ -568,9 +568,9 @@ def compute_measures_mpi(
 
     else:
         mylog(stdout_log, f"rank {rank} waiting for a comm")
-        station = comm.recv(source=server, tags=tags.HANDSHAKE)
+        station = comm.recv(source=server, tag=tags.HANDSHAKE)
         mylog(stdout_log, f"rank {rank} received {station}")
-        comm.send(rank, dest=server, tags=tags.HANDSHAKE)
+        comm.send(rank, dest=server, tag=tags.HANDSHAKE)
         mylog(stdout_log, f"rank {rank} sent ACK")
 
 
