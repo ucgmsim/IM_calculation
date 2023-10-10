@@ -551,13 +551,19 @@ def compute_measures_mpi(
             logger.info(f"SERVER: start listening")
             data = comm.recv(source=MPI.ANY_SOURCE, tag=MPI.ANY_TAG, status=status)
 
-            worker_id = status.Get_source()
+
             tag = status.Get_tag()
+            worker_id = status.Get_source()
             logger.info(f"SERVER: end listening rank_{worker_id} {tag}")
 
             if tag == tags.READY:
                 # next job
-                logger.info(f"SERVER: rank_{worker_id} is READY")
+                worker_id2 = data
+                if worker_id == worker_id2:
+                    logger.info(f"SERVER: rank_{worker_id} is READY")
+                else:
+                    logger.info(f"SERVER: rank_{worker_id} is READY but it should be from {worker_id2}")
+                    worker_id = worker_id2
                 if len(stations_to_run) > 0:
                     station = stations_to_run.pop(0)
                     logger.info(f"SERVER: start Sending rank_{worker_id} START {station}")
@@ -569,10 +575,21 @@ def compute_measures_mpi(
                     logger.info(f"SERVER: end Sending rank_{worker_id} EXIT")
                     # nworkers -= 1
             elif tag == tags.DONE:
-                logger.info(f"SERVER: rank_{worker_id} saying DONE ({data} stats)")
+                worker_id2 = data
+                if worker_id == worker_id2:
+                    logger.info(f"SERVER: rank_{worker_id} saying DONE")
+                else:
+                    logger.info(f"SERVER: rank_{worker_id} saying DONE but it should be from {worker_id2}")
+                    worker_id = worker_id2
             elif tag == tags.EXIT:
                 closed_workers += 1
-                logger.info(f"SERVER: rank_{worker_id} saying EXITing ({data} stats)")
+                worker_id2 = data
+                if worker_id == worker_id2:
+                    logger.info(f"SERVER: rank_{worker_id} saying EXITing")
+                else:
+                    logger.info(f"SERVER: rank_{worker_id} saying EXITing but it should be from {worker_id2}")
+                    worker_id = worker_id2
+
 
         logger.info("SERVER: All stations complete")
     else:
@@ -582,12 +599,16 @@ def compute_measures_mpi(
             f.write(f"WORKER rank_{rank}: Entering loop\n")
         while True:
             #logger.info(f"WORKER rank_{rank}: requesting a job")
-            comm.send(None, dest=server, tag=tags.READY)
+            comm.send(rank, dest=server, tag=tags.READY)
+            with open(stdout_log, "a") as f:
+                f.write(f"WORKER rank_{rank}: requested a job\n")
             #logger.info(f"WORKER rank_{rank}: listening to the server")
             station = comm.recv(source=server, tag=MPI.ANY_TAG, status=status)
             tag = status.Get_tag()
             if tag == tags.START:
             #    logger.info(f"WORKER rank_{rank}: Station to compute: {station}")
+                with open(stdout_log, "a") as f:
+                    f.write(f"WORKER rank_{rank}: Station to compute: {station}\n")
                 num_stats_done += 1
                 waveform = read_waveform.read_waveforms(
                     input_path,
@@ -613,13 +634,15 @@ def compute_measures_mpi(
                     )
                     write_result(result_dict, station_path, station, simple_output)
             #    logger.info(f"WORKER rank_{rank}: done {station} total {num_stats_done} stats")
-                comm.send(num_stats_done, dest=server, tag=tags.DONE)
+                with open(stdout_log, "a") as f:
+                    f.write(f"WORKER rank_{rank}: done {station} total {num_stats_done} stats")
+                comm.send(rank, dest=server, tag=tags.DONE)
             elif tag == tags.EXIT:
             #    logger.info(f"WORKER rank_{rank}: was ordered to stop")
                 break
 
         #logger.info(f"WORKER rank_{rank}: no more job")
-        comm.send(num_stats_done, dest=server, tag=tags.EXIT)
+        comm.send(rank, dest=server, tag=tags.EXIT)
 
     if is_server:
         if running_adv_im:
