@@ -560,16 +560,22 @@ def compute_measures_mpi(
                 station = stations_to_run[i]
             except IndexError:
                 station = None
-
+            logger.info(f"SERVER: SENDING rank_{worker_id} its first station {station}")
             comm.send(station,dest=worker_id, tag=tags.HANDSHAKE)
+            logger.info(f"SERVER: SENT rank_{worker_id} its first station {station}")
             rank = comm.recv(source=worker_id, tag=tags.HANDSHAKE)
-            logger.info(f"SERVER: rank_{rank} has its first statioin {station}")
-        stations_to_run = stations_to_run[size-1:]
+            logger.info(f"SERVER: rank_{rank} ACKed the reception")
+        try:
+            stations_to_run = stations_to_run[size-1:]
+        except IndexError:
+            stations_to_run = []
 
     else:
+        mylog(stdout_log, f"rank {rank} waiting for a comm")
         station = comm.recv(source=server, tags=tags.HANDSHAKE)
-        comm.send(rank, dest=server, tags=tags.HANDSHAKE)
         mylog(stdout_log, f"rank {rank} received {station}")
+        comm.send(rank, dest=server, tags=tags.HANDSHAKE)
+        mylog(stdout_log, f"rank {rank} sent ACK")
 
 
     if is_server:
