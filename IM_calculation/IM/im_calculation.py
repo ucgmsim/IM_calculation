@@ -460,7 +460,7 @@ def enum(*sequential, **named):
     return type('Enum', (), enums)
 
 def mylog(logfile, msg, mode="a"):
-    with(logfile) as f:
+    with open(logfile, mode) as f:
         f.write(f"{msg}\n")
 
 def compute_measures_mpi(
