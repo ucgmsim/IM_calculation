@@ -561,16 +561,18 @@ def compute_measures_mpi(
             else:
                 station = None
             logger.info(f"SERVER: SENDING rank_{worker_id} its first station {station}")
-            comm.send(station,dest=worker_id, tag=tags.HANDSHAKE)
+            comm.send(station,dest=worker_id)
             logger.info(f"SERVER: SENT rank_{worker_id} its first station {station}")
-            rank = comm.recv(source=worker_id, tag=tags.HANDSHAKE)
+            #worker_id2 = status.Get_source()
+            rank = comm.recv(source=worker_id, tag=MPI.ANY_TAG, status=status)
             logger.info(f"SERVER: rank_{rank} ACKed the reception")
 
     else:
         mylog(stdout_log, f"rank {rank} waiting for a comm")
-        station = comm.recv(source=server, tag=tags.HANDSHAKE)
+        station = comm.recv(source=server, tag=MPI.ANY_TAG, status=status)
+        #tag = status.Get_tag()
         mylog(stdout_log, f"rank {rank} received {station}")
-        comm.send(rank, dest=server, tag=tags.HANDSHAKE)
+        comm.send(rank, dest=server)
         mylog(stdout_log, f"rank {rank} sent ACK")
 
 
