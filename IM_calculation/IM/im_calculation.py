@@ -554,8 +554,8 @@ def compute_measures_mpi(
     if is_server:
         logger.info(f"SERVER: Total stations {len(station_names)} Stations previously computed {len(found_stations)} Stations to compute {len(stations_to_run)}")
         logger.info(f"SERVER: num procs {size}")
-        for i in range(size-1,0,-1):
-            worker_id = i+1
+        for i in range(size-1):
+            worker_id = size - i-1  # 128-0-1
             if len(stations_to_run) > 0:
                 station = stations_to_run.pop(0)
             else:
