@@ -459,10 +459,6 @@ def enum(*sequential, **named):
     enums = dict(zip(sequential, range(len(sequential))), **named)
     return type('Enum', (), enums)
 
-def mylog(logfile, msg, mode="a"):
-    with open(logfile, mode) as f:
-        f.write(f"{msg}\n")
-
 def compute_measures_mpi(
     input_path,
     file_type,
@@ -543,55 +539,25 @@ def compute_measures_mpi(
     }
     stations_to_run = list(stations_set.difference(found_stations))
     # Define MPI message tags
-    tags = enum('HANDSHAKE', 'DONE', 'EXIT', 'START')
+    tags = enum('READY', 'DONE', 'EXIT', 'START')
 
     status = MPI.Status()
-
-    stdout_log = output.parent / f"{identifier}_im_calc_{rank}.log"
-
-
-    # initial communication
     if is_server:
         logger.info(f"SERVER: Total stations {len(station_names)} Stations previously computed {len(found_stations)} Stations to compute {len(stations_to_run)}")
         logger.info(f"SERVER: num procs {size}")
-        for i in range(size-1):
-            worker_id = size - i-1  # 128-0-1
-            if len(stations_to_run) > 0:
-                station = stations_to_run.pop(0)
-            else:
-                station = None
-            logger.info(f"SERVER: SENDING rank_{worker_id} its first station {station}")
-            comm.send(station,dest=worker_id)
-            logger.info(f"SERVER: SENT rank_{worker_id} its first station {station}")
-            #worker_id2 = status.Get_source()
-            rank = comm.recv(source=worker_id, tag=MPI.ANY_TAG, status=status)
-            logger.info(f"SERVER: rank_{rank} ACKed the reception")
-
-    else:
-        mylog(stdout_log, f"rank {rank} waiting for a comm")
-        station = comm.recv(source=server, tag=MPI.ANY_TAG, status=status)
-        #tag = status.Get_tag()
-        mylog(stdout_log, f"rank {rank} received {station}")
-        comm.send(rank, dest=server)
-        mylog(stdout_log, f"rank {rank} sent ACK")
-
-
-    if is_server:
         nworkers = size - 1
         closed_workers = 0
         while nworkers > closed_workers:
             logger.info(f"SERVER: start listening")
             data = comm.recv(source=MPI.ANY_SOURCE, tag=MPI.ANY_TAG, status=status)
-            tag = status.Get_tag()
+
             worker_id = status.Get_source()
-            if data != worker_id:
-                logger.info(f"SERVER: {data} != {worker_id} Exiting")
-                MPI.COMM_WORLD.Abort()
+            tag = status.Get_tag()
             logger.info(f"SERVER: end listening rank_{worker_id} {tag}")
 
-            if tag == tags.DONE:
-                logger.info(f"SERVER: rank_{worker_id} saying DONE")
+            if tag == tags.READY:
                 # next job
+                logger.info(f"SERVER: rank_{worker_id} is READY")
                 if len(stations_to_run) > 0:
                     station = stations_to_run.pop(0)
                     logger.info(f"SERVER: start Sending rank_{worker_id} START {station}")
@@ -599,66 +565,59 @@ def compute_measures_mpi(
                     logger.info(f"SERVER: end Sending rank_{worker_id} START")
                 else:
                     logger.info(f"SERVER: start Sending rank_{worker_id} EXIT")
-                    comm.send(None, dest=worker_id, tag=tags.EXIT)  #
+                    comm.send(None, dest=worker_id, tag=tags.EXIT) #
                     logger.info(f"SERVER: end Sending rank_{worker_id} EXIT")
                     # nworkers -= 1
-
+            elif tag == tags.DONE:
+                logger.info(f"SERVER: rank_{worker_id} saying DONE ({data} stats)")
             elif tag == tags.EXIT:
                 closed_workers += 1
-                logger.info(f"SERVER: rank_{worker_id} saying EXITing")
-
-
+                logger.info(f"SERVER: rank_{worker_id} saying EXITing ({data} stats)")
 
         logger.info("SERVER: All stations complete")
     else:
         num_stats_done = 0
-
-        mylog(stdout_log, f"WORKER rank_{rank}: Entering loop")
-        while station is not None:
-
-            mylog(stdout_log, f"WORKER rank_{rank}: Station to compute: {station}")
-            num_stats_done += 1
-            waveform = read_waveform.read_waveforms(
-                input_path,
-                bbseries,
-                [station],
-                components_to_calculate,
-                wave_type=wave_type,
-                file_type=file_type,
-                units=units,
-            )[0]
-            # only run basic im if and only if adv_im not going to run
-            if running_adv_im:
-                compute_adv_measure(waveform, advanced_im_config, output)
-            else:
-                result_dict = compute_measure_single(
-                    waveform,
-                    sorted(ims),
-                    sorted(components_to_store, key=lambda x: x.value),
-                    im_options,
-                    sorted(components_to_calculate, key=lambda x: x.value),
-                    None,  # (stations_to_run.index(station), len(stations_to_run)), #temporarily suppressing logging
-                    logger,
-                )
-                write_result(result_dict, station_path, station, simple_output)
-            #    logger.info(f"WORKER rank_{rank}: done {station} total {num_stats_done} stats")
-            mylog(stdout_log, f"WORKER rank_{rank}: done {station} total {num_stats_done} stats")
-            comm.send(rank, dest=server, tag=tags.DONE)
-            mylog(stdout_log, f"WORKER rank_{rank}: requested a job")
+        print(f"rank {rank}")
+        while True:
+            #logger.info(f"WORKER rank_{rank}: requesting a job")
+            comm.send(None, dest=server, tag=tags.READY)
             #logger.info(f"WORKER rank_{rank}: listening to the server")
             station = comm.recv(source=server, tag=MPI.ANY_TAG, status=status)
             tag = status.Get_tag()
             if tag == tags.START:
             #    logger.info(f"WORKER rank_{rank}: Station to compute: {station}")
-                mylog(stdout_log, f"WORKER rank_{rank}:Station to compute: {station}")
-
+                num_stats_done += 1
+                waveform = read_waveform.read_waveforms(
+                    input_path,
+                    bbseries,
+                    [station],
+                    components_to_calculate,
+                    wave_type=wave_type,
+                    file_type=file_type,
+                    units=units,
+                )[0]
+                # only run basic im if and only if adv_im not going to run
+                if running_adv_im:
+                    compute_adv_measure(waveform, advanced_im_config, output)
+                else:
+                    result_dict = compute_measure_single(
+                        waveform,
+                        sorted(ims),
+                        sorted(components_to_store, key=lambda x: x.value),
+                        im_options,
+                        sorted(components_to_calculate, key=lambda x: x.value),
+                        None, #(stations_to_run.index(station), len(stations_to_run)), #temporarily suppressing logging
+                        logger,
+                    )
+                    write_result(result_dict, station_path, station, simple_output)
+            #    logger.info(f"WORKER rank_{rank}: done {station} total {num_stats_done} stats")
+                comm.send(num_stats_done, dest=server, tag=tags.DONE)
             elif tag == tags.EXIT:
             #    logger.info(f"WORKER rank_{rank}: was ordered to stop")
-                mylog(stdout_log, f"WORKER rank_{rank}: was ordered to stop. total {num_stats_done} stats")
-                break # station is already None
+                break
 
         #logger.info(f"WORKER rank_{rank}: no more job")
-        comm.send(rank, dest=server, tag=tags.EXIT)
+        comm.send(num_stats_done, dest=server, tag=tags.EXIT)
 
     if is_server:
         if running_adv_im:
@@ -678,7 +637,6 @@ def compute_measures_mpi(
         pass
     comm.Barrier()
     logger.info(f"RANK {rank}: terminating")
-
 
 
 def compute_measures_multiprocess(
