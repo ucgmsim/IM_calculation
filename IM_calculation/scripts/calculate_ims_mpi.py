@@ -251,10 +251,7 @@ def main():
     if is_server:
         logger.info(f"SERVER: IM_Calc started")
 
-    #logger.info(f"WORKER rank_{rank}: Initializing")
-    stdout_log = args.output_path.parent / f"{args.identifier}_im_calc_{rank}.log"
-    with open(stdout_log,"w") as f:
-        f.write(f"WORKER rank_{rank}: Initializing\n")
+    logger.info(f"WORKER rank_{rank}: Initializing")
 
     # MPI
     calc.compute_measures_mpi(

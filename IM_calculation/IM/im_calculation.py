@@ -579,13 +579,13 @@ def compute_measures_mpi(
         num_stats_done = 0
         print(f"rank {rank}")
         while True:
-            #logger.info(f"WORKER rank_{rank}: requesting a job")
+            logger.info(f"WORKER rank_{rank}: requesting a job")
             comm.send(None, dest=server, tag=tags.READY)
-            #logger.info(f"WORKER rank_{rank}: listening to the server")
+            logger.info(f"WORKER rank_{rank}: listening to the server")
             station = comm.recv(source=server, tag=MPI.ANY_TAG, status=status)
             tag = status.Get_tag()
             if tag == tags.START:
-            #    logger.info(f"WORKER rank_{rank}: Station to compute: {station}")
+                logger.info(f"WORKER rank_{rank}: Station to compute: {station}")
                 num_stats_done += 1
                 waveform = read_waveform.read_waveforms(
                     input_path,
@@ -610,13 +610,13 @@ def compute_measures_mpi(
                         logger,
                     )
                     write_result(result_dict, station_path, station, simple_output)
-            #    logger.info(f"WORKER rank_{rank}: done {station} total {num_stats_done} stats")
+                logger.info(f"WORKER rank_{rank}: done {station} total {num_stats_done} stats")
                 comm.send(num_stats_done, dest=server, tag=tags.DONE)
             elif tag == tags.EXIT:
-            #    logger.info(f"WORKER rank_{rank}: was ordered to stop")
+                logger.info(f"WORKER rank_{rank}: was ordered to stop")
                 break
 
-        #logger.info(f"WORKER rank_{rank}: no more job")
+        logger.info(f"WORKER rank_{rank}: no more job")
         comm.send(num_stats_done, dest=server, tag=tags.EXIT)
 
     if is_server:
