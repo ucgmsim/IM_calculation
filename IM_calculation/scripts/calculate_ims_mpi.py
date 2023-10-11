@@ -16,7 +16,7 @@ import IM_calculation.IM.im_calculation as calc
 from IM_calculation.Advanced_IM import advanced_IM_factory
 from qcore import constants
 from qcore import utils
-
+from qcore import qclogging
 
 def load_args():
     parent_parser = argparse.ArgumentParser(add_help=False)
@@ -242,16 +242,20 @@ def main():
         components = args.components
         advanced_im_config = None
 
-    mh = MPIFileHandler.MPIFileHandler(
-        args.output_path.parent / f"{args.identifier}_im_calc.log"
+    # mh = MPIFileHandler.MPIFileHandler(
+    #     args.output_path.parent / f"{args.identifier}_im_calc.log"
+    # )
+    # formatter = logging.Formatter("%(asctime)s:%(name)s:%(levelname)s:%(message)s")
+    # mh.setFormatter(formatter)
+    # logger.addHandler(mh)
+    logger = qclogging.get_logger("IM_calc")
+    qclogging.add_general_file_handler(
+        logger, args.output_path.parent / f"{args.identifier}_im_calc_{rank}.log"
     )
-    formatter = logging.Formatter("%(asctime)s:%(name)s:%(levelname)s:%(message)s")
-    mh.setFormatter(formatter)
-    logger.addHandler(mh)
     if is_server:
         logger.info(f"SERVER: IM_Calc started")
-
-    logger.info(f"WORKER rank_{rank}: Initializing")
+    else:
+        logger.info(f"WORKER rank_{rank}: Initializing")
 
     # MPI
     calc.compute_measures_mpi(
