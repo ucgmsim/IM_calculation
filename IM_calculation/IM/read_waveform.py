@@ -70,7 +70,7 @@ def read_ascii_header(fid):
 
     # second line of the header
     header2 = next(fid).split()
-    NT = np.int(header2[0])
+    NT = int(header2[0])
     # force dtype to be float32 to match qcore.BBSeis as well as EMOD3D
     DT = np.float32(header2[1])
 

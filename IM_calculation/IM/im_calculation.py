@@ -651,7 +651,7 @@ def compute_measures_multiprocess(
     total_stations = len(station_names)
     # determine the size of each iteration base on num of processes and mem
     steps = get_steps(
-        input_path, process, total_stations, "FAS" in ims and bbseries.nt > 32768
+        input_path, process, total_stations, "FAS" in ims
     )
 
     # initialize result list for basic IM
