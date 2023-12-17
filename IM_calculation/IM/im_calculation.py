@@ -151,7 +151,7 @@ def compute_measure_single(
     comps_to_store,
     im_options,
     comps_to_calculate,
-    progress = None,
+    progress=None,
     logger=qclogging.get_basic_logger(),
 ):
     """
@@ -645,14 +645,13 @@ def compute_measures_multiprocess(
         components_to_store,
     ) = constants.Components.get_comps_to_calc_and_store(comp)
 
+    # bbseries can be none after this step if using ascii input files
     bbseries, station_names = get_bbseis(
         input_path, file_type, station_names, real_only=real_only
     )
     total_stations = len(station_names)
     # determine the size of each iteration base on num of processes and mem
-    steps = get_steps(
-        input_path, process, total_stations, "FAS" in ims and bbseries.nt > 32768
-    )
+    steps = get_steps(input_path, process, total_stations, "FAS" in ims)
 
     # initialize result list for basic IM
     if not running_adv_im:
