@@ -77,7 +77,7 @@ def get_snr_from_waveform(
         return None, None, None, None, None, None
 
     # Add the tapering to the signal and noise
-    print(f"Waveform {filename}")
+    # print(f"Waveform {filename}")
     try:
         taper_signal_acc = apply_taper(signal_acc)
         taper_noise_acc = apply_taper(noise_acc)
