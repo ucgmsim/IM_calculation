@@ -80,7 +80,7 @@ def get_snr_from_waveform(
     try:
         taper_signal_acc = apply_taper(signal_acc)
         taper_noise_acc = apply_taper(noise_acc)
-    except UserWarning as warning:
+    except RuntimeWarning as warning:
         print("Caught warning:", warning)
         # print(f"Error {e}")
         print(f"Waveform {filename}")
