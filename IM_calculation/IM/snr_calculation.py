@@ -38,6 +38,7 @@ def get_snr_from_waveform(
     apply_smoothing: bool = True,
     ko_matrix_path: Path = None,
     common_frequency_vector: np.asarray = None,
+    filename: str = None
 ):
     """
     Calculates the SNR of a waveform given a tp and common frequency vector
@@ -76,8 +77,12 @@ def get_snr_from_waveform(
         return None, None, None, None, None, None
 
     # Add the tapering to the signal and noise
-    taper_signal_acc = apply_taper(signal_acc)
-    taper_noise_acc = apply_taper(noise_acc)
+    try:
+        taper_signal_acc = apply_taper(signal_acc)
+        taper_noise_acc = apply_taper(noise_acc)
+    except Exception as e:
+        print(f"Error {e}")
+        print(f"Waveform {filename}")
 
     # Generate FFT for the signal and noise
     fas_signal, frequency_signal = computeFAS.generate_fa_spectrum(
