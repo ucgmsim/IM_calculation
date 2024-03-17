@@ -80,8 +80,9 @@ def get_snr_from_waveform(
     try:
         taper_signal_acc = apply_taper(signal_acc)
         taper_noise_acc = apply_taper(noise_acc)
-    except Exception as e:
-        print(f"Error {e}")
+    except UserWarning as warning:
+        print("Caught warning:", warning)
+        # print(f"Error {e}")
         print(f"Waveform {filename}")
 
     # Generate FFT for the signal and noise
