@@ -492,14 +492,20 @@ def test_calculate_mode_shapes(
 
     assert compare_is_close(test_phi, bench_phi)
     assert compare_is_close(
-        test_phi_1, bench_phi_1, tol=1.0e+2
+        test_phi_1, bench_phi_1, tol=1.0e-20
+    ), f"Lower tolerance is used here Difference: {test_phi_1 - bench_phi_1}"
+    assert compare_is_close(
+        test_phi_2, bench_phi_2, tol=1.0e2
     ), f"Lower tolerance is used here Difference: {test_phi_2 - bench_phi_2}"
     assert compare_is_close(
-        test_phi_2, bench_phi_2, tol=1.0e+2
-    ), f"Lower tolerance is used here Difference: {test_phi_2 - bench_phi_2}"
-    assert compare_is_close(test_phi_3, bench_phi_3)
-    assert compare_is_close(test_phi_4, bench_phi_4)
-    assert compare_is_close(test_participation_factor, bench_participation_factor)
+        test_phi_3, bench_phi_3
+    ), f"Lower tolerance is used here Difference: {test_phi_3 - bench_phi_3}"
+    assert compare_is_close(
+        test_phi_4, bench_phi_4
+    ), f"Lower tolerance is used here Difference: {test_phi_4 - bench_phi_4}"
+    assert compare_is_close(
+        test_participation_factor, bench_participation_factor
+    ), f"Lower tolerance is used here Difference: {test_participation_factor - bench_participation_factor}"
 
 
 @pytest.mark.parametrize(
