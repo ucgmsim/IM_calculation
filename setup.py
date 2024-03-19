@@ -16,7 +16,6 @@ from Cython.Distutils import build_ext
 
 class build_konno_matricies(build_py):
     """Post-installation for development mode."""
-    # random comment - to remove
 
     def run(self):
         from IM_calculation.scripts.A_KonnoMatricesComputation import (
