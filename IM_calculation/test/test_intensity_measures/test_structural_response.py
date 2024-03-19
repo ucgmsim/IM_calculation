@@ -487,7 +487,7 @@ def test_calculate_mode_shapes(
 
     assert compare_is_close(test_phi, bench_phi)
     assert compare_is_close(test_phi_1, bench_phi_1)
-    assert compare_is_close(test_phi_2, bench_phi_2)
+    assert compare_is_close(test_phi_2, bench_phi_2), f"{test_phi_2 - bench_phi_2}"
     assert compare_is_close(test_phi_3, bench_phi_3)
     assert compare_is_close(test_phi_4, bench_phi_4)
     assert compare_is_close(test_participation_factor, bench_participation_factor)
