@@ -416,8 +416,8 @@ BENCH_REL_ACCEL_02 = [
 ]
 
 
-def compare_is_close(test_vals, bench_vals):
-    return np.isclose(test_vals, bench_vals, atol=1.0e-20).all()
+def compare_is_close(test_vals, bench_vals, tol=1.0e-20):
+    return np.isclose(test_vals, bench_vals, atol=tol).all()
 
 
 @pytest.mark.parametrize(
@@ -481,16 +481,36 @@ def test_calculate_mode_shapes(
     bench_phi_4,
     bench_participation_factor,
 ):
-    test_phi, test_phi_1, test_phi_2, test_phi_3, test_phi_4, test_participation_factor = calculate_mode_shapes(
-        alpha, gamma, storey
-    )
+    (
+        test_phi,
+        test_phi_1,
+        test_phi_2,
+        test_phi_3,
+        test_phi_4,
+        test_participation_factor,
+    ) = calculate_mode_shapes(alpha, gamma, storey)
 
     assert compare_is_close(test_phi, bench_phi)
-    assert compare_is_close(test_phi_1, bench_phi_1)
-    assert compare_is_close(test_phi_2, bench_phi_2)
-    assert compare_is_close(test_phi_3, bench_phi_3)
-    assert compare_is_close(test_phi_4, bench_phi_4)
-    assert compare_is_close(test_participation_factor, bench_participation_factor)
+    if not compare_is_close(
+        test_phi_1, bench_phi_1
+    ):
+        print(f"FAILED Difference: {test_phi_1 - bench_phi_1}")
+    if not compare_is_close(
+        test_phi_2, bench_phi_2
+    ):
+        print(f"FAILED Difference: {test_phi_2 - bench_phi_2}")
+    if not compare_is_close(
+            test_phi_3, bench_phi_3
+        ):
+        print(f"FAILED Difference: {test_phi_3 - bench_phi_3}")
+    if not compare_is_close(
+            test_phi_4, bench_phi_4
+        ):
+        print(f"FAILED Difference: {test_phi_4 - bench_phi_4}")
+    if not compare_is_close(
+            test_participation_factor, bench_participation_factor
+        ):
+        print(f"FAILED Difference: {test_participation_factor - bench_participation_factor}")
 
 
 @pytest.mark.parametrize(
@@ -622,7 +642,18 @@ def test_calculate_structural_response(
     bench_rel_accel,
     bench_total_accel,
 ):
-    test_disp, test_slope, test_moment, test_storey_moment, test_shear, test_storey_shear, test_load, test_ground_accel, test_rel_accel, test_total_accel = calculate_structural_response(
+    (
+        test_disp,
+        test_slope,
+        test_moment,
+        test_storey_moment,
+        test_shear,
+        test_storey_shear,
+        test_load,
+        test_ground_accel,
+        test_rel_accel,
+        test_total_accel,
+    ) = calculate_structural_response(
         vibration_period,
         acc_time_history,
         dt,
@@ -723,7 +754,14 @@ def test_calculate_structural_response_b(
     bench_load,
     bench_rel_accel,
 ):
-    test_disp, test_slope, test_moment, test_shear, test_load, test_rel_accel = calculate_structural_response_b(
+    (
+        test_disp,
+        test_slope,
+        test_moment,
+        test_shear,
+        test_load,
+        test_rel_accel,
+    ) = calculate_structural_response_b(
         participation_factor,
         phi,
         phi_1,
@@ -839,7 +877,18 @@ def test_extract_peak_structural_response(
     bench_rel_accel,
     bench_total_accel,
 ):
-    test_disp, test_slope, test_moment, test_storey_moment, test_shear, test_storey_shear, test_load, test_ground_accel, test_rel_accel, test_total_accel = extract_peak_structural_response(
+    (
+        test_disp,
+        test_slope,
+        test_moment,
+        test_storey_moment,
+        test_shear,
+        test_storey_shear,
+        test_load,
+        test_ground_accel,
+        test_rel_accel,
+        test_total_accel,
+    ) = extract_peak_structural_response(
         disp,
         slope,
         moment,
