@@ -1,4 +1,6 @@
 from collections import namedtuple
+
+import numpy as np
 import pandas as pd
 import os
 import re
@@ -7,6 +9,8 @@ import tempfile
 
 from qcore.timeseries import seis2txt
 from qcore.utils import load_yaml
+from IM_calculation.IM.read_waveform import Waveform
+
 
 advanced_im_dir = os.path.dirname(__file__)
 CONFIG_FILE_NAME = os.path.join(advanced_im_dir, "advanced_im_config.yaml")
@@ -67,23 +71,43 @@ def compute_ims(accelerations, configuration, adv_im_out_dir):
             subprocess.run(script)
 
 
-def get_acc_filename(folder, stat, component):
-    # returns the same filename structure as timeseries.seis2txt
+def get_acc_filename(folder: str, stat: str, component: str):
+    """
+    Returns the filename for the acceleration file
+
+    Parameters
+    ----------
+    folder : str
+        Folder to save the file
+    stat : str
+        Station name
+    component : str
+        Component of the acceleration data
+    """
     return "%s%s.%s" % (folder, stat, component)
 
 
-def save_waveform_to_tmp_files(tmp_folder, accelerations, station_name):
+def save_waveform_to_tmp_files(
+    tmp_folder: str, accelerations: Waveform, station_name: str
+):
     """
     Writes to the 3 files containing values for all components
-    :param acc_file: Dict containing file handles for each component specified
-    :param accelerations: Acceleration array, 1 column for each component. Ordering is specified in COMP_DICT
-    :return: None
+
+    Parameters
+    ----------
+    tmp_folder : str
+        Folder to save the files
+    accelerations : Waveform
+        Acceleration waveform with all components
+    station_name : str
+        Station name
     """
     for component in COMP_DICT.keys():
+        filename = get_acc_filename(tmp_folder, station_name, component)
         seis2txt(
             accelerations.values[:, COMP_DICT[component]],
             accelerations.DT,
-            tmp_folder,
+            filename,
             station_name,
             component,
         )
