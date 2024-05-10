@@ -1,6 +1,6 @@
+from pathlib import Path
 from collections import namedtuple
 
-import numpy as np
 import pandas as pd
 import os
 import re
@@ -107,7 +107,7 @@ def save_waveform_to_tmp_files(
         timeseries_to_text(
             accelerations.values[:, COMP_DICT[component]],
             accelerations.DT,
-            filename,
+            Path(filename),
             station_name,
             component,
         )
