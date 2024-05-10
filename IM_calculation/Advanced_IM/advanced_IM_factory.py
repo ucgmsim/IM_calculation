@@ -7,7 +7,7 @@ import re
 import subprocess
 import tempfile
 
-from qcore.timeseries import seis2txt
+from qcore.timeseries import timeseries_to_text
 from qcore.utils import load_yaml
 from IM_calculation.IM.read_waveform import Waveform
 
@@ -104,7 +104,7 @@ def save_waveform_to_tmp_files(
     """
     for component in COMP_DICT.keys():
         filename = get_acc_filename(tmp_folder, station_name, component)
-        seis2txt(
+        timeseries_to_text(
             accelerations.values[:, COMP_DICT[component]],
             accelerations.DT,
             filename,
