@@ -7,8 +7,8 @@ import re
 import subprocess
 import tempfile
 
-from qcore.timeseries import timeseries_to_text
-from qcore.utils import load_yaml
+from qcore import timeseries
+from qcore import utils
 from IM_calculation.IM.read_waveform import Waveform
 
 
@@ -22,7 +22,7 @@ COMP_DICT = {"090": 0, "000": 1, "ver": 2}
 
 
 def get_config(config_file=CONFIG_FILE_NAME):
-    return load_yaml(config_file)
+    return utils.load_yaml(config_file)
 
 
 def get_im_list(config_file=CONFIG_FILE_NAME):
@@ -104,7 +104,7 @@ def save_waveform_to_tmp_files(
     """
     for component in COMP_DICT.keys():
         filename = get_acc_filename(tmp_folder, station_name, component)
-        timeseries_to_text(
+        timeseries.timeseries_to_text(
             accelerations.values[:, COMP_DICT[component]],
             accelerations.DT,
             Path(filename),
