@@ -22,7 +22,18 @@ COMP_DICT = {"090": 0, "000": 1, "ver": 2}
 
 
 def get_config(config_file=CONFIG_FILE_NAME):
-    return yaml.safe_load(open(config_file))
+    """
+    Loads the configuration file and returns the dictionary
+
+    Parameters
+    ----------
+    config_file : str, optional
+        Path to the configuration file
+        default: advanced_im_config.yaml
+    """
+    with open(config_file) as yaml_file:
+        loaded_config = yaml.safe_load(yaml_file)
+    return loaded_config
 
 
 def get_im_list(config_file=CONFIG_FILE_NAME):
