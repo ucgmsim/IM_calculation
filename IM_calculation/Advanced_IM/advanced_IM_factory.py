@@ -2,13 +2,13 @@ from pathlib import Path
 from collections import namedtuple
 
 import pandas as pd
+import yaml
 import os
 import re
 import subprocess
 import tempfile
 
 from qcore import timeseries
-from qcore import utils
 from IM_calculation.IM.read_waveform import Waveform
 
 
@@ -22,7 +22,7 @@ COMP_DICT = {"090": 0, "000": 1, "ver": 2}
 
 
 def get_config(config_file=CONFIG_FILE_NAME):
-    return utils.load_yaml(config_file)
+    return yaml.safe_load(open(config_file))
 
 
 def get_im_list(config_file=CONFIG_FILE_NAME):
@@ -43,7 +43,7 @@ def compute_ims(accelerations, configuration, adv_im_out_dir):
     station_name = accelerations.station_name
 
     with tempfile.TemporaryDirectory() as f:
-        f_dir = os.path.join(f, "")  # ensure has a trailing slash on filename
+        f_dir = Path(f)
         save_waveform_to_tmp_files(f_dir, accelerations, station_name)
         for im in configuration.IM_list:
             out_dir = os.path.join(adv_im_out_dir, im)
@@ -56,7 +56,9 @@ def compute_ims(accelerations, configuration, adv_im_out_dir):
             # waveform component sequence
             comp_list = ["000", "090", "ver"]
 
-            script.extend([get_acc_filename(f_dir, station_name, x) for x in comp_list])
+            script.extend(
+                [f_dir / f"{station_name}.{component}" for component in comp_list]
+            )
             script.extend([out_dir])
 
             script.extend(["--OpenSees_path", f"{configuration.OpenSees_path}"])
@@ -71,31 +73,15 @@ def compute_ims(accelerations, configuration, adv_im_out_dir):
             subprocess.run(script)
 
 
-def get_acc_filename(folder: str, stat: str, component: str):
-    """
-    Returns the filename for the acceleration file
-
-    Parameters
-    ----------
-    folder : str
-        Folder to save the file
-    stat : str
-        Station name
-    component : str
-        Component of the acceleration data
-    """
-    return "%s%s.%s" % (folder, stat, component)
-
-
 def save_waveform_to_tmp_files(
-    tmp_folder: str, accelerations: Waveform, station_name: str
+    tmp_folder: Path, accelerations: Waveform, station_name: str
 ):
     """
     Writes to the 3 files containing values for all components
 
     Parameters
     ----------
-    tmp_folder : str
+    tmp_folder : Path
         Folder to save the files
     accelerations : Waveform
         Acceleration waveform with all components
@@ -103,11 +89,11 @@ def save_waveform_to_tmp_files(
         Station name
     """
     for component in COMP_DICT.keys():
-        filename = get_acc_filename(tmp_folder, station_name, component)
+        filename = tmp_folder / f"{station_name}.{component}"
         timeseries.timeseries_to_text(
             accelerations.values[:, COMP_DICT[component]],
             accelerations.DT,
-            Path(filename),
+            filename,
             station_name,
             component,
         )
