@@ -13,7 +13,7 @@ def calc_rrup_rjb(
     srf_points: np.ndarray,
     locations: np.ndarray,
     n_stations_per_iter: int = 1000,
-    return_rrup_points=False,
+    return_rrup_points: bool = False,
 ):
     """Calculates rrup and rjb distance
 
