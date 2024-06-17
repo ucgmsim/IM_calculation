@@ -10,7 +10,10 @@ VOLCANIC_FRONT_LINE = mpltPath.Path(VOLCANIC_FRONT_COORDS)
 
 
 def calc_rrup_rjb(
-    srf_points: np.ndarray, locations: np.ndarray, n_stations_per_iter: int = 1000
+    srf_points: np.ndarray,
+    locations: np.ndarray,
+    n_stations_per_iter: int = 1000,
+    return_rrup_points: bool = False,
 ):
     """Calculates rrup and rjb distance
 
@@ -25,6 +28,8 @@ def calc_rrup_rjb(
     n_stations_per_iter: int
         Number of stations to iterate over, default to 1000.
         Change based on memory requirements
+    return_rrup_points: bool (optional) default False
+        If True, returns the lon, lat, depth of the rrup points on the srf
 
     Returns
     -------
@@ -32,9 +37,12 @@ def calc_rrup_rjb(
         The rrup distance for the locations, shape/order same as locations
     rjb : np.ndarray
         The rjb distance for the locations, shape/order same as locations
+    rrups_points : np.ndarray (optional)
+        The lon, lat, depth of the rrup points, shape/order same as locations
     """
     rrups = np.empty(locations.shape[0], dtype=np.float32)
     rjb = np.empty(locations.shape[0], dtype=np.float32)
+    rrup_points = np.empty((locations.shape[0], 3), dtype=np.float32)
 
     srf_points = srf_points.astype(np.float32)
     locations = locations.astype(np.float32)
@@ -46,18 +54,26 @@ def calc_rrup_rjb(
     )
 
     for ix, cur_locations in enumerate(split_locations):
-        h_dist = np.atleast_2d(geo.get_distances(srf_points, cur_locations[:, 0], cur_locations[:, 1]))
+        h_dist = np.atleast_2d(
+            geo.get_distances(srf_points, cur_locations[:, 0], cur_locations[:, 1])
+        )
 
         v_dist = srf_points[:, 2, np.newaxis] - cur_locations[:, 2]
 
-        d = np.sqrt(h_dist ** 2 + v_dist.T ** 2)
+        d = np.sqrt(h_dist**2 + v_dist.T**2)
 
         start_ix = n_stations_per_iter * ix
         end_ix = start_ix + cur_locations.shape[0]
         rrups[start_ix:end_ix] = np.min(d, axis=1)
         rjb[start_ix:end_ix] = np.min(h_dist, axis=1)
 
-    return rrups, rjb
+        if return_rrup_points:
+            rrup_points[start_ix:end_ix] = srf_points[np.argmin(d, axis=1)]
+
+    if return_rrup_points:
+        return rrups, rjb, rrup_points
+    else:
+        return rrups, rjb
 
 
 def calc_rx_ry(
@@ -240,7 +256,9 @@ def calc_rx_ry_GC2_multi_hypocentre(
 
     for plane_points, plane_header in zip(pnt_sections, plane_infos):
         r_x_p, r_y_p = calc_rx_ry_GC1(plane_points, [plane_header], locations)
-        dists = np.atleast_2d(geo.get_distances(plane_points, locations[:, 0], locations[:, 1]))
+        dists = np.atleast_2d(
+            geo.get_distances(plane_points, locations[:, 0], locations[:, 1])
+        )
         # Minimum distance of 0.001km to prevent nans/infs
         # A bit hacky, but it works. Only needed when a location is directly on top of a subfault
         dists = np.maximum(dists, 0.001)
