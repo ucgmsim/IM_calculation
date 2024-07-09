@@ -4,11 +4,14 @@ use --no-deps to prevent re-installation of dependencies
 use -I to force re-install
 """
 from pathlib import Path
-from setuptools import find_packages
+from setuptools import find_packages, dist
 from distutils.core import setup
 from distutils.command.build_py import build_py
 from distutils.extension import Extension
 
+Distribution().fetch_build_eggs(['Cython', 'numpy>=1.14.3'])
+
+import numpy
 from Cython.Distutils import build_ext
 
 
@@ -30,7 +33,7 @@ setup(
     packages=find_packages(),
     url="https://github.com/ucgmsim/IM_calculation",
     description="IM calculation code",
-    install_requires=["numpy>=1.14.3", "Cython", "obspy", "pandas"],
+    install_requires=["obspy", "pandas"],
     cmdclass={"build_ext": build_ext, "build_py": build_konno_matricies},
     package_data={"": ["*.yaml"]},
     ext_modules=[
