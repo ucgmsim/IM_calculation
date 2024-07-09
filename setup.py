@@ -9,7 +9,7 @@ from distutils.core import setup
 from distutils.command.build_py import build_py
 from distutils.extension import Extension
 
-Distribution().fetch_build_eggs(['Cython', 'numpy>=1.14.3'])
+dist.Distribution().fetch_build_eggs(['Cython', 'numpy>=1.14.3'])
 
 import numpy
 from Cython.Distutils import build_ext
