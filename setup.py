@@ -14,7 +14,7 @@ setup(
     packages=find_packages(),
     url="https://github.com/ucgmsim/IM_calculation",
     description="IM calculation code",
-    install_requires=["obspy", "pandas"],
+    install_requires=["numpy>=1.14.3", "Cython", "obspy", "pandas"],
     package_data={"": ["*.yaml"]},
     ext_modules=[
         Extension(
