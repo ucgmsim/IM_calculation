@@ -5,11 +5,11 @@ use -I to force re-install
 """
 import subprocess
 import sys
-# from distutils.core import setup
-# from distutils.extension import Extension
 
 from setuptools import find_packages, setup, Extension
 
+# The following is required to build the Cython extension
+# This ensures that Cython is installed before running the setup
 try:
     from Cython.Distutils import build_ext
 except ImportError:
