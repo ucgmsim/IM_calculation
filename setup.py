@@ -3,11 +3,11 @@ Install using pip, e.g. pip install ./IM_Calculation
 use --no-deps to prevent re-installation of dependencies
 use -I to force re-install
 """
-from setuptools import find_packages
+from setuptools import find_packages, dist
 from distutils.core import setup
 from distutils.extension import Extension
 
-
+dist.Distribution().fetch_build_eggs(["Cython"])
 from Cython.Distutils import build_ext
 
 
