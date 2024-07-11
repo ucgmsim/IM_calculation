@@ -12,7 +12,7 @@ from setuptools import find_packages, setup, Extension
 # This ensures that Cython is installed before running the setup
 try:
     from Cython.Distutils import build_ext
-except ImportError:
+except ModuleNotFoundError:
     subprocess.check_call([sys.executable, "-m", "pip", "install", "Cython"])
     from Cython.Distutils import build_ext
 
