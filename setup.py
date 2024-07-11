@@ -8,6 +8,9 @@ from distutils.core import setup
 from distutils.extension import Extension
 
 
+from Cython.Distutils import build_ext
+
+
 setup(
     name="IM-calc",
     version="19.5.1",
@@ -15,6 +18,7 @@ setup(
     url="https://github.com/ucgmsim/IM_calculation",
     description="IM calculation code",
     install_requires=["numpy>=1.14.3", "Cython", "obspy", "pandas"],
+    cmdclass={"build_ext": build_ext},
     package_data={"": ["*.yaml"]},
     ext_modules=[
         Extension(
