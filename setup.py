@@ -5,10 +5,10 @@ use -I to force re-install
 """
 import subprocess
 import sys
-from distutils.core import setup
-from distutils.extension import Extension
+# from distutils.core import setup
+# from distutils.extension import Extension
 
-from setuptools import find_packages
+from setuptools import find_packages, setup, Extension
 
 try:
     from Cython.Distutils import build_ext
