@@ -8,7 +8,6 @@ version = "19.5.1"
 description = "IM calculation code"
 homepage = "https://github.com/ucgmsim/IM_calculation"
 readme = "README.md"
-license = "MIT"
 
 [project.scripts]
 calculate_ims = "IM_calculation/scripts/calculate_ims.py"
