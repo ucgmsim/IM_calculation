@@ -9,3 +9,6 @@ authors = [
 ]
 version = "19.5.1"
 description = "IM calculation code"
+
+[tool.setuptools.dynamic]
+dependencies = {file = ["requirements.txt"]}
