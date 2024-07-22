@@ -4,26 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "IM-calc"
+authors = [
+    {name = "QuakeCoRE" },
+]
 version = "19.5.1"
 description = "IM calculation code"
-homepage = "https://github.com/ucgmsim/IM_calculation"
-readme = "README.md"
-
-[project.scripts]
-calculate_ims = "IM_calculation/scripts/calculate_ims.py"
-calculate_rrups_single = "IM_calculation/scripts/calculate_rrups_single.py"
-
-[[project.extensions]]
-name = "IM_calculation.IM.rspectra_calculations.rspectra"
-sources = ["IM_calculation/IM/rspectra_calculations/rspectra.pyx"]
-
-[project.urls]
-homepage = "https://github.com/ucgmsim/IM_calculation"
-
-[project.packages]
-include = ["IM_calculation"]
-
-[project.dependencies]
-obspy = "*"
-pandas = "*"
-Cython = "*"
