@@ -1,6 +1,6 @@
-from setuptools import find_packages, setup, Extension
+import numpy
 from Cython.Distutils import build_ext
-
+from setuptools import Extension, find_packages, setup
 
 setup(
     packages=find_packages(),
@@ -9,6 +9,7 @@ setup(
         Extension(
             "IM_calculation.IM.rspectra_calculations.rspectra",
             ["IM_calculation/IM/rspectra_calculations/rspectra.pyx"],
+            include_dirs=[numpy.get_include()]
         ),
     ],
 )
