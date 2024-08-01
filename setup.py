@@ -43,7 +43,6 @@ setup(
     ],
     scripts=[
         "IM_calculation/scripts/calculate_ims.py",
-        "IM_calculation/scripts/calculate_rrups_single.py",
     ],
     include_dirs=[numpy.get_include()],
 )
