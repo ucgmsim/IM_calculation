@@ -6,5 +6,5 @@ from pathlib import Path
 from IM_calculation.scripts.A_KonnoMatricesComputation import createKonnoMatrices
 
 createKonnoMatrices(
-    Path(__file__).parent / "IM_calculation" / "IM" / "KO_matrices", num_to_gen=5
+    Path(__file__).parent / "IM_calculation" / "IM" / "KO_matrices", num_to_gen=6
 )
