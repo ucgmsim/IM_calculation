@@ -8,8 +8,13 @@ from obspy.signal.konnoohmachismoothing import calculate_smoothing_matrix
 def createKonnoMatrix_single(ft_len: int, bandwidth: int = 20):
     """
     Creates a single Konno Ohmachi matrix
-    :param ft_len: Length of Fourier transform
-    :param bandwidth: Bandwidth of Konno Ohmachi smoothing
+
+    Parameters
+    ----------
+    ft_len : int
+        Length of Fourier transform
+    bandwidth : int, optional
+        Bandwidth of Konno Ohmachi smoothing, by default 20
     """
     dt = 0.005
     ft_freq = np.fft.rfftfreq(ft_len, dt)
@@ -18,18 +23,24 @@ def createKonnoMatrix_single(ft_len: int, bandwidth: int = 20):
 
 
 def createKonnoMatrices(
-    install_directory: Path, num_to_gen: int = 7, bandwidth: int = 20
+    install_directory: Path, num_to_gen: int = 8, bandwidth: int = 20
 ):
     """
     Creates several Konno Ohmachi matrices
-    :param install_directory: Directory to install matrices
-    :param num_to_gen: Number of matrices to generate
-    :param bandwidth: Bandwidth of Konno Ohmachi smoothing
+
+    Parameters
+    ----------
+    install_directory : Path
+        Directory to install matrices
+    num_to_gen : int, optional
+        Number of matrices to generate, by default 8
+    bandwidth : int, optional
+        Bandwidth of Konno Ohmachi smoothing, by default 20
     """
     install_directory.mkdir(exist_ok=True)
     for i in range(num_to_gen):
-        # n = [512, 1024, 2048, 4096, 8192, 16384, 32768]
-        n = 512 * 2 ** i
+        # n = [256, 512, 1024, 2048, 4096, 8192, 16384, 32768]
+        n = 256 * 2**i
         file_name = install_directory / f"KO_{n}.npy"
         matrix = createKonnoMatrix_single(n * 2, bandwidth)
         np.save(file_name, matrix)
@@ -51,7 +62,7 @@ def load_args():
         "--num_to_gen",
         help="Number of Konno matrices to generate",
         type=int,
-        default=7,
+        default=8,
     )
     parser.add_argument(
         "-b",
