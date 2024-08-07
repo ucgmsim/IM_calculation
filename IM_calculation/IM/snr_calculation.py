@@ -34,6 +34,8 @@ def apply_taper(acc: np.ndarray, percent: float = 0.05):
 def get_snr_from_waveform(
     waveform: Waveform,
     tp: float,
+    sampling_rate: float,
+    apply_smoothing: bool = True,
     ko_matrix_path: Path = None,
     common_frequency_vector: np.asarray = None,
 ):
@@ -47,6 +49,10 @@ def get_snr_from_waveform(
         must have values and times attributes as well as DT defined
     tp : float
         The index of the p-arrival
+    sampling_rate : float
+        The sampling rate of the waveform
+    apply_smoothing : bool, optional
+        Whether to apply smoothing to the FAS, by default True
     ko_matrix_path : Path, optional
         The path to the Ko matrices, by default None
     common_frequency_vector : np.asarray, optional
@@ -85,15 +91,21 @@ def get_snr_from_waveform(
     fas_signal = np.abs(fas_signal)
     fas_noise = np.abs(fas_noise)
 
-    # Get appropriate konno ohmachi matrix
-    konno_signal = computeFAS.get_konno_matrix(
-        len(fas_signal), directory=ko_matrix_path
-    )
-    konno_noise = computeFAS.get_konno_matrix(len(fas_noise), directory=ko_matrix_path)
+    if apply_smoothing:
+        # Get appropriate konno ohmachi matrix
+        konno_signal = computeFAS.get_konno_matrix(
+            len(fas_signal), directory=ko_matrix_path
+        )
+        konno_noise = computeFAS.get_konno_matrix(
+            len(fas_noise), directory=ko_matrix_path
+        )
 
-    # Apply konno ohmachi smoothing
-    fa_smooth_signal = np.dot(fas_signal.T, konno_signal).T
-    fa_smooth_noise = np.dot(fas_noise.T, konno_noise).T
+        # Apply konno ohmachi smoothing
+        fa_smooth_signal = np.dot(fas_signal.T, konno_signal).T
+        fa_smooth_noise = np.dot(fas_noise.T, konno_noise).T
+    else:
+        fa_smooth_signal = fas_signal
+        fa_smooth_noise = fas_noise
 
     if common_frequency_vector is not None:
         # Interpolate FAS at common frequencies
@@ -108,6 +120,10 @@ def get_snr_from_waveform(
     else:
         inter_signal = fa_smooth_signal
         inter_noise = fa_smooth_noise
+
+    # Set values to NaN if they are outside the bounds of sample rate / 2
+    inter_signal[common_frequency_vector > sampling_rate / 2] = np.nan
+    inter_noise[common_frequency_vector > sampling_rate / 2] = np.nan
 
     # Calculate the SNR
     snr = (inter_signal / np.sqrt(signal_duration)) / (

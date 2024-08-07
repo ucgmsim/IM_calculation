@@ -27,7 +27,7 @@ pipeline {
                     rm -rf qcore
                     git clone https://github.com/ucgmsim/qcore.git
                     cd qcore
-                    python setup.py install --no-data
+                    python setup.py install
                 """
             }
         }

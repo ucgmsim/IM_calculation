@@ -40,7 +40,7 @@ tp = 1320
 # common_freqs = np.logspace(np.log10(0.05), np.log10(50), num=100, base=10.0)
 
 (snr, frequencies, fas_signal, fas_noise, Ds, Dn) = snr_calc.get_snr_from_waveform(
-    waveform, tp, common_frequency_vector=None
+    waveform, tp, (1 / DT), common_frequency_vector=None
 )
 
 if snr is not None:
