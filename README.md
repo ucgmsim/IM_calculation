@@ -1,4 +1,4 @@
-# About this branch
+# About this branch: Debugging an MPI issue
 Some debug was added to analyze an MPI issue found on KISTI Nurion. Let's keep this branch for future reference.
 
 We have a server and worker processes, where the server has the job list and allocates a job to each worker when the worker requests.
