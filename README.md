@@ -1,3 +1,119 @@
+# About this branch
+Some debug was added to analyze an MPI issue found on KISTI Nurion. Let's keep this branch for future reference.
+
+We have a server and worker processes, where the server has the job list and allocates a job to each worker when the worker requests.
+The server receives a request via MPI Recv() from MPI.ANY_SOURCE.
+
+In a PBS script, 
+```
+#PBS -l select=1:ncpus=64:mpiprocs=64:ompthreads=1
+```
+It works normally if `select=1`(one compute node), but if `select` is 2 or above, the server doesn't receive many of requests from the worker processes. 
+
+Sung contacted the KISTI support, but haven't got a useful resoponse from them, and we decided to stick to 1 node.
+
+The following code is the minimal MPI Python code that can replicate this issue.
+
+```
+from mpi4py import MPI
+import random
+import time
+from pathlib import Path
+from datetime import datetime
+
+
+def enum(*sequential, **named):
+    """Handy way to fake an enumerated type in Python
+    http://stackoverflow.com/questions/36932/how-can-i-represent-an-enum-in-python
+    """
+    enums = dict(zip(sequential, range(len(sequential))), **named)
+    return type('Enum', (), enums)
+
+
+def mylog(rank, msg, mode="a"):
+    logfile = Path(__file__).parent.resolve() / f"rank_{rank}.log"  # rank_X.log in the current directory
+    with open(logfile,mode) as f:
+        f.write(f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')} rank_{rank}: {msg}\n")
+
+def DO_SOMETHING(rank,jobid):
+    duration = random.randint(0,5)
+    mylog(rank, f"Waiting {duration}secs")
+    time.sleep(duration)
+
+if __name__ == "__main__":
+    comm = MPI.COMM_WORLD
+
+    rank = comm.Get_rank()
+    size = comm.Get_size()
+    server = 0
+    is_server = (rank == server)
+
+    tags = enum('READY', 'DONE', 'EXIT', 'START')
+
+    mylog(rank, "Starting", "w")
+
+    status = MPI.Status()
+    if is_server:
+
+        jobs_to_do = list(range(1, 10000))
+        nworkers = size - 1
+        closed_workers = 0
+
+        while nworkers > closed_workers:
+            mylog(rank, f"SERVER: start listening")
+            data = comm.recv(source=MPI.ANY_SOURCE, tag=MPI.ANY_TAG, status=status)
+
+            worker_id = status.Get_source()
+            tag = status.Get_tag()
+            mylog(rank, f"SERVER: end listening rank_{worker_id} {tag}")
+
+            if tag == tags.READY:
+                # next job
+                mylog(rank, f"SERVER: rank_{worker_id} is READY")
+                if len(jobs_to_do) > 0:
+                    jobid = jobs_to_do.pop(0)
+                    mylog(rank, f"SERVER: start Sending rank_{worker_id} START {jobid}")
+                    comm.send(jobid, dest=worker_id, tag=tags.START)
+                    mylog(rank, f"SERVER: end Sending rank_{worker_id} START")
+                else:
+                    mylog(rank, f"SERVER: start Sending rank_{worker_id} EXIT")
+                    comm.send(None, dest=worker_id, tag=tags.EXIT)  #
+                    mylog(rank, f"SERVER: end Sending rank_{worker_id} EXIT")
+                    # nworkers -= 1
+            elif tag == tags.DONE:
+                mylog(rank, f"SERVER: rank_{worker_id} saying DONE ({data} stats)")
+            elif tag == tags.EXIT:
+                closed_workers += 1
+                mylog(rank, f"SERVER: rank_{worker_id} saying EXITing ({data} stats)")
+
+        mylog(rank, "SERVER: All stations complete")
+    else:
+        num_jobs_done = 0
+        while True:
+            mylog(rank, f"requesting a job")
+            comm.send(None, dest=server, tag=tags.READY)
+            mylog(rank, f"listening to the server")
+            jobid = comm.recv(source=server, tag=MPI.ANY_TAG, status=status)
+            tag = status.Get_tag()
+            if tag == tags.START:
+                mylog(rank, f"received a job: {jobid}")
+                num_jobs_done += 1
+                DO_SOMETHING(rank,jobid)
+                mylog(rank, f"done {jobid} total {num_jobs_done} jobs")
+                comm.send(num_jobs_done, dest=server, tag=tags.DONE)
+            elif tag == tags.EXIT:
+                mylog(rank, f"was ordered to stop")
+                break
+
+        mylog(rank, f"no more job")
+        comm.send(num_jobs_done, dest=server, tag=tags.EXIT)
+
+    comm.Barrier()
+    mylog(rank, f"terminating")
+    
+```
+
+
 # IM_calculation
 [![Build Status](https://quakecoresoft.canterbury.ac.nz/jenkins/job/IM_calculation/badge/icon?build=last:${params.ghprbActualCommit=master)](https://quakecoresoft.canterbury.ac.nz/jenkins/job/IM_calculation)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
