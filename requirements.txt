@@ -7,3 +7,4 @@ pandas
 PyYAML
 Scipy
 Cython
+qcore @ git+https://github.com/ucgmsim/qcore@pegasus
