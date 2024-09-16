@@ -40,6 +40,7 @@ pipeline {
                     echo "[ Python used ] : " `which python`
                     echo "[ Installing ${env.JOB_NAME} ]"
 # full installation is not possible as it takes more than 3.0Gb for building and kills the server
+                    cd ${env.WORKSPACE}/../
                     pip install -e IM_calculation
                     cd ${env.WORKSPACE}
 		            python konno_setup.py
