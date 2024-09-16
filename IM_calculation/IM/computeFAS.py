@@ -12,9 +12,13 @@ from typing import List
 
 import numpy as np
 from scipy.interpolate import interp1d
+from threadpoolctl import threadpool_limits
 
 matrices = {}
 matrix_lock = Lock()
+
+# Limit the number of threads used by numpy and scipy
+threadpool_limits(limits=1, user_api='blas')
 
 
 def get_konno_matrix(size: int, directory: Path = None):
