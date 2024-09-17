@@ -67,12 +67,8 @@ def get_snr_from_waveform(
     signal_acc, noise_acc = acc.copy(), acc[:tp]
     signal_duration, noise_duration = t[-1], t[tp]
 
-    # Ensure the noise is not shorter than 1s
+    # Ensure the noise is not shorter than 1s, if not then skip the calculation
     if noise_duration < 1:
-        # Note down the ID of the waveform and ignore
-        print(
-            f"Waveform {waveform.station_name} has noise duration of {noise_duration}s"
-        )
         return None, None, None, None, None, None
 
     # Add the tapering to the signal and noise
@@ -126,9 +122,10 @@ def get_snr_from_waveform(
     inter_noise[common_frequency_vector > sampling_rate / 2] = np.nan
 
     # Calculate the SNR
-    snr = (inter_signal / np.sqrt(signal_duration)) / (
-        inter_noise / np.sqrt(noise_duration)
-    )
+    with np.errstate(divide='ignore'):
+        snr = (inter_signal / np.sqrt(signal_duration)) / (
+            inter_noise / np.sqrt(noise_duration)
+        )
     frequencies = (
         frequency_signal if common_frequency_vector is None else common_frequency_vector
     )
