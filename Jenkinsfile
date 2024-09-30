@@ -26,8 +26,7 @@ pipeline {
                     cd $TEMP_DIR
                     rm -rf qcore
                     git clone https://github.com/ucgmsim/qcore.git
-                    cd qcore
-                    python setup.py install
+                    pip install -e qcore
                 """
             }
         }
@@ -39,11 +38,11 @@ pipeline {
 # activate virtual environment again
                     source $TEMP_DIR/venv/bin/activate
                     echo "[ Python used ] : " `which python`
-                    cd ${env.WORKSPACE}
                     echo "[ Installing ${env.JOB_NAME} ]"
 # full installation is not possible as it takes more than 3.0Gb for building and kills the server
-#                   python setup.py install
-                    python setup.py build_ext --inplace
+                    cd ${env.WORKSPACE}/../
+                    pip install -e IM_calculation
+                    cd ${env.WORKSPACE}
 		            python konno_setup.py
                     echo "[ Linking test data ]"
                     cd ${env.JOB_NAME}/test
