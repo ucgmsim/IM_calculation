@@ -16,9 +16,8 @@ from threadpoolctl import threadpool_limits
 
 matrices = {}
 matrix_lock = Lock()
-
-# Limit the number of threads used by numpy and scipy
-threadpool_limits(limits=1, user_api='blas')
+# Limit the number of threads for loading KO matrices
+threadpool_limits(limits=1, user_api="blas")
 
 
 def get_konno_matrix(size: int, directory: Path = None):
@@ -53,12 +52,13 @@ def get_fourier_spectrum(
     waveform: np.ndarray,
     dt: float = 0.005,
     fa_frequencies_int: List[float] = np.logspace(-1, 2, num=100, base=10.0),
+    konno_matrix_path: Path = None,
 ):
     fa_spectrum, fa_frequencies = generate_fa_spectrum(waveform, dt, waveform.shape[0])
     fa_spectrum = np.abs(fa_spectrum)
 
     # get appropriate konno ohmachi matrix
-    konno = get_konno_matrix(len(fa_spectrum))
+    konno = get_konno_matrix(len(fa_spectrum), konno_matrix_path)
 
     # apply konno ohmachi smoothing
     fa_smooth = np.dot(fa_spectrum.T, konno).T
