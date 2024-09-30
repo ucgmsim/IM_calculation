@@ -162,6 +162,8 @@ def compute_measure_single(
     im_options: a dictionary of options for each IM
     comps_to_calculate: the IM components of the input waveforms (e.g. 000, 090)
     progress: a tuple containing station number and total number of stations
+    logger: the logging object
+    ko_matrices_path: the path to the KO matrices, by default None
     :return: {result[station_name]: {[im]: value or (period,value}}
     """
     waveform_acc, waveform_vel = waveform
