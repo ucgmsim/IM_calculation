@@ -108,30 +108,9 @@ def get_rotations(
     :param max_angle: The maximum angle in degrees to calculate to, 180 is due West. This value is not included in the calculations
     :return: An array of shape [periods.size, nt, (max_angle-min_angle)/delta_theta] containing rotd values
     """
-
     thetas = np.deg2rad(np.arange(min_angle, max_angle, delta_theta))
     rotation_matrices = np.asarray([np.cos(thetas), np.sin(thetas)])
-    *rem, nt, xy = accelerations.shape
-    periods = 1
-
-    if len(rem) > 0:
-        periods = rem[0]
-
-    rotds = np.zeros((periods, thetas.size))
-
-    # Magic number empirically determined from runs on Maui
-    step = int(np.floor(86000000 / (thetas.size * nt)))
-    step = np.min([np.max([step, 1]), periods])
-
-    if periods == 1:
-        rotds = func(np.dot(accelerations, rotation_matrices))
-    else:
-        for period in range(0, periods, step):
-            rotds[period : period + step] = func(
-                np.dot(accelerations[period : period + step], rotation_matrices)
-            )
-
-    return rotds
+    return func(np.dot(accelerations, rotation_matrices))
 
 
 def get_cumulative_abs_velocity_nd(acceleration, times):
