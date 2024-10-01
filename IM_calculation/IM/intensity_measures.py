@@ -1,9 +1,8 @@
 import numpy as np
-
-from IM_calculation.IM.rspectra_calculations import rspectra as rspectra
 from qcore import timeseries
-import numba
+
 from IM_calculation.IM.Burks_Baker_2013_elastic_inelastic import Bilinear_Newmark_withTH
+from IM_calculation.IM.rspectra_calculations import rspectra as rspectra
 
 DELTA_T = 0.005
 G = 981.0  # cm/s^2
@@ -52,9 +51,14 @@ def get_spectral_acceleration_nd(acceleration, period, NT, DT):
 
 
 def get_SDI(acceleration, period, DT, z, alpha, dy, dt):
-
     return Bilinear_Newmark_withTH(
-        period, z, dy, alpha, acceleration * G / 100, DT, dt  # Input is in m/s^2
+        period,
+        z,
+        dy,
+        alpha,
+        acceleration * G / 100,
+        DT,
+        dt,  # Input is in m/s^2
     ).T
 
 
@@ -135,12 +139,12 @@ def get_cumulative_abs_velocity_nd(acceleration, times):
 
 def get_arias_intensity_nd(acceleration, times):
     acc_in_cms = acceleration * G
-    integrand = acc_in_cms ** 2
+    integrand = acc_in_cms**2
     return np.pi / (2 * G) * np.trapz(integrand, times, axis=0)
 
 
 def get_specific_energy_density_nd(velocity, times):
-    integrand = velocity ** 2
+    integrand = velocity**2
     return np.trapz(integrand, times, axis=0)
 
 
@@ -174,7 +178,6 @@ def getDs(dt, fx, percLow=5, percHigh=75):
     return Ds
 
 
-@numba.njit
 def getDs_nd(accelerations, dt, percLow=5, percHigh=75):
     """Computes the percLow-percHigh% sign duration for a nd(>1) ground motion component
     Based on getDs575.m
@@ -185,17 +188,14 @@ def getDs_nd(accelerations, dt, percLow=5, percHigh=75):
         percHigh - The higher percentage bound (default 75%)
     Outputs:
         Ds - The duration (s)"""
-    if accelerations.ndim == 1:
-        return getDs(dt, accelerations, percLow, percHigh)
-    else:
-        values = np.zeros(
-            accelerations.shape[-1]
-        )  # Ds575 shouldn't return [1., 2., 0.] if only 2 columns are needed
-        i = 0
-        for fx in accelerations.transpose():
-            values[i] = getDs(dt, fx, percLow, percHigh)
-            i += 1
-        return values
+    arias_intensity = np.cumsum(np.square(accelerations), axis=-2)
+    arias_intensity /= arias_intensity[:, -1][:, np.newaxis]
+    return dt * (
+        np.count_nonzero(
+            (arias_intensity <= percHigh / 100) & (arias_intensity >= percLow / 100),
+            axis=-1,
+        )
+    )
 
 
 def get_geom(d1, d2):
@@ -216,4 +216,4 @@ def get_euclidean_dist(d1, d2):
     :return: euclidean distance
     ----------
     """
-    return np.sqrt(d1 ** 2 + d2 ** 2)
+    return np.sqrt(d1**2 + d2**2)
