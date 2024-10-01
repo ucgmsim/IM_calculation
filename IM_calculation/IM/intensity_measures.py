@@ -189,13 +189,13 @@ def getDs_nd(accelerations, dt, percLow=5, percHigh=75):
         percHigh - The higher percentage bound (default 75%)
     Outputs:
         Ds - The duration (s)"""
-    arias_intensity = np.cumsum(np.square(accelerations), axis=-2)
+    arias_intensity = np.cumsum(np.square(accelerations), axis=0)
     arias_intensity /= arias_intensity[:, -1][:, np.newaxis]
-    return dt * (
-        np.count_nonzero(
-            (arias_intensity <= percHigh / 100) & (arias_intensity >= percLow / 100),
-            axis=-1,
-        )
+    return np.apply_along_axis(
+        lambda component: dt
+        * np.diff(np.searchsorted(component, [percLow / 100, percHigh / 100])),
+        0,
+        arias_intensity,
     )
 
 
