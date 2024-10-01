@@ -154,31 +154,6 @@ def calculate_MMI_nd(velocities):
     return timeseries.pgv2MMI(pgv)
 
 
-@numba.njit
-def getDs(dt, fx, percLow=5, percHigh=75):
-    """Computes the percLow-percHigh% sign duration for a single ground motion component
-    Based on getDs575.m
-    Inputs:
-        dt - the time step (s)
-        fx - a vector (of acceleration)
-        percLow - The lower percentage bound (default 5%)
-        percHigh - The higher percentage bound (default 75%)
-    Outputs:
-        Ds - The duration (s)"""
-    nsteps = np.size(fx)
-    husid = np.zeros(nsteps)
-    husid[0] = 0  # initialize first to 0
-    for i in range(1, nsteps):
-        husid[i] = husid[i - 1] + dt * (
-            fx[i] ** 2
-        )  # note that pi/(2g) is not used as doesnt affect the result
-    AI = husid[-1]
-    Ds = dt * (
-        np.sum(husid / AI <= percHigh / 100.0) - np.sum(husid / AI <= percLow / 100.0)
-    )
-    return Ds
-
-
 def getDs_nd(accelerations, dt, percLow=5, percHigh=75):
     """Computes the percLow-percHigh% sign duration for a nd(>1) ground motion component
     Based on getDs575.m
@@ -193,10 +168,10 @@ def getDs_nd(accelerations, dt, percLow=5, percHigh=75):
     arias_intensity /= arias_intensity[:, -1][:, np.newaxis]
     return np.apply_along_axis(
         lambda component: dt
-        * np.diff(np.searchsorted(component, [percLow / 100, percHigh / 100])),
+        * (np.diff(np.searchsorted(component, [percLow / 100, percHigh / 100])) + 1),
         0,
         arias_intensity,
-    )
+    ).ravel()
 
 
 def get_geom(d1, d2):
