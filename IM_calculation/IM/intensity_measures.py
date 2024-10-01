@@ -2,6 +2,7 @@ import numpy as np
 
 from IM_calculation.IM.rspectra_calculations import rspectra as rspectra
 from qcore import timeseries
+import numba
 from IM_calculation.IM.Burks_Baker_2013_elastic_inelastic import Bilinear_Newmark_withTH
 
 DELTA_T = 0.005
@@ -148,6 +149,7 @@ def calculate_MMI_nd(velocities):
     return timeseries.pgv2MMI(pgv)
 
 
+@numba.njit
 def getDs(dt, fx, percLow=5, percHigh=75):
     """Computes the percLow-percHigh% sign duration for a single ground motion component
     Based on getDs575.m
@@ -172,6 +174,7 @@ def getDs(dt, fx, percLow=5, percHigh=75):
     return Ds
 
 
+@numba.njit
 def getDs_nd(accelerations, dt, percLow=5, percHigh=75):
     """Computes the percLow-percHigh% sign duration for a nd(>1) ground motion component
     Based on getDs575.m
