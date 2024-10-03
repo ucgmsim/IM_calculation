@@ -122,7 +122,7 @@ def get_snr_from_waveform(
     inter_noise[common_frequency_vector > sampling_rate / 2] = np.nan
 
     # Calculate the SNR
-    with np.errstate(divide='ignore'):
+    with np.errstate(divide='ignore', invalid='ignore'):
         snr = (inter_signal / np.sqrt(signal_duration)) / (
             inter_noise / np.sqrt(noise_duration)
         )

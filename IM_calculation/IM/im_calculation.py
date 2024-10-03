@@ -1,24 +1,23 @@
 import csv
 import glob
 import os
-import sys
 import shutil
+import sys
 from datetime import datetime
 from functools import partial
 from pathlib import Path
-from typing import List, Iterable
+from typing import Iterable, List
 
 import numpy as np
 import pandas as pd
-
-from qcore import timeseries, constants, shared, qclogging
 from qcore.constants import Components
 from qcore.im import order_im_cols_df
-from IM_calculation.Advanced_IM import advanced_IM_factory
-from IM_calculation.IM import read_waveform, intensity_measures
-from IM_calculation.IM.intensity_measures import G
-from IM_calculation.IM.computeFAS import get_fourier_spectrum
 
+from IM_calculation.Advanced_IM import advanced_IM_factory
+from IM_calculation.IM import intensity_measures, read_waveform
+from IM_calculation.IM.computeFAS import get_fourier_spectrum
+from IM_calculation.IM.intensity_measures import G
+from qcore import constants, qclogging, shared, timeseries
 
 DEFAULT_IMS = ("PGA", "PGV", "CAV", "AI", "Ds575", "Ds595", "MMI", "pSA")
 ALL_IMS = (
@@ -153,6 +152,7 @@ def compute_measure_single(
     comps_to_calculate,
     progress=None,
     logger=qclogging.get_basic_logger(),
+    ko_matrices_path: Path = None,
 ):
     """
     Compute measures for a single station
@@ -162,6 +162,8 @@ def compute_measure_single(
     im_options: a dictionary of options for each IM
     comps_to_calculate: the IM components of the input waveforms (e.g. 000, 090)
     progress: a tuple containing station number and total number of stations
+    logger: the logging object
+    ko_matrices_path: the path to the KO matrices, by default None
     :return: {result[station_name]: {[im]: value or (period,value}}
     """
     waveform_acc, waveform_vel = waveform
@@ -195,7 +197,10 @@ def compute_measure_single(
             calculate_SDI,
             (DT, accelerations, im_options, result, station_name, waveform_acc),
         ),
-        "FAS": (calc_FAS, (DT, accelerations, im_options, result, station_name)),
+        "FAS": (
+            calc_FAS,
+            (DT, accelerations, im_options, result, station_name, ko_matrices_path),
+        ),
         "AI": (calc_AI, (accelerations, times)),
         "SED": (calc_SED, (velocities, times)),
         "MMI": (calc_MMI, (velocities,)),
@@ -301,12 +306,15 @@ def calc_FAS(
     im_options,
     result,
     station_name,
+    ko_matrices_path: Path,
     im,
     comps_to_store,
     comps_to_calculate,
 ):
     try:
-        value = get_fourier_spectrum(accelerations[:, :2], DT, im_options[im])
+        value = get_fourier_spectrum(
+            accelerations[:, :2], DT, im_options[im], ko_matrices_path
+        )
         values_to_store = array_to_dict(value, comps_to_calculate, im, comps_to_store)
         if check_rotd(comps_to_store):
             func = lambda rotated_waveform: get_fourier_spectrum(
@@ -321,16 +329,16 @@ def calc_FAS(
     else:
         # compute EAS, the euclidean distance of FAS 000 and 090
         if Components.ceas in comps_to_store:
-            values_to_store[
-                Components.ceas.str_value
-            ] = intensity_measures.get_euclidean_dist(value[:, 0], value[:, 1])
+            values_to_store[Components.ceas.str_value] = (
+                intensity_measures.get_euclidean_dist(value[:, 0], value[:, 1])
+            )
 
         for comp in comps_to_store:
             if comp.str_value in values_to_store:
                 for i, val in enumerate(im_options[im]):
-                    result[(station_name, comp.str_value)][
-                        f"{im}_{str(val)}"
-                    ] = values_to_store[comp.str_value][i]
+                    result[(station_name, comp.str_value)][f"{im}_{str(val)}"] = (
+                        values_to_store[comp.str_value][i]
+                    )
 
 
 def calculate_pSAs(
@@ -631,8 +639,9 @@ def compute_measures_multiprocess(
     :return:
     """
     # Multiprocess imports
-    from multiprocessing.pool import Pool
     from collections import ChainMap
+    from multiprocessing.pool import Pool
+
     from qcore.progress_tracker import ProgressTracker
 
     #  for running adv_im
