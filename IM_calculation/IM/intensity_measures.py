@@ -13,48 +13,6 @@ def get_max_nd(data):
     return np.max(np.abs(data), axis=0)
 
 
-@numba.njit
-def response_spectra(
-    acc: np.ndarray,
-    dt: float,
-    period: np.ndarray,
-    xi: float = 0.05,
-    m: float = 1.0,
-    gamma: float = 0.5,
-    beta=0.25,
-) -> np.ndarray:
-    w = 2 * np.pi / period
-    c = 2 * xi * m * w
-    k = m * w**2
-    k1 = k + gamma * c / (beta * dt) + m / (beta * dt**2)
-    a = m / (beta * dt) + gamma * c / beta
-    b = 0.5 * m / beta + dt * (gamma * 0.5 / beta - 1) * c
-    p = -m * acc
-    u1 = 0
-    u2 = 0
-    u = np.zeros((period.size, acc.size))
-    dp = np.diff(p)
-
-    for i_T in range(acc.size - 1):
-        dp = p[i_T + 1] - p[i_T]
-        u1 = 0
-        u2 = 0
-        for i_s in range(period.size - 1):
-            dp1 = dp + a * u1 + b * u2
-            du: float = dp1 / k1
-            du1 = (
-                gamma * du / (beta * dt)
-                - gamma * u1 / beta
-                + dt * (1.0 - 0.5 * gamma / beta) * u2
-            )
-            du2 = du / (beta * dt**2) - u1 / (beta * dt) - 0.5 * u2 / beta
-            u[i_T, i_s + 1] = u[i_T, i_s] + du
-            u1 += du1
-            u2 += du2
-
-    return (u.T * np.square(w)).T
-
-
 def get_spectral_acceleration(acceleration, period, NT, DT, Nstep, delta_t=DELTA_T):
     # pSA
 
@@ -129,7 +87,6 @@ def calculate_Nstep(DT, NT, delta_t=DELTA_T):
     return NT * int(round(DT / delta_t))
 
 
-@numba.njit
 def get_rotations(
     accelerations,
     func=lambda x: np.abs(x, out=x).max(axis=-2),
