@@ -7,3 +7,6 @@ name = "IM-calc"
 version = "19.5.1"
 description = "IM calculation code"
 readme = "README.md"
+
+[tool.setuptools.dynamic]
+dependencies = {file = ["requirements.txt"]}
