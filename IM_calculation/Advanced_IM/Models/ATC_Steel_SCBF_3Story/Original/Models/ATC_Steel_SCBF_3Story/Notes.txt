@@ -1,2 +1,0 @@
-Mass inflation factor: 5.0
-Rotational Inertia: 1.9
