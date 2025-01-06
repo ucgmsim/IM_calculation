@@ -1,6 +1,9 @@
 """Test cases for intensity measure implementations."""
 
+from collections.abc import Callable
+
 import numpy as np
+import numpy.typing as npt
 import pandas as pd
 import pytest
 from numpy.testing import assert_array_almost_equal, assert_array_equal
@@ -52,9 +55,15 @@ def sample_periods():
         (0.6, 0.3),  # Modified parameters
     ],
 )
-def test_newmark_estimate_psa(sample_waveforms, sample_time, xi, gamma, beta):
+def test_newmark_estimate_psa(
+    sample_waveforms: npt.NDArray[np.float32],
+    sample_time: np.float32,
+    xi: np.float32,
+    gamma: np.float32,
+    beta: np.float32,
+):
     """Test Newmark PSA estimation with various parameters."""
-    dt = 0.01
+    dt = sample_time[1] - sample_time[0]
     w = 2 * np.pi * np.array([1.0, 2.0], dtype=np.float32)
 
     result = ims.newmark_estimate_psa(
@@ -96,7 +105,12 @@ def test_rotd_psa_values():
         (20, 80),  # Custom range
     ],
 )
-def test_significant_duration(sample_waveforms, sample_time, percent_low, percent_high):
+def test_significant_duration(
+    sample_waveforms: npt.NDArray[np.float32],
+    sample_time: npt.NDArray[np.float32],
+    percent_low: float,
+    percent_high: float,
+):
     """Test significant duration calculation."""
     dt = 0.01
 
@@ -119,7 +133,11 @@ def test_significant_duration(sample_waveforms, sample_time, percent_low, percen
         ims.cumulative_absolute_velocity,
     ],
 )
-def test_peak_ground_parameters(sample_waveforms, sample_time, func):
+def test_peak_ground_parameters(
+    sample_waveforms: npt.NDArray[np.float32],
+    sample_time: npt.NDArray[np.float32],
+    func: Callable,
+):
     """Test peak ground motion parameter calculations."""
     dt = sample_time[1] - sample_time[0]
 
@@ -139,7 +157,9 @@ def test_peak_ground_parameters(sample_waveforms, sample_time, func):
 
 
 # Test cases for Arias Intensity
-def test_arias_intensity(sample_waveforms, sample_time):
+def test_arias_intensity(
+    sample_waveforms: npt.NDArray[np.float32], sample_time: npt.NDArray[np.float32]
+):
     """Test Arias Intensity calculation."""
     dt = sample_time[1] - sample_time[0]
 
@@ -159,7 +179,9 @@ def test_arias_intensity(sample_waveforms, sample_time):
 
 # Test cases for Fourier Amplitude Spectra
 @pytest.mark.parametrize("n_freqs", [5, 10])
-def test_fourier_amplitude_spectra(sample_waveforms, sample_time, n_freqs):
+def test_fourier_amplitude_spectra(
+    sample_waveforms: npt.NDArray[np.float32], sample_time: np.float32, n_freqs: int
+):
     """Test Fourier Amplitude Spectra calculation."""
     dt = sample_time[1] - sample_time[0]
     freqs = np.logspace(-1, 1, n_freqs, dtype=np.float32)
@@ -194,7 +216,7 @@ def test_invalid_memory_allocation():
         (2, 100),  # Missing component dimension
     ],
 )
-def test_invalid_waveform_shapes(invalid_shape):
+def test_invalid_waveform_shapes(invalid_shape: tuple[int, ...]):
     """Test handling of invalid waveform shapes."""
     waveforms = np.zeros(invalid_shape, dtype=np.float32)
 
@@ -218,7 +240,7 @@ def test_zero_waveform():
 
 
 @pytest.mark.parametrize("duration", [100, 200, 1000])
-def test_numerical_stability(duration):
+def test_numerical_stability(duration: int):
     """Test numerical stability with different duration lengths."""
     dt = 0.01
     t = np.arange(0, duration * dt, dt, dtype=np.float32)
