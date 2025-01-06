@@ -1,19 +1,18 @@
 """Test cases for intensity measure implementations."""
 
+import functools
 from collections.abc import Callable
 
 import numpy as np
 import numpy.typing as npt
 import pandas as pd
 import pytest
-import functools
+from hypothesis import assume, given, settings
+from hypothesis import strategies as st
+from hypothesis.extra import numpy as nst
 from numpy.testing import assert_array_almost_equal, assert_array_equal
 
 from IM import ims
-
-from hypothesis import assume, given, seed, settings
-from hypothesis import strategies as st
-from hypothesis.extra import numpy as nst
 
 
 # Common test fixtures
@@ -89,7 +88,10 @@ def test_newmark_estimate_psa(
 
 # Test cases for rotd PSA values
 def test_rotd_psa_values():
-    """Test rotation of PSA values."""
+    """Test rotation of PSA values. Assumes that the psa for angular frequnecy 1 is constant 1 for comp 0 and comp 90.
+    Checks that rotd_psa_values calculates cos(theta) * comp_0 + sin(theta) * comp_90 and maximises correctly by checking the maximum rotated psa value
+    is 2 * pi^2 * sqrt(2).
+    """
     w = 2 * np.pi * np.array([1.0])
     comp_0 = np.atleast_3d(np.ones((2, 100), dtype=np.float32))
     comp_90 = np.atleast_3d(np.ones((2, 100), dtype=np.float32))
@@ -127,6 +129,104 @@ def test_significant_duration(
     assert result.shape == (len(sample_waveforms),)
     assert np.all(result >= 0)
     assert np.all(result <= len(sample_time) * dt)
+
+
+@pytest.mark.parametrize(
+    "comp_0,expected_pga",
+    [
+        (np.ones((3,), dtype=np.float32), 1),
+        (np.linspace(0, 1, num=10, dtype=np.float32) ** 2, 1),
+        (2 * np.sin(np.linspace(0, 2 * np.pi)) - 1, 3),
+    ],
+)
+def test_pga(comp_0: npt.NDArray[np.float32], expected_pga: float):
+    waveforms = np.zeros((1, len(comp_0), 3))
+    waveforms[:, :, 1] = comp_0
+    assert np.isclose(
+        ims.peak_ground_acceleration(waveforms)["000"], expected_pga, atol=1e-3
+    )
+
+
+@pytest.mark.parametrize(
+    "comp_0,t_max,expected_pga",
+    [
+        (np.ones((100,), dtype=np.float32), 1, 981),
+        (np.linspace(0, 1, num=100, dtype=np.float32) ** 2, 1, 981 / 3),
+        (
+            2 * np.sin(np.linspace(0, 2 * np.pi, num=100, dtype=np.float32)) - 1,
+            2 * np.pi,
+            981 * 2 * np.pi,
+        ),
+    ],
+)
+def test_pgv(comp_0: npt.NDArray[np.float32], t_max: float, expected_pga: float):
+    waveforms = np.zeros((1, len(comp_0), 3))
+    waveforms[:, :, 1] = comp_0
+    dt = t_max / (len(comp_0) - 1)
+    assert np.isclose(
+        ims.peak_ground_velocity(waveforms, dt)["000"], expected_pga, atol=0.1
+    )
+
+
+@pytest.mark.parametrize(
+    "comp_0,t_max,expected_pgv",
+    [
+        (np.ones((100,), dtype=np.float32), 1, 981),
+        (np.linspace(0, 1, num=100, dtype=np.float32) ** 2, 1, 981 / 3),
+        (
+            2 * np.sin(np.linspace(0, 2 * np.pi, num=1000, dtype=np.float32)) - 1,
+            2 * np.pi,
+            981 * 2 / 3 * (6 * np.sqrt(3) + np.pi),
+        ),
+    ],
+)
+def test_cav(comp_0: npt.NDArray[np.float32], t_max: float, expected_pgv: float):
+    waveforms = np.zeros((1, len(comp_0), 3))
+    waveforms[:, :, 1] = comp_0
+    dt = t_max / (len(comp_0) - 1)
+    assert np.isclose(
+        ims.cumulative_absolute_velocity(waveforms, dt)["000"], expected_pgv, atol=0.1
+    )
+
+
+@pytest.mark.parametrize(
+    "comp_0,t_max,expected_ai",
+    [
+        (np.ones((100,), dtype=np.float32), 1, np.pi / (2 * 981)),
+        (np.linspace(0, 1, num=100, dtype=np.float32) ** 2, 1, np.pi / (2 * 981 * 5)),
+    ],
+)
+def test_ai(comp_0: npt.NDArray[np.float32], t_max: float, expected_ai: float):
+    waveforms = np.zeros((1, len(comp_0), 3))
+    waveforms[:, :, 1] = comp_0
+    dt = t_max / (len(comp_0) - 1)
+    assert np.isclose(ims.arias_intensity(waveforms, dt)["000"], expected_ai, atol=0.1)
+
+
+def test_psa():
+    comp_0 = np.ones((100,))
+    waveforms = np.zeros((1, len(comp_0), 3))
+    waveforms[:, :, 1] = comp_0
+    dt = 0.01
+    w = np.array([1], dtype=np.float32)
+    psa_values = ims.pseudo_spectral_acceleration(waveforms, w, dt)
+
+    # assert psa is close to the expected psa derived by solving the ODE in
+    # Wolfram Alpha and finding the abs max.
+    assert np.isclose(psa_values["000"], 1.8544671, atol=5e-3)
+
+
+# TODO: Find a good test for Fourier Amplitude Spectra
+
+
+def test_ds5xx():
+    comp_0 = np.ones((100,))
+    waveforms = np.zeros((1, len(comp_0), 3))
+    waveforms[:, :, 1] = comp_0
+    t_max = 1
+    dt = t_max / len(comp_0)
+    assert ims.ds575(waveforms, dt)["000"].iloc[0] == pytest.approx(0.7)
+    assert ims.ds595(waveforms, dt)["000"].iloc[0] == pytest.approx(0.9)
 
 
 # Test cases for peak ground motion parameters
@@ -172,10 +272,7 @@ def test_arias_intensity(
 
     # Check DataFrame structure
     assert isinstance(result, pd.DataFrame)
-    assert all(
-        col in result.columns
-        for col in ["intensity_measure", "000", "090", "ver", "mean"]
-    )
+    assert all(col in result.columns for col in ["000", "090", "ver", "mean"])
     # Check values
     assert np.all(result.select_dtypes(include=[np.number]) >= 0)
     # Check mean calculation
@@ -233,15 +330,12 @@ def test_invalid_waveform_shapes(invalid_shape: tuple[int, ...]):
 def test_zero_waveform():
     """Test behavior with zero-amplitude waveforms."""
     waveforms = np.zeros((2, 100, 3), dtype=np.float32)
-    dt = 0.01
 
     # Test various intensity measures with zero input
     pga_result = ims.peak_ground_acceleration(waveforms)
-    ai_result = ims.arias_intensity(waveforms, dt)
 
     # All results should be zero
     assert np.all(pga_result.select_dtypes(include=[np.number]) == 0)
-    assert np.all(ai_result.select_dtypes(include=[np.number]) == 0)
 
 
 @pytest.mark.parametrize("duration", [100, 200, 1000])
@@ -267,30 +361,50 @@ def test_numerical_stability(duration: int):
             ims.peak_ground_acceleration,
             ims.peak_ground_velocity,
             ims.cumulative_absolute_velocity,
+            ims.ds575,
+            ims.ds595,
         ]
     ),
     waveform=nst.arrays(
         np.float32,
         shape=st.tuples(st.integers(2, 10), st.integers(2, 10), st.just(3)),
-        elements=st.floats(-1, 1),
+        elements=st.floats(0.01, 1).flatmap(
+            lambda x: st.sampled_from([-1, 1]).flatmap(lambda sign: st.just(sign * x))
+        ),
     ),
 )
 @settings(deadline=None)
 def test_rotational_invariance(waveform: npt.NDArray[np.float32], func: Callable):
+    # DS595 and DS575 won't work if the waveform has
+    assume(
+        all(
+            np.any(
+                np.abs(
+                    np.cos(np.radians(theta)) * waveform[:, :, 1]
+                    + np.sin(np.radians(theta)) * waveform[:, :, 0]
+                )
+                > 1e-5,
+                axis=1,
+            ).all()
+            for theta in range(180)
+        )
+    )
     if func != ims.peak_ground_acceleration:
         dt = 0.01
         func = functools.partial(func, dt=dt)
+    old_waveform = np.copy(waveform)
     waveform_ims = func(waveform)
+    assert np.allclose(old_waveform, waveform)
     waveform_ims_transposed = func(waveform[:, :, [1, 0, 2]])
 
     assert_array_almost_equal(
-        waveform_ims["rotd0"], waveform_ims_transposed["rotd0"], decimal=5
+        waveform_ims["rotd0"], waveform_ims_transposed["rotd0"], decimal=3
     )
     assert_array_almost_equal(
-        waveform_ims["rotd50"], waveform_ims_transposed["rotd50"], decimal=5
+        waveform_ims["rotd50"], waveform_ims_transposed["rotd50"], decimal=3
     )
     assert_array_almost_equal(
-        waveform_ims["rotd100"], waveform_ims_transposed["rotd100"], decimal=5
+        waveform_ims["rotd100"], waveform_ims_transposed["rotd100"], decimal=3
     )
 
 

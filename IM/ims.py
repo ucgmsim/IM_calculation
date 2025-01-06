@@ -467,7 +467,8 @@ def _cumulative_absolute_velocity(
                 x0 = -v1 * inv_slope
                 tmp += x0 * np.abs(v1) + (dtf - x0) * np.abs(v2)
         cav[i] = tmp * half
-    return cav
+    g = np.float32(981.0)
+    return g * cav
 
 
 @numba.njit(parallel=True)
@@ -503,8 +504,8 @@ def _arias_intensity(
                 x0 = -v1 * inv_slope
                 tmp += x0 * np.square(v1) + (dtf - x0) * np.square(v2)
         ai[i] = tmp * half
-    g = 981
-    return np.pi * g * half * ai
+    g = np.float32(1 / 981)
+    return np.pi * half * g * ai
 
 
 @numba.njit(parallel=True)
@@ -632,7 +633,6 @@ def arias_intensity(waveform: npt.NDArray[np.float32], dt: float) -> pd.DataFram
 
     return pd.DataFrame(
         {
-            "intensity_measure": "AI",
             "000": arias_intensity_0,
             "090": arias_intensity_90,
             "ver": arias_intensity_ver,
