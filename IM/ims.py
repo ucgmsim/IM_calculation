@@ -582,8 +582,8 @@ def peak_ground_velocity(waveform: npt.NDArray[np.float32], dt: float) -> pd.Dat
     """
     g = 981
     return compute_intensity_measure_rotd(
-        np.abs(sp.integrate.cumulative_trapezoid(waveform, dx=dt, axis=1)),
-        lambda v: g * v.max(axis=1),
+        sp.integrate.cumulative_trapezoid(waveform, dx=dt, axis=1),
+        lambda v: g * np.abs(v).max(axis=1),
     )
 
 

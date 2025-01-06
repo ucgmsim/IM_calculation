@@ -6,9 +6,14 @@ import numpy as np
 import numpy.typing as npt
 import pandas as pd
 import pytest
+import functools
 from numpy.testing import assert_array_almost_equal, assert_array_equal
 
 from IM import ims
+
+from hypothesis import assume, given, seed, settings
+from hypothesis import strategies as st
+from hypothesis.extra import numpy as nst
 
 
 # Common test fixtures
@@ -254,3 +259,36 @@ def test_numerical_stability(duration: int):
     assert_array_almost_equal(result["000"], 1.0, decimal=5)
     # The others should just be 0.0
     assert_array_almost_equal(result["090"], 0.0, decimal=5)
+
+
+@given(
+    func=st.sampled_from(
+        [
+            ims.peak_ground_acceleration,
+            ims.peak_ground_velocity,
+            ims.cumulative_absolute_velocity,
+        ]
+    ),
+    waveform=nst.arrays(
+        np.float32,
+        shape=st.tuples(st.integers(2, 10), st.integers(2, 10), st.just(3)),
+        elements=st.floats(-1, 1),
+    ),
+)
+@settings(deadline=None)
+def test_rotational_invariance(func: Callable, waveform: npt.NDArray[np.float32]):
+    if func != ims.peak_ground_acceleration:
+        dt = 0.01
+        func = functools.partial(func, dt=dt)
+    waveform_ims = func(waveform)
+    waveform_ims_transposed = func(waveform[:, :, [1, 0, 2]])
+
+    assert_array_almost_equal(
+        waveform_ims["rotd0"], waveform_ims_transposed["rotd0"], decimal=5
+    )
+    assert_array_almost_equal(
+        waveform_ims["rotd50"], waveform_ims_transposed["rotd50"], decimal=5
+    )
+    assert_array_almost_equal(
+        waveform_ims["rotd100"], waveform_ims_transposed["rotd100"], decimal=5
+    )
