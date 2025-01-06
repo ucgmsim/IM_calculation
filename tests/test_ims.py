@@ -276,7 +276,7 @@ def test_numerical_stability(duration: int):
     ),
 )
 @settings(deadline=None)
-def test_rotational_invariance(func: Callable, waveform: npt.NDArray[np.float32]):
+def test_rotational_invariance(waveform: npt.NDArray[np.float32], func: Callable):
     if func != ims.peak_ground_acceleration:
         dt = 0.01
         func = functools.partial(func, dt=dt)
@@ -291,4 +291,29 @@ def test_rotational_invariance(func: Callable, waveform: npt.NDArray[np.float32]
     )
     assert_array_almost_equal(
         waveform_ims["rotd100"], waveform_ims_transposed["rotd100"], decimal=5
+    )
+
+
+@given(
+    waveform=nst.arrays(
+        np.float32,
+        shape=st.tuples(st.integers(2, 10), st.integers(2, 10), st.just(3)),
+        elements=st.floats(-1, 1),
+    ),
+)
+@settings(deadline=None)
+def test_component_orientation(waveform: npt.NDArray[np.float32]):
+    waveform_ims = ims.peak_ground_acceleration(waveform)
+
+    assert_array_almost_equal(
+        waveform_ims["000"],
+        np.abs(waveform[:, :, ims.Component.COMP_0]).max(axis=1),
+    )
+    assert_array_almost_equal(
+        waveform_ims["090"],
+        np.abs(waveform[:, :, ims.Component.COMP_90]).max(axis=1),
+    )
+    assert_array_almost_equal(
+        waveform_ims["ver"],
+        np.abs(waveform[:, :, ims.Component.COMP_VER]).max(axis=1),
     )

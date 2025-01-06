@@ -628,7 +628,7 @@ def arias_intensity(waveform: npt.NDArray[np.float32], dt: float) -> pd.DataFram
     """
     arias_intensity_0 = _arias_intensity(waveform[:, :, Component.COMP_0.value], dt)
     arias_intensity_90 = _arias_intensity(waveform[:, :, Component.COMP_90.value], dt)
-    arias_intensity_ver = _arias_intensity(waveform[:, :, Component.COMP_VER], dt)
+    arias_intensity_ver = _arias_intensity(waveform[:, :, Component.COMP_VER.value], dt)
 
     return pd.DataFrame(
         {
