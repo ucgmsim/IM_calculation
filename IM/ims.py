@@ -589,7 +589,7 @@ def peak_ground_velocity(waveform: npt.NDArray[np.float32], dt: float) -> pd.Dat
 
 
 def cumulative_absolute_velocity(
-    waveform: npt.NDArray[np.float32], dt: float
+    waveform: npt.NDArray[np.float32], dt: float, threshold: Optional[float] = None
 ) -> pd.DataFrame:
     """Compute Cumulative Absolute Velocity (CAV) for waveforms.
 
@@ -599,12 +599,25 @@ def cumulative_absolute_velocity(
         Acceleration waveforms.
     dt : float
         Timestep resolution of the waveform array.
+    threshold : float, optional
+        The minimum acceleration threshold, in cm/s^2. CAV5 is found by using
+        `threshold` = 5. Acceleration values below `threshold` are set to zero.
 
     Returns
     -------
-    pandas.DataFrame with columns ['000', '090', 'ver', 'geom', 'rotd100', 'rotd50', 'rotd0']
+    pandas.DataFrame with columns `['000', '090', 'ver', 'geom', 'rotd100', 'rotd50', 'rotd0']`
         DataFrame containing CAV values with rotated components.
     """
+
+    if threshold:
+        g = 981
+        return compute_intensity_measure_rotd(
+            waveform,
+            lambda v: _cumulative_absolute_velocity(
+                np.where(np.abs(v) < threshold / g, np.float32(0), v), dt
+            ),
+        )
+
     return compute_intensity_measure_rotd(
         waveform,
         lambda v: _cumulative_absolute_velocity(v, dt),

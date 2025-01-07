@@ -2,6 +2,7 @@
 
 import functools
 from collections.abc import Callable
+from typing import Optional
 
 import numpy as np
 import numpy.typing as npt
@@ -169,24 +170,41 @@ def test_pgv(comp_0: npt.NDArray[np.float32], t_max: float, expected_pga: float)
 
 
 @pytest.mark.parametrize(
-    "comp_0,t_max,expected_pgv",
+    "comp_0,t_max,expected_cav,expected_cav5",
     [
-        (np.ones((100,), dtype=np.float32), 1, 981),
-        (np.linspace(0, 1, num=100, dtype=np.float32) ** 2, 1, 981 / 3),
+        (np.ones((100,), dtype=np.float32), 1, 981, 981),
+        (
+            np.linspace(0, 1, num=100, dtype=np.float32) ** 2,
+            1,
+            981 / 3,
+            981 / 3 * (1 - np.sqrt(5 / 981) ** 3),
+        ),
         (
             2 * np.sin(np.linspace(0, 2 * np.pi, num=1000, dtype=np.float32)) - 1,
             2 * np.pi,
             981 * 2 / 3 * (6 * np.sqrt(3) + np.pi),
+            None,
         ),
     ],
 )
-def test_cav(comp_0: npt.NDArray[np.float32], t_max: float, expected_pgv: float):
+def test_cav(
+    comp_0: npt.NDArray[np.float32],
+    t_max: float,
+    expected_cav: float,
+    expected_cav5: Optional[float],
+):
     waveforms = np.zeros((1, len(comp_0), 3))
     waveforms[:, :, 1] = comp_0
     dt = t_max / (len(comp_0) - 1)
     assert np.isclose(
-        ims.cumulative_absolute_velocity(waveforms, dt)["000"], expected_pgv, atol=0.1
+        ims.cumulative_absolute_velocity(waveforms, dt)["000"], expected_cav, atol=0.1
     )
+    if expected_cav5:
+        assert np.isclose(
+            ims.cumulative_absolute_velocity(waveforms, dt, threshold=5)["000"],
+            expected_cav5,
+            atol=0.1,
+        )
 
 
 @pytest.mark.parametrize(
