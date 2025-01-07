@@ -186,7 +186,7 @@ def pseudo_spectral_acceleration(
 
     Returns
     -------
-    pandas.DataFrame with columns `['intensity_measure', '000', '090', 'ver', 'geom', 'rotd0','rotd50', 'rotd100']`
+    pandas.DataFrame with columns `['000', '090', 'ver', 'geom', 'rotd0','rotd50', 'rotd100']`
         DataFrame containing PSA values for each period and station.
     """
     t = np.arange(waveforms.shape[1]) * dt
@@ -227,23 +227,19 @@ def pseudo_spectral_acceleration(
         newmark_estimate_psa(waveforms[:, :, 2], t, dt, w)
     ).max(axis=1)
     geom_psa = np.sqrt(comp_0_psa * comp_90_psa)
-    return pd.concat(
-        [
-            pd.DataFrame(
-                {
-                    "intensity_measure": f"pSA_{p:.2f}",
-                    "000": comp_0_psa[:, i],
-                    "090": comp_90_psa[:, i],
-                    "ver": ver_psa[:, i],
-                    "geom": geom_psa[:, i],
-                    "rotd0": rotd_psa[:, i, 0],
-                    "rotd50": rotd_psa[:, i, 1],
-                    "rotd100": rotd_psa[:, i, 2],
-                }
-            )
-            for i, p in enumerate(periods)
-        ]
-    )
+
+    return pd.DataFrame(
+        {
+            "period": periods,
+            "000": list(comp_0_psa.T),
+            "090": list(comp_90_psa.T),
+            "ver": list(ver_psa.T),
+            "geom": list(geom_psa.T),
+            "rotd0": list(rotd_psa[:, :, 0].T),
+            "rotd50": list(rotd_psa[:, :, 1].T),
+            "rotd100": list(rotd_psa[:, :, 2].T),
+        }
+    ).set_index("period")
 
 
 def compute_intensity_measure_rotd(
@@ -387,7 +383,7 @@ def fourier_amplitude_spectra(
 
     Returns
     -------
-    pandas.DataFrame with columns `['freq', '000', '090', 'ver', 'mean']`
+    pandas.DataFrame with columns `['000', '090', 'ver', 'mean']`
         DataFrame containing FAS calculations.
     """
     n_fft = 2 ** int(np.ceil(np.log2(waveforms.shape[1])))
@@ -408,21 +404,15 @@ def fourier_amplitude_spectra(
             dtype=np.float32,
         )
     fas_mean = np.sqrt(0.5 * (np.square(fas_0) + np.square(fas_90)))
-    fas_df = pd.concat(
-        [
-            pd.DataFrame(
-                {
-                    "freq": freq,
-                    "000": fas_0[:, i],
-                    "090": fas_90[:, i],
-                    "ver": fas_ver[:, i],
-                    "mean": fas_mean[:, i],
-                }
-            )
-            for i, freq in enumerate(freqs)
-        ]
-    )
-    return fas_df
+    return pd.DataFrame(
+        {
+            "freq": freqs,
+            "000": list(fas_0.T),
+            "090": list(fas_90.T),
+            "ver": list(fas_ver.T),
+            "mean": list(fas_mean.T),
+        }
+    ).set_index("freq")
 
 
 @numba.njit(parallel=True)

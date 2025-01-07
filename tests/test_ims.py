@@ -223,15 +223,16 @@ def test_ai(comp_0: npt.NDArray[np.float32], t_max: float, expected_ai: float):
 
 def test_psa():
     comp_0 = np.ones((100,))
-    waveforms = np.zeros((1, len(comp_0), 3))
-    waveforms[:, :, 1] = comp_0
+    waveforms = np.zeros((2, len(comp_0), 3))
+    waveforms[0, :, 1] = comp_0
+    waveforms[1, :, 1] = comp_0
     dt = 0.01
     w = np.array([1], dtype=np.float32)
     psa_values = ims.pseudo_spectral_acceleration(waveforms, w, dt)
 
     # assert psa is close to the expected psa derived by solving the ODE in
     # Wolfram Alpha and finding the abs max.
-    assert np.isclose(psa_values["000"], 1.8544671, atol=5e-3)
+    assert np.allclose(psa_values.loc[1]["000"], 1.8544671, atol=5e-3)
 
 
 # TODO: Find a good test for Fourier Amplitude Spectra
@@ -310,9 +311,9 @@ def test_fourier_amplitude_spectra(
 
     # Check DataFrame structure
     assert isinstance(result, pd.DataFrame)
-    assert all(col in result.columns for col in ["freq", "000", "090", "ver", "mean"])
+    assert all(col in result.columns for col in ["000", "090", "ver", "mean"])
     # Check frequency values
-    assert_array_equal(result["freq"].unique(), freqs)
+    assert_array_equal(result.index.values, freqs)
     # Check values
     assert np.all(result.select_dtypes(include=[np.number]) >= 0)
 
