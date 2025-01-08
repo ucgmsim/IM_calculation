@@ -19,9 +19,9 @@ import scipy as sp
 class Component(IntEnum):
     """Component index enumeration."""
 
-    COMP_0 = 1
+    COMP_0 = 0
     """Index for the 0° component of a waveform."""
-    COMP_90 = 0
+    COMP_90 = 1
     """Index for the 90° component of a waveform."""
     COMP_VER = 2
     """Index for the vertical component of a waveform."""
@@ -45,11 +45,11 @@ def newmark_estimate_psa(
     waveforms : ndarray of float32 with shape `(n_stations, n_timesteps)`
         Acceleration waveforms array.
     t : ndarray of float32
-        Time values corresponding to waveforms.
+        Time values corresponding to waveforms (s).
     dt : float
-        Time step between consecutive samples.
+        Time step between consecutive samples (s).
     w : ndarray of float32
-        Angular frequencies of single-degree-of-freedom oscillators.
+        Angular frequencies of single-degree-of-freedom oscillators (Hz).
     xi : float32, optional
         Damping coefficient, by default 0.05
     gamma : float32, optional
@@ -120,7 +120,7 @@ def rotd_psa_values(
     comp_090 : ndarray of float32 with shape `(n_periods, n_stations, n_timesteps)`
         PSA in 090 component (cm/s^2).
     w : ndarray of float32
-        Natural angular frequencies of oscillators.
+        Natural angular frequencies of oscillators (Hz).
     step : int
         Number of stations to process in parallel.
 
@@ -174,13 +174,13 @@ def pseudo_spectral_acceleration(
     Parameters
     ----------
     waveforms : ndarray of float32 with shape `(n_stations, n_timesteps, n_components)`
-        Acceleration waveforms array.
+        Acceleration waveforms array (g).
     periods : ndarray of float32
-        Periods for PSA computation. These correspond to SDOF oscillator natural frequencies.
+        Periods for PSA computation (s). These correspond to SDOF oscillator natural frequencies.
     dt : float
-        Timestep resolution of waveform array.
+        Timestep resolution of waveform array (s).
     psa_rotd_maximum_memory_allocation : float, optional
-        Maximum memory allocation for PSA rotation calculations.
+        Maximum memory allocation for PSA rotation calculations (bytes).
     cores : int, optional
         Number of CPU cores to use, by default all available cores.
 
@@ -251,7 +251,7 @@ def compute_intensity_measure_rotd(
     Parameters
     ----------
     waveforms : ndarray of float32 with shape `(n_stations, n_timesteps, n_components)`
-        Acceleration waveforms array (cm/s^2).
+        Acceleration waveforms array (g).
     intensity_measure : callable
         Function that computes the intensity measure. Should accept a 2D array
         of shape `(n_stations, n_timesteps)` and return a 1D array of shape
@@ -259,7 +259,7 @@ def compute_intensity_measure_rotd(
 
     Returns
     -------
-    pandas.DataFrame with columns ['000', '090', 'ver', 'geom', 'rotd100', 'rotd50', 'rotd0']
+    pandas.DataFrame with columns `['000', '090', 'ver', 'geom', 'rotd100', 'rotd50', 'rotd0']`
         DataFrame containing intensity measure statistics. Each row represents
         statistics for a single station.
     """
@@ -302,14 +302,14 @@ def trapz(waveforms: npt.NDArray[np.float32], dt: float) -> npt.NDArray[np.float
     Parameters
     ----------
     waveforms : ndarray of float32 with shape `(n_stations, n_timesteps)`
-        Waveform accelerations to integrate.
+        Waveform accelerations to integrate (g).
     dt : float
-        Timestep resolution of the waveform array.
+        Timestep resolution of the waveform array (t).
 
     Returns
     -------
     ndarray of float32 with shape (n_stations,)
-        Integrated values for each waveform.
+        Integrated values for each waveform (g-sec).
 
     Notes
     -----
@@ -337,9 +337,9 @@ def significant_duration(
     Parameters
     ----------
     waveforms : ndarray of float32 with shape `(n_stations, n_timesteps)`
-        Waveform accelerations.
+        Waveform accelerations (g).
     dt : float
-        Timestep resolution of the waveform array.
+        Timestep resolution of the waveform array (s).
     percent_low : float
         Lower bound percentage for significant duration (e.g., 5 for 5%).
     percent_high : float
@@ -373,11 +373,11 @@ def fourier_amplitude_spectra(
     Parameters
     ----------
     waveforms : ndarray of float32 with shape `(n_stations, n_timesteps, n_components)`
-        Waveform array.
+        Waveform array (g).
     dt : float
-        Timestep resolution of the waveforms.
+        Timestep resolution of the waveforms (s).
     freqs : ndarray of float32
-        Frequencies at which to compute FAS.
+        Frequencies at which to compute FAS (Hz).
     cores : int, optional
         Number of CPU cores to use, by default all available cores.
 
@@ -424,9 +424,9 @@ def _cumulative_absolute_velocity(
     Parameters
     ----------
     waveform : ndarray of float32 with shape `(n_stations, n_timesteps)`
-        Waveform accelerations.
+        Waveform accelerations (g).
     dt : float
-        Timestep resolution of the waveform array.
+        Timestep resolution of the waveform array (s).
 
     Returns
     -------
@@ -470,9 +470,9 @@ def _arias_intensity(
     Parameters
     ----------
     waveform : ndarray of float32 with shape `(n_stations, n_timesteps)`
-        Waveform accelerations.
+        Waveform accelerations (g).
     dt : float
-        Timestep resolution of the waveform array.
+        Timestep resolution of the waveform array (s).
 
     Returns
     -------
@@ -508,9 +508,9 @@ def _cumulative_arias_intensity(
     ----------
     waveform : npt.NDArray[np.float32]
         A 3D array of shape `(n_stations, n_samples, n_components)` for each
-        waveform in each measured component.
+        waveform in each measured component (g).
     dt : float
-        The time step (in seconds) between consecutive samples in the waveform.
+        The time step (in seconds) between consecutive samples in the waveform (s).
 
     Returns
     -------
@@ -567,7 +567,7 @@ def peak_ground_velocity(waveform: npt.NDArray[np.float32], dt: float) -> pd.Dat
 
     Returns
     -------
-    pandas.DataFrame with columns ['000', '090', 'ver', 'geom', 'rotd100', 'rotd50', 'rotd0']
+    pandas.DataFrame with columns `['000', '090', 'ver', 'geom', 'rotd100', 'rotd50', 'rotd0']`
         DataFrame containing PGV values with rotated components. Values are
         in cm/s.
     """
@@ -586,9 +586,9 @@ def cumulative_absolute_velocity(
     Parameters
     ----------
     waveform : ndarray of float32 with shape `(n_stations, n_timesteps, n_components)`
-        Acceleration waveforms.
+        Acceleration waveforms (g).
     dt : float
-        Timestep resolution of the waveform array.
+        Timestep resolution of the waveform array (s).
     threshold : float, optional
         The minimum acceleration threshold, in cm/s^2. CAV5 is found by using
         `threshold` = 5. Acceleration values below `threshold` are set to zero.
@@ -620,9 +620,9 @@ def arias_intensity(waveform: npt.NDArray[np.float32], dt: float) -> pd.DataFram
     Parameters
     ----------
     waveform : ndarray of float32 with shape `(n_stations, n_timesteps, n_components)`
-        Acceleration waveforms.
+        Acceleration waveforms (g).
     dt : float
-        Timestep resolution of the waveform array.
+        Timestep resolution of the waveform array (s).
 
     Returns
     -------
@@ -650,14 +650,14 @@ def ds575(waveform: npt.NDArray[np.float32], dt: float) -> pd.DataFrame:
     Parameters
     ----------
     waveform : ndarray of float32 with shape `(n_stations, n_timesteps, n_components)`
-        Acceleration waveforms.
+        Acceleration waveforms (g).
     dt : float
-        Timestep resolution of the waveform array.
+        Timestep resolution of the waveform array (s).
 
     Returns
     -------
     pandas.DataFrame with columns `['000', '090', 'ver', 'geom', 'rotd100', 'rotd50', 'rotd0']`
-        DataFrame containing DS575 values with rotated components.
+        DataFrame containing DS575 values (in seconds) with rotated components.
     """
     return compute_intensity_measure_rotd(
         waveform,
@@ -678,7 +678,7 @@ def ds595(waveform: npt.NDArray[np.float32], dt: float) -> pd.DataFrame:
     Returns
     -------
     pandas.DataFrame with columns `['000', '090', 'ver', 'geom', 'rotd100', 'rotd50', 'rotd0']`
-        DataFrame containing DS595 values with rotated components.
+        DataFrame containing DS595 values (in seconds) with rotated components.
     """
     return compute_intensity_measure_rotd(
         waveform,

@@ -142,7 +142,7 @@ def test_significant_duration(
 )
 def test_pga(comp_0: npt.NDArray[np.float32], expected_pga: float):
     waveforms = np.zeros((1, len(comp_0), 3))
-    waveforms[:, :, 1] = comp_0
+    waveforms[:, :, ims.Component.COMP_0] = comp_0
     assert np.isclose(
         ims.peak_ground_acceleration(waveforms)["000"], expected_pga, atol=1e-3
     )
@@ -162,7 +162,7 @@ def test_pga(comp_0: npt.NDArray[np.float32], expected_pga: float):
 )
 def test_pgv(comp_0: npt.NDArray[np.float32], t_max: float, expected_pga: float):
     waveforms = np.zeros((1, len(comp_0), 3))
-    waveforms[:, :, 1] = comp_0
+    waveforms[:, :, ims.Component.COMP_0] = comp_0
     dt = t_max / (len(comp_0) - 1)
     assert np.isclose(
         ims.peak_ground_velocity(waveforms, dt)["000"], expected_pga, atol=0.1
@@ -194,7 +194,7 @@ def test_cav(
     expected_cav5: Optional[float],
 ):
     waveforms = np.zeros((1, len(comp_0), 3))
-    waveforms[:, :, 1] = comp_0
+    waveforms[:, :, ims.Component.COMP_0] = comp_0
     dt = t_max / (len(comp_0) - 1)
     assert np.isclose(
         ims.cumulative_absolute_velocity(waveforms, dt)["000"], expected_cav, atol=0.1
@@ -216,7 +216,7 @@ def test_cav(
 )
 def test_ai(comp_0: npt.NDArray[np.float32], t_max: float, expected_ai: float):
     waveforms = np.zeros((1, len(comp_0), 3))
-    waveforms[:, :, 1] = comp_0
+    waveforms[:, :, ims.Component.COMP_0] = comp_0
     dt = t_max / (len(comp_0) - 1)
     assert np.isclose(ims.arias_intensity(waveforms, dt)["000"], expected_ai, atol=0.1)
 
@@ -224,8 +224,8 @@ def test_ai(comp_0: npt.NDArray[np.float32], t_max: float, expected_ai: float):
 def test_psa():
     comp_0 = np.ones((100,))
     waveforms = np.zeros((2, len(comp_0), 3))
-    waveforms[0, :, 1] = comp_0
-    waveforms[1, :, 1] = comp_0
+    waveforms[0, :, ims.Component.COMP_0] = comp_0
+    waveforms[1, :, ims.Component.COMP_0] = comp_0
     dt = 0.01
     w = np.array([1], dtype=np.float32)
     psa_values = ims.pseudo_spectral_acceleration(waveforms, w, dt)
@@ -241,7 +241,7 @@ def test_psa():
 def test_ds5xx():
     comp_0 = np.ones((100,))
     waveforms = np.zeros((1, len(comp_0), 3))
-    waveforms[:, :, 1] = comp_0
+    waveforms[:, :, ims.Component.COMP_0] = comp_0
     t_max = 1
     dt = t_max / len(comp_0)
     assert ims.ds575(waveforms, dt)["000"].iloc[0] == pytest.approx(0.7)
