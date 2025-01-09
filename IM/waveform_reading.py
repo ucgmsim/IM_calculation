@@ -48,6 +48,10 @@ def read_mseed(file_path: Path) -> tuple[float, np.ndarray]:
 
     # Combine all data into a single NumPy array
     waveform_data = np.concatenate(all_data)
+
+    # Ensure dtype is float 32
+    waveform_data = waveform_data.astype(np.float32)
+
     return dt, waveform_data
 
 def read_ascii(file_000: Path, file_090: Path, file_ver: Path) -> tuple[float, np.ndarray]:
@@ -83,5 +87,8 @@ def read_ascii(file_000: Path, file_090: Path, file_ver: Path) -> tuple[float, n
 
     # Stack components into a single NumPy array
     waveform_data = np.stack((comp_000, comp_090, comp_ver), axis=1)
+
+    # Ensure dtype is float 32
+    waveform_data = waveform_data.astype(np.float32)
 
     return delta, waveform_data
