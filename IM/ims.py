@@ -14,6 +14,7 @@ import numpy.typing as npt
 import pandas as pd
 import pykooh
 import scipy as sp
+import xarray as xr
 
 
 class Component(IntEnum):
@@ -168,7 +169,7 @@ def pseudo_spectral_acceleration(
     dt: float,
     psa_rotd_maximum_memory_allocation: Optional[float] = None,
     cores: int = multiprocessing.cpu_count(),
-) -> pd.DataFrame:
+) -> xr.Dataset:
     """Compute pseudo-spectral acceleration statistics for waveforms.
 
     Parameters
@@ -223,23 +224,31 @@ def pseudo_spectral_acceleration(
     conversion_factor = np.square(w)[np.newaxis, :]
     comp_0_psa = conversion_factor * np.abs(comp_0).max(axis=1)
     comp_90_psa = conversion_factor * np.abs(comp_90).max(axis=1)
-    ver_psa = conversion_factor * np.abs(
+    comp_ver_psa = conversion_factor * np.abs(
         newmark_estimate_psa(waveforms[:, :, 2], t, dt, w)
     ).max(axis=1)
     geom_psa = np.sqrt(comp_0_psa * comp_90_psa)
 
-    return pd.DataFrame(
-        {
+    return xr.DataArray(
+        np.stack(
+            [
+                comp_0_psa,
+                comp_90_psa,
+                comp_ver_psa,
+                geom_psa,
+                rotd_psa[:, :, 0],
+                rotd_psa[:, :, 1],
+                rotd_psa[:, :, 2],
+            ],
+            axis=0,
+        ),
+        dims=("component", "station", "period"),
+        coords={
+            "station": np.arange(waveforms.shape[0]),
             "period": periods,
-            "000": list(comp_0_psa.T),
-            "090": list(comp_90_psa.T),
-            "ver": list(ver_psa.T),
-            "geom": list(geom_psa.T),
-            "rotd0": list(rotd_psa[:, :, 0].T),
-            "rotd50": list(rotd_psa[:, :, 1].T),
-            "rotd100": list(rotd_psa[:, :, 2].T),
-        }
-    ).set_index("period")
+            "component": ["000", "090", "ver", "geom", "rotd0", "rotd50", "rotd100"],
+        },
+    )
 
 
 def compute_intensity_measure_rotd(
@@ -365,7 +374,7 @@ def fourier_amplitude_spectra(
     freqs: npt.NDArray[np.float32],
     cores: int = multiprocessing.cpu_count(),
     ko_bandwidth: int = 40,
-) -> pd.DataFrame:
+) -> xr.DataArray:
     """Compute Fourier Amplitude Spectrum (FAS) of seismic waveforms.
 
     The FAS is computed using FFT and then smoothed using the Konno-Ohmachi
@@ -406,16 +415,25 @@ def fourier_amplitude_spectra(
             pool.map(smoother, fa_spectrum[:, :, Component.COMP_VER]),
             dtype=np.float32,
         )
-    fas_mean = np.sqrt(0.5 * (np.square(fas_0) + np.square(fas_90)))
-    return pd.DataFrame(
-        {
-            "freq": freqs,
-            "000": list(fas_0.T),
-            "090": list(fas_90.T),
-            "ver": list(fas_ver.T),
-            "mean": list(fas_mean.T),
-        }
-    ).set_index("freq")
+    eas = np.sqrt(0.5 * (np.square(fas_0) + np.square(fas_90)))
+
+    return xr.DataArray(
+        np.stack(
+            [
+                fas_0,
+                fas_90,
+                fas_ver,
+                eas,
+            ],
+            axis=0,
+        ),
+        dims=("component", "station", "frequency"),
+        coords={
+            "component": ["000", "090", "ver", "eas"],
+            "frequency": freqs,
+            "station": np.arange(waveforms.shape[0]),
+        },
+    )
 
 
 @numba.njit(parallel=True)

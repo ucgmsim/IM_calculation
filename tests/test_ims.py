@@ -8,6 +8,7 @@ import numpy as np
 import numpy.typing as npt
 import pandas as pd
 import pytest
+import xarray as xr
 from hypothesis import assume, given, settings
 from hypothesis import strategies as st
 from hypothesis.extra import numpy as nst
@@ -227,12 +228,14 @@ def test_psa():
     waveforms[0, :, ims.Component.COMP_0] = comp_0
     waveforms[1, :, ims.Component.COMP_0] = comp_0
     dt = 0.01
-    w = np.array([1], dtype=np.float32)
+    w = np.array([1, 2], dtype=np.float32)
     psa_values = ims.pseudo_spectral_acceleration(waveforms, w, dt)
 
     # assert psa is close to the expected psa derived by solving the ODE in
     # Wolfram Alpha and finding the abs max.
-    assert np.allclose(psa_values.loc[1]["000"], 1.8544671, atol=5e-3)
+    assert np.allclose(
+        psa_values.sel(station=0, period=1.0, component="000"), 1.8544671, atol=5e-3
+    )
 
 
 # TODO: Find a good test for Fourier Amplitude Spectra
@@ -310,12 +313,10 @@ def test_fourier_amplitude_spectra(
     result = ims.fourier_amplitude_spectra(sample_waveforms, dt, freqs)
 
     # Check DataFrame structure
-    assert isinstance(result, pd.DataFrame)
-    assert all(col in result.columns for col in ["000", "090", "ver", "mean"])
-    # Check frequency values
-    assert_array_equal(result.index.values, freqs)
-    # Check values
-    assert np.all(result.select_dtypes(include=[np.number]) >= 0)
+    assert isinstance(result, xr.DataArray)
+    assert list(result.coords["component"]) == ["000", "090", "ver", "eas"]
+    assert np.allclose(result.coords["frequency"], freqs)
+    assert np.all(result.as_numpy() >= 0)
 
 
 # Error test cases
