@@ -52,7 +52,10 @@ def read_mseed(file_path: Path) -> tuple[float, np.ndarray]:
     # Ensure dtype is float 32
     waveform_data = waveform_data.astype(np.float32)
 
-    return dt, waveform_data
+    # Reshape the waveform to have the correct shape for the IM calculation
+    reshaped_waveform = waveform_data[np.newaxis, :, :]
+
+    return dt, reshaped_waveform
 
 def read_ascii(file_000: Path, file_090: Path, file_ver: Path) -> tuple[float, np.ndarray]:
     """
@@ -91,4 +94,7 @@ def read_ascii(file_000: Path, file_090: Path, file_ver: Path) -> tuple[float, n
     # Ensure dtype is float 32
     waveform_data = waveform_data.astype(np.float32)
 
-    return delta, waveform_data
+    # Reshape the waveform to have the correct shape for the IM calculation
+    reshaped_waveform = waveform_data[np.newaxis, :, :]
+
+    return delta, reshaped_waveform

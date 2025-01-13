@@ -1,11 +1,9 @@
-import typer
+import multiprocessing
 from pathlib import Path
-import numpy as np
-from enum import StrEnum
-from typing import List, Optional
 
-from IM import ims, waveform_reading
+import typer
 
+from IM import im_calculation, waveform_reading
 
 app = typer.Typer()
 
@@ -13,13 +11,14 @@ app = typer.Typer()
 @app.command()
 def calculate_ims_mseed(
     mseed_file: Path,
-    ims_list: List[IM],
-    components: List[str],
-    periods: Optional[List[float]] = typer.Option(None, help="Periods required for pSA"),
-    frequencies: Optional[List[float]] = typer.Option(None, help="Frequencies required for FAS"),
+    ims_list: list[im_calculation.IM],
+    periods: list[float] = typer.Option(im_calculation.DEFAULT_PERIODS, help="Periods required for pSA"),
+    frequencies: list[float] = typer.Option(im_calculation.DEFAULT_FREQUENCIES, help="Frequencies required for FAS"),
+    cores: int = typer.Option(multiprocessing.cpu_count(), help="Number of cores to use for parallel processing in pSA and FAS calculations."),
+    ko_bandwidth: int = typer.Option(40, help="Bandwidth for the Konno-Ohmachi smoothing."),
 ):
     """
-    Calculate intensity measures for a waveform stored in a MiniSEED file.
+    Calculate intensity measures for a single waveform stored in a MiniSEED file.
 
     Parameters
     ----------
@@ -27,23 +26,28 @@ def calculate_ims_mseed(
         Path to the MiniSEED file.
     ims_list : list of IM
         List of intensity measures (IMs) to calculate, e.g., ['PGA', 'pSA', 'CAV'].
-    components : list of str
-        List of waveform components to process, e.g., ['X', 'Y', 'Z'].
     periods : list of float, optional
         List of periods required for calculating the pseudo-spectral acceleration (pSA).
     frequencies : list of float, optional
         List of frequencies required for calculating the Fourier amplitude spectrum (FAS).
+    cores : int, optional
+        Number of cores to use for parallel processing in pSA and FAS calculations.
+    ko_bandwidth : int, optional
+        Bandwidth for the Konno-Ohmachi smoothing (Applied to FAS).
 
     Returns
     -------
-    None
-        Displays the calculated intensity measures in the terminal or command output.
+    pd.DataFrame
+        DataFrame containing the calculated intensity measures.
+        The columns are the IMs and the rows are the different components.
     """
     # Read the mseed file
     dt, waveform = waveform_reading.read_mseed(mseed_file)
 
     # Calculate the intensity measures
-    calculate_ims(waveform, dt, ims_list, components, periods, frequencies)
+    result = im_calculation.calculate_ims(waveform, dt, ims_list, periods, frequencies, cores, ko_bandwidth)
+
+    return result
 
 
 @app.command()
@@ -51,13 +55,14 @@ def calculate_ims_ascii(
     file_000: Path,
     file_090: Path,
     file_ver: Path,
-    ims_list: List[IM],
-    components: List[str],
-    periods: Optional[List[float]] = typer.Option(None, help="Periods required for pSA"),
-    frequencies: Optional[List[float]] = typer.Option(None, help="Frequencies required for FAS"),
+    ims_list: list[im_calculation.IM],
+    periods: list[float] = typer.Option(im_calculation.DEFAULT_PERIODS, help="Periods required for pSA"),
+    frequencies: list[float] = typer.Option(im_calculation.DEFAULT_FREQUENCIES, help="Frequencies required for FAS"),
+    cores: int = typer.Option(multiprocessing.cpu_count(), help="Number of cores to use for parallel processing in pSA and FAS calculations."),
+    ko_bandwidth: int = typer.Option(40, help="Bandwidth for the Konno-Ohmachi smoothing."),
 ):
     """
-    Calculate intensity measures for ASCII waveform files (000, 090, vertical).
+    Calculate intensity measures for ASCII waveform files (000, 090, vertical) for a single waveform.
 
     Parameters
     ----------
@@ -69,23 +74,28 @@ def calculate_ims_ascii(
         Path to the vertical component file.
     ims_list : list of IM
         List of intensity measures (IMs) to calculate, e.g., ['PGA', 'pSA', 'CAV'].
-    components : list of str
-        List of waveform components to process, e.g., ['X', 'Y', 'Z'].
     periods : list of float, optional
         List of periods required for calculating the pseudo-spectral acceleration (pSA).
     frequencies : list of float, optional
         List of frequencies required for calculating the Fourier amplitude spectrum (FAS).
+    cores : int, optional
+        Number of cores to use for parallel processing in pSA and FAS calculations.
+    ko_bandwidth : int, optional
+        Bandwidth for the Konno-Ohmachi smoothing (Applied to FAS).
 
     Returns
     -------
-    None
-        Displays the calculated intensity measures in the terminal or command output.
+    pd.DataFrame
+        DataFrame containing the calculated intensity measures.
+        The columns are the IMs and the rows are the different components.
     """
     # Read the ASCII files
-    dt, waveform_000 = waveform_reading.read_ascii(file_000, file_090, file_ver)
+    dt, waveform = waveform_reading.read_ascii(file_000, file_090, file_ver)
 
     # Calculate the intensity measures
-    calculate_ims(waveform_000, dt, ims_list, components, periods, frequencies)
+    result = im_calculation.calculate_ims(waveform, dt, ims_list, periods, frequencies, cores, ko_bandwidth)
+
+    return result
 
 
 

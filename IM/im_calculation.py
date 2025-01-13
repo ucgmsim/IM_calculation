@@ -1,54 +1,71 @@
+import multiprocessing
 from enum import StrEnum
 
 import numpy as np
-from typing import List, Optional
+import pandas as pd
 
 from IM import ims
+
 
 class IM(StrEnum):
     PGA = "PGA"
     PGV = "PGV"
-    pSA = "pSA"
     CAV = "CAV"
     CAV5 = "CAV5"
-    MMI = "MMI"
     Ds575 = "Ds575"
     Ds595 = "Ds595"
     AI = "AI"
+    pSA = "pSA"
     FAS = "FAS"
+
+DEFAULT_PERIODS = np.asarray([0.010, 0.020, 0.022, 0.025, 0.029, 0.030, 0.032, 0.035, 0.036, 0.040, 0.042, 0.044, 0.045, 0.046, 0.048, 0.050, 0.055, 0.060, 0.065, 0.067, 0.070, 0.075, 0.080, 0.085, 0.090, 0.095, 0.100, 0.110, 0.120, 0.130, 0.133, 0.140, 0.150, 0.160, 0.170, 0.180, 0.190, 0.200, 0.220, 0.240, 0.250, 0.260, 0.280, 0.290, 0.300, 0.320, 0.340, 0.350, 0.360, 0.380, 0.400, 0.420, 0.440, 0.450, 0.460, 0.480, 0.500, 0.550, 0.600, 0.650, 0.667, 0.700, 0.750, 0.800, 0.850, 0.900, 0.950, 1.000, 1.100, 1.200, 1.300, 1.400, 1.500, 1.600, 1.700, 1.800, 1.900, 2.000, 2.200, 2.400, 2.500, 2.600, 2.800, 3.000, 3.200, 3.400, 3.500, 3.600, 3.800, 4.000, 4.200, 4.400, 4.600, 4.800, 5.000, 5.500, 6.000, 6.500, 7.000, 7.500, 8.000, 8.500, 9.000, 9.500, 10.000, 11.000, 12.000, 13.000, 14.000, 15.000, 20.000])
+DEFAULT_FREQUENCIES = np.logspace(
+        np.log10(0.01318257),
+        np.log10(100),
+        num=389,
+    )
 
 def calculate_ims(
     waveform: np.ndarray[np.float32],
     dt: float,
-    ims_list: List[IM],
-    components: List[str],
-    periods: Optional[List[float]] = None,
-    frequencies: Optional[List[float]] = None,
+    ims_list: list[IM] = list(IM),
+    periods: list[float] = DEFAULT_PERIODS,
+    frequencies: list[float] = DEFAULT_FREQUENCIES,
+    cores: int = multiprocessing.cpu_count(),
+    ko_bandwidth: int = 40,
 ):
     """
-    Calculate intensity measures for a waveform.
+    Calculate intensity measures for a single waveform.
 
     Parameters
     ----------
     waveform : np.ndarray
         Waveform data as a NumPy array.
-    ims_list : list of IM
-        List of intensity measures (IMs) to calculate, e.g., ['PGA', 'pSA', 'CAV'].
-    components : list of str
-        List of waveform components to process, e.g., ['X', 'Y', 'Z'].
+    dt : float
+        Sampling interval (dt) of the waveform.
+    ims_list : list of IM, optional
+        List of intensity measures (IMs) to calculate, e.g., [IM.PGA, IM.pSA, IM.CAV].
     periods : list of float, optional
         List of periods required for calculating the pseudo-spectral acceleration (pSA).
     frequencies : list of float, optional
         List of frequencies required for calculating the Fourier amplitude spectrum (FAS).
+    cores : int, optional
+        Number of cores to use for parallel processing in pSA and FAS calculations.
+    ko_bandwidth : int, optional
+        Bandwidth for the Konno-Ohmachi smoothing, by default 40.
 
     Returns
     -------
-    None
-        Displays the calculated intensity measures in the terminal or command output.
-    """
+    pd.DataFrame
+        DataFrame containing the calculated intensity measures.
+        The columns are the IMs and the rows are the different components.
 
-    # Placeholder for results
-    results = {}
+    Raises
+    ------
+    ValueError
+        If the IM is not recognized.
+    """
+    results = []
 
     # Iterate through IMs and calculate them
     for im in ims_list:
@@ -59,7 +76,8 @@ def calculate_ims(
             result = ims.peak_ground_velocity(waveform, dt)
             result.index = [im.value]
         elif im == IM.pSA:
-            result = ims.pseudo_spectral_acceleration(waveform, periods, dt, cores=1)
+            result = ims.pseudo_spectral_acceleration(waveform, periods, dt, cores=cores)
+            result = result.map(lambda x: x[0])
             result.index = [f"{im.value}_{idx}" for idx in result.index]
         elif im == IM.CAV:
             result = ims.cumulative_absolute_velocity(waveform, dt)
@@ -67,14 +85,23 @@ def calculate_ims(
         elif im == IM.CAV5:
             result = ims.cumulative_absolute_velocity(waveform, dt, 5)
             result.index = [im.value]
-        elif im == IM.MMI:
-            results[im] = ims.calculate_mmi(waveform, components)
         elif im == IM.Ds575:
-            results[im] = ims.calculate_ds575(waveform, components)
+            result = ims.ds575(waveform, dt)
+            result.index = [im.value]
         elif im == IM.Ds595:
-            results[im] = ims.calculate_ds595(waveform, components)
+            result = ims.ds595(waveform, dt)
+            result.index = [im.value]
         elif im == IM.AI:
-            results[im] = ims.calculate_ai(waveform, components)
+            result = ims.arias_intensity(waveform, dt)
+            result.index = [im.value]
         elif im == IM.FAS:
-            results[im] = ims.calculate_fas(waveform, components, frequencies)
-    return results
+            result = ims.fourier_amplitude_spectra(waveform, dt, frequencies, cores=cores, ko_bandwidth=ko_bandwidth)
+            result = result.map(lambda x: x[0])
+            result.index = [f"{im.value}_{idx}" for idx in result.index]
+        else:
+            raise ValueError(f"IM {im} not recognized. Available IMs are {IM.__members__.keys()}")
+        results.append(result)
+
+    # Combine all results into a single DataFrame
+    output_ims = pd.concat(results).T
+    return output_ims
