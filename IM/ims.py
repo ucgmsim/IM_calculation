@@ -4,7 +4,7 @@ import gc
 import multiprocessing
 import sys
 from collections.abc import Callable
-from enum import IntEnum
+from enum import IntEnum, StrEnum
 from typing import Optional
 
 import numba
@@ -26,6 +26,18 @@ class Component(IntEnum):
     """Index for the 90° component of a waveform."""
     COMP_VER = 2
     """Index for the vertical component of a waveform."""
+
+
+class IM(StrEnum):
+    PGA = "PGA"
+    PGV = "PGV"
+    CAV = "CAV"
+    CAV5 = "CAV5"
+    Ds575 = "Ds575"
+    Ds595 = "Ds595"
+    AI = "AI"
+    pSA = "pSA"
+    FAS = "FAS"
 
 
 @numba.njit
@@ -169,7 +181,7 @@ def pseudo_spectral_acceleration(
     dt: float,
     psa_rotd_maximum_memory_allocation: Optional[float] = None,
     cores: int = multiprocessing.cpu_count(),
-) -> xr.Dataset:
+) -> xr.DataArray:
     """Compute pseudo-spectral acceleration statistics for waveforms.
 
     Parameters
@@ -187,8 +199,9 @@ def pseudo_spectral_acceleration(
 
     Returns
     -------
-    pandas.DataFrame with columns `['000', '090', 'ver', 'geom', 'rotd0','rotd50', 'rotd100']`
-        DataFrame containing PSA values for each period and station.
+    xr.DataArray
+        DataArray containing PSA statistics for each
+        station, period and component ['000', '090', 'ver', 'geom', 'rotd0', 'rotd50', 'rotd100'].
     """
     t = np.arange(waveforms.shape[1]) * dt
     w = 2 * np.pi / periods
@@ -242,7 +255,7 @@ def pseudo_spectral_acceleration(
             ],
             axis=0,
         ),
-        name="psa",
+        name=IM.pSA.value,
         dims=("component", "station", "period"),
         coords={
             "station": np.arange(waveforms.shape[0]),
@@ -399,8 +412,8 @@ def fourier_amplitude_spectra(
 
     Returns
     -------
-    pandas.DataFrame with columns `['000', '090', 'ver', 'eas']`
-        DataFrame containing FAS calculations.
+    xr.DataArray
+        DataArray containing FAS values for each station, frequency and component ['000', '090', 'ver', 'eas'].
     """
     n_fft = 2 ** int(np.ceil(np.log2(waveforms.shape[1])))
     fa_frequencies = np.fft.rfftfreq(n_fft, dt)
@@ -431,7 +444,7 @@ def fourier_amplitude_spectra(
             ],
             axis=0,
         ),
-        name="fas",
+        name=IM.FAS.value,
         dims=("component", "station", "frequency"),
         coords={
             "component": ["000", "090", "ver", "eas"],
