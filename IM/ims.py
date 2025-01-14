@@ -242,6 +242,7 @@ def pseudo_spectral_acceleration(
             ],
             axis=0,
         ),
+        name="psa",
         dims=("component", "station", "period"),
         coords={
             "station": np.arange(waveforms.shape[0]),
@@ -427,6 +428,7 @@ def fourier_amplitude_spectra(
             ],
             axis=0,
         ),
+        name="fas",
         dims=("component", "station", "frequency"),
         coords={
             "component": ["000", "090", "ver", "eas"],

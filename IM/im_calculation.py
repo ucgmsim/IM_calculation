@@ -76,9 +76,11 @@ def calculate_ims(
             result = ims.peak_ground_velocity(waveform, dt)
             result.index = [im.value]
         elif im == IM.pSA:
-            result = ims.pseudo_spectral_acceleration(waveform, periods, dt, cores=cores)
-            result = result.map(lambda x: x[0])
-            result.index = [f"{im.value}_{idx}" for idx in result.index]
+            data_array = ims.pseudo_spectral_acceleration(waveform, periods, dt, cores=cores)
+            # Convert the data array to a DataFrame
+            result = data_array.to_dataframe().unstack(level='component')
+            result.index = [f"{im.value}_{idx}" for idx in data_array.coords['period'].values]
+            result.columns = result.columns.droplevel(0)
         elif im == IM.CAV:
             result = ims.cumulative_absolute_velocity(waveform, dt)
             result.index = [im.value]
@@ -95,9 +97,11 @@ def calculate_ims(
             result = ims.arias_intensity(waveform, dt)
             result.index = [im.value]
         elif im == IM.FAS:
-            result = ims.fourier_amplitude_spectra(waveform, dt, frequencies, cores=cores, ko_bandwidth=ko_bandwidth)
-            result = result.map(lambda x: x[0])
-            result.index = [f"{im.value}_{idx}" for idx in result.index]
+            data_array = ims.fourier_amplitude_spectra(waveform, dt, frequencies, cores=cores, ko_bandwidth=ko_bandwidth)
+            # Convert the data array to a DataFrame
+            result = data_array.to_dataframe().unstack(level='component')
+            result.index = [f"{im.value}_{idx}" for idx in data_array.coords['frequency'].values]
+            result.columns = result.columns.droplevel(0)
         else:
             raise ValueError(f"IM {im} not recognized. Available IMs are {IM.__members__.keys()}")
         results.append(result)
