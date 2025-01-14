@@ -1,0 +1,6 @@
+numba
+numpy
+pandas
+scipy
+mseedlib
+pykooh @ git+https://github.com/arkottke/pykooh.git

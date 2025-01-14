@@ -376,6 +376,7 @@ def fourier_amplitude_spectra(
     dt: float,
     freqs: npt.NDArray[np.float32],
     cores: int = multiprocessing.cpu_count(),
+    ko_bandwidth: int = 40,
 ) -> xr.DataArray:
     """Compute Fourier Amplitude Spectrum (FAS) of seismic waveforms.
 
@@ -392,6 +393,8 @@ def fourier_amplitude_spectra(
         Frequencies at which to compute FAS (Hz).
     cores : int, optional
         Number of CPU cores to use, by default all available cores.
+    ko_bandwidth : int, optional
+        Konno-Ohmachi smoothing bandwidth, by default 40.
 
     Returns
     -------
@@ -401,7 +404,7 @@ def fourier_amplitude_spectra(
     n_fft = 2 ** int(np.ceil(np.log2(waveforms.shape[1])))
     fa_frequencies = np.fft.rfftfreq(n_fft, dt)
     fa_spectrum = np.abs(np.fft.rfft(waveforms, n=n_fft, axis=1))
-    smoother = pykooh.CachedSmoother(fa_frequencies, freqs, 40)
+    smoother = pykooh.CachedSmoother(fa_frequencies, freqs, ko_bandwidth)
     with multiprocessing.Pool(cores) as pool:
         fas_0 = np.array(
             pool.map(smoother, fa_spectrum[:, :, Component.COMP_0.value]),
