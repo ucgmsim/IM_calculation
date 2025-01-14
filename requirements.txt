@@ -2,5 +2,5 @@ numba
 numpy
 pandas
 scipy
-mseedlib
+xarray
 pykooh @ git+https://github.com/arkottke/pykooh.git

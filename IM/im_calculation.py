@@ -1,22 +1,10 @@
 import multiprocessing
-from enum import StrEnum
 
 import numpy as np
 import pandas as pd
 
 from IM import ims
-
-
-class IM(StrEnum):
-    PGA = "PGA"
-    PGV = "PGV"
-    CAV = "CAV"
-    CAV5 = "CAV5"
-    Ds575 = "Ds575"
-    Ds595 = "Ds595"
-    AI = "AI"
-    pSA = "pSA"
-    FAS = "FAS"
+from IM.ims import IM
 
 DEFAULT_PERIODS = np.asarray([0.010, 0.020, 0.022, 0.025, 0.029, 0.030, 0.032, 0.035, 0.036, 0.040, 0.042, 0.044, 0.045, 0.046, 0.048, 0.050, 0.055, 0.060, 0.065, 0.067, 0.070, 0.075, 0.080, 0.085, 0.090, 0.095, 0.100, 0.110, 0.120, 0.130, 0.133, 0.140, 0.150, 0.160, 0.170, 0.180, 0.190, 0.200, 0.220, 0.240, 0.250, 0.260, 0.280, 0.290, 0.300, 0.320, 0.340, 0.350, 0.360, 0.380, 0.400, 0.420, 0.440, 0.450, 0.460, 0.480, 0.500, 0.550, 0.600, 0.650, 0.667, 0.700, 0.750, 0.800, 0.850, 0.900, 0.950, 1.000, 1.100, 1.200, 1.300, 1.400, 1.500, 1.600, 1.700, 1.800, 1.900, 2.000, 2.200, 2.400, 2.500, 2.600, 2.800, 3.000, 3.200, 3.400, 3.500, 3.600, 3.800, 4.000, 4.200, 4.400, 4.600, 4.800, 5.000, 5.500, 6.000, 6.500, 7.000, 7.500, 8.000, 8.500, 9.000, 9.500, 10.000, 11.000, 12.000, 13.000, 14.000, 15.000, 20.000])
 DEFAULT_FREQUENCIES = np.logspace(
@@ -76,9 +64,11 @@ def calculate_ims(
             result = ims.peak_ground_velocity(waveform, dt)
             result.index = [im.value]
         elif im == IM.pSA:
-            result = ims.pseudo_spectral_acceleration(waveform, periods, dt, cores=cores)
-            result = result.map(lambda x: x[0])
-            result.index = [f"{im.value}_{idx}" for idx in result.index]
+            data_array = ims.pseudo_spectral_acceleration(waveform, periods, dt, cores=cores)
+            # Convert the data array to a DataFrame
+            result = data_array.to_dataframe().unstack(level='component')
+            result.index = [f"{im.value}_{idx}" for idx in data_array.coords['period'].values]
+            result.columns = result.columns.droplevel(0)
         elif im == IM.CAV:
             result = ims.cumulative_absolute_velocity(waveform, dt)
             result.index = [im.value]
@@ -95,9 +85,11 @@ def calculate_ims(
             result = ims.arias_intensity(waveform, dt)
             result.index = [im.value]
         elif im == IM.FAS:
-            result = ims.fourier_amplitude_spectra(waveform, dt, frequencies, cores=cores, ko_bandwidth=ko_bandwidth)
-            result = result.map(lambda x: x[0])
-            result.index = [f"{im.value}_{idx}" for idx in result.index]
+            data_array = ims.fourier_amplitude_spectra(waveform, dt, frequencies, cores=cores, ko_bandwidth=ko_bandwidth)
+            # Convert the data array to a DataFrame
+            result = data_array.to_dataframe().unstack(level='component')
+            result.index = [f"{im.value}_{idx}" for idx in data_array.coords['frequency'].values]
+            result.columns = result.columns.droplevel(0)
         else:
             raise ValueError(f"IM {im} not recognized. Available IMs are {IM.__members__.keys()}")
         results.append(result)

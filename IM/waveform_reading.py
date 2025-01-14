@@ -1,61 +1,8 @@
 from pathlib import Path
 
-import mseedlib
 import numpy as np
 import pandas as pd
 
-
-def read_mseed(file_path: Path) -> tuple[float, np.ndarray]:
-    """
-    Read a MiniSEED file and return the sampling interval (dt) and waveform data.
-
-    Parameters
-    ----------
-    file_path : Path
-        Path to the MiniSEED file.
-
-    Returns
-    -------
-    Tuple[float, np.ndarray]
-        Sampling interval (dt) and the waveform data as a NumPy array.
-    """
-    nptype = {"i": np.int32, "f": np.float32, "d": np.float64, "t": np.char}
-    mstl = mseedlib.MSTraceList()
-    mstl.read_file(str(file_path), unpack_data=False, record_list=True)
-
-    all_data = []
-    dt = None
-
-    for traceid in mstl.traceids():
-        for segment in traceid.segments():
-            # Determine data type and allocate array
-            (sample_size, sample_type) = segment.sample_size_type
-            dtype = nptype[sample_type]
-            data_samples = np.zeros(segment.samplecnt, dtype=dtype)
-
-            # Unpack data samples
-            segment.unpack_recordlist(
-                buffer_pointer=np.ctypeslib.as_ctypes(data_samples),
-                buffer_bytes=data_samples.nbytes,
-            )
-
-            # Determine sampling interval (dt) from the sampling rate
-            sampling_rate = segment.samprate
-            dt = 1.0 / sampling_rate
-
-            # Collect data
-            all_data.append(data_samples)
-
-    # Combine all data into a single NumPy array
-    waveform_data = np.concatenate(all_data)
-
-    # Ensure dtype is float 32
-    waveform_data = waveform_data.astype(np.float32)
-
-    # Reshape the waveform to have the correct shape for the IM calculation
-    reshaped_waveform = waveform_data[np.newaxis, :, :]
-
-    return dt, reshaped_waveform
 
 def read_ascii(file_000: Path, file_090: Path, file_ver: Path) -> tuple[float, np.ndarray]:
     """
