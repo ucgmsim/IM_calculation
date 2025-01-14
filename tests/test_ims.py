@@ -33,7 +33,7 @@ def sample_waveforms():
 
     # Create synthetic acceleration time histories
     acc_0 = np.sin(2 * np.pi * freq * t)
-    acc_90 = np.cos(2 * np.pi * freq * t)
+    acc_90 = 2 * np.cos(2 * np.pi * freq * t)
     acc_ver = 0.5 * np.sin(2 * np.pi * freq * t)
 
     # Stack for multiple stations
@@ -298,7 +298,7 @@ def test_arias_intensity(
     # Check values
     assert np.all(result.select_dtypes(include=[np.number]) >= 0)
     # Check geom calculation
-    assert_array_almost_equal(result["geom"], (result["000"] + result["090"]) / 2)
+    assert_array_almost_equal(result["geom"], np.sqrt(result["000"] * result["090"]))
 
 
 # Test cases for Fourier Amplitude Spectra
