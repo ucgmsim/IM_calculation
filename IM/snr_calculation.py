@@ -71,4 +71,21 @@ def calculate_snr(
             fas_noise / np.sqrt(noise_duration)
         )
 
-    return snr, frequencies, fas_signal, fas_noise, signal_duration, noise_duration
+    # Create SNR DataFrame with 000, 090 and ver
+    snr_df = snr.to_dataframe().unstack(level='component')
+    snr_df.index = snr.coords['frequency'].values
+    snr_df.columns = snr_df.columns.droplevel(0)
+    snr_df = snr_df[["000", "090", "ver"]]
+
+    # Create FAS noise and signal DataFrames with 000, 090 and ver
+    fas_signal_df = fas_signal.to_dataframe().unstack(level='component')
+    fas_signal_df.index = fas_signal.coords['frequency'].values
+    fas_signal_df.columns = fas_signal_df.columns.droplevel(0)
+    fas_signal_df = fas_signal_df[["000", "090", "ver"]]
+
+    fas_noise_df = fas_noise.to_dataframe().unstack(level='component')
+    fas_noise_df.index = fas_noise.coords['frequency'].values
+    fas_noise_df.columns = fas_noise_df.columns.droplevel(0)
+    fas_noise_df = fas_noise_df[["000", "090", "ver"]]
+
+    return snr_df, fas_signal_df, fas_noise_df, signal_duration, noise_duration

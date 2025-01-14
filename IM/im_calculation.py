@@ -14,7 +14,7 @@ DEFAULT_FREQUENCIES = np.logspace(
     )
 
 def calculate_ims(
-    waveform: np.ndarray[np.float32],
+    waveform: np.ndarray,
     dt: float,
     ims_list: list[IM] = list(IM),
     periods: list[float] = DEFAULT_PERIODS,
