@@ -1,6 +1,9 @@
-import numpy as np
+import multiprocessing
 
-from IM import ims, im_calculation
+import numpy as np
+import scipy as sp
+
+from IM import im_calculation, ims
 
 
 def calculate_snr(
@@ -8,6 +11,9 @@ def calculate_snr(
     dt: float,
     tp: float,
     frequencies: np.asarray = im_calculation.DEFAULT_FREQUENCIES,
+    cores: int = multiprocessing.cpu_count(),
+    ko_bandwidth: int = 40,
+    apply_taper: bool = True,
 ):
     """
     Calculates the SNR of a waveform given a tp and common frequency vector
@@ -23,56 +29,46 @@ def calculate_snr(
     frequencies : np.asarray, optional
         The frequency vector to use for the SNR calculation,
         by default takes the frequencies from FAS
+    cores : int, optional
+        Number of cores to use for parallel processing in FAS calculations.
+    ko_bandwidth : int, optional
+        Bandwidth for the Konno-Ohmachi smoothing, by default 40.
+    apply_taper : bool, optional
+        Whether to apply a taper of 5% to the signal and noise, by default True.
     """
     # Calculate signal and noise areas
     signal_acc, noise_acc = waveform[:, tp:], waveform[:, :tp]
-    signal_duration, noise_duration = len(signal_acc) * dt, len(noise_acc) * dt
+    signal_duration, noise_duration = signal_acc.shape[1] * dt, noise_acc.shape[1] * dt
 
     # Ensure the noise is not shorter than 1s, if not then skip the calculation
     if noise_duration < 1:
-        return None, None, None, None, None, None
+        raise ValueError("Noise duration is less than 1s")
 
     # Add the tapering to the signal and noise
-    taper_signal_acc = apply_taper(signal_acc)
-    taper_noise_acc = apply_taper(noise_acc)
+    if apply_taper:
+        taper_signal_acc = sp.signal.windows.tukey(signal_acc.shape[1], alpha=0.05).reshape(-1, 1) * signal_acc[:]
+        taper_noise_acc = sp.signal.windows.tukey(noise_acc.shape[1], alpha=0.05).reshape(-1, 1) * noise_acc[:]
+    else:
+        taper_signal_acc = signal_acc
+        taper_noise_acc = noise_acc
+
+    # Ensure float 32 for the waveform
+    taper_signal_acc = taper_signal_acc.astype(np.float32)
+    taper_noise_acc = taper_noise_acc.astype(np.float32)
 
     # Generate FFT for the signal and noise
-    fas_signal, frequency_signal = computeFAS.generate_fa_spectrum(
-        taper_signal_acc, waveform.DT, len(taper_signal_acc)
-    )
-    fas_noise, frequency_noise = computeFAS.generate_fa_spectrum(
-        taper_noise_acc, waveform.DT, len(taper_signal_acc)
-    )
-
-    # Take the absolute value of the FAS
-    fas_signal = np.abs(fas_signal)
-    fas_noise = np.abs(fas_noise)
-
-    if frequencies is not None:
-        # Interpolate FAS at common frequencies
-        inter_signal_f = interp1d(
-            frequency_signal, fa_smooth_signal, axis=0, bounds_error=False
-        )
-        inter_noise_f = interp1d(
-            frequency_noise, fa_smooth_noise, axis=0, bounds_error=False
-        )
-        inter_signal = inter_signal_f(frequencies)
-        inter_noise = inter_noise_f(frequencies)
-    else:
-        inter_signal = fa_smooth_signal
-        inter_noise = fa_smooth_noise
+    fas_signal = ims.fourier_amplitude_spectra(taper_signal_acc, dt, frequencies, cores, ko_bandwidth)
+    fas_noise = ims.fourier_amplitude_spectra(taper_noise_acc, dt, frequencies, cores, ko_bandwidth)
 
     # Set values to NaN if they are outside the bounds of sample rate / 2
-    inter_signal[frequencies > sampling_rate / 2] = np.nan
-    inter_noise[frequencies > sampling_rate / 2] = np.nan
+    sample_rate = 1 / dt
+    fas_signal[:, :, frequencies > sample_rate / 2] = np.nan
+    fas_noise[:, :, frequencies > sample_rate / 2] = np.nan
 
     # Calculate the SNR
     with np.errstate(divide='ignore', invalid='ignore'):
-        snr = (inter_signal / np.sqrt(signal_duration)) / (
-            inter_noise / np.sqrt(noise_duration)
+        snr = (fas_signal / np.sqrt(signal_duration)) / (
+            fas_noise / np.sqrt(noise_duration)
         )
-    frequencies = (
-        frequency_signal if frequencies is None else frequencies
-    )
 
-    return snr, frequencies, inter_signal, inter_noise, signal_duration, noise_duration
+    return snr, frequencies, fas_signal, fas_noise, signal_duration, noise_duration

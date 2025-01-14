@@ -314,7 +314,7 @@ def test_fourier_amplitude_spectra(
 
     # Check DataFrame structure
     assert isinstance(result, xr.DataArray)
-    assert list(result.coords["component"]) == ["000", "090", "ver", "eas"]
+    assert list(result.coords["component"]) == ["000", "090", "ver", "geom", "eas"]
     assert np.allclose(result.coords["frequency"], freqs)
     assert np.all(result.as_numpy() >= 0)
 

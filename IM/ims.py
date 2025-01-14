@@ -433,6 +433,7 @@ def fourier_amplitude_spectra(
             dtype=np.float32,
         )
     eas = np.sqrt(0.5 * (np.square(fas_0) + np.square(fas_90)))
+    geom_fas = np.sqrt(fas_0 * fas_90)
 
     return xr.DataArray(
         np.stack(
@@ -440,6 +441,7 @@ def fourier_amplitude_spectra(
                 fas_0,
                 fas_90,
                 fas_ver,
+                geom_fas,
                 eas,
             ],
             axis=0,
@@ -447,7 +449,7 @@ def fourier_amplitude_spectra(
         name=IM.FAS.value,
         dims=("component", "station", "frequency"),
         coords={
-            "component": ["000", "090", "ver", "eas"],
+            "component": ["000", "090", "ver", "geom", "eas"],
             "frequency": freqs,
             "station": np.arange(waveforms.shape[0]),
         },
