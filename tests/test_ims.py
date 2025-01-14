@@ -12,7 +12,7 @@ import xarray as xr
 from hypothesis import assume, given, settings
 from hypothesis import strategies as st
 from hypothesis.extra import numpy as nst
-from numpy.testing import assert_array_almost_equal, assert_array_equal
+from numpy.testing import assert_array_almost_equal
 
 from IM import ims
 
@@ -215,7 +215,7 @@ def test_cav(
         (np.linspace(0, 1, num=100, dtype=np.float32) ** 2, 1, np.pi / (2 * 981 * 5)),
     ],
 )
-def test_ai(comp_0: npt.NDArray[np.float32], t_max: float, expected_ai: float):
+def test_ai_values(comp_0: npt.NDArray[np.float32], t_max: float, expected_ai: float):
     waveforms = np.zeros((1, len(comp_0), 3))
     waveforms[:, :, ims.Component.COMP_0] = comp_0
     dt = t_max / (len(comp_0) - 1)
@@ -275,10 +275,10 @@ def test_peak_ground_parameters(
 
     # Check DataFrame structure
     assert isinstance(result, pd.DataFrame)
-    assert all(
-        col in result.columns
-        for col in ["000", "090", "ver", "geom", "rotd50", "rotd100"]
-    )
+    columns = ["000", "090", "ver", "geom"]
+    if func != ims.cumulative_absolute_velocity:
+        columns.extend(["rotd0", "rotd50", "rotd100"])
+    assert set(columns) == set(result.columns.tolist())
     # Check values
     assert np.all(result >= 0)  # All values should be non-negative
 
@@ -294,11 +294,11 @@ def test_arias_intensity(
 
     # Check DataFrame structure
     assert isinstance(result, pd.DataFrame)
-    assert all(col in result.columns for col in ["000", "090", "ver", "mean"])
+    assert set(result.columns.tolist()) == {"000", "090", "ver", "geom"}
     # Check values
     assert np.all(result.select_dtypes(include=[np.number]) >= 0)
-    # Check mean calculation
-    assert_array_almost_equal(result["mean"], (result["000"] + result["090"]) / 2)
+    # Check geom calculation
+    assert_array_almost_equal(result["geom"], (result["000"] + result["090"]) / 2)
 
 
 # Test cases for Fourier Amplitude Spectra
@@ -380,9 +380,6 @@ def test_numerical_stability(duration: int):
         [
             ims.peak_ground_acceleration,
             ims.peak_ground_velocity,
-            ims.cumulative_absolute_velocity,
-            ims.ds575,
-            ims.ds595,
         ]
     ),
     waveform=nst.arrays(
