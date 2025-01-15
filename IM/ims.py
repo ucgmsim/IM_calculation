@@ -417,7 +417,7 @@ def fourier_amplitude_spectra(
     """
     n_fft = 2 ** int(np.ceil(np.log2(waveforms.shape[1])))
     fa_frequencies = np.fft.rfftfreq(n_fft, dt)
-    fa_spectrum = np.abs(np.fft.rfft(waveforms, n=n_fft, axis=1))
+    fa_spectrum = np.abs(np.fft.rfft(waveforms, n=n_fft, axis=1) * dt)
     smoother = pykooh.CachedSmoother(fa_frequencies, freqs, ko_bandwidth)
     with multiprocessing.Pool(cores) as pool:
         fas_0 = np.array(
