@@ -418,7 +418,7 @@ def fourier_amplitude_spectra(
     n_fft = 2 ** int(np.ceil(np.log2(waveforms.shape[1])))
     fa_frequencies = np.fft.rfftfreq(n_fft, dt)
     fa_spectrum = np.abs(np.fft.rfft(waveforms, n=n_fft, axis=1) * dt)
-    smoother = pykooh.CachedSmoother(fa_frequencies, freqs, ko_bandwidth)
+    smoother = pykooh.CachedSmoother(fa_frequencies, fa_frequencies, ko_bandwidth)
     with multiprocessing.Pool(cores) as pool:
         fas_0 = np.array(
             pool.map(smoother, fa_spectrum[:, :, Component.COMP_0.value]),
@@ -432,6 +432,14 @@ def fourier_amplitude_spectra(
             pool.map(smoother, fa_spectrum[:, :, Component.COMP_VER]),
             dtype=np.float32,
         )
+    # Interpolate for output frequencies
+    interpolator_0 = sp.interpolate.interp1d(fa_frequencies, fas_0[0], axis=0, fill_value="extrapolate")
+    fas_0 = interpolator_0(freqs).reshape(1, -1)
+    interpolator_90 = sp.interpolate.interp1d(fa_frequencies, fas_90[0], axis=0, fill_value="extrapolate")
+    fas_90 = interpolator_90(freqs).reshape(1, -1)
+    interpolator_ver = sp.interpolate.interp1d(fa_frequencies, fas_ver[0], axis=0, fill_value="extrapolate")
+    fas_ver = interpolator_ver(freqs).reshape(1, -1)
+
     eas = np.sqrt(0.5 * (np.square(fas_0) + np.square(fas_90)))
     geom_fas = np.sqrt(fas_0 * fas_90)
 
