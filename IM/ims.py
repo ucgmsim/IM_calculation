@@ -433,12 +433,13 @@ def fourier_amplitude_spectra(
             dtype=np.float32,
         )
     # Interpolate for output frequencies
-    interpolator_0 = sp.interpolate.interp1d(fa_frequencies, fas_0[0], axis=0, fill_value="extrapolate")
-    fas_0 = interpolator_0(freqs).reshape(1, -1)
-    interpolator_90 = sp.interpolate.interp1d(fa_frequencies, fas_90[0], axis=0, fill_value="extrapolate")
-    fas_90 = interpolator_90(freqs).reshape(1, -1)
-    interpolator_ver = sp.interpolate.interp1d(fa_frequencies, fas_ver[0], axis=0, fill_value="extrapolate")
-    fas_ver = interpolator_ver(freqs).reshape(1, -1)
+
+    interpolator_0 = sp.interpolate.make_interp_spline(fa_frequencies, fas_0, axis=1, k=1)
+    fas_0 = interpolator_0(freqs)
+    interpolator_90 = sp.interpolate.make_interp_spline(fa_frequencies, fas_90, axis=1, k=1)
+    fas_90 = interpolator_90(freqs)
+    interpolator_ver = sp.interpolate.make_interp_spline(fa_frequencies, fas_ver, axis=1, k=1)
+    fas_ver = interpolator_ver(freqs)
 
     eas = np.sqrt(0.5 * (np.square(fas_0) + np.square(fas_90)))
     geom_fas = np.sqrt(fas_0 * fas_90)
