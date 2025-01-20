@@ -2,6 +2,7 @@
 
 import functools
 from collections.abc import Callable
+from pathlib import Path
 from typing import Optional
 
 import numpy as np
@@ -14,7 +15,7 @@ from hypothesis import strategies as st
 from hypothesis.extra import numpy as nst
 from numpy.testing import assert_array_almost_equal
 
-from IM import ims
+from IM import ims, snr_calculation, waveform_reading
 
 
 # Common test fixtures
@@ -238,7 +239,53 @@ def test_psa():
     )
 
 
-# TODO: Find a good test for Fourier Amplitude Spectra
+def test_fas_benchmark():
+    """Compare benchmark FAS calculation against current implementation."""
+    # Load the data array
+    data_array_ffp = Path(__file__).parent / "resources" / "fas_benchmark.nc"
+    data = xr.open_dataarray(data_array_ffp)
+
+    # Read the example waveform
+    data_dir = Path(__file__).parent.parent / "examples" / "resources"
+    comp_000_ffp = data_dir / "2024p950420_MWFS_HN_20.000"
+    comp_090_ffp = data_dir / "2024p950420_MWFS_HN_20.090"
+    comp_ver_ffp = data_dir / "2024p950420_MWFS_HN_20.ver"
+
+    # Read the files to a waveform array that's readable by IM Calculation
+    dt, waveform = waveform_reading.read_ascii(comp_000_ffp, comp_090_ffp, comp_ver_ffp)
+
+    # Compute the Fourier Amplitude Spectra
+    fas_result_ims = ims.fourier_amplitude_spectra(
+        waveform, dt, data.frequency
+    )
+
+    # Compare the results
+    assert_array_almost_equal(data, fas_result_ims, decimal=5)
+
+
+def test_snr_benchmark():
+    """Compare benchmark SNR calculation against current implementation."""
+    # Load the DataFrame
+    benchmark_ffp = Path(__file__).parent / "resources" / "snr_benchmark.csv"
+    data = pd.read_csv(benchmark_ffp, index_col=0)
+
+    # Read the example waveform
+    data_dir = Path(__file__).parent.parent / "examples" / "resources"
+    comp_000_ffp = data_dir / "2024p950420_MWFS_HN_20.000"
+    comp_090_ffp = data_dir / "2024p950420_MWFS_HN_20.090"
+    comp_ver_ffp = data_dir / "2024p950420_MWFS_HN_20.ver"
+
+    # Read the files to a waveform array that's readable by IM Calculation
+    dt, waveform = waveform_reading.read_ascii(comp_000_ffp, comp_090_ffp, comp_ver_ffp)
+
+    # Index of the start of the P-wave
+    tp = 3170
+
+    # Compute the SNR
+    snr_result_ims, _, _, _, _ = snr_calculation.calculate_snr(waveform, dt, tp)
+
+    # Compare the results
+    assert_array_almost_equal(data, snr_result_ims, decimal=5)
 
 
 def test_ds5xx():
