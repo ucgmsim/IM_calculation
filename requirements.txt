@@ -3,4 +3,6 @@ numpy
 pandas
 scipy
 xarray
+pytest
+hypothesis
 pykooh @ git+https://github.com/arkottke/pykooh.git
