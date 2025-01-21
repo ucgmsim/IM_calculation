@@ -50,7 +50,7 @@ def newmark_estimate_psa(
     gamma: np.float32 = np.float32(1 / 2),
     beta: np.float32 = np.float32(1 / 4),
     m: np.float32 = np.float32(1),
-) -> npt.NDArray[np.float32]:
+) -> npt.NDArray[np.float32]: # pragma: no cover
     """Compute pseudo-spectral acceleration using the Newmark-beta method [1]_ [2]_.
 
     Parameters
@@ -322,7 +322,7 @@ def compute_intensity_measure_rotd(
 
 
 @numba.njit(parallel=True)
-def trapz(waveforms: npt.NDArray[np.float32], dt: float) -> npt.NDArray[np.float32]:
+def trapz(waveforms: npt.NDArray[np.float32], dt: float) -> npt.NDArray[np.float32]: # pragma: no cover
     """Compute parallel trapezium numerical integration.
 
     Parameters
@@ -482,7 +482,7 @@ def fourier_amplitude_spectra(
 @numba.njit(parallel=True)
 def _cumulative_absolute_velocity(
     waveform: npt.NDArray[np.float32], dt: float
-) -> npt.NDArray[np.float32]:
+) -> npt.NDArray[np.float32]: # pragma: no cover
     """Compute Cumulative Absolute Velocity (CAV) of waveforms.
 
     Parameters
@@ -528,7 +528,7 @@ def _cumulative_absolute_velocity(
 @numba.njit(parallel=True)
 def _arias_intensity(
     waveform: npt.NDArray[np.float32], dt: float
-) -> npt.NDArray[np.float32]:
+) -> npt.NDArray[np.float32]: # pragma: no cover
     """Compute Arias Intensity (AI) of waveforms.
 
     Parameters
@@ -565,7 +565,7 @@ def _arias_intensity(
 @numba.njit(parallel=True)
 def _cumulative_arias_intensity(
     waveform: npt.NDArray[np.float32], dt: float
-) -> npt.NDArray[np.float32]:
+) -> npt.NDArray[np.float32]: # pragma: no cover
     """Compute the cumulative Arias Intensity (AI) of a waveform.
 
     Parameters
