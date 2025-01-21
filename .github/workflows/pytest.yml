@@ -18,6 +18,7 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -e .
+          pip install pytest-cov  # Install pytest-cov plugin
 
       - name: Run tests
         run: |
