@@ -29,6 +29,7 @@ class Component(IntEnum):
 
 
 class IM(StrEnum):
+    """Intensity Measure enumeration."""
     PGA = "PGA"
     PGV = "PGV"
     CAV = "CAV"
@@ -36,7 +37,7 @@ class IM(StrEnum):
     Ds575 = "Ds575"
     Ds595 = "Ds595"
     AI = "AI"
-    pSA = "pSA"
+    pSA = "pSA" # noqa: N815
     FAS = "FAS"
 
 
