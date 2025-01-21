@@ -328,14 +328,14 @@ def trapz(waveforms: npt.NDArray[np.float32], dt: float) -> npt.NDArray[np.float
     Parameters
     ----------
     waveforms : ndarray of float32 with shape `(n_stations, n_timesteps)`
-        Waveform accelerations to integrate (g).
+        Waveform accelerations to integrate (units).
     dt : float
         Timestep resolution of the waveform array (t).
 
     Returns
     -------
     ndarray of float32 with shape (n_stations,)
-        Integrated values for each waveform (g-sec).
+        Integrated values for each waveform (units-sec).
 
     Notes
     -----
@@ -464,7 +464,6 @@ def fourier_amplitude_spectra(
         },
     )
 
-
 @numba.njit(parallel=True)
 def _cumulative_absolute_velocity(
     waveform: npt.NDArray[np.float32], dt: float
@@ -481,7 +480,7 @@ def _cumulative_absolute_velocity(
     Returns
     -------
     ndarray of float32 with shape `(n_stations,)`
-        CAV values for each waveform.
+        CAV values for each waveform (m/s).
 
     Notes
     -----
@@ -507,7 +506,7 @@ def _cumulative_absolute_velocity(
                 x0 = -v1 * inv_slope
                 tmp += x0 * np.abs(v1) + (dtf - x0) * np.abs(v2)
         cav[i] = tmp * half
-    g = np.float32(981.0)
+    g = np.float32(9.81)
     return g * cav
 
 
@@ -527,7 +526,7 @@ def _arias_intensity(
     Returns
     -------
     ndarray of float32 with shape `(n_stations,)`
-        AI values for each waveform.
+        AI values for each waveform (m/s).
     """
     ai = np.zeros((waveform.shape[0],), dtype=np.float32)
     dtf = np.float32(dt)
@@ -538,13 +537,13 @@ def _arias_intensity(
             v1 = waveform[i, j]
             v2 = waveform[i, j + 1]
             if min(v1, v2) >= 0 or max(v1, v2) <= 0:
-                tmp += dtf * (np.abs(v1) + np.abs(v2))
+                tmp += dtf * (np.square(v1) + np.square(v2))
             else:
                 inv_slope = dtf / (v2 - v1)
                 x0 = -v1 * inv_slope
                 tmp += x0 * np.square(v1) + (dtf - x0) * np.square(v2)
         ai[i] = tmp * half
-    g = np.float32(1 / 981)
+    g = np.float32(9.81)
     return np.pi * half * g * ai
 
 
@@ -577,14 +576,16 @@ def _cumulative_arias_intensity(
             v1 = waveform[i, j]
             v2 = waveform[i, j + 1]
             if min(v1, v2) >= 0 or max(v1, v2) <= 0:
-                tmp += dtf * (np.abs(v1) + np.abs(v2))
+                tmp += dtf * (np.square(v1) + np.square(v2))
             else:
                 inv_slope = dtf / (v2 - v1)
                 x0 = -v1 * inv_slope
                 tmp += x0 * np.square(v1) + (dtf - x0) * np.square(v2)
 
             ai[i, j + 1] = tmp
-    return ai * half
+
+    g = np.float32(9.81)
+    return ai * np.pi * half * g 
 
 
 def peak_ground_acceleration(
@@ -646,7 +647,7 @@ def cumulative_absolute_velocity(
     Returns
     -------
     pandas.DataFrame with columns `['000', '090', 'ver', 'geom', 'rotd100', 'rotd50', 'rotd0']`
-        DataFrame containing CAV values with rotated components.
+        DataFrame containing CAV values (m/s) with rotated components.
     """
 
     comp_0 = waveform[:, :, Component.COMP_0]
@@ -686,7 +687,7 @@ def arias_intensity(waveform: npt.NDArray[np.float32], dt: float) -> pd.DataFram
     Returns
     -------
     pandas.DataFrame with columns `['intensity_measure', '000', '090', 'ver', 'geom']`
-        DataFrame containing Arias Intensity values. The 'geom' component
+        DataFrame containing Arias Intensity values (m/s). The 'geom' component
         is the geometric mean of the 000 and 090 components.
     """
     arias_intensity_0 = _arias_intensity(waveform[:, :, Component.COMP_0.value], dt)

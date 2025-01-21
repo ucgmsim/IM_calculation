@@ -174,17 +174,17 @@ def test_pgv(comp_0: npt.NDArray[np.float32], t_max: float, expected_pga: float)
 @pytest.mark.parametrize(
     "comp_0,t_max,expected_cav,expected_cav5",
     [
-        (np.ones((100,), dtype=np.float32), 1, 981, 981),
+        (np.ones((100,), dtype=np.float32), 1, 9.81, 9.81),
         (
             np.linspace(0, 1, num=100, dtype=np.float32) ** 2,
             1,
-            981 / 3,
-            981 / 3 * (1 - np.sqrt(5 / 981) ** 3),
+            9.81 / 3,
+            9.81 / 3 * (1 - np.sqrt(5 / 981) ** 3),
         ),
         (
             2 * np.sin(np.linspace(0, 2 * np.pi, num=1000, dtype=np.float32)) - 1,
             2 * np.pi,
-            981 * 2 / 3 * (6 * np.sqrt(3) + np.pi),
+            9.81 * 2 / 3 * (6 * np.sqrt(3) + np.pi),
             None,
         ),
     ],
@@ -212,8 +212,8 @@ def test_cav(
 @pytest.mark.parametrize(
     "comp_0,t_max,expected_ai",
     [
-        (np.ones((100,), dtype=np.float32), 1, np.pi / (2 * 981)),
-        (np.linspace(0, 1, num=100, dtype=np.float32) ** 2, 1, np.pi / (2 * 981 * 5)),
+        (np.ones((100,), dtype=np.float32), 1, np.pi * 9.81 / 2),
+        (np.linspace(0, 1, num=100, dtype=np.float32) ** 2, 1, np.pi * 9.81 / (2 * 5)),
     ],
 )
 def test_ai_values(comp_0: npt.NDArray[np.float32], t_max: float, expected_ai: float):
@@ -432,7 +432,7 @@ def test_numerical_stability(duration: int):
     waveform=nst.arrays(
         np.float32,
         shape=st.tuples(st.integers(2, 10), st.integers(2, 10), st.just(3)),
-        elements=st.floats(0.01, 1).flatmap(
+        elements=st.floats(0.01, 1, width=32).flatmap(
             lambda x: st.sampled_from([-1, 1]).flatmap(lambda sign: st.just(sign * x))
         ),
     ),
@@ -476,7 +476,7 @@ def test_rotational_invariance(waveform: npt.NDArray[np.float32], func: Callable
     waveform=nst.arrays(
         np.float32,
         shape=st.tuples(st.integers(2, 10), st.integers(2, 10), st.just(3)),
-        elements=st.floats(-1, 1),
+        elements=st.floats(-1, 1, width=32),
     ),
 )
 @settings(deadline=None)
