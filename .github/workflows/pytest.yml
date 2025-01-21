@@ -19,6 +19,7 @@ jobs:
           python -m pip install --upgrade pip
           pip install -e .
           pip install pytest-cov  # Install pytest-cov plugin
+          pip install hypothesis  # Install hypothesis
 
       - name: Run tests
         run: |
