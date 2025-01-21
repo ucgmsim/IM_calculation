@@ -9,12 +9,11 @@ authors = [
 ]
 description = "Intensity Measure Calculation for Ground Motion Waveforms"
 readme = "README.md"
-requires-python = ">=3.12"
+requires-python = ">=3.11"
 dynamic = ["version", "dependencies"]
 
 [tool.setuptools.dynamic]
 dependencies = {file = ["requirements.txt"]}
-
 
 [tool.setuptools.packages.find]
 exclude = ["wiki", "tests"]
