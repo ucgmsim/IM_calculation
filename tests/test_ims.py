@@ -368,7 +368,7 @@ def test_fourier_amplitude_spectra(
     assert np.allclose(result_mp.coords["frequency"], freqs)
     assert np.all(result_mp.as_numpy() >= 0)
     # Check that multi-core result and single-core result produce the same output.
-    assert np.allclose(result_mp.as_numpy(), result_sc.numpy())
+    assert np.allclose(result_mp.as_numpy(), result_sc.as_numpy())
 
 
 # Error test cases
