@@ -1,6 +1,7 @@
 """Test cases for intensity measure implementations."""
 
 import functools
+import multiprocessing
 from collections.abc import Callable
 from pathlib import Path
 from typing import Optional
@@ -355,15 +356,19 @@ def test_fourier_amplitude_spectra(
 ):
     """Test Fourier Amplitude Spectra calculation."""
     dt = sample_time[1] - sample_time[0]
-    freqs = np.logspace(-1, 1, n_freqs, dtype=np.float32)
-
-    result = ims.fourier_amplitude_spectra(sample_waveforms, dt, freqs)
+    freqs = np.logspace(-1, 1, n_freqs, dtype=np.float32) 
+    # Force the multiprocessing code path if necessary.
+    result_mp = ims.fourier_amplitude_spectra(sample_waveforms, dt, freqs, cores=max(2, multiprocessing.cpu_count()))
+    # Force the single core path.
+    result_sc = ims.fourier_amplitude_spectra(sample_waveforms, dt, freqs, cores=1)
 
     # Check DataFrame structure
-    assert isinstance(result, xr.DataArray)
-    assert list(result.coords["component"]) == ["000", "090", "ver", "geom", "eas"]
-    assert np.allclose(result.coords["frequency"], freqs)
-    assert np.all(result.as_numpy() >= 0)
+    assert isinstance(result_mp, xr.DataArray)
+    assert list(result_mp.coords["component"]) == ["000", "090", "ver", "geom", "eas"]
+    assert np.allclose(result_mp.coords["frequency"], freqs)
+    assert np.all(result_mp.as_numpy() >= 0)
+    # Check that multi-core result and single-core result produce the same output.
+    assert np.allclose(result_mp.as_numpy(), result_sc.numpy())
 
 
 # Error test cases
