@@ -432,7 +432,8 @@ def test_numerical_stability(duration: int):
     waveform=nst.arrays(
         np.float32,
         shape=st.tuples(st.integers(2, 10), st.integers(2, 10), st.just(3)),
-        elements=st.floats(0.01, 1, width=32).flatmap(
+        # Weird number is closest 32-bit floating point value to 0.01
+        elements=st.floats(0.009999999776482582, 1, width=32).flatmap(
             lambda x: st.sampled_from([-1, 1]).flatmap(lambda sign: st.just(sign * x))
         ),
     ),
