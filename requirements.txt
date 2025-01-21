@@ -1,5 +1,6 @@
 numba
 numpy
+numexpr
 pandas
 scipy
 xarray

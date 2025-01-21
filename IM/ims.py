@@ -419,21 +419,36 @@ def fourier_amplitude_spectra(
     fa_frequencies = np.fft.rfftfreq(n_fft, dt)
     fa_spectrum = np.abs(np.fft.rfft(waveforms, n=n_fft, axis=1) * dt)
     smoother = pykooh.CachedSmoother(fa_frequencies, fa_frequencies, ko_bandwidth)
-    with multiprocessing.Pool(cores) as pool:
+
+    if cores > 1:
+        with multiprocessing.Pool(cores) as pool:
+            fas_0 = np.array(
+                pool.map(smoother, fa_spectrum[:, :, Component.COMP_0.value]),
+                dtype=np.float32,
+            )
+            fas_90 = np.array(
+                pool.map(smoother, fa_spectrum[:, :, Component.COMP_90.value]),
+                dtype=np.float32,
+            )
+            fas_ver = np.array(
+                pool.map(smoother, fa_spectrum[:, :, Component.COMP_VER.value]),
+                dtype=np.float32,
+            )
+    else:
         fas_0 = np.array(
-            pool.map(smoother, fa_spectrum[:, :, Component.COMP_0.value]),
+            list(map(smoother, fa_spectrum[:, :, Component.COMP_0.value])),
             dtype=np.float32,
         )
         fas_90 = np.array(
-            pool.map(smoother, fa_spectrum[:, :, Component.COMP_90.value]),
+            list(map(smoother, fa_spectrum[:, :, Component.COMP_90.value])),
             dtype=np.float32,
         )
         fas_ver = np.array(
-            pool.map(smoother, fa_spectrum[:, :, Component.COMP_VER]),
+            list(map(smoother, fa_spectrum[:, :, Component.COMP_VER.value])),
             dtype=np.float32,
         )
-    # Interpolate for output frequencies
 
+    # Interpolate for output frequencies
     interpolator_0 = sp.interpolate.make_interp_spline(fa_frequencies, fas_0, axis=1, k=1)
     fas_0 = interpolator_0(freqs)
     interpolator_90 = sp.interpolate.make_interp_spline(fa_frequencies, fas_90, axis=1, k=1)
