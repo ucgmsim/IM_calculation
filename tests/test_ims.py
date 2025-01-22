@@ -16,7 +16,7 @@ from hypothesis import strategies as st
 from hypothesis.extra import numpy as nst
 from numpy.testing import assert_array_almost_equal
 
-from IM import ims, snr_calculation, waveform_reading
+from IM import im_calculation, ims, snr_calculation, waveform_reading
 
 
 # Common test fixtures
@@ -287,6 +287,28 @@ def test_snr_benchmark():
 
     # Compare the results
     assert_array_almost_equal(data, snr_result_ims, decimal=5)
+
+
+def test_all_ims_benchmark():
+    """Compare benchmark IM calculation against current implementation."""
+    # Load the DataFrame
+    benchmark_ffp = Path(__file__).parent / "resources" / "im_benchmark.csv"
+    data = pd.read_csv(benchmark_ffp, index_col=0)
+
+    # Read the example waveform
+    data_dir = Path(__file__).parent.parent / "examples" / "resources"
+    comp_000_ffp = data_dir / "2024p950420_MWFS_HN_20.000"
+    comp_090_ffp = data_dir / "2024p950420_MWFS_HN_20.090"
+    comp_ver_ffp = data_dir / "2024p950420_MWFS_HN_20.ver"
+
+    # Read the files to a waveform array that's readable by IM Calculation
+    dt, waveform = waveform_reading.read_ascii(comp_000_ffp, comp_090_ffp, comp_ver_ffp)
+
+    # Calculate the intensity measures
+    result = im_calculation.calculate_ims(waveform, dt)
+
+    # Compare the results
+    assert_array_almost_equal(data, result, decimal=5)
 
 
 def test_ds5xx():
