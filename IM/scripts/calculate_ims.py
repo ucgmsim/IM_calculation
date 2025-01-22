@@ -10,17 +10,58 @@ from IM import im_calculation, waveform_reading
 app = typer.Typer()
 
 
-@app.command(help='Calculate intensity measures for a single ASCII waveform fileset (000, 090, vertical).')
+@app.command(
+    help="Calculate intensity measures for a single ASCII waveform fileset (000, 090, vertical)."
+)
 def calculate_ims_ascii(
-    file_000: Annotated[Path, typer.Argument(help='ASCII file containing 000 component of waveform.', exists=True,dir_okay=False)],
-    file_090: Annotated[Path, typer.Argument(help='ASCII file containing 090 component of waveform.', exists=True, dir_okay=False)],
-    file_ver: Annotated[Path, typer.Argument(help='ASCII file containing ver component of waveform.', exists=True, dir_okay=False)],
-    output_file: Annotated[Path,typer.Argument( help="Output file for the calculated IMs.", dir_okay=False)],
-    ims_list: Annotated[list[im_calculation.IM], typer.Argument(help='Intensity measures to calculate.', )],
-    periods: Annotated[list[float],  typer.Option( help="Periods required for pSA")] = list(im_calculation.DEFAULT_PERIODS),
-    frequencies: Annotated[list[float],  typer.Option( help="Frequencies required for FAS")] = list(im_calculation.DEFAULT_FREQUENCIES),
-    cores: Annotated[int, typer.Option( help="Number of cores to use for parallel processing in pSA and FAS calculations.")] = multiprocessing.cpu_count(),
-    ko_bandwidth: Annotated[int, typer.Option(help='Bandwidth for Konno-Ohmachi smoothing.')] = 40,
+    file_000: Annotated[
+        Path,
+        typer.Argument(
+            help="ASCII file containing 000 component of waveform.",
+            exists=True,
+            dir_okay=False,
+        ),
+    ],
+    file_090: Annotated[
+        Path,
+        typer.Argument(
+            help="ASCII file containing 090 component of waveform.",
+            exists=True,
+            dir_okay=False,
+        ),
+    ],
+    file_ver: Annotated[
+        Path,
+        typer.Argument(
+            help="ASCII file containing ver component of waveform.",
+            exists=True,
+            dir_okay=False,
+        ),
+    ],
+    output_file: Annotated[
+        Path, typer.Argument(help="Output file for the calculated IMs.", dir_okay=False)
+    ],
+    ims_list: Annotated[
+        list[im_calculation.IM],
+        typer.Argument(
+            help="Intensity measures to calculate.",
+        ),
+    ],
+    periods: Annotated[
+        list[float], typer.Option(help="Periods required for pSA")
+    ] = list(im_calculation.DEFAULT_PERIODS),
+    frequencies: Annotated[
+        list[float], typer.Option(help="Frequencies required for FAS")
+    ] = list(im_calculation.DEFAULT_FREQUENCIES),
+    cores: Annotated[
+        int,
+        typer.Option(
+            help="Number of cores to use for parallel processing in pSA and FAS calculations."
+        ),
+    ] = multiprocessing.cpu_count(),
+    ko_bandwidth: Annotated[
+        int, typer.Option(help="Bandwidth for Konno-Ohmachi smoothing.")
+    ] = 40,
 ):
     """
     Calculate intensity measures for a single ASCII waveform fileset (000, 090, vertical).
@@ -57,6 +98,14 @@ def calculate_ims_ascii(
     dt, waveform = waveform_reading.read_ascii(file_000, file_090, file_ver)
 
     # Calculate the intensity measures
-    result = im_calculation.calculate_ims(waveform, dt, ims_list, np.array(periods), np.array(frequencies), cores, ko_bandwidth)
+    result = im_calculation.calculate_ims(
+        waveform,
+        dt,
+        ims_list,
+        np.array(periods),
+        np.array(frequencies),
+        cores,
+        ko_bandwidth,
+    )
 
     result.to_csv(output_file)

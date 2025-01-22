@@ -258,9 +258,7 @@ def test_fas_benchmark():
     dt, waveform = waveform_reading.read_ascii(comp_000_ffp, comp_090_ffp, comp_ver_ffp)
 
     # Compute the Fourier Amplitude Spectra
-    fas_result_ims = ims.fourier_amplitude_spectra(
-        waveform, dt, data.frequency
-    )
+    fas_result_ims = ims.fourier_amplitude_spectra(waveform, dt, data.frequency)
 
     # Compare the results
     assert_array_almost_equal(data, fas_result_ims, decimal=5)
@@ -383,9 +381,11 @@ def test_fourier_amplitude_spectra(
 ):
     """Test Fourier Amplitude Spectra calculation."""
     dt = sample_time[1] - sample_time[0]
-    freqs = np.logspace(-1, 1, n_freqs, dtype=np.float32) 
+    freqs = np.logspace(-1, 1, n_freqs, dtype=np.float32)
     # Force the multiprocessing code path if necessary.
-    result_mp = ims.fourier_amplitude_spectra(sample_waveforms, dt, freqs, cores=max(2, multiprocessing.cpu_count()))
+    result_mp = ims.fourier_amplitude_spectra(
+        sample_waveforms, dt, freqs, cores=max(2, multiprocessing.cpu_count())
+    )
     # Force the single core path.
     result_sc = ims.fourier_amplitude_spectra(sample_waveforms, dt, freqs, cores=1)
 

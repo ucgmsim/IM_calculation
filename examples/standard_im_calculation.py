@@ -15,9 +15,7 @@ comp_ver_ffp = data_dir / "2024p950420_MWFS_HN_20.ver"
 dt, waveform = waveform_reading.read_ascii(comp_000_ffp, comp_090_ffp, comp_ver_ffp)
 
 # Calculate the intensity measures using defaults
-im_results = im_calculation.calculate_ims(
-    waveform, dt
-)
+im_results = im_calculation.calculate_ims(waveform, dt)
 
 # Sanity check that the IMs that are calculated are the ones we expect
 # By comparing against the benchmark set

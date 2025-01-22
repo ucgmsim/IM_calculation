@@ -15,8 +15,6 @@ tp = 3170
 dt, waveform = waveform_reading.read_ascii(comp_000_ffp, comp_090_ffp, comp_ver_ffp)
 
 # Calculate the SNR using defaults
-snr_results = snr_calculation.calculate_snr(
-    waveform, dt, tp
-)
+snr_results = snr_calculation.calculate_snr(waveform, dt, tp)
 
 print(snr_results)

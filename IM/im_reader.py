@@ -1,4 +1,5 @@
 """Utility module for reading intensity measure files stored in HDF5 format."""
+
 from pathlib import Path
 
 import pandas as pd
@@ -11,8 +12,8 @@ class IMFile:
     """
     A class for reading intensity measure (IM) data from an HDF5 file.
 
-    This class provides methods to retrieve IM data as either a 
-    `pandas.DataFrame` or an `xarray.DataArray`, depending on the type 
+    This class provides methods to retrieve IM data as either a
+    `pandas.DataFrame` or an `xarray.DataArray`, depending on the type
     of intensity measure requested.
 
     Attributes
@@ -20,7 +21,7 @@ class IMFile:
     path : Path
         The file path to the HDF5 file containing intensity measure data.
     _xarray_methods : set
-        A set of intensity measures that should be accessed as 
+        A set of intensity measures that should be accessed as
         `xarray.DataArray` objects.
     """
 
@@ -49,8 +50,8 @@ class IMFile:
         Returns
         -------
         pd.DataFrame or xr.DataArray
-            The data associated with the given intensity measure. Returns 
-            an `xarray.DataArray` if the intensity measure is in 
+            The data associated with the given intensity measure. Returns
+            an `xarray.DataArray` if the intensity measure is in
             `_xarray_methods`, otherwise a `pandas.DataFrame`.
 
         Raises
@@ -67,8 +68,8 @@ class IMFile:
         <class 'xarray.DataArray'>  # If IM.pSA is in `_xarray_methods`
         """
         if intensity_measure in self._xarray_methods:
-            return xr.open_dataarray(self.path, engine='h5netcdf', group=intensity_measure)
+            return xr.open_dataarray(
+                self.path, engine="h5netcdf", group=intensity_measure
+            )
         else:
             return pd.read_hdf(self.path, key=intensity_measure)
-
-

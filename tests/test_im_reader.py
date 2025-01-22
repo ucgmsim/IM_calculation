@@ -24,6 +24,7 @@ def hdf5_file(tmp_path: Path):
 
     return file_path
 
+
 @pytest.mark.parametrize("intensity_measure", IM)
 def test_getitem_all_ims(hdf5_file: Path, intensity_measure: IM):
     """Test reading all intensity measures from disk."""
@@ -39,6 +40,7 @@ def test_getitem_all_ims(hdf5_file: Path, intensity_measure: IM):
         assert isinstance(data, pd.DataFrame)
         assert list(data["values"]) == [10, 20, 30]
         assert list(data["index"]) == ["A", "B", "C"]
+
 
 def test_initialization(hdf5_file: Path):
     """Test initialization of the IMFile object."""

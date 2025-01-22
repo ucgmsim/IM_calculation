@@ -4,7 +4,9 @@ import numpy as np
 import pandas as pd
 
 
-def read_ascii(file_000: Path, file_090: Path, file_ver: Path) -> tuple[float, np.ndarray]:
+def read_ascii(
+    file_000: Path, file_090: Path, file_ver: Path
+) -> tuple[float, np.ndarray]:
     """
     Read ASCII waveform files (000, 090, vertical) and return the sampling interval (dt) and waveform data.
 
@@ -28,7 +30,9 @@ def read_ascii(file_000: Path, file_090: Path, file_ver: Path) -> tuple[float, n
     comp_ver = pd.read_csv(file_ver, sep=r"\s+", header=None, skiprows=2).values.ravel()
 
     # Extract the sampling interval (dt) from the 000 component file
-    delta = pd.read_csv(file_000, sep=r"\s+", header=None, nrows=2, skiprows=1).iloc[0, 1]
+    delta = pd.read_csv(file_000, sep=r"\s+", header=None, nrows=2, skiprows=1).iloc[
+        0, 1
+    ]
 
     # Remove NaN values
     comp_000 = comp_000[~np.isnan(comp_000)]
