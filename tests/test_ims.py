@@ -315,6 +315,9 @@ def test_ds5xx():
     comp_0 = np.ones((100,))
     waveforms = np.zeros((1, len(comp_0), 3))
     waveforms[:, :, ims.Component.COMP_0] = comp_0
+    # To stop invalid value errors when dividing by zero in other components
+    waveforms[:, :, ims.Component.COMP_90] = comp_0 * 2
+    waveforms[:, :, ims.Component.COMP_VER] = comp_0 * 3
     t_max = 1
     dt = t_max / len(comp_0)
     assert ims.ds575(waveforms, dt)["000"].iloc[0] == pytest.approx(0.7)
