@@ -21,15 +21,15 @@ def strip_trailing_nans(arr: np.ndarray) -> np.ndarray:
     """
     # Find last non-NaN index in each row
     last_valid = np.maximum.accumulate(
-        np.where(~np.isnan(arr), np.arange(arr.shape[1]), 0),
-        axis=1
+        np.where(~np.isnan(arr), np.arange(arr.shape[0])[:, np.newaxis], 0),
+        axis=0
     )
     
     # Find maximum needed width by finding the rightmost non-NaN value
     max_width = last_valid.max() + 1
     
     # Return trimmed array
-    return arr[:, :max_width]
+    return arr[:max_width, :]
 
 def read_ascii(
     file_000: Path, file_090: Path, file_ver: Path
@@ -55,14 +55,13 @@ def read_ascii(
     comp_000 = pd.read_csv(file_000, sep=r"\s+", header=None, skiprows=2).values.ravel()
     comp_090 = pd.read_csv(file_090, sep=r"\s+", header=None, skiprows=2).values.ravel()
     comp_ver = pd.read_csv(file_ver, sep=r"\s+", header=None, skiprows=2).values.ravel()
-    waveform_data = strip_trailing_nans(np.stack((comp_000, comp_090, comp_ver), axis=1).T).T
-
+    waveform_data = strip_trailing_nans(np.stack((comp_000, comp_090, comp_ver), axis=1))
     # Extract the sampling interval (dt) from the 000 component file
     delta = pd.read_csv(file_000, sep=r"\s+", header=None, nrows=2, skiprows=1).iloc[
         0, 1
     ]
 
-    if np.any(np.isnan(comp_000) | np.isnan(comp_090) | np.isnan(comp_ver)):
+    if np.any(np.isnan(waveform_data)):
         raise ValueError('Components contain NaN values.')
 
     # Ensure dtype is float 32
