@@ -34,10 +34,8 @@ def read_ascii(
         0, 1
     ]
 
-    # Remove NaN values
-    comp_000 = comp_000[~np.isnan(comp_000)]
-    comp_090 = comp_090[~np.isnan(comp_090)]
-    comp_ver = comp_ver[~np.isnan(comp_ver)]
+    if np.any(np.isnan(comp_000) | np.isnan(comp_090) | np.isnan(comp_ver)):
+        raise ValueError('Components contain NaN values.')
 
     # Stack components into a single NumPy array
     waveform_data = np.stack((comp_000, comp_090, comp_ver), axis=1)
