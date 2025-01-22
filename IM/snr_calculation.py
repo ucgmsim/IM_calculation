@@ -40,7 +40,7 @@ def calculate_snr(
     waveform: np.ndarray,
     dt: float,
     tp: int,
-    frequencies: np.asarray = im_calculation.DEFAULT_FREQUENCIES,
+    frequencies: np.ndarray = im_calculation.DEFAULT_FREQUENCIES,
     cores: int = multiprocessing.cpu_count(),
     ko_bandwidth: int = 40,
     apply_taper: bool = True,
@@ -56,7 +56,7 @@ def calculate_snr(
         The sampling rate of the waveform
     tp : float
         The index of the p-arrival
-    frequencies : np.asarray, optional
+    frequencies : np.ndarray, optional
         The frequency vector to use for the SNR calculation,
         by default takes the frequencies from FAS
     cores : int, optional
