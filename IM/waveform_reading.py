@@ -3,16 +3,21 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-def strip_trailing_nans(arr):
-    """
-    Efficiently removes trailing NaNs from a 2D numpy array.
+
+def strip_trailing_nans(arr: np.ndarray) -> np.ndarray:
+    """Remove trailing NaNs from a 2D numpy array.
+    
     Only removes NaNs if they are at the end of columns.
     
-    Parameters:
-    arr : 2D numpy array
+    Parameters
+    ----------
+    arr : np.ndarray
+        Array to strip.
     
-    Returns:
-    2D numpy array with trailing NaNs removed
+    Returns
+    -------
+    np.ndarray
+        2D numpy array with trailing NaNs removed.
     """
     # Find last non-NaN index in each row
     last_valid = np.maximum.accumulate(
