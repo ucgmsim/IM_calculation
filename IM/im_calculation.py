@@ -17,8 +17,8 @@ def calculate_ims(
     waveform: np.ndarray,
     dt: float,
     ims_list: list[IM] = list(IM),
-    periods: list[float] = DEFAULT_PERIODS,
-    frequencies: list[float] = DEFAULT_FREQUENCIES,
+    periods: np.ndarray = DEFAULT_PERIODS,
+    frequencies: np.ndarray = DEFAULT_FREQUENCIES,
     cores: int = multiprocessing.cpu_count(),
     ko_bandwidth: int = 40,
 ):

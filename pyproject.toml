@@ -18,6 +18,9 @@ dependencies = {file = ["requirements.txt"]}
 [tool.setuptools.packages.find]
 exclude = ["wiki", "tests"]
 
+[project.scripts]
+calculate-ims-ascii = "IM.scripts.calculate_ims:app"
+
 [tool.ruff.lint]
 extend-select = [
   # isort imports
