@@ -1,13 +1,12 @@
+import shutil
 from pathlib import Path
 
 import pytest
 from typer.testing import CliRunner
 
-from IM.scripts import calculate_ims
 from IM.scripts.calculate_ims import (
     app,  # Replace with the actual module name containing your app
 )
-import shutil
 
 runner = CliRunner()
 
