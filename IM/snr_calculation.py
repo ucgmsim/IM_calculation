@@ -1,20 +1,50 @@
 import multiprocessing
+from typing import NamedTuple
 
 import numpy as np
+import pandas as pd
 import scipy as sp
 
 from IM import im_calculation, ims
 
 
+class SNRResult(NamedTuple):
+    """Result of an SNR calculation.
+
+    Contains the signal-to-noise ratio (SNR) calculations along with the Fourier amplitude 
+    spectra (FAS) for both signal and noise components, and their respective durations.
+    """
+    snr_df: pd.DataFrame
+    """DataFrame containing the calculated SNR values for each component (000, 090, ver).
+    The index represents frequencies and columns represent the different components."""
+
+    fas_signal_df: pd.DataFrame
+    """DataFrame containing the Fourier amplitude spectra of the signal portion
+    for each component (000, 090, ver). The index represents frequencies and
+    columns represent the different components."""
+
+    fas_noise_df: pd.DataFrame
+    """DataFrame containing the Fourier amplitude spectra of the noise portion
+    for each component (000, 090, ver). The index represents frequencies and
+    columns represent the different components."""
+
+    signal_duration: float
+    """Duration of the signal portion in seconds, calculated as the number of
+    samples in the signal multiplied by the sampling interval (dt)."""
+
+    noise_duration: float
+    """Duration of the noise portion in seconds, calculated as the number of
+    samples in the noise multiplied by the sampling interval (dt)."""
+
 def calculate_snr(
     waveform: np.ndarray,
     dt: float,
-    tp: float,
+    tp: int,
     frequencies: np.asarray = im_calculation.DEFAULT_FREQUENCIES,
     cores: int = multiprocessing.cpu_count(),
     ko_bandwidth: int = 40,
     apply_taper: bool = True,
-):
+) -> SNRResult:
     """
     Calculates the SNR of a waveform given a tp and common frequency vector
 
@@ -35,6 +65,12 @@ def calculate_snr(
         Bandwidth for the Konno-Ohmachi smoothing, by default 40.
     apply_taper : bool, optional
         Whether to apply a taper of 5% to the signal and noise, by default True.
+
+    Returns
+    -------
+    SNRResult
+        The output of the SNR calculation. See `SNRResult` documentation
+        for details of each component of the SNR calculation.
     """
     # Calculate signal and noise areas
     signal_acc, noise_acc = waveform[:, tp:], waveform[:, :tp]
@@ -98,4 +134,4 @@ def calculate_snr(
     fas_noise_df.columns = fas_noise_df.columns.droplevel(0)
     fas_noise_df = fas_noise_df[["000", "090", "ver"]]
 
-    return snr_df, fas_signal_df, fas_noise_df, signal_duration, noise_duration
+    return SNRResult(snr_df, fas_signal_df, fas_noise_df, signal_duration, noise_duration)
