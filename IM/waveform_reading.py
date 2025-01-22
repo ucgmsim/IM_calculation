@@ -74,6 +74,11 @@ def read_ascii(
     -------
     Tuple[float, np.ndarray]
         Sampling interval (dt) and waveform data as a NumPy array.
+
+    Raises
+    ------
+    ValueError
+        If the components contain NaN values in the middle or start of the waveform data.
     """
     # Load all components
     comp_000 = pd.read_csv(file_000, sep=r"\s+", header=None, skiprows=2).values.ravel()

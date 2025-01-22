@@ -71,6 +71,11 @@ def calculate_snr(
     SNRResult
         The output of the SNR calculation. See `SNRResult` documentation
         for details of each component of the SNR calculation.
+
+    Raises
+    ------
+    ValueError
+        If the noise duration is less than 1s and so SNR can't be computed.
     """
     # Calculate signal and noise areas
     signal_acc, noise_acc = waveform[:, tp:], waveform[:, :tp]
