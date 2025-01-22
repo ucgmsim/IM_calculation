@@ -467,7 +467,7 @@ def test_numerical_stability(duration: int):
 )
 @settings(deadline=None)
 def test_rotational_invariance(waveform: npt.NDArray[np.float32], func: Callable):
-    # DS595 and DS575 won't work if the waveform has
+    # DS595 and DS575 won't work if the waveform has values that are too small.
     assume(
         all(
             np.any(
