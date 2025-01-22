@@ -92,7 +92,7 @@ def test_newmark_estimate_psa(
 
 # Test cases for rotd PSA values
 def test_rotd_psa_values():
-    """Test rotation of PSA values. Assumes that the psa for angular frequnecy 1 is constant 1 for comp 0 and comp 90.
+    """Test rotation of PSA values. Assumes that the psa for angular frequency 1 is constant 1 for comp 0 and comp 90.
     Checks that rotd_psa_values calculates cos(theta) * comp_0 + sin(theta) * comp_90 and maximises correctly by checking the maximum rotated psa value
     is 2 * pi^2 * sqrt(2).
     """
