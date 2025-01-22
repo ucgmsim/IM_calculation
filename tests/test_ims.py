@@ -166,6 +166,8 @@ def test_pga(comp_0: npt.NDArray[np.float32], expected_pga: float):
 def test_pgv(comp_0: npt.NDArray[np.float32], t_max: float, expected_pga: float):
     waveforms = np.zeros((1, len(comp_0), 3))
     waveforms[:, :, ims.Component.COMP_0] = comp_0
+    # NOTE: This dt calculation is correct, if dt = 1 / len(comp_0) then dt
+    # ends up *too small* and these tests will fail.
     dt = t_max / (len(comp_0) - 1)
     assert np.isclose(
         ims.peak_ground_velocity(waveforms, dt)["000"], expected_pga, atol=0.1
