@@ -4,6 +4,7 @@ from pathlib import Path
 
 import pandas as pd
 import xarray as xr
+import h5py
 
 from IM.ims import IM
 
@@ -38,6 +39,18 @@ class IMFile:
         """
         self.path = path
 
+    @property
+    def ims(self) -> set[IM]:
+        """Return the list of IMs in the IM file.
+
+        Returns
+        -------
+        set[IM]
+            The set of IMs available to read in the file.
+        """
+        with h5py.File(self.path) as im_handle:
+            return {x for x in set(IM) if x in set(im_handle.keys())}
+
     def __getitem__(self, intensity_measure: IM) -> pd.DataFrame | xr.DataArray:
         """Retrieve data for a given intensity measure.
 
@@ -67,6 +80,10 @@ class IMFile:
         >>> type(data)
         <class 'xarray.DataArray'>  # If IM.pSA is in `_xarray_methods`
         """
+        if intensity_measure not in self.ims:
+            raise AttributeError(
+                f"Intensity measure not available. Available intensity measures are: {', '.join(sorted(self.ims))}."
+            )
         if intensity_measure in self._xarray_methods:
             return xr.open_dataarray(
                 self.path, engine="h5netcdf", group=intensity_measure

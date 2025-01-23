@@ -3,6 +3,7 @@ from pathlib import Path
 import pandas as pd
 import pytest
 import xarray as xr
+import h5py
 
 from IM.im_reader import IMFile
 from IM.ims import IM
@@ -46,3 +47,25 @@ def test_initialization(hdf5_file: Path):
     """Test initialization of the IMFile object."""
     im_file = IMFile(hdf5_file)
     assert im_file.path == hdf5_file
+
+
+def test_ims_property(hdf5_file: Path):
+    """Test initialization of the IMFile object."""
+    im_file = IMFile(hdf5_file)
+    assert im_file.ims == set(IM)
+    with h5py.File(hdf5_file, mode="a") as f:
+        del f[IM.PGA]
+    assert im_file.ims == set(IM) - {IM.PGA}
+
+
+def test_missing_ims(hdf5_file: Path):
+    """Test initialization of the IMFile object."""
+    im_file = IMFile(hdf5_file)
+    with h5py.File(hdf5_file, mode="a") as f:
+        del f[IM.PGA]
+    for im in set(IM) - {IM.PGA}:
+        # no assert here, just checks that reading the IMs does not throw
+        # an error.
+        _ = im_file[im]
+    with pytest.raises(AttributeError):
+        _ = im_file[IM.PGA]
