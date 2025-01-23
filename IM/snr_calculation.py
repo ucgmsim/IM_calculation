@@ -11,9 +11,10 @@ from IM import im_calculation, ims
 class SNRResult(NamedTuple):
     """Result of an SNR calculation.
 
-    Contains the signal-to-noise ratio (SNR) calculations along with the Fourier amplitude 
+    Contains the signal-to-noise ratio (SNR) calculations along with the Fourier amplitude
     spectra (FAS) for both signal and noise components, and their respective durations.
     """
+
     snr_df: pd.DataFrame
     """DataFrame containing the calculated SNR values for each component (000, 090, ver).
     The index represents frequencies and columns represent the different components."""
@@ -35,6 +36,7 @@ class SNRResult(NamedTuple):
     noise_duration: float
     """Duration of the noise portion in seconds, calculated as the number of
     samples in the noise multiplied by the sampling interval (dt)."""
+
 
 def calculate_snr(
     waveform: np.ndarray,
@@ -134,4 +136,6 @@ def calculate_snr(
     fas_noise_df.columns = fas_noise_df.columns.droplevel(0)
     fas_noise_df = fas_noise_df[["000", "090", "ver"]]
 
-    return SNRResult(snr_df, fas_signal_df, fas_noise_df, signal_duration, noise_duration)
+    return SNRResult(
+        snr_df, fas_signal_df, fas_noise_df, signal_duration, noise_duration
+    )

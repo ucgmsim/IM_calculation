@@ -3,6 +3,7 @@
 import gc
 import multiprocessing
 import sys
+import warnings
 from collections.abc import Callable
 from enum import IntEnum, StrEnum
 from typing import Optional
@@ -419,6 +420,15 @@ def fourier_amplitude_spectra(
     xr.DataArray
         DataArray containing FAS values for each station, frequency and component ['000', '090', 'ver', 'eas'].
     """
+    nyquist_frequency = 1 / (2 * dt)
+    max_frequency = freqs.max()
+    if max_frequency > nyquist_frequency:
+        warnings.warn(
+            f"Attempting to compute FAS for frequencies above Nyquist frequency {nyquist_frequency:.2e} Hz. Results have been filtered",
+            RuntimeWarning,
+        )
+        freqs = freqs[freqs <= nyquist_frequency]
+
     n_fft = 2 ** int(np.ceil(np.log2(waveforms.shape[1])))
     fa_frequencies = np.fft.rfftfreq(n_fft, dt)
     fa_spectrum = np.abs(np.fft.rfft(waveforms, n=n_fft, axis=1) * dt)
