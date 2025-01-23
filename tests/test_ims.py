@@ -311,6 +311,28 @@ def test_all_ims_benchmark():
     assert_array_almost_equal(data, result, decimal=5)
 
 
+@pytest.mark.parametrize("resource_dir", [d for d in Path('resources').iterdir() if d.is_dir()])
+def test_all_ims_benchmark_edge_cases(resource_dir: Path):
+    """Compare benchmark IM calculation against current implementation for each directory in resources for edge cases."""
+    # Load the benchmark DataFrame
+    benchmark_ffp = resource_dir / "im_benchmark.csv"
+    data = pd.read_csv(benchmark_ffp, index_col=0)
+
+    # Read the edge case waveform files
+    comp_000_ffp = resource_dir / f"{resource_dir.stem}.000"
+    comp_090_ffp = resource_dir / f"{resource_dir.stem}.090"
+    comp_ver_ffp = resource_dir / f"{resource_dir.stem}.ver"
+
+    # Read the files to a waveform array that's readable by IM Calculation
+    dt, waveform = waveform_reading.read_ascii(comp_000_ffp, comp_090_ffp, comp_ver_ffp)
+
+    # Calculate the intensity measures
+    result = im_calculation.calculate_ims(waveform, dt)
+
+    # Compare the results
+    assert_array_almost_equal(data, result, decimal=5)
+
+
 def test_ds5xx():
     comp_0 = np.ones((100,))
     waveforms = np.zeros((1, len(comp_0), 3))
