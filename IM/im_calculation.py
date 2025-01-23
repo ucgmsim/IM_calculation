@@ -148,9 +148,9 @@ def calculate_ims(
         Sampling interval (dt) of the waveform.
     ims_list : list of IM, optional
         List of intensity measures (IMs) to calculate, e.g., [IM.PGA, IM.pSA, IM.CAV].
-    periods : list of float, optional
+    periods : np.ndarray, optional
         List of periods required for calculating the pseudo-spectral acceleration (pSA).
-    frequencies : list of float, optional
+    frequencies : np.ndarray, optional
         List of frequencies required for calculating the Fourier amplitude spectrum (FAS).
     cores : int, optional
         Number of cores to use for parallel processing in pSA and FAS calculations.

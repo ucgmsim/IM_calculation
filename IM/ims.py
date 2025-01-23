@@ -222,7 +222,7 @@ def pseudo_spectral_acceleration(
         dt,
         w,
     )
-    # Step size is either the CPU count, or the maximum number of
+    # Step size is the minimum of either the CPU count, or the maximum number of
     # steps that fits within the psa_rotd_maximum_memory_allocation.
     if psa_rotd_maximum_memory_allocation:
         step = min(
