@@ -2,6 +2,7 @@
 
 import functools
 import multiprocessing
+import warnings
 from collections.abc import Callable
 from pathlib import Path
 from typing import Optional
@@ -396,6 +397,32 @@ def test_fourier_amplitude_spectra(
     assert np.all(result_mp.as_numpy() >= 0)
     # Check that multi-core result and single-core result produce the same output.
     assert np.allclose(result_mp.as_numpy(), result_sc.as_numpy())
+
+
+def test_nyquist_frequency():
+    # Define test parameters
+    n_stations = 2
+    n_timesteps = 1024
+    n_components = 3
+    dt = 0.01  # Timestep resolution (s)
+    nyquist_frequency = 1 / (2 * dt)
+
+    # Generate test waveforms (random data for simplicity)
+    waveforms = np.random.rand(n_stations, n_timesteps, n_components).astype(np.float32)
+
+    # Define frequencies, including some above the Nyquist frequency
+    freqs = np.array(
+        [1.0, 10.0, 20.0, 60.0], dtype=np.float32
+    )  # 60 Hz > Nyquist (50 Hz)
+    with pytest.warns(RuntimeWarning):
+        fas = ims.fourier_amplitude_spectra(waveforms, dt, freqs)
+
+    # Verify that frequencies above Nyquist are filtered out
+    expected_freqs = freqs[freqs <= nyquist_frequency]
+    np.testing.assert_array_equal(fas.coords["frequency"].values, expected_freqs)
+
+    # Verify the shape of the output
+    assert fas.shape == (5, n_stations, len(expected_freqs)), "Unexpected FAS shape."
 
 
 # Error test cases
