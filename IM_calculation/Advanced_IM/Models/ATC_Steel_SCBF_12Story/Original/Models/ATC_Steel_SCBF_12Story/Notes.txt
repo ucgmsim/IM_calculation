@@ -1,3 +1,0 @@
-Mass inflation factor: 50.0
-Rotational Inertia: 22.0
-Mass deflation factor: 0.81
