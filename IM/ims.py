@@ -425,7 +425,7 @@ def fourier_amplitude_spectra(
     if max_frequency > nyquist_frequency:
         warnings.warn(
             RuntimeWarning(
-                f"Attempting to compute FAS for frequencies above Nyquist frequency {nyquist_frequency:.2e} Hz. Results only include frequencies below Nyquist frequency {nyquist_frequency:.2e} Hz."
+                f"Attempting to compute FAS for frequencies above Nyquist frequency {nyquist_frequency:.2e} Hz. Results only include frequencies at or below Nyquist frequency {nyquist_frequency:.2e} Hz."
             ),
         )
         freqs = freqs[freqs <= nyquist_frequency]
