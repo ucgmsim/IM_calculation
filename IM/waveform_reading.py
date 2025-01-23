@@ -26,7 +26,7 @@ def strip_trailing_nans(arr: np.ndarray) -> np.ndarray:
     #
     # 1     2    3.5
     # 6     7    8
-    # NaN  NoN   5
+    # NaN  NaN   5
     # 4     3    9
     # NaN  NaN  NaN
     #
