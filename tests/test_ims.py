@@ -311,7 +311,10 @@ def test_all_ims_benchmark():
     assert_array_almost_equal(data, result, decimal=5)
 
 
-@pytest.mark.parametrize("resource_dir", [d for d in (Path(__file__).parent / 'resources').iterdir() if d.is_dir()])
+@pytest.mark.parametrize(
+    "resource_dir",
+    [d for d in (Path(__file__).parent / "resources").iterdir() if d.is_dir()],
+)
 def test_all_ims_benchmark_edge_cases(resource_dir: Path):
     """Compare benchmark IM calculation against current implementation for each directory in resources for edge cases."""
     # Load the benchmark DataFrame
