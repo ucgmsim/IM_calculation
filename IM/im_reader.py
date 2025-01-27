@@ -1,11 +1,13 @@
-import xarray as xr
-import pint_xarray  # noqa: F401
 from pathlib import Path
+
+import pint_xarray  # noqa: F401
+import xarray as xr
+
 from IM.ims import IM
 
 
 def read_intensity_measures(
-    intensity_measure_file: str | Path, units: bool = True
+    intensity_measure_file: str | Path,
 ) -> xr.Dataset:
     """
     Read intensity measures from a file and return as an xarray Dataset.
@@ -14,19 +16,12 @@ def read_intensity_measures(
     ----------
     intensity_measure_file : str or Path
         The file path or filename of the intensity measures dataset to be read.
-    units : bool, optional
-        If True, the dataset will be quantified with units using Pint (default is True).
 
     Returns
     -------
     xr.Dataset
-        The xarray dataset containing the intensity measures. If `units` is True,
-        the dataset will include units quantified using Pint.
-    """
-    dataset = xr.open_dataset(intensity_measure_file, engine="h5netcdf")
-    if units:
-        return dataset.pint.quantify()
-    return dataset
+        The xarray dataset containing the intensity measures."""
+    return xr.open_dataset(intensity_measure_file, engine="h5netcdf").pint.quantify()
 
 
 COORDINATE_METADATA = {
@@ -89,7 +84,7 @@ def write_intensity_measures(dataset: xr.Dataset, output_ffp: str | Path) -> Non
         dataset.coords[name].attrs.update(COORDINATE_METADATA[name])
 
     for im_name, description in IM_METADATA.items():
-        if name not in dataset:
+        if im_name not in dataset:
             continue
         dataset[im_name].attrs["description"] = IM_METADATA[im_name]
 
