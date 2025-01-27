@@ -4,9 +4,11 @@ import numpy as np
 import pytest
 import xarray as xr
 
-from IM.im_reader import (  # Replace with actual module name
+from IM import ims
+from IM.im_reader import (
     COORDINATE_METADATA,
     IM_METADATA,
+    IM_UNITS,
     read_intensity_measures,
     write_intensity_measures,
 )
@@ -26,6 +28,7 @@ def sample_dataset() -> xr.Dataset:
         "PGA": (["component", "station"], np.random.rand(7, 3)),
         "PGV": (["component", "station"], np.random.rand(7, 3)),
         "CAV": (["component", "station"], np.random.rand(7, 3)),
+        "CAV5": (["component", "station"], np.random.rand(7, 3)),
         "AI": (["component", "station"], np.random.rand(7, 3)),
         "Ds575": (["component", "station"], np.random.rand(7, 3)),
         "Ds595": (["component", "station"], np.random.rand(7, 3)),
@@ -34,17 +37,9 @@ def sample_dataset() -> xr.Dataset:
     ds = xr.Dataset(variables, coords=coords)
 
     # Add units to the variables
-    for var, units in {
-        "PGA": "g_0",
-        "PGV": "cm/s",
-        "CAV": "m/s",
-        "AI": "m/s",
-        "Ds575": "s",
-        "Ds595": "s",
-        "FAS": "g_0 * s",
-        "pSA": "g_0",
-    }.items():
-        ds[var].attrs["units"] = units
+    for var, units in IM_UNITS.items():
+        if isinstance(var, ims.IM):
+            ds[var].attrs["units"] = units
 
     return ds
 

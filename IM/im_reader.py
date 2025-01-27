@@ -1,5 +1,8 @@
 from pathlib import Path
 
+# Importing pint_xarray registers pint units with xarray, allowing for
+# unit-aware operations. It is not explicitly used, so we ignore the flake8
+# F401 error.
 import pint_xarray  # noqa: F401
 import xarray as xr
 
@@ -45,6 +48,7 @@ IM_METADATA = {
     IM.PGA: "Peak ground acceleration",
     IM.PGV: "Peak ground velocity",
     IM.CAV: "Cumulative absolute velocity",
+    IM.CAV5: "Cumulative absolute velocity (above 5 cm/s)",
     IM.AI: "Arias intensity",
     IM.Ds575: "Significant duration (5-75%)",
     IM.Ds595: "Significant duration (5-95%)",
