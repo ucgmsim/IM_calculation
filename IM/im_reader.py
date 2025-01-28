@@ -57,6 +57,9 @@ IM_METADATA = {
 }
 
 
+# The 'g0' unit is used for acceleration and is equivalent to 9.81 m/s^2. The
+# reason for this is that 'g' is reserved for 'grams'. This is a decision
+# made by the `pint` library, which is used to handle the units.
 IM_UNITS = {
     IM.PGA: "g0",
     IM.PGV: "cm/s",
