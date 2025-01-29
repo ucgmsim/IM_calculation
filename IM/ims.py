@@ -556,6 +556,7 @@ def _cumulative_absolute_velocity(
     ----------
     .. [0] https://stackoverflow.com/questions/79164983/numerically-integrating-signals-with-absolute-value/79173972#79173972
     """
+    print(f"Numba is using {numba.get_num_threads()} threads")
     cav = np.zeros((waveform.shape[0],), dtype=np.float32)
     dtf = np.float32(dt)
     half = np.float32(0.5)
