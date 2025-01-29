@@ -168,6 +168,9 @@ def calculate_ims(
     ValueError
         If the IM is not recognized.
     """
+    # Set the number of cores
+    ims.set_cores(cores)
+
     results = []
 
     # Iterate through IMs and calculate them

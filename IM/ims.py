@@ -2,6 +2,7 @@
 
 import gc
 import multiprocessing
+import os
 import sys
 import warnings
 from collections.abc import Callable
@@ -41,6 +42,31 @@ class IM(StrEnum):
     AI = "AI"
     pSA = "pSA"  # noqa: N815
     FAS = "FAS"
+
+def set_cores(cores: int = multiprocessing.cpu_count()) -> None:
+    """
+    Set the number of cores to use for NumExpr and Numba.
+
+    Parameters
+    ----------
+    cores : int, optional
+        Number of cores to use, by default all available cores.
+
+    Raises
+    ------
+    AssertionError
+        If the number of cores exceeds the maximum available.
+    """
+    # Check the number of cores is not above the maximum
+    assert cores <= multiprocessing.cpu_count(), "Number of cores exceeds maximum available."
+
+    # Set environment variables for NumExpr
+    os.environ['NUMEXPR_NUM_THREADS'] = str(cores)
+    ne.set_num_threads(cores)
+
+    # Set environment variables for Numba
+    os.environ['NUMBA_NUM_THREADS'] = str(cores)
+    numba.set_num_threads(cores)
 
 
 @numba.njit
