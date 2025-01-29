@@ -171,6 +171,7 @@ def rotd_psa_values(
     ndarray of float32 with shape `(n_stations, n_periods, 3)`
         Array containing minimum (rotd0), median (rotd50) and maximum (rotd100) PSA values.
     """
+    print(f"NumExpr is using {ne.get_num_threads()} threads")
     theta = np.linspace(0, np.pi, num=180, dtype=np.float32)
     psa = np.zeros((comp_000.shape[0], comp_000.shape[-1], 3), np.float32)
     out = np.zeros((step, *comp_000.shape[1:], 180), np.float32)
@@ -373,6 +374,7 @@ def trapz(
     This is a parallel implementation equivalent to np.trapz, optimized for
     performance with numba.
     """
+    print(f"NumExpr is using {ne.get_num_threads()} threads")
     sums = np.zeros((waveforms.shape[0],), np.float32)
     for i in numba.prange(waveforms.shape[0]):
         for j in range(waveforms.shape[1]):
