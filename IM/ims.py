@@ -374,7 +374,7 @@ def trapz(
     This is a parallel implementation equivalent to np.trapz, optimized for
     performance with numba.
     """
-    print(f"NumExpr is using {ne.get_num_threads()} threads")
+    print(f"Numba is using {numba.get_num_threads()} threads")
     sums = np.zeros((waveforms.shape[0],), np.float32)
     for i in numba.prange(waveforms.shape[0]):
         for j in range(waveforms.shape[1]):
