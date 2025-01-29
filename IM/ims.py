@@ -61,11 +61,11 @@ def set_cores(cores: int = multiprocessing.cpu_count()) -> None:
     assert cores <= multiprocessing.cpu_count(), "Number of cores exceeds maximum available."
 
     # Set environment variables for NumExpr
-    os.environ['NUMEXPR_NUM_THREADS'] = str(cores)
+    # os.environ['NUMEXPR_NUM_THREADS'] = str(cores)
     ne.set_num_threads(cores)
 
     # Set environment variables for Numba
-    os.environ['NUMBA_NUM_THREADS'] = str(cores)
+    # os.environ['NUMBA_NUM_THREADS'] = str(cores)
     numba.set_num_threads(cores)
 
 
