@@ -316,6 +316,8 @@ def compute_intensity_measure_rotd(
         DataFrame containing intensity measure statistics. Each row represents
         statistics for a single station.
     """
+    print(f"NumExpr is using {ne.ncores} cores")
+    print(f"NumExpr is using {ne.get_num_threads()} threads")
     (stations, _, _) = waveforms.shape
     values = np.zeros(shape=(stations, 180), dtype=waveforms.dtype)
 
