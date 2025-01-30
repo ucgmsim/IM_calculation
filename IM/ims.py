@@ -596,6 +596,7 @@ def _arias_intensity(
     ndarray of float32 with shape `(n_stations,)`
         AI values for each waveform (m/s).
     """
+    print(f"Numba is using {numba.get_num_threads()} threads")
     ai = np.zeros((waveform.shape[0],), dtype=np.float32)
     dtf = np.float32(dt)
     half = np.float32(0.5)
