@@ -2,7 +2,6 @@
 
 import gc
 import multiprocessing
-import os
 import sys
 import warnings
 from collections.abc import Callable
@@ -42,26 +41,6 @@ class IM(StrEnum):
     AI = "AI"
     pSA = "pSA"  # noqa: N815
     FAS = "FAS"
-
-def set_single_core() -> None:
-    """
-    Set environment variables for single-core execution.
-    """
-
-    # Set environment variables for NumExpr
-    os.environ['NUMEXPR_NUM_THREADS'] = "1"
-
-    # Set environment variables for Numba
-    os.environ['NUMBA_MAX_THREADS'] = "1"
-    # os.environ['NUMBA_NUM_THREADS'] = "1"
-
-    # Set the number of threads for OpenBLAS
-    # Needed for matrix multiplication in NumPy during FAS
-    os.environ["OPENBLAS_NUM_THREADS"] = "1"
-
-    # Print usage
-    print(f"NumExpr is using {ne.get_num_threads()} threads")
-    print(f"Numba is using {numba.get_num_threads()} threads")
 
 
 @numba.njit
@@ -166,7 +145,6 @@ def rotd_psa_values(
     ndarray of float32 with shape `(n_stations, n_periods, 3)`
         Array containing minimum (rotd0), median (rotd50) and maximum (rotd100) PSA values.
     """
-    print(f"NumExpr is using {ne.get_num_threads()} threads")
     theta = np.linspace(0, np.pi, num=180, dtype=np.float32)
     psa = np.zeros((comp_000.shape[0], comp_000.shape[-1], 3), np.float32)
     out = np.zeros((step, *comp_000.shape[1:], 180), np.float32)
