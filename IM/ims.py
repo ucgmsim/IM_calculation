@@ -71,6 +71,10 @@ def set_cores(cores: int = multiprocessing.cpu_count()) -> None:
     # Needed for matrix multiplication in NumPy during FAS
     os.environ["OPENBLAS_NUM_THREADS"] = str(cores)
 
+    # Print usage
+    print(f"NumExpr is using {ne.get_num_threads()} threads")
+    print(f"Numba is using {numba.get_num_threads()} threads")
+
 
 @numba.njit
 def newmark_estimate_psa(
@@ -319,8 +323,6 @@ def compute_intensity_measure_rotd(
         DataFrame containing intensity measure statistics. Each row represents
         statistics for a single station.
     """
-    print(f"NumExpr is using {ne.ncores} cores")
-    print(f"NumExpr is using {ne.get_num_threads()} threads")
     (stations, _, _) = waveforms.shape
     values = np.zeros(shape=(stations, 180), dtype=waveforms.dtype)
 
@@ -379,7 +381,6 @@ def trapz(
     This is a parallel implementation equivalent to np.trapz, optimized for
     performance with numba.
     """
-    print(f"Numba is using {numba.get_num_threads()} threads")
     sums = np.zeros((waveforms.shape[0],), np.float32)
     for i in numba.prange(waveforms.shape[0]):
         for j in range(waveforms.shape[1]):
@@ -561,7 +562,6 @@ def _cumulative_absolute_velocity(
     ----------
     .. [0] https://stackoverflow.com/questions/79164983/numerically-integrating-signals-with-absolute-value/79173972#79173972
     """
-    print(f"Numba is using {numba.get_num_threads()} threads")
     cav = np.zeros((waveform.shape[0],), dtype=np.float32)
     dtf = np.float32(dt)
     half = np.float32(0.5)
@@ -599,7 +599,6 @@ def _arias_intensity(
     ndarray of float32 with shape `(n_stations,)`
         AI values for each waveform (m/s).
     """
-    print(f"Numba is using {numba.get_num_threads()} threads")
     ai = np.zeros((waveform.shape[0],), dtype=np.float32)
     dtf = np.float32(dt)
     half = np.float32(0.5)
