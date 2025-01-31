@@ -169,7 +169,7 @@ def calculate_ims(
         If the IM is not recognized.
     """
     # Set the number of cores
-    # ims.set_cores(cores)
+    ims.set_cores(cores)
 
     results = []
 
