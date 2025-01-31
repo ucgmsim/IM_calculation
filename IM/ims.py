@@ -43,33 +43,21 @@ class IM(StrEnum):
     pSA = "pSA"  # noqa: N815
     FAS = "FAS"
 
-def set_cores(cores: int = multiprocessing.cpu_count()) -> None:
+def set_single_core() -> None:
     """
-    Set the number of cores to use for NumExpr and Numba.
-
-    Parameters
-    ----------
-    cores : int, optional
-        Number of cores to use, by default all available cores.
-
-    Raises
-    ------
-    AssertionError
-        If the number of cores exceeds the maximum available.
+    Set environment variables for single-core execution.
     """
-    # Check the number of cores is not above the maximum
-    assert cores <= multiprocessing.cpu_count(), "Number of cores exceeds maximum available."
 
     # Set environment variables for NumExpr
-    os.environ['NUMEXPR_NUM_THREADS'] = str(cores)
+    os.environ['NUMEXPR_NUM_THREADS'] = "1"
 
     # Set environment variables for Numba
-    os.environ['NUMBA_MAX_THREADS'] = str(cores)
-    # os.environ['NUMBA_NUM_THREADS'] = str(cores)
+    os.environ['NUMBA_MAX_THREADS'] = "1"
+    # os.environ['NUMBA_NUM_THREADS'] = "1"
 
     # Set the number of threads for OpenBLAS
     # Needed for matrix multiplication in NumPy during FAS
-    os.environ["OPENBLAS_NUM_THREADS"] = str(cores)
+    os.environ["OPENBLAS_NUM_THREADS"] = "1"
 
     # Print usage
     print(f"NumExpr is using {ne.get_num_threads()} threads")
