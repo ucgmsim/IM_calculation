@@ -65,7 +65,7 @@ def set_cores(cores: int = multiprocessing.cpu_count()) -> None:
 
     # Set environment variables for Numba
     os.environ['NUMBA_MAX_THREADS'] = str(cores)
-    os.environ['NUMBA_NUM_THREADS'] = str(cores)
+    # os.environ['NUMBA_NUM_THREADS'] = str(cores)
 
     # Set the number of threads for OpenBLAS
     # Needed for matrix multiplication in NumPy during FAS
