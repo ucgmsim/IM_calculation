@@ -113,11 +113,6 @@ def calculate_snr(
         taper_noise_acc, dt, frequencies, cores, ko_bandwidth
     )
 
-    # Set values to NaN if they are outside the bounds of sample rate / 2
-    sample_rate = 1 / dt
-    fas_signal[:, :, frequencies > sample_rate / 2] = np.nan
-    fas_noise[:, :, frequencies > sample_rate / 2] = np.nan
-
     # Calculate the SNR
     with np.errstate(divide="ignore", invalid="ignore"):
         snr = (fas_signal / np.sqrt(signal_duration)) / (
