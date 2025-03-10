@@ -186,15 +186,12 @@ def calculate_ims(
     # Iterate through IMs and calculate them
     for im in ims_list:
         if im == IM.PGA:
-            print("Calculating PGA")
             result = ims.peak_ground_acceleration(waveform)
             result.index = [im.value]
         elif im == IM.PGV:
-            print("Calculating PGV")
             result = ims.peak_ground_velocity(waveform, dt)
             result.index = [im.value]
         elif im == IM.pSA:
-            print("Calculating pSA")
             data_array = ims.pseudo_spectral_acceleration(
                 waveform, periods, dt, cores=cores
             )
@@ -205,27 +202,21 @@ def calculate_ims(
             ]
             result.columns = result.columns.droplevel(0)
         elif im == IM.CAV:
-            print("Calculating CAV")
             result = ims.cumulative_absolute_velocity(waveform, dt)
             result.index = [im.value]
         elif im == IM.CAV5:
-            print("Calculating CAV5")
             result = ims.cumulative_absolute_velocity(waveform, dt, 5)
             result.index = [im.value]
         elif im == IM.Ds575:
-            print("Calculating Ds575")
             result = ims.ds575(waveform, dt)
             result.index = [im.value]
         elif im == IM.Ds595:
-            print("Calculating Ds595")
             result = ims.ds595(waveform, dt)
             result.index = [im.value]
         elif im == IM.AI:
-            print("Calculating AI")
             result = ims.arias_intensity(waveform, dt)
             result.index = [im.value]
         elif im == IM.FAS:
-            print("Calculating FAS")
             data_array = ims.fourier_amplitude_spectra(
                 waveform, dt, frequencies, cores=cores, ko_bandwidth=ko_bandwidth
             )
