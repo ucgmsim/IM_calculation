@@ -94,8 +94,12 @@ def calculate_ims_ascii(
         DataFrame containing the calculated intensity measures.
         The columns are the IMs and the rows are the different components.
     """
+    print(f"Reading ASCII files: {file_000}")
+
     # Read the ASCII files
     dt, waveform = waveform_reading.read_ascii(file_000, file_090, file_ver)
+
+    print(f"Starting calulation for {file_000}")
 
     # Calculate the intensity measures
     result = im_calculation.calculate_ims(
@@ -107,5 +111,7 @@ def calculate_ims_ascii(
         cores,
         ko_bandwidth,
     )
+
+    print(f"Saving results to {output_file}")
 
     result.to_csv(output_file)
