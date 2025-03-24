@@ -13,9 +13,10 @@ import numexpr as ne
 import numpy as np
 import numpy.typing as npt
 import pandas as pd
-import pykooh
 import scipy as sp
 import xarray as xr
+
+from IM import ko_matrices
 
 
 class Component(IntEnum):
@@ -43,7 +44,7 @@ class IM(StrEnum):
     FAS = "FAS"
 
 
-@numba.njit
+@numba.njit(cache=True)
 def newmark_estimate_psa(
     waveforms: npt.NDArray[np.float32],
     t: npt.NDArray[np.float32],
@@ -120,6 +121,24 @@ def newmark_estimate_psa(
         dudt[:] = np.float32(0.0)
     return u
 
+def rotate_components(step_000, step_090, theta, out=None, USE_NUMEXPR=True):
+    """Helper function to handle rotation computation using either numexpr or numpy."""
+    if USE_NUMEXPR:
+        return ne.evaluate(
+            "abs(comp_000 * cos(theta) + comp_090 * sin(theta))",
+            {
+                "comp_000": step_000[..., np.newaxis],
+                "theta": theta[np.newaxis, ...],
+                "comp_090": step_090[..., np.newaxis],
+            },
+            out=out
+        )
+    else:
+        return np.abs(
+            step_000[..., np.newaxis] * np.cos(theta)[np.newaxis, ...] +
+            step_090[..., np.newaxis] * np.sin(theta)[np.newaxis, ...]
+        )
+
 
 def rotd_psa_values(
     comp_000: npt.NDArray[np.float32],
@@ -153,17 +172,15 @@ def rotd_psa_values(
     for i in range(0, comp_000.shape[0], step):
         step_000 = comp_000[i : i + step]
         step_090 = comp_090[i : i + step]
-        psa[i : i + step] = np.transpose(
+        psa[i: i + step] = np.transpose(
             np.percentile(
                 np.max(
-                    ne.evaluate(
-                        "abs(comp_000 * cos(theta) + comp_090 * sin(theta))",
-                        {
-                            "comp_000": step_000[..., np.newaxis],
-                            "theta": theta[np.newaxis, ...],
-                            "comp_090": step_090[..., np.newaxis],
-                        },
+                    rotate_components(
+                        step_000,
+                        step_090,
+                        theta,
                         out=out[: len(step_000)],
+                        USE_NUMEXPR=False,
                     )[: len(step_000)],
                     axis=1,
                 ),
@@ -297,13 +314,17 @@ def compute_intensity_measure_rotd(
     for i in range(180):
         theta = np.deg2rad(i).astype(np.float32)
 
+        # values[:, i] = intensity_measure(
+        #     ne.evaluate(
+        #         "cos(theta) * comp_0 + sin(theta) * comp_90",
+        #         {"comp_0": comp_0, "comp_90": comp_90, "theta": theta},
+        #     ),
+        # )
+        # Use compiled expression for performance
         values[:, i] = intensity_measure(
-            ne.evaluate(
-                "cos(theta) * comp_0 + sin(theta) * comp_90",
-                {"comp_0": comp_0, "comp_90": comp_90, "theta": theta},
-            ),
+            np.cos(theta) * comp_0 + np.sin(theta) * comp_90
         )
-
+        
     comp_0 = values[:, 0]
     comp_90 = values[:, 90]
     comp_ver = waveforms[:, :, Component.COMP_VER.value]
@@ -324,7 +345,7 @@ def compute_intensity_measure_rotd(
     )
 
 
-@numba.njit(parallel=True)
+@numba.njit(parallel=True, cache=True)
 def trapz(
     waveforms: npt.NDArray[np.float32], dt: float
 ) -> npt.NDArray[np.float32]:  # pragma: no cover
@@ -383,9 +404,10 @@ def significant_duration(
     """
     arias_intensity = _cumulative_arias_intensity(waveforms, dt)
     arias_intensity /= arias_intensity[:, -1][:, np.newaxis]
-    sum_mask = ne.evaluate(
-        "(arias_intensity >= percent_low / 100) & (arias_intensity <= percent_high / 100)"
-    )
+    # sum_mask = ne.evaluate(
+    #     "(arias_intensity >= percent_low / 100) & (arias_intensity <= percent_high / 100)"
+    # )
+    sum_mask = (arias_intensity >= percent_low / 100) & (arias_intensity <= percent_high / 100)
     threshold_values = np.count_nonzero(sum_mask, axis=1) * dt
     return threshold_values.ravel()
 
@@ -433,61 +455,80 @@ def fourier_amplitude_spectra(
     n_fft = 2 ** int(np.ceil(np.log2(waveforms.shape[1])))
     fa_frequencies = np.fft.rfftfreq(n_fft, dt)
     fa_spectrum = np.abs(np.fft.rfft(waveforms, n=n_fft, axis=1) * dt)
-    smoother = pykooh.CachedSmoother(fa_frequencies, fa_frequencies, ko_bandwidth)
+    # get appropriate konno ohmachi matrix
+    konno = ko_matrices.get_konno_matrix(fa_spectrum.shape[1], "/mnt/hypo_data/jri83/KO")
+    # smoother = pykooh.CachedSmoother(fa_frequencies, fa_frequencies, ko_bandwidth)
 
-    if cores > 1:
-        with multiprocessing.Pool(cores) as pool:
-            fas_0 = np.array(
-                pool.map(smoother, fa_spectrum[:, :, Component.COMP_0.value]),
-                dtype=np.float32,
-            )
-            fas_90 = np.array(
-                pool.map(smoother, fa_spectrum[:, :, Component.COMP_90.value]),
-                dtype=np.float32,
-            )
-            fas_ver = np.array(
-                pool.map(smoother, fa_spectrum[:, :, Component.COMP_VER.value]),
-                dtype=np.float32,
-            )
-    else:
-        fas_0 = np.array(
-            list(map(smoother, fa_spectrum[:, :, Component.COMP_0.value])),
-            dtype=np.float32,
-        )
-        fas_90 = np.array(
-            list(map(smoother, fa_spectrum[:, :, Component.COMP_90.value])),
-            dtype=np.float32,
-        )
-        fas_ver = np.array(
-            list(map(smoother, fa_spectrum[:, :, Component.COMP_VER.value])),
-            dtype=np.float32,
-        )
+    # fas_0 = np.dot(fa_spectrum[:, :, Component.COMP_0.value], konno)
+    # fas_90 = np.dot(fa_spectrum[:, :, Component.COMP_90.value], konno)
+    # fas_ver = np.dot(fa_spectrum[:, :, Component.COMP_VER.value], konno)
+    
+    fas_smooth = np.dot(fa_spectrum[0].T, konno)
+
+    # if cores > 1:
+    #     with multiprocessing.Pool(cores) as pool:
+    #         fas_0 = np.array(
+    #             pool.map(smoother, fa_spectrum[:, :, Component.COMP_0.value]),
+    #             dtype=np.float32,
+    #         )
+    #         fas_90 = np.array(
+    #             pool.map(smoother, fa_spectrum[:, :, Component.COMP_90.value]),
+    #             dtype=np.float32,
+    #         )
+    #         fas_ver = np.array(
+    #             pool.map(smoother, fa_spectrum[:, :, Component.COMP_VER.value]),
+    #             dtype=np.float32,
+    #         )
+    # else:
+    #     fas_0 = np.array(
+    #         list(map(smoother, fa_spectrum[:, :, Component.COMP_0.value])),
+    #         dtype=np.float32,
+    #     )
+    #     fas_90 = np.array(
+    #         list(map(smoother, fa_spectrum[:, :, Component.COMP_90.value])),
+    #         dtype=np.float32,
+    #     )
+    #     fas_ver = np.array(
+    #         list(map(smoother, fa_spectrum[:, :, Component.COMP_VER.value])),
+    #         dtype=np.float32,
+    #     )
 
     # Interpolate for output frequencies
-    interpolator_0 = sp.interpolate.make_interp_spline(
-        fa_frequencies, fas_0, axis=1, k=1
+    # interpolator_0 = sp.interpolate.make_interp_spline(
+    #     fa_frequencies, fas_0, axis=1, k=1
+    # )
+    # fas_0 = interpolator_0(freqs)
+    # interpolator_90 = sp.interpolate.make_interp_spline(
+    #     fa_frequencies, fas_90, axis=1, k=1
+    # )
+    # fas_90 = interpolator_90(freqs)
+    # interpolator_ver = sp.interpolate.make_interp_spline(
+    #     fa_frequencies, fas_ver, axis=1, k=1
+    # )
+    # fas_ver = interpolator_ver(freqs)
+    interpolator = sp.interpolate.make_interp_spline(
+        fa_frequencies, fas_smooth, axis=1, k=1
     )
-    fas_0 = interpolator_0(freqs)
-    interpolator_90 = sp.interpolate.make_interp_spline(
-        fa_frequencies, fas_90, axis=1, k=1
-    )
-    fas_90 = interpolator_90(freqs)
-    interpolator_ver = sp.interpolate.make_interp_spline(
-        fa_frequencies, fas_ver, axis=1, k=1
-    )
-    fas_ver = interpolator_ver(freqs)
+    fas_smooth = interpolator(freqs)
 
-    eas = np.sqrt(0.5 * (np.square(fas_0) + np.square(fas_90)))
-    geom_fas = np.sqrt(fas_0 * fas_90)
+    eas = np.sqrt(0.5 * (np.square(fas_smooth[Component.COMP_0.value]) + np.square(fas_smooth[Component.COMP_90.value])))
+    geom_fas = np.sqrt(fas_smooth[Component.COMP_0.value] * fas_smooth[Component.COMP_90.value])
 
     return xr.DataArray(
         np.stack(
+            # [
+            #     fas_smooth[Component.COMP_0.value],
+            #     fas_smooth[Component.COMP_90.value],
+            #     fas_smooth[Component.COMP_VER.value],
+            #     geom_fas,
+            #     eas,
+            # ],
             [
-                fas_0,
-                fas_90,
-                fas_ver,
-                geom_fas,
-                eas,
+                np.expand_dims(fas_smooth[Component.COMP_0.value], axis=0),
+                np.expand_dims(fas_smooth[Component.COMP_90.value], axis=0),
+                np.expand_dims(fas_smooth[Component.COMP_VER.value], axis=0),
+                np.expand_dims(geom_fas, axis=0),
+                np.expand_dims(eas, axis=0),
             ],
             axis=0,
         ),
@@ -501,7 +542,7 @@ def fourier_amplitude_spectra(
     )
 
 
-@numba.njit(parallel=True)
+@numba.njit(parallel=True, cache=True)
 def _cumulative_absolute_velocity(
     waveform: npt.NDArray[np.float32], dt: float
 ) -> npt.NDArray[np.float32]:  # pragma: no cover
@@ -547,7 +588,7 @@ def _cumulative_absolute_velocity(
     return g * cav
 
 
-@numba.njit(parallel=True)
+@numba.njit(parallel=True, cache=True)
 def _arias_intensity(
     waveform: npt.NDArray[np.float32], dt: float
 ) -> npt.NDArray[np.float32]:  # pragma: no cover
@@ -584,7 +625,7 @@ def _arias_intensity(
     return np.pi * half * g * ai
 
 
-@numba.njit(parallel=True)
+@numba.njit(parallel=True, cache=True)
 def _cumulative_arias_intensity(
     waveform: npt.NDArray[np.float32], dt: float
 ) -> npt.NDArray[np.float32]:  # pragma: no cover
