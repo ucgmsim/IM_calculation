@@ -17,6 +17,18 @@ from hypothesis.extra import numpy as nst
 from numpy.testing import assert_array_almost_equal
 
 from IM import im_calculation, ims, snr_calculation, waveform_reading
+from IM.scripts import gen_ko_matrix
+
+KO_TEST_DIR = Path(__file__).parent / "resources" / "KO_matrices"
+
+@pytest.fixture(scope="session", autouse=True)
+def generate_ko_matrices():
+    """
+    Generate the KO matrices for testing, also test that the KO matrix gen script works.
+    """
+    # Make the KO matrices directory
+    KO_TEST_DIR.mkdir(exist_ok=True)
+    gen_ko_matrix.main(KO_TEST_DIR, num_to_gen=8)
 
 
 # Common test fixtures
@@ -258,7 +270,7 @@ def test_fas_benchmark():
     dt, waveform = waveform_reading.read_ascii(comp_000_ffp, comp_090_ffp, comp_ver_ffp)
 
     # Compute the Fourier Amplitude Spectra
-    fas_result_ims = ims.fourier_amplitude_spectra(waveform, dt, data.frequency)
+    fas_result_ims = ims.fourier_amplitude_spectra(waveform, dt, data.frequency, KO_TEST_DIR)
 
     # Compare the results
     assert_array_almost_equal(data, fas_result_ims, decimal=5)
@@ -283,7 +295,7 @@ def test_snr_benchmark():
     tp = 3170
 
     # Compute the SNR
-    snr_result_ims, _, _, _, _ = snr_calculation.calculate_snr(waveform, dt, tp)
+    snr_result_ims, _, _, _, _ = snr_calculation.calculate_snr(waveform, dt, tp, KO_TEST_DIR)
 
     # Compare the results
     assert_array_almost_equal(data, snr_result_ims, decimal=5)

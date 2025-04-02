@@ -1,5 +1,6 @@
 import multiprocessing
 import os
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -136,7 +137,7 @@ def calculate_ims(
     periods: np.ndarray = DEFAULT_PERIODS,
     frequencies: np.ndarray = DEFAULT_FREQUENCIES,
     cores: int = multiprocessing.cpu_count(),
-    ko_bandwidth: int = 40,
+    ko_directory: Path = None,
 ):
     """
     Calculate intensity measures for a single waveform.
@@ -155,8 +156,9 @@ def calculate_ims(
         List of frequencies required for calculating the Fourier amplitude spectrum (FAS).
     cores : int, optional
         Number of cores to use for parallel processing in pSA and FAS calculations.
-    ko_bandwidth : int, optional
-        Bandwidth for the Konno-Ohmachi smoothing, by default 40.
+    ko_directory : Path, optional
+        Path to the directory containing the Konno-Ohmachi matrices.
+        Only required if FAS is in the list of IMs.
 
     Returns
     -------
@@ -174,13 +176,17 @@ def calculate_ims(
             "NUMEXPR_NUM_THREADS",
             "NUMBA_MAX_THREADS",
             "NUMBA_NUM_THREADS",
-            "OPENBLAS_NUM_THREADS",
         ]
         unset_vars = [var for var in required_env_vars if os.getenv(var) != "1"]
         if unset_vars:
             raise ValueError(
                 f"The following environment variables must be set to 1: {', '.join(unset_vars)}"
             )
+    if ko_directory is None and IM.FAS in ims_list:
+        raise ValueError(
+            "The Konno-Ohmachi directory must be provided if Fourier amplitude spectrum is in the list of IMs."
+        )
+
     results = []
 
     # Iterate through IMs and calculate them
@@ -218,7 +224,7 @@ def calculate_ims(
             result.index = [im.value]
         elif im == IM.FAS:
             data_array = ims.fourier_amplitude_spectra(
-                waveform, dt, frequencies, cores=cores, ko_bandwidth=ko_bandwidth
+                waveform, dt, frequencies, cores=cores, ko_directory=ko_directory
             )
             # Convert the data array to a DataFrame
             result = data_array.to_dataframe().unstack(level="component")

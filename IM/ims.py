@@ -6,6 +6,7 @@ import sys
 import warnings
 from collections.abc import Callable
 from enum import IntEnum, StrEnum
+from pathlib import Path
 from typing import Optional
 
 import numba
@@ -121,9 +122,24 @@ def newmark_estimate_psa(
         dudt[:] = np.float32(0.0)
     return u
 
-def rotate_components(step_000, step_090, theta, out=None, USE_NUMEXPR=True):
-    """Helper function to handle rotation computation using either numexpr or numpy."""
-    if USE_NUMEXPR:
+def rotate_components(step_000: np.ndarray, step_090: np.ndarray, theta: np.ndarray, out: np.ndarray =None, use_numexpr: bool =True):
+    """
+    Helper function to handle rotation computation using either numexpr or numpy.
+
+    Parameters
+    ----------
+    step_000 : np.ndarray
+        Array containing the 000 component of the waveforms.
+    step_090 : np.ndarray
+        Array containing the 090 component of the waveforms.
+    theta : np.ndarray
+        Array containing the angles at which to rotate the components.
+    out : np.ndarray, optional
+        Array to store the output of the computation, by default None.
+    use_numexpr : bool, optional
+        Use numexpr for computation, by default True.
+    """
+    if use_numexpr:
         return ne.evaluate(
             "abs(comp_000 * cos(theta) + comp_090 * sin(theta))",
             {
@@ -145,6 +161,7 @@ def rotd_psa_values(
     comp_090: npt.NDArray[np.float32],
     w: npt.NDArray[np.float32],
     step: int,
+    use_numexpr: bool = True,
 ) -> npt.NDArray[np.float32]:
     """Compute rotated pseudo-spectral acceleration statistics.
 
@@ -158,6 +175,8 @@ def rotd_psa_values(
         Natural angular frequencies of oscillators (Hz).
     step : int
         Number of stations to process in parallel.
+    use_numexpr : bool, optional
+        Use numexpr for computation, by default True.
 
     Returns
     -------
@@ -180,7 +199,7 @@ def rotd_psa_values(
                         step_090,
                         theta,
                         out=out[: len(step_000)],
-                        USE_NUMEXPR=False,
+                        use_numexpr=use_numexpr,
                     )[: len(step_000)],
                     axis=1,
                 ),
@@ -288,6 +307,7 @@ def pseudo_spectral_acceleration(
 def compute_intensity_measure_rotd(
     waveforms: npt.NDArray[np.float32],
     intensity_measure: Callable,
+    use_numexpr: bool = True,
 ) -> pd.DataFrame:
     """Compute rotated intensity measure statistics for multiple waveforms.
 
@@ -299,6 +319,8 @@ def compute_intensity_measure_rotd(
         Function that computes the intensity measure. Should accept a 2D array
         of shape `(n_stations, n_timesteps)` and return a 1D array of shape
         `(n_stations,)`.
+    use_numexpr : bool, optional
+        Use numexpr for computation, by default True.
 
     Returns
     -------
@@ -314,16 +336,17 @@ def compute_intensity_measure_rotd(
     for i in range(180):
         theta = np.deg2rad(i).astype(np.float32)
 
-        # values[:, i] = intensity_measure(
-        #     ne.evaluate(
-        #         "cos(theta) * comp_0 + sin(theta) * comp_90",
-        #         {"comp_0": comp_0, "comp_90": comp_90, "theta": theta},
-        #     ),
-        # )
-        # Use compiled expression for performance
-        values[:, i] = intensity_measure(
-            np.cos(theta) * comp_0 + np.sin(theta) * comp_90
-        )
+        if use_numexpr:
+            values[:, i] = intensity_measure(
+                ne.evaluate(
+                    "cos(theta) * comp_0 + sin(theta) * comp_90",
+                    {"comp_0": comp_0, "comp_90": comp_90, "theta": theta},
+                ),
+            )
+        else:
+            values[:, i] = intensity_measure(
+                np.cos(theta) * comp_0 + np.sin(theta) * comp_90
+            )
         
     comp_0 = values[:, 0]
     comp_90 = values[:, 90]
@@ -383,6 +406,7 @@ def significant_duration(
     dt: float,
     percent_low: float,
     percent_high: float,
+    use_numexpr: bool = True,
 ) -> npt.NDArray[np.float32]:
     """Compute significant duration based on Arias Intensity accumulation.
 
@@ -396,6 +420,8 @@ def significant_duration(
         Lower bound percentage for significant duration (e.g., 5 for 5%).
     percent_high : float
         Upper bound percentage for significant duration (e.g., 95 for 95%).
+    use_numexpr : bool, optional
+        Use numexpr for computation, by default True.
 
     Returns
     -------
@@ -404,10 +430,12 @@ def significant_duration(
     """
     arias_intensity = _cumulative_arias_intensity(waveforms, dt)
     arias_intensity /= arias_intensity[:, -1][:, np.newaxis]
-    # sum_mask = ne.evaluate(
-    #     "(arias_intensity >= percent_low / 100) & (arias_intensity <= percent_high / 100)"
-    # )
-    sum_mask = (arias_intensity >= percent_low / 100) & (arias_intensity <= percent_high / 100)
+    if use_numexpr:
+        sum_mask = ne.evaluate(
+            "(arias_intensity >= percent_low / 100) & (arias_intensity <= percent_high / 100)"
+        )
+    else:
+        sum_mask = (arias_intensity >= percent_low / 100) & (arias_intensity <= percent_high / 100)
     threshold_values = np.count_nonzero(sum_mask, axis=1) * dt
     return threshold_values.ravel()
 
@@ -416,8 +444,8 @@ def fourier_amplitude_spectra(
     waveforms: npt.NDArray[np.float32],
     dt: float,
     freqs: npt.NDArray[np.float32],
+    ko_directory: Path,
     cores: int = multiprocessing.cpu_count(),
-    ko_bandwidth: int = 40,
 ) -> xr.DataArray:
     """Compute Fourier Amplitude Spectrum (FAS) of seismic waveforms.
 
@@ -432,10 +460,10 @@ def fourier_amplitude_spectra(
         Timestep resolution of the waveforms (s).
     freqs : ndarray of float32
         Frequencies at which to compute FAS (Hz).
+    ko_directory : Path
+        Directory containing precomputed Konno-Ohmachi matrices.
     cores : int, optional
         Number of CPU cores to use, by default all available cores.
-    ko_bandwidth : int, optional
-        Konno-Ohmachi smoothing bandwidth, by default 40.
 
     Returns
     -------
@@ -455,14 +483,14 @@ def fourier_amplitude_spectra(
     n_fft = 2 ** int(np.ceil(np.log2(waveforms.shape[1])))
     fa_frequencies = np.fft.rfftfreq(n_fft, dt)
     fa_spectrum = np.abs(np.fft.rfft(waveforms, n=n_fft, axis=1) * dt)
-    # get appropriate konno ohmachi matrix
-    konno = ko_matrices.get_konno_matrix(fa_spectrum.shape[1], "/mnt/hypo_data/jri83/KO")
+    # Get appropriate konno ohmachi matrix
+    konno = ko_matrices.get_konno_matrix(fa_spectrum.shape[1], ko_directory)
     # smoother = pykooh.CachedSmoother(fa_frequencies, fa_frequencies, ko_bandwidth)
 
     # fas_0 = np.dot(fa_spectrum[:, :, Component.COMP_0.value], konno)
     # fas_90 = np.dot(fa_spectrum[:, :, Component.COMP_90.value], konno)
     # fas_ver = np.dot(fa_spectrum[:, :, Component.COMP_VER.value], konno)
-    
+
     fas_smooth = np.dot(fa_spectrum[0].T, konno)
 
     # if cores > 1:
