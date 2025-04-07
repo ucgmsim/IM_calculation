@@ -37,7 +37,7 @@ def get_konno_matrix(size: int, directory: Path):
             )
         raise FileNotFoundError(
             f"KO matrix file '{ko_matrix_file}' not found.\n"
-            f"Run 'A_KonnoMatricesComputation.py' with at least {num_to_gen} generations."
+            f"Run 'gen_ko_matrix.py' with at least {num_to_gen} generations."
         )
 
     # Load matrix with memory mapping for efficiency

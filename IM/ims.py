@@ -122,7 +122,7 @@ def newmark_estimate_psa(
         dudt[:] = np.float32(0.0)
     return u
 
-def rotate_components(step_000: np.ndarray, step_090: np.ndarray, theta: np.ndarray, out: np.ndarray =None, use_numexpr: bool =True):
+def rotate_components(step_000: np.ndarray, step_090: np.ndarray, theta: np.ndarray, out: Optional[np.ndarray] = None, use_numexpr: bool = True):
     """
     Helper function to handle rotation computation using either numexpr or numpy.
 
