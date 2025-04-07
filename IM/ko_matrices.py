@@ -1,5 +1,6 @@
-import numpy as np
 from pathlib import Path
+
+import numpy as np
 
 
 def get_konno_matrix(size: int, directory: Path):
