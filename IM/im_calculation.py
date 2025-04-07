@@ -138,6 +138,7 @@ def calculate_ims(
     frequencies: np.ndarray = DEFAULT_FREQUENCIES,
     cores: int = multiprocessing.cpu_count(),
     ko_directory: Path = None,
+    use_numexpr: bool = False,
 ):
     """
     Calculate intensity measures for a single waveform.
@@ -159,6 +160,9 @@ def calculate_ims(
     ko_directory : Path, optional
         Path to the directory containing the Konno-Ohmachi matrices.
         Only required if FAS is in the list of IMs.
+    use_numexpr : bool, optional
+        If True, use numexpr for calculations. (Faster off for single waveform and multiprocessing)
+        Default is False.
 
     Returns
     -------
@@ -192,14 +196,14 @@ def calculate_ims(
     # Iterate through IMs and calculate them
     for im in ims_list:
         if im == IM.PGA:
-            result = ims.peak_ground_acceleration(waveform)
+            result = ims.peak_ground_acceleration(waveform, use_numexpr=use_numexpr)
             result.index = [im.value]
         elif im == IM.PGV:
-            result = ims.peak_ground_velocity(waveform, dt)
+            result = ims.peak_ground_velocity(waveform, dt, use_numexpr=use_numexpr)
             result.index = [im.value]
         elif im == IM.pSA:
             data_array = ims.pseudo_spectral_acceleration(
-                waveform, periods, dt, cores=cores
+                waveform, periods, dt, cores=cores, use_numexpr=use_numexpr
             )
             # Convert the data array to a DataFrame
             result = data_array.to_dataframe().unstack(level="component")
@@ -214,10 +218,10 @@ def calculate_ims(
             result = ims.cumulative_absolute_velocity(waveform, dt, 5)
             result.index = [im.value]
         elif im == IM.Ds575:
-            result = ims.ds575(waveform, dt)
+            result = ims.ds575(waveform, dt, use_numexpr=use_numexpr)
             result.index = [im.value]
         elif im == IM.Ds595:
-            result = ims.ds595(waveform, dt)
+            result = ims.ds595(waveform, dt, use_numexpr=use_numexpr)
             result.index = [im.value]
         elif im == IM.AI:
             result = ims.arias_intensity(waveform, dt)

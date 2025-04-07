@@ -349,7 +349,8 @@ def test_snr_benchmark():
     assert_array_almost_equal(data, snr_result_ims, decimal=5)
 
 
-def test_all_ims_benchmark():
+@pytest.mark.parametrize("use_numexpr", [True, False])
+def test_all_ims_benchmark(use_numexpr: bool):
     """Compare benchmark IM calculation against current implementation."""
     # Load the DataFrame
     benchmark_ffp = Path(__file__).parent / "resources" / "im_benchmark.csv"
@@ -365,7 +366,7 @@ def test_all_ims_benchmark():
     dt, waveform = waveform_reading.read_ascii(comp_000_ffp, comp_090_ffp, comp_ver_ffp)
 
     # Calculate the intensity measures
-    result = im_calculation.calculate_ims(waveform, dt, ko_directory=KO_TEST_DIR)
+    result = im_calculation.calculate_ims(waveform, dt, ko_directory=KO_TEST_DIR, use_numexpr=use_numexpr)
 
     # Compare the results
     assert_array_almost_equal(data, result, decimal=5)
