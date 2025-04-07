@@ -155,41 +155,49 @@ def test_significant_duration(
 
 
 @pytest.mark.parametrize(
-    "comp_0,expected_pga",
+    "comp_0,expected_pga,use_numexpr",
     [
-        (np.ones((3,), dtype=np.float32), 1),
-        (np.linspace(0, 1, num=10, dtype=np.float32) ** 2, 1),
-        (2 * np.sin(np.linspace(0, 2 * np.pi)) - 1, 3),
+        (np.ones((3,), dtype=np.float32), 1, True),
+        (np.linspace(0, 1, num=10, dtype=np.float32) ** 2, 1, True),
+        (2 * np.sin(np.linspace(0, 2 * np.pi)) - 1, 3, True),
+        (2 * np.sin(np.linspace(0, 2 * np.pi)) - 1, 3, False),
     ],
 )
-def test_pga(comp_0: npt.NDArray[np.float32], expected_pga: float):
+def test_pga(comp_0: npt.NDArray[np.float32], expected_pga: float, use_numexpr: bool):
     waveforms = np.zeros((1, len(comp_0), 3))
     waveforms[:, :, ims.Component.COMP_0] = comp_0
     assert np.isclose(
-        ims.peak_ground_acceleration(waveforms)["000"], expected_pga, atol=1e-3
+        ims.peak_ground_acceleration(waveforms, use_numexpr=use_numexpr)["000"], expected_pga, atol=1e-3
     )
 
 
 @pytest.mark.parametrize(
-    "comp_0,t_max,expected_pga",
+    "comp_0,t_max,expected_pga,use_numexpr",
     [
-        (np.ones((100,), dtype=np.float32), 1, 981),
-        (np.linspace(0, 1, num=100, dtype=np.float32) ** 2, 1, 981 / 3),
+        (np.ones((100,), dtype=np.float32), 1, 981, True),
+        (np.linspace(0, 1, num=100, dtype=np.float32) ** 2, 1, 981 / 3, True),
         (
             2 * np.sin(np.linspace(0, 2 * np.pi, num=100, dtype=np.float32)) - 1,
             2 * np.pi,
             981 * 2 * np.pi,
+            True,
+        ),
+        (
+            2 * np.sin(np.linspace(0, 2 * np.pi, num=100, dtype=np.float32)) - 1,
+            2 * np.pi,
+            981 * 2 * np.pi,
+            False,
         ),
     ],
 )
-def test_pgv(comp_0: npt.NDArray[np.float32], t_max: float, expected_pga: float):
+def test_pgv(comp_0: npt.NDArray[np.float32], t_max: float, expected_pga: float, use_numexpr: bool):
     waveforms = np.zeros((1, len(comp_0), 3))
     waveforms[:, :, ims.Component.COMP_0] = comp_0
     # NOTE: This dt calculation is correct, if dt = 1 / len(comp_0) then dt
     # ends up *too small* and these tests will fail.
     dt = t_max / (len(comp_0) - 1)
     assert np.isclose(
-        ims.peak_ground_velocity(waveforms, dt)["000"], expected_pga, atol=0.1
+        ims.peak_ground_velocity(waveforms, dt, use_numexpr=use_numexpr)["000"], expected_pga, atol=0.1
     )
 
 
@@ -245,14 +253,15 @@ def test_ai_values(comp_0: npt.NDArray[np.float32], t_max: float, expected_ai: f
     assert np.isclose(ims.arias_intensity(waveforms, dt)["000"], expected_ai, atol=0.1)
 
 
-def test_psa():
+@pytest.mark.parametrize("use_numexpr", [True, False])
+def test_psa(use_numexpr: bool):
     comp_0 = np.ones((100,))
     waveforms = np.zeros((2, len(comp_0), 3))
     waveforms[0, :, ims.Component.COMP_0] = comp_0
     waveforms[1, :, ims.Component.COMP_0] = comp_0
     dt = 0.01
     w = np.array([1, 2], dtype=np.float32)
-    psa_values = ims.pseudo_spectral_acceleration(waveforms, w, dt)
+    psa_values = ims.pseudo_spectral_acceleration(waveforms, w, dt, use_numexpr=use_numexpr)
 
     # assert psa is close to the expected psa derived by solving the ODE in
     # Wolfram Alpha and finding the abs max.

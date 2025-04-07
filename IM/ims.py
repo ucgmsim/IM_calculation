@@ -220,6 +220,7 @@ def pseudo_spectral_acceleration(
     dt: float,
     psa_rotd_maximum_memory_allocation: Optional[float] = None,
     cores: int = multiprocessing.cpu_count(),
+    use_numexpr: bool = True,
 ) -> xr.DataArray:
     """Compute pseudo-spectral acceleration statistics for waveforms.
 
@@ -235,6 +236,8 @@ def pseudo_spectral_acceleration(
         Maximum memory allocation for PSA rotation calculations (bytes).
     cores : int, optional
         Number of CPU cores to use, by default all available cores.
+    use_numexpr : bool, optional
+        Use numexpr for computation, by default True.
 
     Returns
     -------
@@ -271,7 +274,7 @@ def pseudo_spectral_acceleration(
         raise ValueError(
             "PSA rotd memory allocation is too small (cannot even calculate a single station's pSA)."
         )
-    rotd_psa = rotd_psa_values(comp_0, comp_90, w, step=step)
+    rotd_psa = rotd_psa_values(comp_0, comp_90, w, step=step, use_numexpr=use_numexpr)
 
     conversion_factor = np.square(w)[np.newaxis, :]
     comp_0_psa = conversion_factor * np.abs(comp_0).max(axis=1)
@@ -698,6 +701,7 @@ def _cumulative_arias_intensity(
 
 def peak_ground_acceleration(
     waveform: npt.NDArray[np.float32],
+    use_numexpr: bool = True
 ) -> pd.DataFrame:
     """Compute Peak Ground Acceleration (PGA) for waveforms.
 
@@ -705,16 +709,18 @@ def peak_ground_acceleration(
     ----------
     waveform : ndarray of float32 with shape `(n_stations, n_timesteps, n_components)`
         Acceleration waveforms in g units.
+    use_numexpr : bool, optional
+        Use numexpr for computation, by default True.
 
     Returns
     -------
     pandas.DataFrame with columns `['000', '090', 'ver', 'geom', 'rotd100', 'rotd50', 'rotd0']`
         DataFrame containing PGA values with rotated components in g-units.
     """
-    return compute_intensity_measure_rotd(waveform, lambda v: np.abs(v).max(axis=1))
+    return compute_intensity_measure_rotd(waveform, lambda v: np.abs(v).max(axis=1), use_numexpr=use_numexpr)
 
 
-def peak_ground_velocity(waveform: npt.NDArray[np.float32], dt: float) -> pd.DataFrame:
+def peak_ground_velocity(waveform: npt.NDArray[np.float32], dt: float, use_numexpr: bool = True) -> pd.DataFrame:
     """Compute Peak Ground Velocity (PGV) for waveforms.
 
     Parameters
@@ -723,6 +729,8 @@ def peak_ground_velocity(waveform: npt.NDArray[np.float32], dt: float) -> pd.Dat
         Acceleration waveforms in g units.
     dt : float
         Timestep resolution of the waveform array.
+    use_numexpr: bool, optional
+        Use numexpr for computation, by default True.
 
     Returns
     -------
@@ -734,6 +742,7 @@ def peak_ground_velocity(waveform: npt.NDArray[np.float32], dt: float) -> pd.Dat
     return compute_intensity_measure_rotd(
         sp.integrate.cumulative_trapezoid(waveform, dx=dt, axis=1),
         lambda v: g * np.abs(v).max(axis=1),
+        use_numexpr=use_numexpr,
     )
 
 
