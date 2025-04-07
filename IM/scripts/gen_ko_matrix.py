@@ -16,7 +16,6 @@ def main(
         typer.Argument(
             help="Directory where the Konno matrices will be saved",
             exists=False,
-            dir_okay=True,
             file_okay=False,
         ),
     ],

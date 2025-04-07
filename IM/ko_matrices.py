@@ -2,7 +2,7 @@ import numpy as np
 from pathlib import Path
 
 
-def get_konno_matrix(size: int, directory: Path = None):
+def get_konno_matrix(size: int, directory: Path):
     """
     Retrieves the precomputed Konno matrix from a file.
 
@@ -10,8 +10,8 @@ def get_konno_matrix(size: int, directory: Path = None):
     ----------
     size : int
         The size of the matrix to load.
-    directory : Path, optional
-        Directory containing precomputed KO matrices. If None, defaults to the script's "KO_matrices" folder.
+    directory : Path
+        Directory containing precomputed KO matrices.
 
     Returns
     -------
@@ -24,14 +24,16 @@ def get_konno_matrix(size: int, directory: Path = None):
         If the required matrix file does not exist.
     """
 
-    # Default directory handling
-    directory = Path(directory or Path(__file__).parent / "KO_matrices").resolve()
-
     # File path for the matrix
     ko_matrix_file = directory / f"KO_{size - 1}.npy"
 
     if not ko_matrix_file.exists():
-        num_to_gen = max(0, int(np.log2(size - 1)) - 9)
+        try:
+            num_to_gen = max(0, int(np.log2(size - 1)) - 2)
+        except OverflowError:
+            raise FileNotFoundError(
+                f"Matrix size {size} is too small and most likely an issue with the waveform."
+            )
         raise FileNotFoundError(
             f"KO matrix file '{ko_matrix_file}' not found.\n"
             f"Run 'A_KonnoMatricesComputation.py' with at least {num_to_gen} generations."

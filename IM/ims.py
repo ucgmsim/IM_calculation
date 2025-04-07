@@ -400,10 +400,6 @@ def trapz(
                 sums[i] += waveforms[i, j]
     return sums * dt
 
-def dot_product_component(args):
-    i, component, fa_spectrum, konno = args
-    return np.dot(fa_spectrum[i, :, component], konno)
-
 
 def significant_duration(
     waveforms: npt.NDArray[np.float32],
@@ -444,11 +440,29 @@ def significant_duration(
     return threshold_values.ravel()
 
 
-def dot_product_all_components(args):
-    # i, fa_spectrum, konno = args
-    # return np.dot(fa_spectrum[i], konno)
-    i, fa_spectrum, konno = args
-    return np.dot(fa_spectrum[i, :, :], konno)
+def dot_product_component(i: int, component: int, fa_spectrum: npt.NDArray[np.float32], konno: npt.NDArray[np.float32]) -> npt.NDArray[np.float32]:
+    """
+    Compute the dot product of the Fourier Amplitude Spectrum (FAS) with
+    the Konno-Ohmachi smoothing matrix for a given component.
+
+    Parameters
+    ----------
+    i : int
+        Index of the station.
+    component : int
+        Component index (0 for 000, 1 for 090, 2 for vertical).
+    fa_spectrum : ndarray of float32
+        Fourier Amplitude Spectrum (FAS) array.
+    konno : ndarray of float32
+        Konno-Ohmachi smoothing matrix.
+
+    Returns
+    -------
+    ndarray of float32
+        Smoothed FAS for the given component.
+    """
+    return np.dot(fa_spectrum[i, :, component], konno)
+
 
 def fourier_amplitude_spectra(
     waveforms: npt.NDArray[np.float32],
@@ -495,26 +509,25 @@ def fourier_amplitude_spectra(
     fa_spectrum = np.abs(np.fft.rfft(waveforms, n=n_fft, axis=1) * dt)
     # Get appropriate konno ohmachi matrix
     konno = ko_matrices.get_konno_matrix(fa_spectrum.shape[1], ko_directory)
-    # smoother = pykooh.CachedSmoother(fa_frequencies, fa_frequencies, ko_bandwidth)
 
     if cores > 1:
         with multiprocessing.Pool(cores) as pool:
             fas_0 = np.array(
-                pool.map(
+                pool.starmap(
                     dot_product_component,
                     [(i, Component.COMP_0.value, fa_spectrum, konno) for i in range(fa_spectrum.shape[0])]
                 ),
                 dtype=np.float32,
             )
             fas_90 = np.array(
-                pool.map(
+                pool.starmap(
                     dot_product_component,
                     [(i, Component.COMP_90.value, fa_spectrum, konno) for i in range(fa_spectrum.shape[0])]
                 ),
                 dtype=np.float32,
             )
             fas_ver = np.array(
-                pool.map(
+                pool.starmap(
                     dot_product_component,
                     [(i, Component.COMP_VER.value, fa_spectrum, konno) for i in range(fa_spectrum.shape[0])]
                 ),
@@ -530,47 +543,6 @@ def fourier_amplitude_spectra(
         fas_smooth = np.dot(fa_spectrum[0].T, konno)
         fas_smooth = np.expand_dims(fas_smooth.T, axis=0)
 
-    # if cores > 1:
-    #     with multiprocessing.Pool(cores) as pool:
-    #         fas_0 = np.array(
-    #             pool.map(smoother, fa_spectrum[:, :, Component.COMP_0.value]),
-    #             dtype=np.float32,
-    #         )
-    #         fas_90 = np.array(
-    #             pool.map(smoother, fa_spectrum[:, :, Component.COMP_90.value]),
-    #             dtype=np.float32,
-    #         )
-    #         fas_ver = np.array(
-    #             pool.map(smoother, fa_spectrum[:, :, Component.COMP_VER.value]),
-    #             dtype=np.float32,
-    #         )
-    # else:
-    #     fas_0 = np.array(
-    #         list(map(smoother, fa_spectrum[:, :, Component.COMP_0.value])),
-    #         dtype=np.float32,
-    #     )
-    #     fas_90 = np.array(
-    #         list(map(smoother, fa_spectrum[:, :, Component.COMP_90.value])),
-    #         dtype=np.float32,
-    #     )
-    #     fas_ver = np.array(
-    #         list(map(smoother, fa_spectrum[:, :, Component.COMP_VER.value])),
-    #         dtype=np.float32,
-    #     )
-
-    # Interpolate for output frequencies
-    # interpolator_0 = sp.interpolate.make_interp_spline(
-    #     fa_frequencies, fas_0, axis=1, k=1
-    # )
-    # fas_0 = interpolator_0(freqs)
-    # interpolator_90 = sp.interpolate.make_interp_spline(
-    #     fa_frequencies, fas_90, axis=1, k=1
-    # )
-    # fas_90 = interpolator_90(freqs)
-    # interpolator_ver = sp.interpolate.make_interp_spline(
-    #     fa_frequencies, fas_ver, axis=1, k=1
-    # )
-    # fas_ver = interpolator_ver(freqs)
     interpolator = sp.interpolate.make_interp_spline(
         fa_frequencies, fas_smooth, axis=1, k=1
     )
@@ -588,13 +560,6 @@ def fourier_amplitude_spectra(
                 geom_fas,
                 eas,
             ],
-            # [
-            #     np.expand_dims(fas_smooth[Component.COMP_0.value], axis=0),
-            #     np.expand_dims(fas_smooth[Component.COMP_90.value], axis=0),
-            #     np.expand_dims(fas_smooth[Component.COMP_VER.value], axis=0),
-            #     np.expand_dims(geom_fas, axis=0),
-            #     np.expand_dims(eas, axis=0),
-            # ],
             axis=0,
         ),
         name=IM.FAS.value,
@@ -847,7 +812,7 @@ def arias_intensity(waveform: npt.NDArray[np.float32], dt: float) -> pd.DataFram
     )
 
 
-def ds575(waveform: npt.NDArray[np.float32], dt: float) -> pd.DataFrame:
+def ds575(waveform: npt.NDArray[np.float32], dt: float, use_numexpr: bool = True) -> pd.DataFrame:
     """Compute 5-75% Significant Duration (DS575) for waveforms.
 
     Parameters
@@ -856,6 +821,8 @@ def ds575(waveform: npt.NDArray[np.float32], dt: float) -> pd.DataFrame:
         Acceleration waveforms (g).
     dt : float
         Timestep resolution of the waveform array (s).
+    use_numexpr: bool, optional
+        Use numexpr for computation, by default True.
 
     Returns
     -------
@@ -863,13 +830,13 @@ def ds575(waveform: npt.NDArray[np.float32], dt: float) -> pd.DataFrame:
         DataFrame containing DS575 values (in seconds) with rotated components.
     """
     significant_duration_0 = significant_duration(
-        waveform[:, :, Component.COMP_0.value], dt, 5, 75
+        waveform[:, :, Component.COMP_0.value], dt, 5, 75, use_numexpr
     )
     significant_duration_90 = significant_duration(
-        waveform[:, :, Component.COMP_90.value], dt, 5, 75
+        waveform[:, :, Component.COMP_90.value], dt, 5, 75, use_numexpr
     )
     significant_duration_ver = significant_duration(
-        waveform[:, :, Component.COMP_VER.value], dt, 5, 75
+        waveform[:, :, Component.COMP_VER.value], dt, 5, 75, use_numexpr
     )
 
     return pd.DataFrame(
@@ -882,7 +849,7 @@ def ds575(waveform: npt.NDArray[np.float32], dt: float) -> pd.DataFrame:
     )
 
 
-def ds595(waveform: npt.NDArray[np.float32], dt: float) -> pd.DataFrame:
+def ds595(waveform: npt.NDArray[np.float32], dt: float, use_numexpr: bool = True) -> pd.DataFrame:
     """Compute 5-95% Significant Duration (DS595) for waveforms.
 
     Parameters
@@ -891,6 +858,8 @@ def ds595(waveform: npt.NDArray[np.float32], dt: float) -> pd.DataFrame:
         Acceleration waveforms (g).
     dt : float
         Timestep resolution of the waveform array (s).
+    use_numexpr: bool, optional
+        Use numexpr for computation, by default True.
 
     Returns
     -------
@@ -898,13 +867,13 @@ def ds595(waveform: npt.NDArray[np.float32], dt: float) -> pd.DataFrame:
         DataFrame containing DS595 values (in seconds) with rotated components.
     """
     significant_duration_0 = significant_duration(
-        waveform[:, :, Component.COMP_0.value], dt, 5, 95
+        waveform[:, :, Component.COMP_0.value], dt, 5, 95, use_numexpr
     )
     significant_duration_90 = significant_duration(
-        waveform[:, :, Component.COMP_90.value], dt, 5, 95
+        waveform[:, :, Component.COMP_90.value], dt, 5, 95, use_numexpr
     )
     significant_duration_ver = significant_duration(
-        waveform[:, :, Component.COMP_VER.value], dt, 5, 95
+        waveform[:, :, Component.COMP_VER.value], dt, 5, 95, use_numexpr
     )
 
     return pd.DataFrame(
