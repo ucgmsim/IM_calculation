@@ -180,6 +180,7 @@ def calculate_ims(
             "NUMEXPR_NUM_THREADS",
             "NUMBA_MAX_THREADS",
             "NUMBA_NUM_THREADS",
+            "OPENBLAS_NUM_THREADS",
         ]
         unset_vars = [var for var in required_env_vars if os.getenv(var) != "1"]
         if unset_vars:

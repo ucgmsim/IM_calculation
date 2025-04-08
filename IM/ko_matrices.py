@@ -3,7 +3,7 @@ from pathlib import Path
 import numpy as np
 
 
-def get_konno_matrix(size: int, directory: Path):
+def get_konno_matrix(size: int, directory: Path) -> np.memmap:
     """
     Retrieves the precomputed Konno matrix from a file.
 
@@ -16,7 +16,7 @@ def get_konno_matrix(size: int, directory: Path):
 
     Returns
     -------
-    np.ndarray
+    np.memmap
         The loaded Konno matrix.
 
     Raises
