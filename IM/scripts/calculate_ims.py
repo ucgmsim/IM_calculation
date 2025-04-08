@@ -11,7 +11,7 @@ from qcore import cli
 app = typer.Typer()
 
 
-cli.from_docstring(app)
+@cli.from_docstring(app)
 def calculate_ims_ascii(
     file_000: Annotated[
         Path,
