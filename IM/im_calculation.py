@@ -1,5 +1,6 @@
 import multiprocessing
 import os
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -136,7 +137,8 @@ def calculate_ims(
     periods: np.ndarray = DEFAULT_PERIODS,
     frequencies: np.ndarray = DEFAULT_FREQUENCIES,
     cores: int = multiprocessing.cpu_count(),
-    ko_bandwidth: int = 40,
+    ko_directory: Path = None,
+    use_numexpr: bool = False,
 ):
     """
     Calculate intensity measures for a single waveform.
@@ -155,8 +157,12 @@ def calculate_ims(
         List of frequencies required for calculating the Fourier amplitude spectrum (FAS).
     cores : int, optional
         Number of cores to use for parallel processing in pSA and FAS calculations.
-    ko_bandwidth : int, optional
-        Bandwidth for the Konno-Ohmachi smoothing, by default 40.
+    ko_directory : Path, optional
+        Path to the directory containing the Konno-Ohmachi matrices.
+        Only required if FAS is in the list of IMs.
+    use_numexpr : bool, optional
+        If True, use numexpr for calculations. (Faster off for single waveform and multiprocessing)
+        Default is False.
 
     Returns
     -------
@@ -181,19 +187,24 @@ def calculate_ims(
             raise ValueError(
                 f"The following environment variables must be set to 1: {', '.join(unset_vars)}"
             )
+    if ko_directory is None and IM.FAS in ims_list:
+        raise ValueError(
+            "The Konno-Ohmachi directory must be provided if Fourier amplitude spectrum is in the list of IMs."
+        )
+
     results = []
 
     # Iterate through IMs and calculate them
     for im in ims_list:
         if im == IM.PGA:
-            result = ims.peak_ground_acceleration(waveform)
+            result = ims.peak_ground_acceleration(waveform, use_numexpr=use_numexpr)
             result.index = [im.value]
         elif im == IM.PGV:
-            result = ims.peak_ground_velocity(waveform, dt)
+            result = ims.peak_ground_velocity(waveform, dt, use_numexpr=use_numexpr)
             result.index = [im.value]
         elif im == IM.pSA:
             data_array = ims.pseudo_spectral_acceleration(
-                waveform, periods, dt, cores=cores
+                waveform, periods, dt, cores=cores, use_numexpr=use_numexpr
             )
             # Convert the data array to a DataFrame
             result = data_array.to_dataframe().unstack(level="component")
@@ -208,17 +219,17 @@ def calculate_ims(
             result = ims.cumulative_absolute_velocity(waveform, dt, 5)
             result.index = [im.value]
         elif im == IM.Ds575:
-            result = ims.ds575(waveform, dt)
+            result = ims.ds575(waveform, dt, use_numexpr=use_numexpr)
             result.index = [im.value]
         elif im == IM.Ds595:
-            result = ims.ds595(waveform, dt)
+            result = ims.ds595(waveform, dt, use_numexpr=use_numexpr)
             result.index = [im.value]
         elif im == IM.AI:
             result = ims.arias_intensity(waveform, dt)
             result.index = [im.value]
         elif im == IM.FAS:
             data_array = ims.fourier_amplitude_spectra(
-                waveform, dt, frequencies, cores=cores, ko_bandwidth=ko_bandwidth
+                waveform, dt, frequencies, cores=cores, ko_directory=ko_directory
             )
             # Convert the data array to a DataFrame
             result = data_array.to_dataframe().unstack(level="component")

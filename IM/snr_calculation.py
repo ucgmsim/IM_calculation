@@ -1,4 +1,5 @@
 import multiprocessing
+from pathlib import Path
 from typing import NamedTuple
 
 import numpy as np
@@ -42,9 +43,9 @@ def calculate_snr(
     waveform: np.ndarray,
     dt: float,
     tp: int,
+    ko_directory: Path,
     frequencies: np.ndarray = im_calculation.DEFAULT_FREQUENCIES,
     cores: int = multiprocessing.cpu_count(),
-    ko_bandwidth: int = 40,
     apply_taper: bool = True,
 ) -> SNRResult:
     """
@@ -58,13 +59,13 @@ def calculate_snr(
         The sampling rate of the waveform
     tp : float
         The index of the p-arrival
+    ko_directory : Path
+        The path to the directory containing the Konno-Ohmachi matrices
     frequencies : np.ndarray, optional
         The frequency vector to use for the SNR calculation,
         by default takes the frequencies from FAS
     cores : int, optional
         Number of cores to use for parallel processing in FAS calculations.
-    ko_bandwidth : int, optional
-        Bandwidth for the Konno-Ohmachi smoothing, by default 40.
     apply_taper : bool, optional
         Whether to apply a taper of 5% to the signal and noise, by default True.
 
@@ -107,10 +108,10 @@ def calculate_snr(
 
     # Generate FFT for the signal and noise
     fas_signal = ims.fourier_amplitude_spectra(
-        taper_signal_acc, dt, frequencies, cores, ko_bandwidth
+        taper_signal_acc, dt, frequencies, ko_directory, cores
     )
     fas_noise = ims.fourier_amplitude_spectra(
-        taper_noise_acc, dt, frequencies, cores, ko_bandwidth
+        taper_noise_acc, dt, frequencies, ko_directory, cores
     )
 
     # Calculate the SNR
