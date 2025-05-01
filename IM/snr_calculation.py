@@ -80,6 +80,11 @@ def calculate_snr(
     ValueError
         If the noise duration is less than 1s and so SNR can't be computed.
     """
+    # X * T = X - C
+    # C = len(waveform[:, tp:])
+    # T = 0.05
+
+
     # Calculate signal and noise areas
     signal_acc, noise_acc = waveform[:, tp:], waveform[:, :tp]
     signal_duration, noise_duration = signal_acc.shape[1] * dt, noise_acc.shape[1] * dt
