@@ -79,7 +79,7 @@ def calculate_snr(
     """
     # This extra time is to ensure that when a taper is applied, the signal part of the waveform
     # is not affected by the tapering. The tapering is applied to the signal and noise separately.
-    tp_extra = 20 * waveform[:, tp:].shape[1] / 19 - waveform[:, tp:].shape[1]
+    tp_extra = waveform[:, tp:].shape[1] / 19
     # Round up the tp_extra to the nearest highest integer
     tp_extra = int(np.ceil(tp_extra))
 
