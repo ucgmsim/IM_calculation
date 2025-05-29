@@ -54,9 +54,9 @@ class RotdPsaValuesOutput:
     """ndarray of float32 with shape `(n_stations, n_periods, 3)`
        Array containing minimum (rotd0), median (rotd50) and maximum (rotd100) PSA values."""
     psa_comp_0_maxes: npt.NDArray[np.float32]
-    """Maximum pSA values for the 000 component."""
+    """Maximum absolute displacement values for the 000 component."""
     psa_comp_90_maxes: npt.NDArray[np.float32]
-    """Maximum pSA values for the 090 component."""
+    """Maximum absolute displacement values for the 090 component."""
 
 
 @numba.njit(cache=True)
