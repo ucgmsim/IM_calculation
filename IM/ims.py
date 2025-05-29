@@ -314,7 +314,7 @@ def pseudo_spectral_acceleration(
     # (using COMP_90.value+1 for Python's "up to but not including" slice behavior)
     rotd_psa_values_output = rotd_psa_values(
         waveforms[:, :, Component.COMP_0.value : Component.COMP_90.value + 1],
-        dt,
+        np.float32(dt),
         w,
         step=step,
         use_numexpr=use_numexpr,
@@ -335,7 +335,7 @@ def pseudo_spectral_acceleration(
     for i in range(0, waveforms.shape[0], step):
         comp_ver_psa[i : i + step, :] = conversion_factor * np.abs(
             newmark_estimate_psa(
-                waveforms[i : i + step, :, Component.COMP_VER.value], dt, w
+                waveforms[i : i + step, :, Component.COMP_VER.value], np.float32(dt), w
             )
         ).max(axis=1)
 

@@ -40,6 +40,13 @@ def generate_ko_matrices(request: pytest.FixtureRequest):
     request.addfinalizer(remove_ko_matrices)
 
 
+# Common test fixtures
+@pytest.fixture
+def sample_time():
+    """Generate sample time array."""
+    return np.arange(0, 1, 0.01, dtype=np.float32)
+
+
 @pytest.fixture
 def sample_dt() -> np.float32:
     """Generate sample time step for testing."""
@@ -171,7 +178,7 @@ def test_significant_duration(
     ],
 )
 def test_pga(comp_0: npt.NDArray[np.float32], expected_pga: float, use_numexpr: bool):
-    waveforms = np.zeros((1, len(comp_0), 3))
+    waveforms = np.zeros((1, len(comp_0), 3), dtype=np.float32)
     waveforms[:, :, ims.Component.COMP_0] = comp_0
     assert np.isclose(
         ims.peak_ground_acceleration(waveforms, use_numexpr=use_numexpr)["000"],
@@ -205,7 +212,7 @@ def test_pgv(
     expected_pga: float,
     use_numexpr: bool,
 ):
-    waveforms = np.zeros((1, len(comp_0), 3))
+    waveforms = np.zeros((1, len(comp_0), 3), dtype=np.float32)
     waveforms[:, :, ims.Component.COMP_0] = comp_0
     # NOTE: This dt calculation is correct, if dt = 1 / len(comp_0) then dt
     # ends up *too small* and these tests will fail.
@@ -241,7 +248,7 @@ def test_cav(
     expected_cav: float,
     expected_cav5: Optional[float],
 ):
-    waveforms = np.zeros((1, len(comp_0), 3))
+    waveforms = np.zeros((1, len(comp_0), 3), dtype=np.float32)
     waveforms[:, :, ims.Component.COMP_0] = comp_0
     dt = t_max / (len(comp_0) - 1)
     assert np.isclose(
@@ -263,7 +270,7 @@ def test_cav(
     ],
 )
 def test_ai_values(comp_0: npt.NDArray[np.float32], t_max: float, expected_ai: float):
-    waveforms = np.zeros((1, len(comp_0), 3))
+    waveforms = np.zeros((1, len(comp_0), 3), dtype=np.float32)
     waveforms[:, :, ims.Component.COMP_0] = comp_0
     dt = t_max / (len(comp_0) - 1)
     assert np.isclose(ims.arias_intensity(waveforms, dt)["000"], expected_ai, atol=0.1)
@@ -271,8 +278,8 @@ def test_ai_values(comp_0: npt.NDArray[np.float32], t_max: float, expected_ai: f
 
 @pytest.mark.parametrize("use_numexpr", [True, False])
 def test_psa(use_numexpr: bool):
-    comp_0 = np.ones((100,))
-    waveforms = np.zeros((2, len(comp_0), 3))
+    comp_0 = np.ones((100,), dtype=np.float32)
+    waveforms = np.zeros((2, len(comp_0), 3), dtype=np.float32)
     waveforms[0, :, ims.Component.COMP_0] = comp_0
     waveforms[1, :, ims.Component.COMP_0] = comp_0
     dt = 0.01
@@ -425,8 +432,8 @@ def test_all_ims_benchmark_edge_cases(resource_dir: Path):
 
 @pytest.mark.parametrize("use_numexpr", [True, False])
 def test_ds5xx(use_numexpr: bool):
-    comp_0 = np.ones((100,))
-    waveforms = np.zeros((1, len(comp_0), 3))
+    comp_0 = np.ones((100,), dtype=np.float32)
+    waveforms = np.zeros((1, len(comp_0), 3), dtype=np.float32)
     waveforms[:, :, ims.Component.COMP_0] = comp_0
     # To stop invalid value errors when dividing by zero in other components
     waveforms[:, :, ims.Component.COMP_90] = comp_0 * 2
@@ -490,7 +497,9 @@ def test_arias_intensity(
 # Test cases for Fourier Amplitude Spectra
 @pytest.mark.parametrize("n_freqs", [5, 10])
 def test_fourier_amplitude_spectra(
-    sample_waveforms: npt.NDArray[np.float32], sample_time: np.float32, n_freqs: int
+    sample_waveforms: npt.NDArray[np.float32],
+    sample_time: npt.NDArray[np.float32],
+    n_freqs: int,
 ):
     """Test Fourier Amplitude Spectra calculation."""
     dt = sample_time[1] - sample_time[0]
