@@ -127,9 +127,6 @@ def test_rotd_psa_values():
     out = ims.rotd_psa_values(sample_waveforms, sample_dt, w, step=1)
     rotd_psa = out.rotd_psa
 
-    print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
-    print("results:")
-    print(rotd_psa)
     # Expect (n_stations=2, n_freqs=1, percentiles=3)
     assert rotd_psa.shape == (2, 1, 3)
     # Check one numerical value
