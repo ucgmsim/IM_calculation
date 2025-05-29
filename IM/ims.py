@@ -300,7 +300,7 @@ def pseudo_spectral_acceleration(
     if psa_rotd_maximum_memory_allocation:
         step = min(
             int(
-                psa_rotd_maximum_memory_allocation / (180 * sys.getsizeof(waveforms[0]))
+                psa_rotd_maximum_memory_allocation / (180 * len(w) * waveforms[0].nbytes)
             ),
             cores,
         )
