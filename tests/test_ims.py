@@ -21,6 +21,7 @@ from IM.scripts import gen_ko_matrix
 
 KO_TEST_DIR = Path(__file__).parent / "KO_matrices"
 
+
 @pytest.fixture(scope="session", autouse=True)
 def generate_ko_matrices(request: pytest.FixtureRequest):
     """
@@ -38,11 +39,11 @@ def generate_ko_matrices(request: pytest.FixtureRequest):
 
     request.addfinalizer(remove_ko_matrices)
 
-# Common test fixtures
+
 @pytest.fixture
-def sample_time():
-    """Generate sample time array."""
-    return np.arange(0, 1, 0.01, dtype=np.float32)
+def sample_dt() -> np.float32:
+    """Generate sample time step for testing."""
+    return np.float32(0.1)
 
 
 @pytest.fixture
@@ -84,19 +85,17 @@ def sample_periods():
 )
 def test_newmark_estimate_psa(
     sample_waveforms: npt.NDArray[np.float32],
-    sample_time: np.float32,
+    sample_dt: np.float32,
     xi: np.float32,
     gamma: np.float32,
     beta: np.float32,
 ):
     """Test Newmark PSA estimation with various parameters."""
-    dt = sample_time[1] - sample_time[0]
     w = 2 * np.pi * np.array([1.0, 2.0], dtype=np.float32)
 
     result = ims.newmark_estimate_psa(
         sample_waveforms[:, :, ims.Component.COMP_0],
-        sample_time,
-        dt,
+        sample_dt,
         w,
         xi=xi,
         gamma=gamma,
@@ -104,7 +103,11 @@ def test_newmark_estimate_psa(
     )
 
     # Basic checks
-    assert result.shape == (len(sample_waveforms), len(sample_time), len(w))
+    assert result.shape == (
+        sample_waveforms.shape[0],
+        sample_waveforms.shape[1],
+        len(w),
+    )
     assert not np.any(np.isnan(result))
     assert not np.any(np.isinf(result))
 
@@ -115,15 +118,22 @@ def test_rotd_psa_values():
     Checks that rotd_psa_values calculates cos(theta) * comp_0 + sin(theta) * comp_90 and maximises correctly by checking the maximum rotated psa value
     is 2 * pi^2 * sqrt(2).
     """
-    w = 2 * np.pi * np.array([1.0])
-    comp_0 = np.atleast_3d(np.ones((2, 100), dtype=np.float32))
-    comp_90 = np.atleast_3d(np.ones((2, 100), dtype=np.float32))
 
-    result = ims.rotd_psa_values(comp_0, comp_90, w, 3)
+    sample_waveforms = np.ones((2, 3, 2), dtype=np.float32)
+    sample_dt = np.float32(0.1)
 
-    # Shape checks
-    assert result.shape == (len(comp_0), len(w), 3)
-    assert result[0, 0, 2] == pytest.approx((2 * np.pi) ** 2 * np.sqrt(2), abs=1e-3)
+    w = 2 * np.pi * np.array([1.0], dtype=np.float32)
+
+    out = ims.rotd_psa_values(sample_waveforms, sample_dt, w, step=1)
+    rotd_psa = out.rotd_psa
+
+    print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+    print("results:")
+    print(rotd_psa)
+    # Expect (n_stations=2, n_freqs=1, percentiles=3)
+    assert rotd_psa.shape == (2, 1, 3)
+    # Check one numerical value
+    assert rotd_psa[0, 0, 2] == pytest.approx(0.8880277276039124, abs=1e-3)
 
 
 # Test cases for significant duration
@@ -167,7 +177,9 @@ def test_pga(comp_0: npt.NDArray[np.float32], expected_pga: float, use_numexpr: 
     waveforms = np.zeros((1, len(comp_0), 3))
     waveforms[:, :, ims.Component.COMP_0] = comp_0
     assert np.isclose(
-        ims.peak_ground_acceleration(waveforms, use_numexpr=use_numexpr)["000"], expected_pga, atol=1e-3
+        ims.peak_ground_acceleration(waveforms, use_numexpr=use_numexpr)["000"],
+        expected_pga,
+        atol=1e-3,
     )
 
 
@@ -190,14 +202,21 @@ def test_pga(comp_0: npt.NDArray[np.float32], expected_pga: float, use_numexpr: 
         ),
     ],
 )
-def test_pgv(comp_0: npt.NDArray[np.float32], t_max: float, expected_pga: float, use_numexpr: bool):
+def test_pgv(
+    comp_0: npt.NDArray[np.float32],
+    t_max: float,
+    expected_pga: float,
+    use_numexpr: bool,
+):
     waveforms = np.zeros((1, len(comp_0), 3))
     waveforms[:, :, ims.Component.COMP_0] = comp_0
     # NOTE: This dt calculation is correct, if dt = 1 / len(comp_0) then dt
     # ends up *too small* and these tests will fail.
     dt = t_max / (len(comp_0) - 1)
     assert np.isclose(
-        ims.peak_ground_velocity(waveforms, dt, use_numexpr=use_numexpr)["000"], expected_pga, atol=0.1
+        ims.peak_ground_velocity(waveforms, dt, use_numexpr=use_numexpr)["000"],
+        expected_pga,
+        atol=0.1,
     )
 
 
@@ -261,7 +280,9 @@ def test_psa(use_numexpr: bool):
     waveforms[1, :, ims.Component.COMP_0] = comp_0
     dt = 0.01
     w = np.array([1, 2], dtype=np.float32)
-    psa_values = ims.pseudo_spectral_acceleration(waveforms, w, dt, use_numexpr=use_numexpr)
+    psa_values = ims.pseudo_spectral_acceleration(
+        waveforms, w, dt, use_numexpr=use_numexpr
+    )
 
     # assert psa is close to the expected psa derived by solving the ODE in
     # Wolfram Alpha and finding the abs max.
@@ -287,7 +308,9 @@ def test_fas_benchmark(cores: int):
     dt, waveform = waveform_reading.read_ascii(comp_000_ffp, comp_090_ffp, comp_ver_ffp)
 
     # Compute the Fourier Amplitude Spectra
-    fas_result_ims = ims.fourier_amplitude_spectra(waveform, dt, data.frequency, KO_TEST_DIR, cores=cores)
+    fas_result_ims = ims.fourier_amplitude_spectra(
+        waveform, dt, data.frequency, KO_TEST_DIR, cores=cores
+    )
 
     # Compare the results
     assert_array_almost_equal(data, fas_result_ims, decimal=5)
@@ -313,7 +336,9 @@ def test_fas_multiple_stations_benchmark(cores: int):
     duplicated_array = np.tile(waveform, (2, 1, 1))
 
     # Compute the Fourier Amplitude Spectra
-    fas_result_ims = ims.fourier_amplitude_spectra(duplicated_array, dt, data.frequency, KO_TEST_DIR, cores=cores)
+    fas_result_ims = ims.fourier_amplitude_spectra(
+        duplicated_array, dt, data.frequency, KO_TEST_DIR, cores=cores
+    )
 
     # Compare the results
     for i in range(fas_result_ims.shape[1]):
@@ -343,7 +368,9 @@ def test_snr_benchmark():
     tp = 3170
 
     # Compute the SNR
-    snr_result_ims, _, _, _, _ = snr_calculation.calculate_snr(waveform, dt, tp, KO_TEST_DIR)
+    snr_result_ims, _, _, _, _ = snr_calculation.calculate_snr(
+        waveform, dt, tp, KO_TEST_DIR
+    )
 
     # Compare the results
     assert_array_almost_equal(data, snr_result_ims, decimal=5)
@@ -366,13 +393,18 @@ def test_all_ims_benchmark(use_numexpr: bool):
     dt, waveform = waveform_reading.read_ascii(comp_000_ffp, comp_090_ffp, comp_ver_ffp)
 
     # Calculate the intensity measures
-    result = im_calculation.calculate_ims(waveform, dt, ko_directory=KO_TEST_DIR, use_numexpr=use_numexpr)
+    result = im_calculation.calculate_ims(
+        waveform, dt, ko_directory=KO_TEST_DIR, use_numexpr=use_numexpr
+    )
 
     # Compare the results
     assert_array_almost_equal(data, result, decimal=5)
 
 
-@pytest.mark.parametrize("resource_dir", [d for d in (Path(__file__).parent / 'resources').iterdir() if d.is_dir()])
+@pytest.mark.parametrize(
+    "resource_dir",
+    [d for d in (Path(__file__).parent / "resources").iterdir() if d.is_dir()],
+)
 def test_all_ims_benchmark_edge_cases(resource_dir: Path):
     """Compare benchmark IM calculation against current implementation for each directory in resources for edge cases."""
     # Load the benchmark DataFrame
@@ -468,10 +500,16 @@ def test_fourier_amplitude_spectra(
     freqs = np.logspace(-1, 1, n_freqs, dtype=np.float32)
     # Force the multiprocessing code path if necessary.
     result_mp = ims.fourier_amplitude_spectra(
-        sample_waveforms, dt, freqs, KO_TEST_DIR, cores=max(2, multiprocessing.cpu_count())
+        sample_waveforms,
+        dt,
+        freqs,
+        KO_TEST_DIR,
+        cores=max(2, multiprocessing.cpu_count()),
     )
     # Force the single core path.
-    result_sc = ims.fourier_amplitude_spectra(sample_waveforms, dt, freqs, KO_TEST_DIR, cores=1)
+    result_sc = ims.fourier_amplitude_spectra(
+        sample_waveforms, dt, freqs, KO_TEST_DIR, cores=1
+    )
 
     # Check DataFrame structure
     assert isinstance(result_mp, xr.DataArray)
