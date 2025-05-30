@@ -120,7 +120,7 @@ def test_rotd_psa_values():
     comp_0 = np.atleast_3d(np.ones((2, 100), dtype=np.float32))
     comp_90 = np.atleast_3d(np.ones((2, 100), dtype=np.float32))
 
-    result = ims.rotd_psa_values(comp_0, comp_90, w, 3)
+    result = ims.rotd_psa_values(comp_0, comp_90, w)
 
     # Shape checks
     assert result.shape == (len(comp_0), len(w), 3)
@@ -269,7 +269,7 @@ def test_psa(use_numexpr: bool):
     waveforms = np.zeros((2, len(comp_0), 3), dtype=np.float32)
     waveforms[0, :, ims.Component.COMP_0] = comp_0
     waveforms[1, :, ims.Component.COMP_0] = comp_0
-    dt = 0.01
+    dt = np.float32(0.01)
     w = np.array([1, 2], dtype=np.float32)
     psa_values = ims.pseudo_spectral_acceleration(
         waveforms, w, dt, use_numexpr=use_numexpr
@@ -547,7 +547,10 @@ def test_invalid_memory_allocation():
 
     with pytest.raises(ValueError, match="PSA rotd memory allocation is too small"):
         ims.pseudo_spectral_acceleration(
-            waveforms, periods, 0.01, psa_rotd_maximum_memory_allocation=1e-10
+            waveforms,
+            periods,
+            np.float32(0.01),
+            psa_rotd_maximum_memory_allocation=1e-10,
         )
 
 

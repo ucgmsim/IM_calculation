@@ -204,7 +204,7 @@ def rotd_psa_values(
             axis=-1,
         ),
         [1, 2, 0],
-    )
+    ).astype(np.float32)
 
     del out
     gc.collect()  # This is required because Python's GC is too lazy to remove the out array when it should
