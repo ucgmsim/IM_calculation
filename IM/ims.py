@@ -2,7 +2,6 @@
 
 import gc
 import multiprocessing
-import sys
 import warnings
 from collections.abc import Callable
 from enum import IntEnum, StrEnum
@@ -48,8 +47,7 @@ class IM(StrEnum):
 @numba.njit(cache=True)
 def newmark_estimate_psa(
     waveforms: npt.NDArray[np.float32],
-    t: npt.NDArray[np.float32],
-    dt: float,
+    dt: np.float32,
     w: npt.NDArray[np.float32],
     xi: np.float32 = np.float32(0.05),
     gamma: np.float32 = np.float32(1 / 2),
@@ -62,9 +60,7 @@ def newmark_estimate_psa(
     ----------
     waveforms : ndarray of float32 with shape `(n_stations, n_timesteps)`
         Acceleration waveforms array.
-    t : ndarray of float32
-        Time values corresponding to waveforms (s).
-    dt : float
+    dt : float32
         Time step between consecutive samples (s).
     w : ndarray of float32
         Angular frequencies of single-degree-of-freedom oscillators (Hz).
@@ -122,7 +118,14 @@ def newmark_estimate_psa(
         dudt[:] = np.float32(0.0)
     return u
 
-def rotate_components(step_000: np.ndarray, step_090: np.ndarray, theta: np.ndarray, out: Optional[np.ndarray] = None, use_numexpr: bool = True):
+
+def rotate_components(
+    step_000: np.ndarray,
+    step_090: np.ndarray,
+    theta: np.ndarray,
+    out: Optional[np.ndarray] = None,
+    use_numexpr: bool = True,
+):
     """
     Helper function to handle rotation computation using either numexpr or numpy.
 
@@ -147,12 +150,12 @@ def rotate_components(step_000: np.ndarray, step_090: np.ndarray, theta: np.ndar
                 "theta": theta[np.newaxis, ...],
                 "comp_090": step_090[..., np.newaxis],
             },
-            out=out
+            out=out,
         )
     else:
         return np.abs(
-            step_000[..., np.newaxis] * np.cos(theta)[np.newaxis, ...] +
-            step_090[..., np.newaxis] * np.sin(theta)[np.newaxis, ...]
+            step_000[..., np.newaxis] * np.cos(theta)[np.newaxis, ...]
+            + step_090[..., np.newaxis] * np.sin(theta)[np.newaxis, ...]
         )
 
 
@@ -160,7 +163,6 @@ def rotd_psa_values(
     comp_000: npt.NDArray[np.float32],
     comp_090: npt.NDArray[np.float32],
     w: npt.NDArray[np.float32],
-    step: int,
     use_numexpr: bool = True,
 ) -> npt.NDArray[np.float32]:
     """Compute rotated pseudo-spectral acceleration statistics.
@@ -173,8 +175,6 @@ def rotd_psa_values(
         PSA in 090 component (cm/s^2).
     w : ndarray of float32
         Natural angular frequencies of oscillators (Hz).
-    step : int
-        Number of stations to process in parallel.
     use_numexpr : bool, optional
         Use numexpr for computation, by default True.
 
@@ -184,30 +184,27 @@ def rotd_psa_values(
         Array containing minimum (rotd0), median (rotd50) and maximum (rotd100) PSA values.
     """
     theta = np.linspace(0, np.pi, num=180, dtype=np.float32)
-    psa = np.zeros((comp_000.shape[0], comp_000.shape[-1], 3), np.float32)
-    out = np.zeros((step, *comp_000.shape[1:], 180), np.float32)
-    w2 = np.square(w)
+    psa = np.zeros((comp_000.shape[0], comp_000.shape[-1], 3), dtype=np.float32)
+    out = np.zeros((comp_000.shape[0], *comp_000.shape[1:], 180), dtype=np.float32)
+    w2 = np.square(w, dtype=np.float32)
 
-    for i in range(0, comp_000.shape[0], step):
-        step_000 = comp_000[i : i + step]
-        step_090 = comp_090[i : i + step]
-        psa[i: i + step] = np.transpose(
-            np.percentile(
-                np.max(
-                    rotate_components(
-                        step_000,
-                        step_090,
-                        theta,
-                        out=out[: len(step_000)],
-                        use_numexpr=use_numexpr,
-                    )[: len(step_000)],
-                    axis=1,
-                ),
-                [0, 50, 100],
-                axis=-1,
+    psa = np.transpose(
+        np.percentile(
+            np.max(
+                rotate_components(
+                    comp_000,
+                    comp_090,
+                    theta,
+                    out=out[: len(comp_000)],
+                    use_numexpr=use_numexpr,
+                )[: len(comp_000)],
+                axis=1,
             ),
-            [1, 2, 0],
-        )
+            [0, 50, 100],
+            axis=-1,
+        ),
+        [1, 2, 0],
+    ).astype(np.float32)
 
     del out
     gc.collect()  # This is required because Python's GC is too lazy to remove the out array when it should
@@ -217,7 +214,7 @@ def rotd_psa_values(
 def pseudo_spectral_acceleration(
     waveforms: npt.NDArray[np.float32],
     periods: npt.NDArray[np.float32],
-    dt: float,
+    dt: np.float32,
     psa_rotd_maximum_memory_allocation: Optional[float] = None,
     cores: int = multiprocessing.cpu_count(),
     use_numexpr: bool = True,
@@ -245,27 +242,16 @@ def pseudo_spectral_acceleration(
         DataArray containing PSA statistics for each
         station, period and component ['000', '090', 'ver', 'geom', 'rotd0', 'rotd50', 'rotd100'].
     """
-    t = np.arange(waveforms.shape[1]) * dt
     w = 2 * np.pi / periods
 
-    comp_0 = newmark_estimate_psa(
-        waveforms[:, :, Component.COMP_0.value],
-        t,
-        dt,
-        w,
-    )
-
-    comp_90 = newmark_estimate_psa(
-        waveforms[:, :, Component.COMP_90.value],
-        t,
-        dt,
-        w,
-    )
     # Step size is the minimum of either the CPU count, or the maximum number of
     # steps that fits within the psa_rotd_maximum_memory_allocation.
     if psa_rotd_maximum_memory_allocation:
         step = min(
-            int(psa_rotd_maximum_memory_allocation / (180 * sys.getsizeof(comp_0[0]))),
+            int(
+                psa_rotd_maximum_memory_allocation
+                / (180 * len(w) * waveforms[0].nbytes)
+            ),
             cores,
         )
     else:
@@ -274,14 +260,40 @@ def pseudo_spectral_acceleration(
         raise ValueError(
             "PSA rotd memory allocation is too small (cannot even calculate a single station's pSA)."
         )
-    rotd_psa = rotd_psa_values(comp_0, comp_90, w, step=step, use_numexpr=use_numexpr)
 
-    conversion_factor = np.square(w)[np.newaxis, :]
-    comp_0_psa = conversion_factor * np.abs(comp_0).max(axis=1)
-    comp_90_psa = conversion_factor * np.abs(comp_90).max(axis=1)
-    comp_ver_psa = conversion_factor * np.abs(
-        newmark_estimate_psa(waveforms[:, :, 2], t, dt, w)
-    ).max(axis=1)
+    rotd_psa = np.zeros((waveforms.shape[0], len(w), 3), dtype=np.float32)
+
+    comp_0_psa = np.zeros((waveforms.shape[0], len(w)), dtype=np.float32)
+    comp_90_psa = np.zeros((waveforms.shape[0], len(w)), dtype=np.float32)
+    comp_ver_psa = np.zeros((waveforms.shape[0], len(w)), dtype=np.float32)
+
+    for i in range(0, waveforms.shape[0], step):
+        comp_0 = newmark_estimate_psa(
+            waveforms[i : i + step, :, Component.COMP_0.value],
+            dt,
+            w,
+        )
+
+        comp_90 = newmark_estimate_psa(
+            waveforms[i : i + step, :, Component.COMP_90.value],
+            dt,
+            w,
+        )
+
+        rotd_psa[i : i + step, :, :] = rotd_psa_values(
+            comp_0, comp_90, w, use_numexpr=use_numexpr
+        )
+
+        conversion_factor = np.square(w)[np.newaxis, :]
+        comp_0_psa[i : i + step, :] = conversion_factor * np.abs(comp_0).max(axis=1)
+        comp_90_psa[i : i + step, :] = conversion_factor * np.abs(comp_90).max(axis=1)
+
+        comp_ver_psa[i : i + step, :] = conversion_factor * np.abs(
+            newmark_estimate_psa(
+                waveforms[i : i + step, :, Component.COMP_VER.value], dt, w
+            )
+        ).max(axis=1)
+
     geom_psa = np.sqrt(comp_0_psa * comp_90_psa)
 
     return xr.DataArray(
@@ -350,7 +362,7 @@ def compute_intensity_measure_rotd(
             values[:, i] = intensity_measure(
                 np.cos(theta) * comp_0 + np.sin(theta) * comp_90
             )
-        
+
     comp_0 = values[:, 0]
     comp_90 = values[:, 90]
     comp_ver = waveforms[:, :, Component.COMP_VER.value]
@@ -438,12 +450,19 @@ def significant_duration(
             "(arias_intensity >= percent_low / 100) & (arias_intensity <= percent_high / 100)"
         )
     else:
-        sum_mask = (arias_intensity >= percent_low / 100) & (arias_intensity <= percent_high / 100)
+        sum_mask = (arias_intensity >= percent_low / 100) & (
+            arias_intensity <= percent_high / 100
+        )
     threshold_values = np.count_nonzero(sum_mask, axis=1) * dt
     return threshold_values.ravel()
 
 
-def dot_product_component(i: int, component: int, fa_spectrum: npt.NDArray[np.float32], konno: npt.NDArray[np.float32]) -> npt.NDArray[np.float32]:
+def dot_product_component(
+    i: int,
+    component: int,
+    fa_spectrum: npt.NDArray[np.float32],
+    konno: npt.NDArray[np.float32],
+) -> npt.NDArray[np.float32]:
     """
     Compute the dot product of the Fourier Amplitude Spectrum (FAS) with
     the Konno-Ohmachi smoothing matrix for a given component.
@@ -518,21 +537,30 @@ def fourier_amplitude_spectra(
             fas_0 = np.array(
                 pool.starmap(
                     dot_product_component,
-                    [(i, Component.COMP_0.value, fa_spectrum, konno) for i in range(fa_spectrum.shape[0])]
+                    [
+                        (i, Component.COMP_0.value, fa_spectrum, konno)
+                        for i in range(fa_spectrum.shape[0])
+                    ],
                 ),
                 dtype=np.float32,
             )
             fas_90 = np.array(
                 pool.starmap(
                     dot_product_component,
-                    [(i, Component.COMP_90.value, fa_spectrum, konno) for i in range(fa_spectrum.shape[0])]
+                    [
+                        (i, Component.COMP_90.value, fa_spectrum, konno)
+                        for i in range(fa_spectrum.shape[0])
+                    ],
                 ),
                 dtype=np.float32,
             )
             fas_ver = np.array(
                 pool.starmap(
                     dot_product_component,
-                    [(i, Component.COMP_VER.value, fa_spectrum, konno) for i in range(fa_spectrum.shape[0])]
+                    [
+                        (i, Component.COMP_VER.value, fa_spectrum, konno)
+                        for i in range(fa_spectrum.shape[0])
+                    ],
                 ),
                 dtype=np.float32,
             )
@@ -551,8 +579,17 @@ def fourier_amplitude_spectra(
     )
     fas_smooth = interpolator(freqs)
 
-    eas = np.sqrt(0.5 * (np.square(fas_smooth[:, :, Component.COMP_0.value]) + np.square(fas_smooth[:, :, Component.COMP_90.value])))
-    geom_fas = np.sqrt(fas_smooth[:, :, Component.COMP_0.value] * fas_smooth[:, :, Component.COMP_90.value])
+    eas = np.sqrt(
+        0.5
+        * (
+            np.square(fas_smooth[:, :, Component.COMP_0.value])
+            + np.square(fas_smooth[:, :, Component.COMP_90.value])
+        )
+    )
+    geom_fas = np.sqrt(
+        fas_smooth[:, :, Component.COMP_0.value]
+        * fas_smooth[:, :, Component.COMP_90.value]
+    )
 
     return xr.DataArray(
         np.stack(
@@ -700,8 +737,7 @@ def _cumulative_arias_intensity(
 
 
 def peak_ground_acceleration(
-    waveform: npt.NDArray[np.float32],
-    use_numexpr: bool = True
+    waveform: npt.NDArray[np.float32], use_numexpr: bool = True
 ) -> pd.DataFrame:
     """Compute Peak Ground Acceleration (PGA) for waveforms.
 
@@ -717,10 +753,14 @@ def peak_ground_acceleration(
     pandas.DataFrame with columns `['000', '090', 'ver', 'geom', 'rotd100', 'rotd50', 'rotd0']`
         DataFrame containing PGA values with rotated components in g-units.
     """
-    return compute_intensity_measure_rotd(waveform, lambda v: np.abs(v).max(axis=1), use_numexpr=use_numexpr)
+    return compute_intensity_measure_rotd(
+        waveform, lambda v: np.abs(v).max(axis=1), use_numexpr=use_numexpr
+    )
 
 
-def peak_ground_velocity(waveform: npt.NDArray[np.float32], dt: float, use_numexpr: bool = True) -> pd.DataFrame:
+def peak_ground_velocity(
+    waveform: npt.NDArray[np.float32], dt: float, use_numexpr: bool = True
+) -> pd.DataFrame:
     """Compute Peak Ground Velocity (PGV) for waveforms.
 
     Parameters
@@ -821,7 +861,9 @@ def arias_intensity(waveform: npt.NDArray[np.float32], dt: float) -> pd.DataFram
     )
 
 
-def ds575(waveform: npt.NDArray[np.float32], dt: float, use_numexpr: bool = True) -> pd.DataFrame:
+def ds575(
+    waveform: npt.NDArray[np.float32], dt: float, use_numexpr: bool = True
+) -> pd.DataFrame:
     """Compute 5-75% Significant Duration (DS575) for waveforms.
 
     Parameters
@@ -858,7 +900,9 @@ def ds575(waveform: npt.NDArray[np.float32], dt: float, use_numexpr: bool = True
     )
 
 
-def ds595(waveform: npt.NDArray[np.float32], dt: float, use_numexpr: bool = True) -> pd.DataFrame:
+def ds595(
+    waveform: npt.NDArray[np.float32], dt: float, use_numexpr: bool = True
+) -> pd.DataFrame:
     """Compute 5-95% Significant Duration (DS595) for waveforms.
 
     Parameters

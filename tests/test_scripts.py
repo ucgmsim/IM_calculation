@@ -62,7 +62,7 @@ def test_calculate_ims_ascii_invalid_file():
 
     # Assertions
     assert result.exit_code != 0
-    assert "Usage:" in result.stdout
+    assert "Usage:" in result.stderr
 
 
 def test_calculate_ims_ascii_empty_ims_list(tmp_path: Path):
@@ -90,4 +90,4 @@ def test_calculate_ims_ascii_empty_ims_list(tmp_path: Path):
 
     # Assertions
     assert result.exit_code != 0
-    assert "Usage:" in result.stdout
+    assert "Usage:" in result.stderr
