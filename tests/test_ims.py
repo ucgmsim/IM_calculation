@@ -125,19 +125,15 @@ def test_rotd_psa_values():
     Checks that rotd_psa_values calculates cos(theta) * comp_0 + sin(theta) * comp_90 and maximises correctly by checking the maximum rotated psa value
     is 2 * pi^2 * sqrt(2).
     """
+    w = 2 * np.pi * np.array([1.0])
+    comp_0 = np.atleast_3d(np.ones((2, 100), dtype=np.float32))
+    comp_90 = np.atleast_3d(np.ones((2, 100), dtype=np.float32))
 
-    sample_waveforms = np.ones((2, 3, 2), dtype=np.float32)
-    sample_dt = np.float32(0.1)
+    result = ims.rotd_psa_values(comp_0, comp_90, w, 3)
 
-    w = 2 * np.pi * np.array([1.0], dtype=np.float32)
-
-    out = ims.rotd_psa_values(sample_waveforms, sample_dt, w, step=1)
-    rotd_psa = out.rotd_psa
-
-    # Expect (n_stations=2, n_freqs=1, percentiles=3)
-    assert rotd_psa.shape == (2, 1, 3)
-    # Check one numerical value
-    assert rotd_psa[0, 0, 2] == pytest.approx(0.8880277276039124, abs=1e-3)
+    # Shape checks
+    assert result.shape == (len(comp_0), len(w), 3)
+    assert result[0, 0, 2] == pytest.approx((2 * np.pi) ** 2 * np.sqrt(2), abs=1e-3)
 
 
 # Test cases for significant duration

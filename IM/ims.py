@@ -2,10 +2,8 @@
 
 import gc
 import multiprocessing
-import sys
 import warnings
 from collections.abc import Callable
-from dataclasses import dataclass
 from enum import IntEnum, StrEnum
 from pathlib import Path
 from typing import Optional
@@ -46,19 +44,6 @@ class IM(StrEnum):
     FAS = "FAS"
 
 
-@dataclass
-class RotdPsaValuesOutput:
-    """Output data structure for the rotd_psa_values() function."""
-
-    rotd_psa: npt.NDArray[np.float32]
-    """ndarray of float32 with shape `(n_stations, n_periods, 3)`
-       Array containing minimum (rotd0), median (rotd50) and maximum (rotd100) PSA values."""
-    psa_comp_0_maxes: npt.NDArray[np.float32]
-    """Maximum absolute displacement values for the 000 component."""
-    psa_comp_90_maxes: npt.NDArray[np.float32]
-    """Maximum absolute displacement values for the 090 component."""
-
-
 @numba.njit(cache=True)
 def newmark_estimate_psa(
     waveforms: npt.NDArray[np.float32],
@@ -75,7 +60,7 @@ def newmark_estimate_psa(
     ----------
     waveforms : ndarray of float32 with shape `(n_stations, n_timesteps)`
         Acceleration waveforms array.
-    dt : float
+    dt : float32
         Time step between consecutive samples (s).
     w : ndarray of float32
         Angular frequencies of single-degree-of-freedom oscillators (Hz).
@@ -98,17 +83,15 @@ def newmark_estimate_psa(
     .. [1] https://en.wikipedia.org/wiki/Newmark-beta_method
     .. [2] ENCI335 (Structural Analysis), Chapter 4: Course notes on Newmark-beta method
     """
-
     c = np.float32(2 * xi) * w
     a = 1 / (beta * dt) * m + (gamma / beta) * c
     b = 1 / (2 * beta) * m + dt * (gamma / (2 * beta) - 1) * c
     k = np.square(w)
     kbar = k + (gamma / (beta * dt)) * c + 1 / (beta * dt**2) * m
-
     u = np.zeros(
         shape=(waveforms.shape[0], waveforms.shape[1], w.size), dtype=np.float32
     )
-
+    # calculations for each time step
     dudt = np.zeros_like(w, dtype=np.float32)
     #         ns         np x ns    np x ns
     for i in range(waveforms.shape[0]):
@@ -177,94 +160,61 @@ def rotate_components(
 
 
 def rotd_psa_values(
-    waveforms: npt.NDArray[np.float32],
-    dt: np.float32,
+    comp_000: npt.NDArray[np.float32],
+    comp_090: npt.NDArray[np.float32],
     w: npt.NDArray[np.float32],
-    step: int,
     use_numexpr: bool = True,
-) -> RotdPsaValuesOutput:
+) -> npt.NDArray[np.float32]:
     """Compute rotated pseudo-spectral acceleration statistics.
 
     Parameters
     ----------
-    waveforms : ndarray of float32 with shape `(n_stations, n_timesteps, n_components)`
-        Acceleration waveforms array (g).
+    comp_000 : ndarray of float32 with shape `(n_periods, n_stations, n_timesteps)`
+        PSA in 000 component (cm/s^2).
+    comp_090 : ndarray of float32 with shape `(n_periods, n_stations, n_timesteps)`
         PSA in 090 component (cm/s^2).
     w : ndarray of float32
         Natural angular frequencies of oscillators (Hz).
-    step : int
-        Number of stations to process in parallel.
     use_numexpr : bool, optional
         Use numexpr for computation, by default True.
 
     Returns
     -------
-    RotdPsaValuesOutput
-        Contains Rotd and max pSA values for the 000 and 090 components.
+    ndarray of float32 with shape `(n_stations, n_periods, 3)`
+        Array containing minimum (rotd0), median (rotd50) and maximum (rotd100) PSA values.
     """
     theta = np.linspace(0, np.pi, num=180, dtype=np.float32)
-    psa = np.zeros((waveforms.shape[0], len(w), 3), np.float32)
-    out = np.zeros((step, waveforms.shape[1], len(w), 180), np.float32)
+    psa = np.zeros((comp_000.shape[0], comp_000.shape[-1], 3), dtype=np.float32)
+    out = np.zeros((comp_000.shape[0], *comp_000.shape[1:], 180), dtype=np.float32)
+    w2 = np.square(w, dtype=np.float32)
 
-    w2 = np.square(w)
-
-    # Preallocate arrays for maximum pSA values
-    psa_000_maxes = np.zeros((waveforms.shape[0], len(w)), np.float32)
-    psa_090_maxes = np.zeros((waveforms.shape[0], len(w)), np.float32)
-
-    # Compute pSA for a small subset of stations simultaneously to avoid
-    # using too much memory.
-    for i in range(0, waveforms.shape[0], step):
-        step_000 = newmark_estimate_psa(
-            waveforms[i : i + step, :, Component.COMP_0.value],
-            dt,
-            w,
-        )
-
-        psa_000_maxes[i : i + step, :] = np.abs(step_000).max(axis=1)
-
-        step_090 = newmark_estimate_psa(
-            waveforms[i : i + step, :, Component.COMP_90.value],
-            dt,
-            w,
-        )
-
-        psa_090_maxes[i : i + step, :] = np.abs(step_090).max(axis=1)
-
-        psa[i : i + step] = np.transpose(
-            np.percentile(
-                np.max(
-                    rotate_components(
-                        step_000,
-                        step_090,
-                        theta,
-                        out=out[: len(step_000)],
-                        use_numexpr=use_numexpr,
-                    )[: len(step_000)],
-                    axis=1,
-                ),
-                [0, 50, 100],
-                axis=-1,
+    psa = np.transpose(
+        np.percentile(
+            np.max(
+                rotate_components(
+                    comp_000,
+                    comp_090,
+                    theta,
+                    out=out[: len(comp_000)],
+                    use_numexpr=use_numexpr,
+                )[: len(comp_000)],
+                axis=1,
             ),
-            [1, 2, 0],
-        )
+            [0, 50, 100],
+            axis=-1,
+        ),
+        [1, 2, 0],
+    )
 
     del out
-    del step_000
-    del step_090
     gc.collect()  # This is required because Python's GC is too lazy to remove the out array when it should
-
-    return RotdPsaValuesOutput(
-        rotd_psa=w2[np.newaxis, :, np.newaxis] * psa,
-        psa_comp_0_maxes=psa_000_maxes,
-        psa_comp_90_maxes=psa_090_maxes,
-    )
+    return w2[np.newaxis, :, np.newaxis] * psa
 
 
 def pseudo_spectral_acceleration(
     waveforms: npt.NDArray[np.float32],
     periods: npt.NDArray[np.float32],
-    dt: float,
+    dt: np.float32,
     psa_rotd_maximum_memory_allocation: Optional[float] = None,
     cores: int = multiprocessing.cpu_count(),
     use_numexpr: bool = True,
@@ -292,7 +242,6 @@ def pseudo_spectral_acceleration(
         DataArray containing PSA statistics for each
         station, period and component ['000', '090', 'ver', 'geom', 'rotd0', 'rotd50', 'rotd100'].
     """
-
     w = 2 * np.pi / periods
 
     # Step size is the minimum of either the CPU count, or the maximum number of
@@ -300,7 +249,8 @@ def pseudo_spectral_acceleration(
     if psa_rotd_maximum_memory_allocation:
         step = min(
             int(
-                psa_rotd_maximum_memory_allocation / (180 * len(w) * waveforms[0].nbytes)
+                psa_rotd_maximum_memory_allocation
+                / (180 * len(w) * waveforms[0].nbytes)
             ),
             cores,
         )
@@ -310,32 +260,37 @@ def pseudo_spectral_acceleration(
         raise ValueError(
             "PSA rotd memory allocation is too small (cannot even calculate a single station's pSA)."
         )
-    # Pass in only the COMP_0 and COMP_90 slices of the waveforms array
-    # (using COMP_90.value+1 for Python's "up to but not including" slice behavior)
-    rotd_psa_values_output = rotd_psa_values(
-        waveforms[:, :, Component.COMP_0.value : Component.COMP_90.value + 1],
-        np.float32(dt),
-        w,
-        step=step,
-        use_numexpr=use_numexpr,
-    )
 
-    # Unpack the output values
-    rotd_psa = rotd_psa_values_output.rotd_psa
-    psa_comp_0_maxes = rotd_psa_values_output.psa_comp_0_maxes
-    psa_comp_90_maxes = rotd_psa_values_output.psa_comp_90_maxes
+    rotd_psa = np.zeros((waveforms.shape[0], len(w), 3), dtype=np.float32)
 
-    conversion_factor = np.square(w)[np.newaxis, :]
-    comp_0_psa = conversion_factor * psa_comp_0_maxes
-    comp_90_psa = conversion_factor * psa_comp_90_maxes
+    comp_0_psa = np.zeros((waveforms.shape[0], len(w)), dtype=np.float32)
+    comp_90_psa = np.zeros((waveforms.shape[0], len(w)), dtype=np.float32)
+    comp_ver_psa = np.zeros((waveforms.shape[0], len(w)), dtype=np.float32)
 
-    # Compute the vertical component pSA for a small subset of stations simultaneously
-    # to avoid using too much memory.
-    comp_ver_psa = np.zeros((waveforms.shape[0], len(w)), np.float32)
     for i in range(0, waveforms.shape[0], step):
+        comp_0 = newmark_estimate_psa(
+            waveforms[i : i + step, :, Component.COMP_0.value],
+            dt,
+            w,
+        )
+
+        comp_90 = newmark_estimate_psa(
+            waveforms[i : i + step, :, Component.COMP_90.value],
+            dt,
+            w,
+        )
+
+        rotd_psa[i : i + step, :, :] = rotd_psa_values(
+            comp_0, comp_90, w, use_numexpr=use_numexpr
+        )
+
+        conversion_factor = np.square(w)[np.newaxis, :]
+        comp_0_psa[i : i + step, :] = conversion_factor * np.abs(comp_0).max(axis=1)
+        comp_90_psa[i : i + step, :] = conversion_factor * np.abs(comp_90).max(axis=1)
+
         comp_ver_psa[i : i + step, :] = conversion_factor * np.abs(
             newmark_estimate_psa(
-                waveforms[i : i + step, :, Component.COMP_VER.value], np.float32(dt), w
+                waveforms[i : i + step, :, Component.COMP_VER.value], dt, w
             )
         ).max(axis=1)
 
