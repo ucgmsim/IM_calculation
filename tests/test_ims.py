@@ -48,12 +48,6 @@ def sample_time():
 
 
 @pytest.fixture
-def sample_dt() -> np.float32:
-    """Generate sample time step for testing."""
-    return np.float32(0.1)
-
-
-@pytest.fixture
 def sample_waveforms():
     """Generate sample waveform data for testing."""
     t = np.arange(0, 1, 0.01, dtype=np.float32)
@@ -92,17 +86,18 @@ def sample_periods():
 )
 def test_newmark_estimate_psa(
     sample_waveforms: npt.NDArray[np.float32],
-    sample_dt: np.float32,
+    sample_time: npt.NDArray[np.float32],
     xi: np.float32,
     gamma: np.float32,
     beta: np.float32,
 ):
     """Test Newmark PSA estimation with various parameters."""
+    dt = sample_time[1] - sample_time[0]
     w = 2 * np.pi * np.array([1.0, 2.0], dtype=np.float32)
 
     result = ims.newmark_estimate_psa(
         sample_waveforms[:, :, ims.Component.COMP_0],
-        sample_dt,
+        dt,
         w,
         xi=xi,
         gamma=gamma,
@@ -110,11 +105,7 @@ def test_newmark_estimate_psa(
     )
 
     # Basic checks
-    assert result.shape == (
-        sample_waveforms.shape[0],
-        sample_waveforms.shape[1],
-        len(w),
-    )
+    assert result.shape == (len(sample_waveforms), len(sample_time), len(w))
     assert not np.any(np.isnan(result))
     assert not np.any(np.isinf(result))
 
