@@ -46,7 +46,6 @@ def calculate_snr(
     ko_directory: Path,
     frequencies: np.ndarray = im_calculation.DEFAULT_FREQUENCIES,
     cores: int = multiprocessing.cpu_count(),
-    apply_taper: bool = True,
 ) -> SNRResult:
     """
     Calculates the SNR of a waveform given a tp and common frequency vector
@@ -66,8 +65,6 @@ def calculate_snr(
         by default takes the frequencies from FAS
     cores : int, optional
         Number of cores to use for parallel processing in FAS calculations.
-    apply_taper : bool, optional
-        Whether to apply a taper of 5% to the signal and noise, by default True.
 
     Returns
     -------
@@ -80,27 +77,32 @@ def calculate_snr(
     ValueError
         If the noise duration is less than 1s and so SNR can't be computed.
     """
+    # This extra time is to ensure that when a taper is applied, the signal part of the waveform
+    # is not affected by the tapering. The tapering is applied to the signal and noise separately.
+    tp_extra = waveform[:, tp:].shape[1] / 19
+    # Round up the tp_extra to the nearest highest integer
+    tp_extra = int(np.ceil(tp_extra))
+
     # Calculate signal and noise areas
-    signal_acc, noise_acc = waveform[:, tp:], waveform[:, :tp]
+    signal_acc, noise_acc = waveform[:, tp - tp_extra:], waveform[:, :tp]
     signal_duration, noise_duration = signal_acc.shape[1] * dt, noise_acc.shape[1] * dt
 
     # Ensure the noise is not shorter than 1s, if not then skip the calculation
     if noise_duration < 1:
         raise ValueError("Noise duration is less than 1s")
 
-    # Add the tapering to the signal and noise
-    if apply_taper:
-        taper_signal_acc = (
-            sp.signal.windows.tukey(signal_acc.shape[1], alpha=0.05).reshape(-1, 1)
-            * signal_acc[:]
-        )
-        taper_noise_acc = (
-            sp.signal.windows.tukey(noise_acc.shape[1], alpha=0.05).reshape(-1, 1)
-            * noise_acc[:]
-        )
-    else:
-        taper_signal_acc = signal_acc
-        taper_noise_acc = noise_acc
+    # Apply Taper
+    taper_signal_acc = (
+        sp.signal.windows.tukey(signal_acc.shape[1], alpha=0.05).reshape(-1, 1)
+        * signal_acc[:]
+    )
+    taper_noise_acc = (
+        sp.signal.windows.tukey(noise_acc.shape[1], alpha=0.05).reshape(-1, 1)
+        * noise_acc[:]
+    )
+
+    # Add an assertion check to ensure that the tapering did not affect the signal at tp
+    assert np.all(signal_acc[0, tp] == taper_signal_acc[0, tp])
 
     # Ensure float 32 for the waveform
     taper_signal_acc = taper_signal_acc.astype(np.float32)
