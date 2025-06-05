@@ -12,10 +12,10 @@ import argparse
 import logging
 from pathlib import Path
 
+from qcore import constants, utils
+
 import IM_calculation.IM.im_calculation as calc
 from IM_calculation.Advanced_IM import advanced_IM_factory
-from qcore import constants
-from qcore import utils
 
 
 def load_args():
@@ -50,7 +50,7 @@ def load_args():
         "-i",
         "--identifier",
         required=True,
-        help="Please specify the unique runname of the simulation. " "eg.Albury_REL01",
+        help="Please specify the unique runname of the simulation. eg.Albury_REL01",
     )
     parser.add_argument(
         "-r",
@@ -242,9 +242,17 @@ def main():
         components = args.components
         advanced_im_config = None
 
-    mh = MPIFileHandler.MPIFileHandler(
-        args.output_path.parent / f"{args.identifier}_im_calc.log"
-    )
+    # Create logs directory and individual log file for each MPI process
+    logs_dir = args.output_path.parent / f"{args.identifier}_im_calc_logs"
+    if is_server:
+        utils.setup_dir(logs_dir)
+
+    # Wait for server to create the logs directory before other processes proceed
+    comm.Barrier()
+
+    # Each process gets its own log file
+    log_file_path = logs_dir / f"rank_{rank:04d}.log"
+    mh = MPIFileHandler.MPIFileHandler(log_file_path)
     formatter = logging.Formatter("%(asctime)s:%(name)s:%(levelname)s:%(message)s")
     mh.setFormatter(formatter)
     logger.addHandler(mh)
