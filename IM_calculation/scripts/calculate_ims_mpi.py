@@ -189,7 +189,6 @@ def load_args():
 
 def main():
     from mpi4py import MPI
-    from qcore import MPIFileHandler
 
     comm = MPI.COMM_WORLD
     rank = comm.Get_rank()
@@ -250,12 +249,12 @@ def main():
     # Wait for server to create the logs directory before other processes proceed
     comm.Barrier()
 
-    # Each process gets its own log file
+    # Each process gets its own log file using standard FileHandler
     log_file_path = logs_dir / f"rank_{rank:04d}.log"
-    mh = MPIFileHandler.MPIFileHandler(log_file_path)
+    fh = logging.FileHandler(log_file_path)
     formatter = logging.Formatter("%(asctime)s:%(name)s:%(levelname)s:%(message)s")
-    mh.setFormatter(formatter)
-    logger.addHandler(mh)
+    fh.setFormatter(formatter)
+    logger.addHandler(fh)
     if is_server:
         logger.info("IM_Calc started")
 
