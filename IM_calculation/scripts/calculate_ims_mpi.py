@@ -242,7 +242,7 @@ def main():
         advanced_im_config = None
 
     # Create logs directory and individual log file for each MPI process
-    logs_dir = args.output_path.parent / f"{args.identifier}_im_calc_logs"
+    logs_dir = args.output_path / f"{args.identifier}_im_calc_logs"
     if is_server:
         utils.setup_dir(logs_dir)
 
