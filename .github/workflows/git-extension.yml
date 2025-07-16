@@ -1,4 +1,4 @@
-name: Check requirements.txt git URLs are properly formatted
+name: Check pyproject.toml git URLs are properly formatted
 
 on: pull_request
 
@@ -11,8 +11,55 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: sed -i '/git\+/ { /\.git$/! s/$/.git/ }' requirements.txt
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.x"
+      - name: Check and fix git dependencies
+        run: |
+          python3 << 'EOF'
+          import tomllib
+          from urllib import parse
+          import re
+
+          # Read pyproject.toml
+          with open('pyproject.toml', 'rb') as f:
+              data = tomllib.load(f)
+
+          # Get project dependencies
+          dependencies = data.get('project', {}).get('dependencies', [])
+
+          # Find git dependencies that need .git suffix
+          git_deps_to_fix = []
+
+          for dep in dependencies:
+              # Match git dependencies: git+https://... or git+http://...
+              # Does not include the PIP version specifier.
+              git_match = re.search(r'git\+(https?://[^@\s]+)', dep)
+              if git_match:
+                  git_url = git_match.group(1)
+                  # Extract base URL before any fragment (#subdirectory, etc.)
+                  parse_result = parse.urlparse(git_url)
+                  # Check if it needs .git suffix
+                  if not parse_result.path.endswith('.git'):
+                      fixed_path = parse_result.path + '.git' # add the git suffix
+                      new_url = parse_result._replace(path=fixed_path).geturl()
+                      new_dep = dep.replace(git_url, new_url)
+                      git_deps_to_fix.append((dep, new_dep))
+
+          # Apply fixes to pyproject.toml
+          # This only applies the minimal changes (i.e. it doesn't strip comments, reformat the TOML, etc)
+          if git_deps_to_fix:
+              with open('pyproject.toml', 'r') as f:
+                  content = f.read()
+
+              for original, fixed in git_deps_to_fix:
+                  content = content.replace(original, fixed)
+
+              with open('pyproject.toml', 'w') as f:
+                  f.write(content)
+          EOF
       - uses: parkerbxyz/suggest-changes@v2
         with:
-          comment: 'Please change the following dependencies for consistency.'
-          event: 'REQUEST_CHANGES'
+          comment: "Please change the following dependencies for consistency."
+          event: "REQUEST_CHANGES"
