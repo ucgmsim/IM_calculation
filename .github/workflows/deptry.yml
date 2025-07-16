@@ -1,20 +1,16 @@
 name: Deptry Dependency Check
 
 on: [pull_request]
-
 jobs:
-  test:
+  dependencies:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      # Setup the minimum required python distribution
-      - uses: actions/setup-python@v5
+      # Install uv
+      - uses: astral-sh/setup-uv@v4
         with:
-          python-version: '3.11'
-      - run: pip install -r requirements.txt
+          enable-cache: true
       # Install deptry
-      - run: pip install deptry
-      # Remove pyproject.toml so that deptry doesn't get confused
-      - run: rm pyproject.toml
+      - run: uv sync --dev --all-extras
       # Run deptry to check that all dependencies are present.
-      - run: deptry .
+      - run: uv run deptry .

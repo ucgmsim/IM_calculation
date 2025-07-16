@@ -10,10 +10,22 @@ authors = [
 description = "Intensity Measure Calculation for Ground Motion Waveforms"
 readme = "README.md"
 requires-python = ">=3.11"
-dynamic = ["version", "dependencies"]
+dynamic = ["version"]
+dependencies = [
+  "numba",
+  "numpy",
+  "numexpr",
+  "pandas[hdf5]",
+  "scipy",
+  "pint-xarray",
+  "xarray[io]",
+  "typer>0.12.3",
+  "qcore @ git+https://github.com/ucgmsim/qcore"
+]
 
-[tool.setuptools.dynamic]
-dependencies = {file = ["requirements.txt"]}
+[project.optional-dependencies]
+ko_matrix = ["obspy"]
+test = ["pytest", "hypothesis[numpy]"]
 
 [tool.setuptools.packages.find]
 exclude = ["wiki", "tests"]
