@@ -13,4 +13,4 @@ jobs:
       # Install deptry
       - run: uv pip install deptry
       # Run deptry to check that all dependencies are present.
-      - run: uv run deptry .
+      - run: uv run deptry . -ddg test
