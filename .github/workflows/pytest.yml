@@ -13,13 +13,11 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.x"
+          python-version: 3.11
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -e .
-          pip install pytest-cov  # Install pytest-cov plugin
-          pip install hypothesis  # Install hypothesis
+          pip install -e ".[test]"
 
       - name: Run tests
         run: |
@@ -44,7 +42,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: 3.12
+          python-version: 3.11
 
       - name: Install dependencies
         run: |
