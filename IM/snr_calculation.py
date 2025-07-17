@@ -102,7 +102,7 @@ def calculate_snr(
     )
 
     # Add an assertion check to ensure that the tapering did not affect the signal at tp
-    assert np.all(signal_acc[0, tp] == taper_signal_acc[0, tp])
+    assert np.all(signal_acc[0, tp_extra] == taper_signal_acc[0, tp_extra])
 
     # Ensure float 32 for the waveform
     taper_signal_acc = taper_signal_acc.astype(np.float32)
