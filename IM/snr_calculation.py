@@ -118,9 +118,7 @@ def calculate_snr(
 
     # Calculate the SNR
     with np.errstate(divide="ignore", invalid="ignore"):
-        snr = (fas_signal / signal_duration) / (
-            fas_noise / noise_duration
-        )
+        snr = (fas_signal * noise_duration) / (fas_noise * signal_duration)
 
     # Create SNR DataFrame with 000, 090 and ver
     snr_df = snr.to_dataframe().unstack(level="component")
