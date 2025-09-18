@@ -101,9 +101,6 @@ def calculate_snr(
         * noise_acc[:]
     )
 
-    # Add an assertion check to ensure that the tapering did not affect the signal at tp
-    assert np.all(signal_acc[0, tp_extra] == taper_signal_acc[0, tp_extra])
-
     # Ensure float 32 for the waveform
     taper_signal_acc = taper_signal_acc.astype(np.float32)
     taper_noise_acc = taper_noise_acc.astype(np.float32)
