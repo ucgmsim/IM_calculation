@@ -15,6 +15,7 @@ import numpy.typing as npt
 import pandas as pd
 import scipy as sp
 import xarray as xr
+from pyfftw.interfaces import numpy_fft as fft
 
 from IM import ko_matrices
 
@@ -528,44 +529,11 @@ def fourier_amplitude_spectra(
 
     n_fft = 2 ** int(np.ceil(np.log2(waveforms.shape[1])))
     fa_frequencies = np.fft.rfftfreq(n_fft, dt)
-    fa_spectrum = np.abs(np.fft.rfft(waveforms, n=n_fft, axis=1) * dt)
+    fa_spectrum = np.abs(fft.rfft(waveforms, n=n_fft, axis=1, threads=cores) * dt)
     # Get appropriate konno ohmachi matrix
     konno = ko_matrices.get_konno_matrix(fa_spectrum.shape[1], ko_directory)
 
-    if cores > 1:
-        with multiprocessing.Pool(cores) as pool:
-            fas_0 = np.array(
-                pool.starmap(
-                    dot_product_component,
-                    [
-                        (i, Component.COMP_0.value, fa_spectrum, konno)
-                        for i in range(fa_spectrum.shape[0])
-                    ],
-                ),
-                dtype=np.float32,
-            )
-            fas_90 = np.array(
-                pool.starmap(
-                    dot_product_component,
-                    [
-                        (i, Component.COMP_90.value, fa_spectrum, konno)
-                        for i in range(fa_spectrum.shape[0])
-                    ],
-                ),
-                dtype=np.float32,
-            )
-            fas_ver = np.array(
-                pool.starmap(
-                    dot_product_component,
-                    [
-                        (i, Component.COMP_VER.value, fa_spectrum, konno)
-                        for i in range(fa_spectrum.shape[0])
-                    ],
-                ),
-                dtype=np.float32,
-            )
-        fas_smooth = np.stack((fas_0, fas_90, fas_ver), axis=-1)
-    elif fa_spectrum.shape[0] > 1:
+    if fa_spectrum.shape[0] > 1:
         fas_0 = np.dot(fa_spectrum[:, :, Component.COMP_0.value], konno)
         fas_90 = np.dot(fa_spectrum[:, :, Component.COMP_90.value], konno)
         fas_ver = np.dot(fa_spectrum[:, :, Component.COMP_VER.value], konno)

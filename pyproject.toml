@@ -4,9 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "IM_calculation"
-authors = [
-    {name = "QuakeCoRE" },
-]
+authors = [{ name = "QuakeCoRE" }]
 description = "Intensity Measure Calculation for Ground Motion Waveforms"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -16,11 +14,12 @@ dependencies = [
   "numpy",
   "numexpr",
   "pandas[hdf5]",
+  "pyfftw",
   "scipy",
   "pint-xarray",
   "xarray[io]",
   "typer>0.12.3",
-  "qcore @ git+https://github.com/ucgmsim/qcore.git"
+  "qcore @ git+https://github.com/ucgmsim/qcore.git",
 ]
 
 [project.optional-dependencies]
@@ -55,7 +54,7 @@ extend-select = [
   # Missing function argument type-annotation
   "ANN001",
   # Using except without specifying an exception type to catch
-  "BLE001"
+  "BLE001",
 ]
 
 [tool.ruff.lint.pydocstyle]
@@ -63,14 +62,14 @@ convention = "numpy"
 
 [tool.ruff.lint.isort]
 known-first-party = [
-    "source_modelling",
-    "workflow",
-    "pygmt_helper",
-    "qcore",
-    "empirical",
-    "nshmdb",
-    "IM_calculation",
-    "mera"
+  "source_modelling",
+  "workflow",
+  "pygmt_helper",
+  "qcore",
+  "empirical",
+  "nshmdb",
+  "IM_calculation",
+  "mera",
 ]
 
 [tool.ruff.lint.per-file-ignores]
