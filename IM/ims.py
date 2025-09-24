@@ -458,35 +458,6 @@ def significant_duration(
     return threshold_values.ravel()
 
 
-def dot_product_component(
-    i: int,
-    component: int,
-    fa_spectrum: npt.NDArray[np.float32],
-    konno: npt.NDArray[np.float32],
-) -> npt.NDArray[np.float32]:
-    """
-    Compute the dot product of the Fourier Amplitude Spectrum (FAS) with
-    the Konno-Ohmachi smoothing matrix for a given component.
-
-    Parameters
-    ----------
-    i : int
-        Index of the station.
-    component : int
-        Component index (0 for 000, 1 for 090, 2 for vertical).
-    fa_spectrum : ndarray of float32
-        Fourier Amplitude Spectrum (FAS) array.
-    konno : ndarray of float32
-        Konno-Ohmachi smoothing matrix.
-
-    Returns
-    -------
-    ndarray of float32
-        Smoothed FAS for the given component.
-    """
-    return np.dot(fa_spectrum[i, :, component], konno)
-
-
 def fourier_amplitude_spectra(
         waveforms: npt.NDArray[np.float32],
         dt: float,
