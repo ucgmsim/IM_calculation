@@ -488,11 +488,11 @@ def dot_product_component(
 
 
 def fourier_amplitude_spectra(
-    waveforms: npt.NDArray[np.float32],
-    dt: float,
-    freqs: npt.NDArray[np.float32],
-    ko_directory: Path,
-    cores: int = multiprocessing.cpu_count(),
+        waveforms: npt.NDArray[np.float32],
+        dt: float,
+        freqs: npt.NDArray[np.float32],
+        ko_directory: Path,
+        cores: int = multiprocessing.cpu_count(),
 ) -> xr.DataArray:
     """Compute Fourier Amplitude Spectrum (FAS) of seismic waveforms.
 
@@ -528,43 +528,46 @@ def fourier_amplitude_spectra(
         freqs = freqs[freqs <= nyquist_frequency]
 
     n_fft = 2 ** int(np.ceil(np.log2(waveforms.shape[1])))
+    # Swap the first and last axes to ensure array has shape
+    # (n_components, n_stations, nt) or (n_components, nt).
+    waveforms = np.moveaxis(waveforms, -1, 0)
+    # Essential! Repack the waveform array so that the rows are
+    # contiguous in memory.
+    waveforms = np.ascontiguousarray(waveforms)
     fa_frequencies = np.fft.rfftfreq(n_fft, dt)
-    fa_spectrum = np.abs(fft.rfft(waveforms, n=n_fft, axis=1, threads=cores) * dt)
+    fa_spectrum = np.abs(fft.rfft(waveforms, n=n_fft, axis=-1, threads=cores) * dt)
     # Get appropriate konno ohmachi matrix
-    konno = ko_matrices.get_konno_matrix(fa_spectrum.shape[1], ko_directory)
-
-    if fa_spectrum.shape[0] > 1:
-        fas_0 = np.dot(fa_spectrum[:, :, Component.COMP_0.value], konno)
-        fas_90 = np.dot(fa_spectrum[:, :, Component.COMP_90.value], konno)
-        fas_ver = np.dot(fa_spectrum[:, :, Component.COMP_VER.value], konno)
-        fas_smooth = np.stack((fas_0, fas_90, fas_ver), axis=-1)
-    else:
-        fas_smooth = np.dot(fa_spectrum[0].T, konno)
-        fas_smooth = np.expand_dims(fas_smooth.T, axis=0)
-
+    konno = ko_matrices.get_konno_matrix(fa_spectrum.shape[-1], ko_directory)
+    # For optimal matrix-product calculation, repack the matrix in column-major order
+    # (i.e. Fortran order) to optimise cache efficiency and allow
+    # multi-threaded BLAS if enabled.
+    konno = np.asfortranarray(konno)
+    fas_smooth = fa_spectrum @ konno
+    if np.ndims(fas_smooth) == 2:
+        fas_smooth = np.expand_dims(fas_smooth, axis=1)
     interpolator = sp.interpolate.make_interp_spline(
-        fa_frequencies, fas_smooth, axis=1, k=1
+        fa_frequencies, fas_smooth, axis=-1, k=1
     )
     fas_smooth = interpolator(freqs)
 
     eas = np.sqrt(
         0.5
         * (
-            np.square(fas_smooth[:, :, Component.COMP_0.value])
-            + np.square(fas_smooth[:, :, Component.COMP_90.value])
+            np.square(fas_smooth[Component.COMP_0.value])
+            + np.square(fas_smooth[Component.COMP_90.value])
         )
     )
     geom_fas = np.sqrt(
-        fas_smooth[:, :, Component.COMP_0.value]
-        * fas_smooth[:, :, Component.COMP_90.value]
+        fas_smooth[Component.COMP_0.value]
+        * fas_smooth[Component.COMP_90.value]
     )
 
     return xr.DataArray(
         np.stack(
             [
-                fas_smooth[:, :, Component.COMP_0.value],
-                fas_smooth[:, :, Component.COMP_90.value],
-                fas_smooth[:, :, Component.COMP_VER.value],
+                fas_smooth[Component.COMP_0.value],
+                fas_smooth[Component.COMP_90.value],
+                fas_smooth[Component.COMP_VER.value],
                 geom_fas,
                 eas,
             ],
@@ -575,7 +578,7 @@ def fourier_amplitude_spectra(
         coords={
             "component": ["000", "090", "ver", "geom", "eas"],
             "frequency": freqs,
-            "station": np.arange(waveforms.shape[0]),
+            "station": np.arange(waveforms.shape[1]),
         },
     )
 
