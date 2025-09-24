@@ -543,7 +543,7 @@ def fourier_amplitude_spectra(
     # multi-threaded BLAS if enabled.
     konno = np.asfortranarray(konno)
     fas_smooth = fa_spectrum @ konno
-    if np.ndims(fas_smooth) == 2:
+    if np.ndim(fas_smooth) == 2:
         fas_smooth = np.expand_dims(fas_smooth, axis=1)
     interpolator = sp.interpolate.make_interp_spline(
         fa_frequencies, fas_smooth, axis=-1, k=1
