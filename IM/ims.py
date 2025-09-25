@@ -553,7 +553,7 @@ def fourier_amplitude_spectra(
         coords={
             "component": ["000", "090", "ver", "geom", "eas"],
             "frequency": freqs,
-            "station": np.arange(waveforms.shape[1]),
+            "station": np.arange(fas_smooth.shape[1]),
         },
     )
 
