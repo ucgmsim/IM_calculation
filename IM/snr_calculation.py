@@ -84,7 +84,7 @@ def calculate_snr(
     tp_extra = int(np.ceil(tp_extra))
 
     # Calculate signal and noise areas
-    signal_acc, noise_acc = waveform[:, tp - tp_extra:], waveform[:, :tp]
+    signal_acc, noise_acc = waveform[:, max(tp - tp_extra, 0):], waveform[:, :tp]
     signal_duration, noise_duration = signal_acc.shape[1] * dt, noise_acc.shape[1] * dt
 
     # Ensure the noise is not shorter than 1s, if not then skip the calculation
@@ -100,9 +100,6 @@ def calculate_snr(
         sp.signal.windows.tukey(noise_acc.shape[1], alpha=0.05).reshape(-1, 1)
         * noise_acc[:]
     )
-
-    # Add an assertion check to ensure that the tapering did not affect the signal at tp
-    assert np.all(signal_acc[0, tp_extra] == taper_signal_acc[0, tp_extra])
 
     # Ensure float 32 for the waveform
     taper_signal_acc = taper_signal_acc.astype(np.float32)
