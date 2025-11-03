@@ -175,7 +175,7 @@ def test_pga(comp_0: npt.NDArray[np.float32], expected_pga: float, use_numexpr: 
 
 
 @pytest.mark.parametrize(
-    "comp_0,t_max,expected_pga,use_numexpr",
+    "comp_0,t_max,expected_pgv,use_numexpr",
     [
         (np.ones((100,), dtype=np.float32), 1, 981, True),
         (np.linspace(0, 1, num=100, dtype=np.float32) ** 2, 1, 981 / 3, True),
@@ -196,7 +196,7 @@ def test_pga(comp_0: npt.NDArray[np.float32], expected_pga: float, use_numexpr: 
 def test_pgv(
     comp_0: npt.NDArray[np.float32],
     t_max: float,
-    expected_pga: float,
+    expected_pgv: float,
     use_numexpr: bool,
 ):
     waveforms = np.zeros((1, len(comp_0), 3), dtype=np.float32)
@@ -206,10 +206,41 @@ def test_pgv(
     dt = t_max / (len(comp_0) - 1)
     assert np.isclose(
         ims.peak_ground_velocity(waveforms, dt, use_numexpr=use_numexpr)["000"],
-        expected_pga,
+        expected_pgv,
         atol=0.1,
     )
 
+
+@pytest.mark.parametrize(
+    "comp_0,t_max,expected_pgd,use_numexpr",
+    [
+        (np.ones((100,), dtype=np.float32), 1, 0.5 * 981, True),
+        (np.linspace(0, 1, num=100, dtype=np.float32) ** 2, 1, 0.5 * 981 / 6, True),
+        (
+            2 * np.sin(np.linspace(0, 2 * np.pi, num=100, dtype=np.float32)) - 1,
+            2 * np.pi,
+            7040.69,  # (the trapezoidal result for N=100 samples) - should be 981 * 2 * np.pi * (np.pi - 2)
+            True,
+        ),
+        (
+            2 * np.sin(np.linspace(0, 2 * np.pi, num=100, dtype=np.float32)) - 1,
+            2 * np.pi,
+            7040.69,  # (the trapezoidal result for N=100 samples) - should be 981 * 2 * np.pi * (np.pi - 2)
+            False,
+        ),
+    ],
+)
+def test_pgd(
+    comp_0: npt.NDArray[np.float32],
+    t_max: float,
+    expected_pgd: float,
+    use_numexpr: bool,
+):
+    waveforms = np.zeros((1, len(comp_0), 3), dtype=np.float32)
+    waveforms[:, :, ims.Component.COMP_0] = comp_0
+    dt = t_max / (len(comp_0) - 1)
+    result = ims.peak_ground_displacement(waveforms, dt, use_numexpr=use_numexpr)
+    assert np.isclose(result["000"], expected_pgd, atol=0.1)
 
 @pytest.mark.parametrize(
     "comp_0,t_max,expected_cav,expected_cav5",
