@@ -459,11 +459,11 @@ def significant_duration(
 
 
 def fourier_amplitude_spectra(
-        waveforms: npt.NDArray[np.float32],
-        dt: float,
-        freqs: npt.NDArray[np.float32],
-        ko_directory: Path,
-        cores: int = multiprocessing.cpu_count(),
+    waveforms: npt.NDArray[np.float32],
+    dt: float,
+    freqs: npt.NDArray[np.float32],
+    ko_directory: Path,
+    cores: int = multiprocessing.cpu_count(),
 ) -> xr.DataArray:
     """Compute Fourier Amplitude Spectrum (FAS) of seismic waveforms.
 
@@ -506,7 +506,16 @@ def fourier_amplitude_spectra(
     # contiguous in memory.
     waveforms = np.ascontiguousarray(waveforms)
     fa_frequencies = np.fft.rfftfreq(n_fft, dt)
-    fa_spectrum = np.abs(fft.rfft(waveforms, n=n_fft, axis=-1, threads=cores) * dt)
+    waveform_shape = list(waveforms.shape)
+
+    waveform_shape[-1] = len(fa_frequencies)
+    n_components = waveform_shape[0]
+    fa_spectrum = np.empty(waveform_shape, dtype=waveforms.dtype)
+    for i in range(n_components):
+        fa_spectrum[i] = np.abs(
+            fft.rfft(waveforms[i], n=n_fft, axis=-1, threads=cores) * dt
+        )
+
     # Get appropriate konno ohmachi matrix
     konno = ko_matrices.get_konno_matrix(fa_spectrum.shape[-1], ko_directory)
     # For optimal matrix-product calculation, repack the matrix in column-major order
@@ -533,8 +542,7 @@ def fourier_amplitude_spectra(
         )
     )
     geom_fas = np.sqrt(
-        fas_smooth[Component.COMP_0.value]
-        * fas_smooth[Component.COMP_90.value]
+        fas_smooth[Component.COMP_0.value] * fas_smooth[Component.COMP_90.value]
     )
 
     return xr.DataArray(
