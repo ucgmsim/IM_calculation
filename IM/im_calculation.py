@@ -229,13 +229,14 @@ def calculate_ims(
             result = ims.arias_intensity(waveform, dt)
             result.index = [im.value]
         elif im == IM.FAS:
+            assert ko_directory
             data_array = ims.fourier_amplitude_spectra(
                 waveform,
                 dt,
                 frequencies,
                 cores=cores,
                 # ko_directory must be Path because of the check earlier.
-                ko_directory=typing.cast(Path, ko_directory),
+                ko_directory=ko_directory,
             )
             # Convert the data array to a DataFrame
             result = data_array.to_dataframe().unstack(level="component")
