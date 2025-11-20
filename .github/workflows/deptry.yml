@@ -10,7 +10,5 @@ jobs:
       - uses: astral-sh/setup-uv@v4
       # Install project
       - run: uv sync --dev --all-extras
-      # Install deptry
-      - run: uv pip install deptry
       # Run deptry to check that all dependencies are present.
-      - run: uv run deptry . -ddg test
+      - run: uv run deptry . -ddg test -ddg dev
