@@ -25,6 +25,7 @@ dependencies = [
 [project.optional-dependencies]
 ko_matrix = ["obspy"]
 test = ["pytest", "hypothesis[numpy]", "obspy", "pytest-cov"]
+types = ["pandas-stubs", "scipy-stubs"]
 dev = ["deptry", "ruff", "ty"]
 
 [tool.setuptools.packages.find]
