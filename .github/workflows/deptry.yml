@@ -11,4 +11,4 @@ jobs:
       # Install project
       - run: uv sync --dev --all-extras
       # Run deptry to check that all dependencies are present.
-      - run: uv run deptry . -ddg test,dev
+      - run: uv run deptry . -ddg test,dev,types
