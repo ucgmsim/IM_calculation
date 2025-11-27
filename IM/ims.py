@@ -45,7 +45,7 @@ class IM(StrEnum):
     FAS = "FAS"
 
 
-@numba.njit(cache=True)
+@numba.njit(cache=True, parallel=True)
 def newmark_estimate_psa(
     waveforms: npt.NDArray[np.float32],
     dt: np.float32,
