@@ -84,7 +84,7 @@ def calculate_snr(
     tp_extra = int(np.ceil(tp_extra))
 
     # Calculate signal and noise areas
-    signal_acc, noise_acc = waveform[:, max(tp - tp_extra, 0):], waveform[:, :tp]
+    signal_acc, noise_acc = waveform[:, max(tp - tp_extra, 0) :], waveform[:, :tp]
     signal_duration, noise_duration = signal_acc.shape[1] * dt, noise_acc.shape[1] * dt
 
     # Ensure the noise is not shorter than 1s, if not then skip the calculation
@@ -133,6 +133,10 @@ def calculate_snr(
     fas_noise_df.index = fas_noise.coords["frequency"].values
     fas_noise_df.columns = fas_noise_df.columns.droplevel(0)
     fas_noise_df = fas_noise_df[["000", "090", "ver"]]
+
+    assert isinstance(snr_df, pd.DataFrame)
+    assert isinstance(fas_signal_df, pd.DataFrame)
+    assert isinstance(fas_noise_df, pd.DataFrame)
 
     return SNRResult(
         snr_df, fas_signal_df, fas_noise_df, signal_duration, noise_duration

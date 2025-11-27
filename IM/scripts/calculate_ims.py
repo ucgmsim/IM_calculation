@@ -34,27 +34,23 @@ def calculate_ims_ascii(
             dir_okay=False,
         ),
     ],
-    output_file: Annotated[
-        Path, typer.Argument(dir_okay=False)
-    ],
+    output_file: Annotated[Path, typer.Argument(dir_okay=False)],
     ims_list: Annotated[
         list[im_calculation.IM],
         typer.Argument(),
     ],
-    periods: Annotated[
-        list[float], typer.Option()
-    ] = list(im_calculation.DEFAULT_PERIODS),
-    frequencies: Annotated[
-        list[float], typer.Option()
-    ] = list(im_calculation.DEFAULT_FREQUENCIES),
+    periods: Annotated[list[float], typer.Option()] = list(
+        im_calculation.DEFAULT_PERIODS
+    ),
+    frequencies: Annotated[list[float], typer.Option()] = list(
+        im_calculation.DEFAULT_FREQUENCIES
+    ),
     cores: Annotated[
         int,
         typer.Option(),
     ] = multiprocessing.cpu_count(),
-    ko_directory: Annotated[
-        Path, typer.Option()
-    ] = None,
-):
+    ko_directory: Annotated[Path | None, typer.Option()] = None,
+) -> None:
     """
     Calculate intensity measures for a single ASCII waveform fileset (000, 090, vertical).
 
@@ -79,12 +75,6 @@ def calculate_ims_ascii(
     ko_directory : Path, optional
         Path to the directory containing the Konno-Ohmachi matrices.
         Only required if FAS is in the list of IMs.
-
-    Returns
-    -------
-    pd.DataFrame
-        DataFrame containing the calculated intensity measures.
-        The columns are the IMs and the rows are the different components.
     """
     # Read the ASCII files
     dt, waveform = waveform_reading.read_ascii(file_000, file_090, file_ver)

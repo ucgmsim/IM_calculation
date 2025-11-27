@@ -137,7 +137,7 @@ def calculate_ims(
     periods: np.ndarray = DEFAULT_PERIODS,
     frequencies: np.ndarray = DEFAULT_FREQUENCIES,
     cores: int = multiprocessing.cpu_count(),
-    ko_directory: Path = None,
+    ko_directory: Path | None = None,
     use_numexpr: bool = False,
 ):
     """
@@ -204,7 +204,7 @@ def calculate_ims(
             result.index = [im.value]
         elif im == IM.pSA:
             data_array = ims.pseudo_spectral_acceleration(
-                waveform, periods, dt, cores=cores, use_numexpr=use_numexpr
+                waveform, periods, np.float32(dt), cores=cores, use_numexpr=use_numexpr
             )
             # Convert the data array to a DataFrame
             result = data_array.to_dataframe().unstack(level="component")
@@ -228,8 +228,14 @@ def calculate_ims(
             result = ims.arias_intensity(waveform, dt)
             result.index = [im.value]
         elif im == IM.FAS:
+            assert ko_directory
             data_array = ims.fourier_amplitude_spectra(
-                waveform, dt, frequencies, cores=cores, ko_directory=ko_directory
+                waveform,
+                dt,
+                frequencies,
+                cores=cores,
+                # ko_directory must be Path because of the check earlier.
+                ko_directory=ko_directory,
             )
             # Convert the data array to a DataFrame
             result = data_array.to_dataframe().unstack(level="component")

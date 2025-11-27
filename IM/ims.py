@@ -151,7 +151,8 @@ def rotate_components(
                 "theta": theta[np.newaxis, ...],
                 "comp_090": step_090[..., np.newaxis],
             },
-            out=out,
+            # The out parameter should accept None, but doesn't because of a bug in numexpr
+            out=out,  # type: ignore
         )
     else:
         return np.abs(
@@ -408,7 +409,7 @@ def trapz(
     performance with numba.
     """
     sums = np.zeros((waveforms.shape[0],), np.float32)
-    for i in numba.prange(waveforms.shape[0]):
+    for i in numba.prange(waveforms.shape[0]):  # type: ignore
         for j in range(waveforms.shape[1]):
             if j == 0 or j == waveforms.shape[1] - 1:
                 sums[i] += waveforms[i, j] / 2
@@ -596,7 +597,7 @@ def _cumulative_absolute_velocity(
     cav = np.zeros((waveform.shape[0],), dtype=np.float32)
     dtf = np.float32(dt)
     half = np.float32(0.5)
-    for i in numba.prange(np.int32(waveform.shape[0])):
+    for i in numba.prange(np.int32(waveform.shape[0])):  # type: ignore
         tmp = np.float32(0)
         for j in range(np.int32(waveform.shape[1] - 1)):
             v1 = waveform[i, j]
@@ -633,7 +634,7 @@ def _arias_intensity(
     ai = np.zeros((waveform.shape[0],), dtype=np.float32)
     dtf = np.float32(dt)
     half = np.float32(0.5)
-    for i in numba.prange(np.int32(waveform.shape[0])):
+    for i in numba.prange(np.int32(waveform.shape[0])):  # type: ignore
         tmp = np.float32(0)
         for j in range(np.int32(waveform.shape[1] - 1)):
             v1 = waveform[i, j]
@@ -672,7 +673,7 @@ def _cumulative_arias_intensity(
     ai = np.zeros_like(waveform, dtype=np.float32)
     dtf = np.float32(dt)
     half = np.float32(0.5)
-    for i in numba.prange(np.int32(waveform.shape[0])):
+    for i in numba.prange(np.int32(waveform.shape[0])):  # type: ignore
         tmp = np.float32(0)
         for j in range(np.int32(waveform.shape[1] - 1)):
             v1 = waveform[i, j]
