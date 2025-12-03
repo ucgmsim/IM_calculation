@@ -1,0 +1,15 @@
+[package]
+name = "utils"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+name = "_utils"
+crate-type = ["cdylib"]
+path = "src-rust/lib.rs"
+
+[dependencies]
+ndarray = { version = "0.17.1", features = ["rayon"] }
+num = "0.4.3"
+numpy = "0.27.1"
+pyo3 = "0.27.1"

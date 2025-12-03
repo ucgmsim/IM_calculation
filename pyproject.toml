@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools", "setuptools-scm"]
+requires = ["setuptools", "setuptools-scm", "setuptools-rust>=1.1.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -22,14 +22,22 @@ dependencies = [
   "qcore @ git+https://github.com/ucgmsim/qcore.git",
 ]
 
+[tool.setuptools_scm]
+
+
+[tool.setuptools]
+include-package-data = true
+zip-safe = false
+
 [project.optional-dependencies]
 ko_matrix = ["obspy"]
 test = ["pytest", "hypothesis[numpy]", "obspy", "pytest-cov"]
 types = ["pandas-stubs", "scipy-stubs"]
 dev = ["deptry", "ruff", "ty"]
 
-[tool.setuptools.packages.find]
-exclude = ["wiki", "tests"]
+[tool.setuptools.packages]
+find = { where = ["."], include = ["IM"], exclude = ["wiki", "tests", "src-rust"] }
+
 
 [project.scripts]
 calculate-ims-ascii = "IM.scripts.calculate_ims:app"
@@ -81,3 +89,8 @@ known-first-party = [
 "tests/**.py" = ["D"]
 # Ignore the module name IM
 "IM/__init__.py" = ["N999"]
+
+
+[[tool.setuptools-rust.ext-modules]]
+target = "IM._utils"
+binding = "PyO3"
