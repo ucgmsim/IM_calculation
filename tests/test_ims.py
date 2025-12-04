@@ -373,17 +373,12 @@ def test_all_ims_benchmark(use_numexpr: bool):
         waveform, dt, ko_directory=KO_TEST_DIR, use_numexpr=use_numexpr
     )
 
-    # Compare the results
-    if not np.allclose(result.values, data.values, atol=5e-6, equal_nan=True):
-        print(result)
-        print(result.loc[:, result.columns.str.startswith("pSA")])
-        # Prepare report on columns.
-        for im in result.columns:
-            assert result[im].values == pytest.approx(
-                data[im].values, abs=5e-4, rel=0.01, nan_ok=True
-            ), (
-                f"Results for {im} do not match!"
-            )  # 5e-6 implies rounding to five decimal places
+    for im in result.columns:
+        assert result[im].values == pytest.approx(
+            data[im].values, abs=5e-4, rel=0.01, nan_ok=True
+        ), (
+            f"Results for {im} do not match!\n{result}"
+        )  # 5e-6 implies rounding to five decimal places
 
 
 @pytest.mark.parametrize(
@@ -406,18 +401,12 @@ def test_all_ims_benchmark_edge_cases(resource_dir: Path):
 
     # Calculate the intensity measures
     result = im_calculation.calculate_ims(waveform, dt, ko_directory=KO_TEST_DIR)
-    print(result)
-    # Compare the results
-    if not np.allclose(result.values, data.values, atol=5e-6, equal_nan=True):
-        print(result)
-        print(result.loc[:, result.columns.str.startswith("pSA")])
-        # Prepare report on columns.
-        for im in result.columns:
-            assert result[im].values == pytest.approx(
-                data[im].values, abs=5e-4, rel=0.01, nan_ok=True
-            ), (
-                f"Results for {im} do not match!"
-            )  # 5e-6 implies rounding to five decimal places
+    for im in result.columns:
+        assert result[im].values == pytest.approx(
+            data[im].values, abs=5e-4, rel=0.01, nan_ok=True
+        ), (
+            f"Results for {im} do not match!\n{result}"
+        )  # 5e-6 implies rounding to five decimal places
 
 
 @pytest.mark.parametrize("use_numexpr", [True, False])
