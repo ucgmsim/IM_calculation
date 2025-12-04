@@ -2,23 +2,21 @@ use std::f64::consts::PI;
 
 use ndarray::prelude::*;
 use ndarray::Zip;
-use num::*;
 
 const DEGREES: f64 = PI / 180.0;
 
 /// RotD180 calculations for a single pair of components assuming the absmax reduction function.
 fn rotd_calculation(comp_0: ArrayView1<f64>, comp_90: ArrayView1<f64>) -> (f64, f64, f64) {
-    let mut rotd_values: [f64; 180] = [f64::zero(); 180];
-    for theta in 0..180 {
+    let mut rotd_values: [f64; 180] = [0.0; 180];
+
+    for (theta, result) in rotd_values.iter_mut().enumerate() {
         let theta_f: f64 = theta as f64;
         let theta_rad = theta_f * DEGREES;
         let sin_theta = theta_rad.sin();
         let cos_theta = theta_rad.cos();
-        rotd_values[theta] = Zip::from(comp_0)
-            .and(comp_90)
-            .fold(f64::zero(), |acc, &x, &y| {
-                acc.max((cos_theta * x + sin_theta * y).abs())
-            });
+        *result = Zip::from(comp_0).and(comp_90).fold(0.0, |acc, &x, &y| {
+            acc.max((cos_theta * x + sin_theta * y).abs())
+        });
     }
     let (small, middle, large) = rotd_values.select_nth_unstable_by(90, f64::total_cmp);
     let min = small.iter().min_by(|a, b| a.total_cmp(b)).unwrap();

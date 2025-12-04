@@ -7,6 +7,7 @@ use ndarray::{Ix1, Ix2};
 use num::traits::NumOps;
 use num::{Float, NumCast};
 
+#[allow(clippy::too_many_arguments)]
 fn newmark_beta_solver<F: Float + NumOps + Div + AddAssign>(
     waveform: ArrayView<F, Ix1>,
     dt: F,
