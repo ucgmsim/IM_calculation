@@ -72,10 +72,19 @@ fn choose_gamma_beta<F: Float + NumOps + Div + AddAssign>(dt: F, w: F) -> (F, F)
     let gamma: F = one / two;
 
     let stability_constant_f64 = 0.551328895421792;
-    let stability_constant: F = NumCast::from(stability_constant_f64).unwrap();
+    // Whilst the linear solver is theoretically stable for ratios
+    // dt/T up to 0.551-ish, we want to be a bit more conservative
+    // about when we choose the linear solver instead of the constant
+    // solver. During testing Hence, we pick a conservative 80%. This means we leave
+    // some result accuracy on the table, but I can live with this
+    // because it only affects very short period pSA with large
+    // timesteps.
+    let stability_fraction_f64 = 0.8f64;
+    let effective_stability_constant: F =
+        NumCast::from(stability_fraction_f64 * stability_constant_f64).unwrap();
     let pi_f64 = std::f64::consts::PI;
     let pi = NumCast::from(pi_f64).unwrap();
-    let beta: F = if dt < stability_constant * (two * pi) / w {
+    let beta: F = if dt < effective_stability_constant * (two * pi) / w {
         let beta_linear_f64: f64 = 1.0 / 6.0;
         NumCast::from(beta_linear_f64)
     } else {
