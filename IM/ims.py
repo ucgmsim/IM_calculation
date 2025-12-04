@@ -234,6 +234,7 @@ def pseudo_spectral_acceleration(
         DataArray containing PSA statistics for each
         station, period and component ['000', '090', 'ver', 'geom', 'rotd0', 'rotd50', 'rotd100'].
     """
+    waveforms = np.ascontiguousarray(waveforms)
     angular_frequencies = 2 * np.pi / periods
 
     # Step size *used* to be based on the cores available but that no
