@@ -288,7 +288,7 @@ def pseudo_spectral_acceleration(
 
             z = waveforms[Component.COMP_VER.value, i : i + step].astype(np.float64)
             z_response = _utils._newmark_beta_method(z, dt, w, xi)
-            comp_ver_psa[:, i : i + step] = conversion_factor * np.abs(z_response).max(
+            comp_ver_psa[j, i : i + step] = conversion_factor * np.abs(z_response).max(
                 axis=1
             )
 
