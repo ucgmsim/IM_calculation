@@ -1,3 +1,5 @@
+"""ASCII Waveform reading code."""
+
 from pathlib import Path
 
 import numpy as np

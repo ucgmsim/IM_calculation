@@ -1,3 +1,5 @@
+"""IM calculation script for ascii waveforms"""
+
 import multiprocessing
 import os
 from pathlib import Path

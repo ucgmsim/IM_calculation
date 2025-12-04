@@ -1,3 +1,5 @@
+"""Waveform SNR calculation"""
+
 import multiprocessing
 from pathlib import Path
 from typing import NamedTuple

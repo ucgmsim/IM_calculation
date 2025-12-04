@@ -1,3 +1,5 @@
+"""KO matrix generation module"""
+
 from pathlib import Path
 
 import numpy as np
