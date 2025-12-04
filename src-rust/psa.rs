@@ -260,11 +260,10 @@ mod tests {
         let k = M * w * w;
         let sdof_invariant = M * du2 + c * du + k * u + M * waveform;
         // Skipping the first and last value of u because the differentiation is less accurate at the boundary.
-        let max_deviation =
-            sdof_invariant
-                .slice(s![1..-1])
-                .iter()
-                .fold(0.0, |x, &y| if x < y.abs() { y.abs() } else { x });
+        let max_deviation = sdof_invariant
+            .slice(s![1..sdof_invariant.len() - 1])
+            .iter()
+            .fold(0.0, |x, &y| if x < y.abs() { y.abs() } else { x });
         assert!(
             max_deviation < 5e-4,
             "SDOF equation not solved, invariant = {}, mean deviation = {:?}, max deviation = {}",
