@@ -274,7 +274,7 @@ def pseudo_spectral_acceleration(
                 np.float64
             )
             comp_0_response = _utils._newmark_beta_method(comp_0_chunk, dt, w, xi)
-            comp_90_response = _utils._newmark_beta_method(comp_0_chunk, dt, w, xi)
+            comp_90_response = _utils._newmark_beta_method(comp_90_chunk, dt, w, xi)
             conversion_factor = w * w
 
             rotd_psa[j, i : i + step] = conversion_factor * _utils._rotd_parallel(
