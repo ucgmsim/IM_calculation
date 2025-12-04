@@ -40,7 +40,7 @@ def environment(
     Parameters
     ----------
     **environment : str or bytes
-        environment values to update inside the context manager.
+        Environment values to update inside the context manager.
 
     Yields
     ------
@@ -164,7 +164,7 @@ def rotate_components(
     theta: np.ndarray,
     out: Optional[np.ndarray] = None,
     use_numexpr: bool = True,
-):
+) -> np.ndarray | None:
     """
     Helper function to handle rotation computation using either numexpr or numpy.
 
@@ -180,6 +180,11 @@ def rotate_components(
         Array to store the output of the computation, by default None.
     use_numexpr : bool, optional
         Use numexpr for computation, by default True.
+
+    Returns
+    -------
+    array of floats or None
+        The absolute value of ``cos(theta) * comp_0 + sin(theta) * comp_90``, or
     """
     if use_numexpr:
         return ne.evaluate(
@@ -222,11 +227,9 @@ def pseudo_spectral_acceleration(
         Maximum memory allocation for PSA rotation calculations (bytes).
     cores : int, optional
         Number of CPU cores to use, by default all available cores.
-    use_numexpr : bool, optional
-        Use numexpr for computation, by default True.
     step : int, optional
         Number of steps to use. If `None`, will use the number of cores as the default number of steps.
-    use_tqdm: bool, optional
+    use_tqdm : bool, optional
         If true, show tqdm progress bar.
 
     Returns
@@ -348,6 +351,7 @@ def compute_intensity_measure_rotd(
         DataFrame containing intensity measure statistics. Each row represents
         statistics for a single station.
     """
+
     (stations, _, _) = waveforms.shape
     values = np.zeros(shape=(stations, 180), dtype=waveforms.dtype)
 
@@ -727,7 +731,7 @@ def peak_ground_velocity(
         Acceleration waveforms in g units.
     dt : float
         Timestep resolution of the waveform array.
-    use_numexpr: bool, optional
+    use_numexpr : bool, optional
         Use numexpr for computation, by default True.
 
     Returns
@@ -830,7 +834,7 @@ def ds575(
         Acceleration waveforms (g).
     dt : float
         Timestep resolution of the waveform array (s).
-    use_numexpr: bool, optional
+    use_numexpr : bool, optional
         Use numexpr for computation, by default True.
 
     Returns
@@ -869,7 +873,7 @@ def ds595(
         Acceleration waveforms (g).
     dt : float
         Timestep resolution of the waveform array (s).
-    use_numexpr: bool, optional
+    use_numexpr : bool, optional
         Use numexpr for computation, by default True.
 
     Returns

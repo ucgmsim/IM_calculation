@@ -51,3 +51,22 @@ jobs:
       - run: uv sync --dev --all-extras
       # Run deptry to check that all dependencies are present.
       - run: uv run deptry . -ddg test,dev,types
+
+  numpydoc:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.13" # Adjust version as needed
+
+      - name: Install dependencies
+        run: |
+          pip install numpydoc
+
+      - name: Run Numpydoc Lint
+        run: |
+          fdfind . IM/ -E "__init__.py" --extension py | xargs numpydoc lint

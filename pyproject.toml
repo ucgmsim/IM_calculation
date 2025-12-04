@@ -34,7 +34,7 @@ zip-safe = false
 ko_matrix = ["obspy"]
 test = ["pytest", "hypothesis[numpy]", "obspy", "pytest-cov"]
 types = ["pandas-stubs", "scipy-stubs"]
-dev = ["deptry", "ruff", "ty"]
+dev = ["deptry", "ruff", "ty", "numpydoc"]
 
 [tool.setuptools.packages]
 find = { where = [
@@ -103,3 +103,23 @@ known-first-party = [
 [[tool.setuptools-rust.ext-modules]]
 target = "IM._utils"
 binding = "PyO3"
+
+
+[tool.numpydoc_validation]
+checks = [
+  "GL05",
+  "GL08",
+  "GL10",
+  "PR01",
+  "PR02",
+  "PR03",
+  "PR04",
+  "PR05",
+  "PR06",
+  "PR07",
+  "RT01",
+  "RT02",
+  "RT03",
+  "RT04",
+  "YD01",
+]
