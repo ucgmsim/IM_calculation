@@ -91,6 +91,7 @@ def read_ascii(
     delta = pd.read_csv(file_000, sep=r"\s+", header=None, nrows=2, skiprows=1).iloc[
         0, 1
     ]
+    assert isinstance(delta, float)
 
     if np.any(np.isnan(waveform_data)):
         raise ValueError("Components contain NaN values.")

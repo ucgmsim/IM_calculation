@@ -20,7 +20,10 @@ import tqdm
 import xarray as xr
 from pyfftw.interfaces import numpy_fft as fft
 
-from IM import _utils, ko_matrices
+from IM import (
+    _utils,  # type: ignore[unresolved-import]
+    ko_matrices,
+)
 
 
 @contextmanager
@@ -47,7 +50,7 @@ def environment(
     # Code to acquire resource, e.g.:
     old_environment: dict[str, str] = os.environ.copy()
     try:
-        os.environ.update(environment)
+        os.environ.update(environment)  # type: ignore[no-matching-overload]
         yield os.environ
     finally:
         for key in set(os.environ) - set(old_environment):

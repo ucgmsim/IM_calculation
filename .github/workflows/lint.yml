@@ -1,4 +1,4 @@
-name: Ruff
+name: Lint
 on: [pull_request]
 
 env:
