@@ -36,7 +36,15 @@ types = ["pandas-stubs", "scipy-stubs"]
 dev = ["deptry", "ruff", "ty"]
 
 [tool.setuptools.packages]
-find = { where = ["."], include = ["IM"], exclude = ["wiki", "tests", "src-rust"] }
+find = { where = [
+  ".",
+], include = [
+  "IM",
+], exclude = [
+  "wiki",
+  "tests",
+  "src-rust",
+] }
 
 
 [project.scripts]

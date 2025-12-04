@@ -4,15 +4,6 @@ use ndarray::prelude::*;
 use ndarray::Zip;
 use num::*;
 
-fn absmax(x: f64, y: f64) -> f64 {
-    let y_abs = y.abs();
-    if x < y_abs {
-        y_abs
-    } else {
-        x
-    }
-}
-
 const DEGREES: f64 = PI / 180.0;
 
 /// RotD180 calculations for a single pair of components assuming the absmax reduction function.
@@ -26,12 +17,15 @@ fn rotd_calculation(comp_0: ArrayView1<f64>, comp_90: ArrayView1<f64>) -> (f64, 
         rotd_values[theta] = Zip::from(comp_0)
             .and(comp_90)
             .fold(f64::zero(), |acc, &x, &y| {
-                absmax(acc, cos_theta * x + sin_theta * y)
+                acc.max((cos_theta * x + sin_theta * y).abs())
             });
     }
-    rotd_values.sort_by(|a, b| a.total_cmp(b));
-    let median = (rotd_values[89] + rotd_values[90]) / 2.0;
-    (rotd_values[0], median, rotd_values[179])
+    let (small, middle, large) = rotd_values.select_nth_unstable_by(90, f64::total_cmp);
+    let min = small.iter().min_by(|a, b| a.total_cmp(b)).unwrap();
+    let lower_middle = small.iter().max_by(|a, b| a.total_cmp(b)).unwrap();
+    let max = large.iter().max_by(|a, b| a.total_cmp(b)).unwrap();
+    let median = (lower_middle + *middle) / 2.0;
+    (*min, median, *max)
 }
 
 pub fn rotd_parallel(comp_0: ArrayView2<f64>, comp_90: ArrayView2<f64>) -> Array<f64, Ix2> {
@@ -74,7 +68,7 @@ mod tests {
         );
         assert!(
             (max - expected_max).abs() < 1e-6,
-            "Minimum calculation failed: expected 1.0 +/- 1e-6 found: {}",
+            "Maximum calculation failed: expected 1.0 +/- 1e-6 found: {}",
             max
         );
     }
