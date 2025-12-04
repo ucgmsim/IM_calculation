@@ -17,7 +17,6 @@ from hypothesis.extra import numpy as nst
 from numpy.testing import assert_array_almost_equal
 
 from IM import im_calculation, ims, snr_calculation, waveform_reading
-from IM.ims import IM as IntensityMeasures
 from IM.scripts import gen_ko_matrix
 
 KO_TEST_DIR = Path(__file__).parent / "KO_matrices"

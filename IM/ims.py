@@ -1,16 +1,14 @@
 """Intensity Measure Implementations."""
 
-import gc
 import itertools
 import multiprocessing
 import os
-import time
 import warnings
-from collections.abc import Callable, MutableMapping
+from collections.abc import Callable, Generator, MutableMapping
 from contextlib import contextmanager
 from enum import IntEnum, StrEnum
 from pathlib import Path
-from typing import AnyStr, Generator, Optional
+from typing import AnyStr, Optional
 
 import numba
 import numexpr as ne
