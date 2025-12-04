@@ -1,4 +1,0 @@
-name: Deptry Dependency Check
-
-on: [pull_request]
-jobs:
