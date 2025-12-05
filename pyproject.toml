@@ -32,7 +32,7 @@ zip-safe = false
 
 [project.optional-dependencies]
 ko_matrix = ["obspy"]
-test = ["pytest", "hypothesis[numpy]", "obspy", "pytest-cov"]
+test = ["pytest", "hypothesis[numpy]", "pytest-cov", "rich>=14.2.0"]
 types = ["pandas-stubs", "scipy-stubs"]
 dev = ["deptry", "ruff", "ty", "numpydoc"]
 
