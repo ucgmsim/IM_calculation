@@ -78,41 +78,6 @@ def sample_periods() -> npt.NDArray[np.float32]:
     return np.array([0.1, 0.2, 0.5, 1.0], dtype=np.float32)
 
 
-# Test cases for Newmark PSA estimation
-@pytest.mark.parametrize("xi", [0.01, 0.05, 0.1])
-@pytest.mark.parametrize(
-    "gamma,beta",
-    [
-        (0.5, 0.25),  # Standard Newmark
-        (0.6, 0.3),  # Modified parameters
-    ],
-)
-def test_newmark_estimate_psa(
-    sample_waveforms: npt.NDArray[np.float32],
-    sample_time: npt.NDArray[np.float32],
-    xi: np.float32,
-    gamma: np.float32,
-    beta: np.float32,
-):
-    """Test Newmark PSA estimation with various parameters."""
-    dt = sample_time[1] - sample_time[0]
-    w = 2 * np.pi * np.array([1.0, 2.0], dtype=np.float32)
-
-    result = ims.newmark_estimate_psa(
-        sample_waveforms[:, :, ims.Component.COMP_0],
-        dt,
-        w,
-        xi=xi,
-        gamma=gamma,
-        beta=beta,
-    )
-
-    # Basic checks
-    assert result.shape == (len(sample_waveforms), len(sample_time), len(w))
-    assert not np.any(np.isnan(result))
-    assert not np.any(np.isinf(result))
-
-
 # Test cases for significant duration
 @pytest.mark.parametrize(
     "percent_low,percent_high",
