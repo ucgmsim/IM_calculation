@@ -58,10 +58,15 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v5
 
+      - uses: awalsh128/cache-apt-pkgs-action@latest
+        with:
+          packages: fd-find
+          version: 1.0
+
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: "3.13" # Adjust version as needed
+          python-version: "3.13"
 
       - name: Install dependencies
         run: |
