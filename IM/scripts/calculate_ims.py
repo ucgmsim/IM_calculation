@@ -1,3 +1,5 @@
+"""ASCII IM Calculation script - entrypoint"""
+
 import multiprocessing
 from pathlib import Path
 from typing import Annotated

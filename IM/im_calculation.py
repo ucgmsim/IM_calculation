@@ -1,3 +1,5 @@
+"""IM calculation script for ascii waveforms"""
+
 import multiprocessing
 import os
 from pathlib import Path
@@ -204,7 +206,7 @@ def calculate_ims(
             result.index = [im.value]
         elif im == IM.pSA:
             data_array = ims.pseudo_spectral_acceleration(
-                waveform, periods, np.float32(dt), cores=cores, use_numexpr=use_numexpr
+                np.moveaxis(waveform, -1, 0), periods, np.float64(dt), cores=cores
             )
             # Convert the data array to a DataFrame
             result = data_array.to_dataframe().unstack(level="component")
