@@ -206,7 +206,7 @@ def calculate_ims(
             result.index = [im.value]
         elif im == IM.pSA:
             data_array = ims.pseudo_spectral_acceleration(
-                waveform.reshape((3, 1, -1)), periods, np.float64(dt), cores=cores
+                np.moveaxis(waveform, -1, 0), periods, np.float64(dt), cores=cores
             )
             # Convert the data array to a DataFrame
             result = data_array.to_dataframe().unstack(level="component")
