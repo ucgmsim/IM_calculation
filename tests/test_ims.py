@@ -15,6 +15,9 @@ from hypothesis import assume, given, settings
 from hypothesis import strategies as st
 from hypothesis.extra import numpy as nst
 from numpy.testing import assert_array_almost_equal
+from rich import box
+from rich.console import Console
+from rich.table import Table
 
 from IM import im_calculation, ims, snr_calculation, waveform_reading
 from IM.scripts import gen_ko_matrix
@@ -386,11 +389,113 @@ def test_all_ims_benchmark(use_numexpr: bool) -> None:
         )  # 5e-6 implies rounding to five decimal places
 
 
+BENCHMARK_CASES = [
+    d for d in (Path(__file__).parent / "resources").iterdir() if d.is_dir()
+]
+
+
+def print_diff_table(
+    df_old: pd.DataFrame,
+    df_new: pd.DataFrame,
+    title: str = "DataFrame Difference",
+    chunk_size: int | None = None,
+) -> None:
+    """Prints a Rich table of the differences between two dataframes.
+
+    Parameters
+    ----------
+    df_old : pd.DataFrame
+        The old dataframe to compare to.
+    df_new : pd.DataFrame
+        The new result dataframe.
+    title : str
+        Title for the comparison table.
+    chunk_size : int | None
+        Number of columns to show per line.
+    """
+
+    console = Console()
+
+    df_old, df_new = df_old.align(df_new, join="outer", axis=None)
+    diff_abs = df_new - df_old
+
+    with np.errstate(divide="ignore", invalid="ignore"):
+        diff_rel: pd.DataFrame = (df_new - df_old) / df_old
+
+    all_columns = df_new.columns.tolist()
+    if chunk_size is None or chunk_size <= 0:
+        column_chunks = [all_columns]
+    else:
+        column_chunks = [
+            all_columns[i : i + chunk_size]
+            for i in range(0, len(all_columns), chunk_size)
+        ]
+
+    for i, cols in enumerate(column_chunks):
+        current_title = title
+        if len(column_chunks) > 1:
+            current_title = f"{title} (Part {i + 1}/{len(column_chunks)})"
+
+        table = Table(title=current_title, box=box.ROUNDED)
+
+        table.add_column("Index", style="cyan", no_wrap=True)
+
+        for col in cols:
+            table.add_column(str(col), justify="right")
+
+        for index, row in diff_abs.iterrows():
+            assert isinstance(index, str)
+            row_cells = [index]
+
+            for col in cols:
+                val_abs = row[col]
+                assert isinstance(col, str)
+                val_rel = diff_rel.at[index, col]
+                assert isinstance(val_rel, float)
+
+                if pd.isna(val_abs):
+                    text_display = "-"
+                else:
+                    text_display = (
+                        f"{val_abs:+3g}"
+                        if isinstance(val_abs, (int, float))
+                        else str(val_abs)
+                    )
+
+                style = ""
+
+                if pd.isna(val_rel):
+                    style = "dim"
+                elif abs(val_rel) < 0.05 or abs(val_abs) < 1e-6:
+                    style = "dim"  # Plain/Dim for no change
+                elif val_rel >= 0.20:
+                    # Strong Red for >= +20%
+                    style = "bold white on red"
+                elif val_rel > 0:
+                    # Light Red/Salmon for positive but < 20%
+                    style = "black on #ffcccb"
+                elif val_rel <= -0.20:
+                    # Strong Blue for <= -20%
+                    style = "bold white on blue"
+                elif val_rel < 0:
+                    # Light Blue for negative but > -20%
+                    style = "black on #add8e6"
+
+                # Append the cell with style
+                row_cells.append(f"[{style}]{text_display}[/{style}]")
+
+            table.add_row(*row_cells)
+
+        console.print(table)
+        # Add a little spacing between chunks
+        if i < len(column_chunks) - 1:
+            console.print("")
+
+
 @pytest.mark.parametrize(
-    "resource_dir",
-    [d for d in (Path(__file__).parent / "resources").iterdir() if d.is_dir()],
+    "resource_dir", BENCHMARK_CASES, ids=[d.stem for d in BENCHMARK_CASES]
 )
-def test_all_ims_benchmark_edge_cases(resource_dir: Path):
+def test_all_ims_benchmark_edge_cases(resource_dir: Path) -> None:
     """Compare benchmark IM calculation against current implementation for each directory in resources for edge cases."""
     # Load the benchmark DataFrame
     benchmark_ffp = resource_dir / "im_benchmark.csv"
@@ -403,9 +508,40 @@ def test_all_ims_benchmark_edge_cases(resource_dir: Path):
 
     # Read the files to a waveform array that's readable by IM Calculation
     dt, waveform = waveform_reading.read_ascii(comp_000_ffp, comp_090_ffp, comp_ver_ffp)
+    nt = waveform.shape[1]
+    im_list = [
+        ims.IM.PGA,
+        ims.IM.PGV,
+        ims.IM.CAV,
+        ims.IM.CAV5,
+        ims.IM.Ds575,
+        ims.IM.Ds595,
+        ims.IM.AI,
+        ims.IM.pSA,
+    ]
+    # If the record is too long the test will fail because of missing KO matrices
+    print(np.ceil(np.log2(nt)))
+    have_ko_matrix = np.ceil(np.log2(nt)) < 15
+    if have_ko_matrix:
+        im_list.append(ims.IM.FAS)
 
     # Calculate the intensity measures
-    result = im_calculation.calculate_ims(waveform, dt, ko_directory=KO_TEST_DIR)
+    result = im_calculation.calculate_ims(
+        waveform, dt, ims_list=im_list, ko_directory=KO_TEST_DIR
+    )
+    if not np.allclose(
+        result.values,
+        data.loc[result.index, result.columns].values,
+        atol=5e-4,
+        rtol=0.01,
+    ):
+        print_diff_table(
+            data.loc[:, data.columns.str.startswith("pSA")],  # type: ignore[invalid-argument]
+            result.loc[:, result.columns.str.startswith("pSA")],
+            title=f"Differences for {resource_dir.stem}",
+            chunk_size=8,
+        )
+
     for im in result.columns:
         assert result[im].values == pytest.approx(
             data[im].values, abs=5e-4, rel=0.01, nan_ok=True
