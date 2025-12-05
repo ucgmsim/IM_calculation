@@ -23,7 +23,7 @@ KO_TEST_DIR = Path(__file__).parent / "KO_matrices"
 
 
 @pytest.fixture(scope="session", autouse=True)
-def generate_ko_matrices(request: pytest.FixtureRequest):
+def generate_ko_matrices(request: pytest.FixtureRequest) -> None:
     """
     Generate the KO matrices for testing, also test that the KO matrix gen script works.
     """
@@ -32,7 +32,7 @@ def generate_ko_matrices(request: pytest.FixtureRequest):
     gen_ko_matrix.main(KO_TEST_DIR, num_to_gen=12)
 
     # Add finalizer to remove the KO matrices directory
-    def remove_ko_matrices():
+    def remove_ko_matrices() -> None:
         for file in KO_TEST_DIR.glob("*"):
             file.unlink()
         KO_TEST_DIR.rmdir()
@@ -42,13 +42,13 @@ def generate_ko_matrices(request: pytest.FixtureRequest):
 
 # Common test fixtures
 @pytest.fixture
-def sample_time():
+def sample_time() -> npt.NDArray[np.float32]:
     """Generate sample time array."""
     return np.arange(0, 1, 0.01, dtype=np.float32)
 
 
 @pytest.fixture
-def sample_waveforms():
+def sample_waveforms() -> npt.NDArray[np.float32]:
     """Generate sample waveform data for testing."""
     t = np.arange(0, 1, 0.01, dtype=np.float32)
     freq = 5.0  # Hz
@@ -70,7 +70,7 @@ def sample_waveforms():
 
 
 @pytest.fixture
-def sample_periods():
+def sample_periods() -> npt.NDArray[np.float32]:
     """Generate sample periods for PSA calculation."""
     return np.array([0.1, 0.2, 0.5, 1.0], dtype=np.float32)
 
@@ -124,7 +124,7 @@ def test_significant_duration(
     sample_time: npt.NDArray[np.float32],
     percent_low: float,
     percent_high: float,
-):
+) -> None:
     """Test significant duration calculation."""
     dt = 0.01
 
@@ -147,7 +147,9 @@ def test_significant_duration(
         (2 * np.sin(np.linspace(0, 2 * np.pi)) - 1, 3, False),
     ],
 )
-def test_pga(comp_0: npt.NDArray[np.float32], expected_pga: float, use_numexpr: bool):
+def test_pga(
+    comp_0: npt.NDArray[np.float32], expected_pga: float, use_numexpr: bool
+) -> None:
     waveforms = np.zeros((1, len(comp_0), 3), dtype=np.float32)
     waveforms[:, :, ims.Component.COMP_0] = comp_0
     assert np.isclose(
@@ -181,7 +183,7 @@ def test_pgv(
     t_max: float,
     expected_pga: float,
     use_numexpr: bool,
-):
+) -> None:
     waveforms = np.zeros((1, len(comp_0), 3), dtype=np.float32)
     waveforms[:, :, ims.Component.COMP_0] = comp_0
     # NOTE: This dt calculation is correct, if dt = 1 / len(comp_0) then dt
@@ -217,7 +219,7 @@ def test_cav(
     t_max: float,
     expected_cav: float,
     expected_cav5: Optional[float],
-):
+) -> None:
     waveforms = np.zeros((1, len(comp_0), 3), dtype=np.float32)
     waveforms[:, :, ims.Component.COMP_0] = comp_0
     dt = t_max / (len(comp_0) - 1)
@@ -239,14 +241,16 @@ def test_cav(
         (np.linspace(0, 1, num=100, dtype=np.float32) ** 2, 1, np.pi * 9.81 / (2 * 5)),
     ],
 )
-def test_ai_values(comp_0: npt.NDArray[np.float32], t_max: float, expected_ai: float):
+def test_ai_values(
+    comp_0: npt.NDArray[np.float32], t_max: float, expected_ai: float
+) -> None:
     waveforms = np.zeros((1, len(comp_0), 3), dtype=np.float32)
     waveforms[:, :, ims.Component.COMP_0] = comp_0
     dt = t_max / (len(comp_0) - 1)
     assert np.isclose(ims.arias_intensity(waveforms, dt)["000"], expected_ai, atol=0.1)
 
 
-def test_psa():
+def test_psa() -> None:
     comp_0 = np.ones((100,), dtype=np.float32)
     waveforms = np.zeros((3, 2, len(comp_0)), dtype=np.float32)
     waveforms[ims.Component.COMP_0, 0] = comp_0
@@ -267,7 +271,7 @@ def test_psa():
 
 
 @pytest.mark.parametrize("cores", [1, multiprocessing.cpu_count()])
-def test_fas_benchmark(cores: int):
+def test_fas_benchmark(cores: int) -> None:
     """Compare benchmark FAS calculation against current implementation."""
     # Load the data array
     data_array_ffp = Path(__file__).parent / "resources" / "fas_benchmark.nc"
@@ -292,7 +296,7 @@ def test_fas_benchmark(cores: int):
 
 
 @pytest.mark.parametrize("cores", [1, multiprocessing.cpu_count()])
-def test_fas_multiple_stations_benchmark(cores: int):
+def test_fas_multiple_stations_benchmark(cores: int) -> None:
     """Compare benchmark FAS calculation with multiple stations against current implementation."""
     # Load the data array
     data_array_ffp = Path(__file__).parent / "resources" / "fas_benchmark.nc"
@@ -324,7 +328,7 @@ def test_fas_multiple_stations_benchmark(cores: int):
         )
 
 
-def test_snr_benchmark():
+def test_snr_benchmark() -> None:
     """Compare benchmark SNR calculation against current implementation."""
     # Load the DataFrame
     benchmark_ffp = Path(__file__).parent / "resources" / "snr_benchmark.csv"
@@ -348,11 +352,13 @@ def test_snr_benchmark():
     )
 
     # Compare the results
-    assert_array_almost_equal(data, snr_result_ims, decimal=5)
+    assert_array_almost_equal(
+        data.values.astype(float), snr_result_ims.values.astype(float), decimal=5
+    )
 
 
 @pytest.mark.parametrize("use_numexpr", [True, False])
-def test_all_ims_benchmark(use_numexpr: bool):
+def test_all_ims_benchmark(use_numexpr: bool) -> None:
     """Compare benchmark IM calculation against current implementation."""
     # Load the DataFrame
     benchmark_ffp = Path(__file__).parent / "resources" / "im_benchmark.csv"
@@ -409,7 +415,7 @@ def test_all_ims_benchmark_edge_cases(resource_dir: Path):
 
 
 @pytest.mark.parametrize("use_numexpr", [True, False])
-def test_ds5xx(use_numexpr: bool):
+def test_ds5xx(use_numexpr: bool) -> None:
     comp_0 = np.ones((100,), dtype=np.float32)
     waveforms = np.zeros((1, len(comp_0), 3), dtype=np.float32)
     waveforms[:, :, ims.Component.COMP_0] = comp_0
@@ -435,7 +441,7 @@ def test_peak_ground_parameters(
     sample_waveforms: npt.NDArray[np.float32],
     sample_time: npt.NDArray[np.float32],
     func: Callable,
-):
+) -> None:
     """Test peak ground motion parameter calculations."""
     dt = sample_time[1] - sample_time[0]
 
@@ -457,7 +463,7 @@ def test_peak_ground_parameters(
 # Test cases for Arias Intensity
 def test_arias_intensity(
     sample_waveforms: npt.NDArray[np.float32], sample_time: npt.NDArray[np.float32]
-):
+) -> None:
     """Test Arias Intensity calculation."""
     dt = sample_time[1] - sample_time[0]
 
@@ -469,7 +475,9 @@ def test_arias_intensity(
     # Check values
     assert np.all(result.select_dtypes(include=[np.number]) >= 0)
     # Check geom calculation
-    assert_array_almost_equal(result["geom"], np.sqrt(result["000"] * result["090"]))
+    assert_array_almost_equal(
+        result["geom"].to_numpy(float), np.sqrt(result["000"] * result["090"])
+    )
 
 
 # Test cases for Fourier Amplitude Spectra
@@ -478,7 +486,7 @@ def test_fourier_amplitude_spectra(
     sample_waveforms: npt.NDArray[np.float32],
     sample_time: npt.NDArray[np.float32],
     n_freqs: int,
-):
+) -> None:
     """Test Fourier Amplitude Spectra calculation."""
     dt = sample_time[1] - sample_time[0]
     freqs = np.logspace(-1, 1, n_freqs, dtype=np.float32)
@@ -504,7 +512,7 @@ def test_fourier_amplitude_spectra(
     assert np.allclose(result_mp.as_numpy(), result_sc.as_numpy())
 
 
-def test_nyquist_frequency():
+def test_nyquist_frequency() -> None:
     # Define test parameters
     n_stations = 2
     n_timesteps = 1024
@@ -537,7 +545,7 @@ def test_nyquist_frequency():
         (2, 100),  # Missing component dimension
     ],
 )
-def test_invalid_waveform_shapes(invalid_shape: tuple[int, ...]):
+def test_invalid_waveform_shapes(invalid_shape: tuple[int, ...]) -> None:
     """Test handling of invalid waveform shapes."""
     waveforms = np.zeros(invalid_shape, dtype=np.float32)
 
@@ -546,7 +554,7 @@ def test_invalid_waveform_shapes(invalid_shape: tuple[int, ...]):
 
 
 # Edge cases
-def test_zero_waveform():
+def test_zero_waveform() -> None:
     """Test behavior with zero-amplitude waveforms."""
     waveforms = np.zeros((2, 100, 3), dtype=np.float32)
 
@@ -558,7 +566,7 @@ def test_zero_waveform():
 
 
 @pytest.mark.parametrize("duration", [100, 200, 1000])
-def test_numerical_stability(duration: int):
+def test_numerical_stability(duration: int) -> None:
     """Test numerical stability with different duration lengths."""
     dt = 0.01
     t = np.arange(0, duration * dt, dt, dtype=np.float32)
@@ -569,9 +577,9 @@ def test_numerical_stability(duration: int):
     result = ims.peak_ground_acceleration(waveforms)
 
     # Maximum should be close to 1.0 regardless of duration
-    assert_array_almost_equal(result["000"], 1.0, decimal=5)
+    assert_array_almost_equal(result["000"].to_numpy(float), 1.0, decimal=5)
     # The others should just be 0.0
-    assert_array_almost_equal(result["090"], 0.0, decimal=5)
+    assert_array_almost_equal(result["090"].to_numpy(float), 0.0, decimal=5)
 
 
 @given(
@@ -591,7 +599,9 @@ def test_numerical_stability(duration: int):
     ),
 )
 @settings(deadline=None)
-def test_rotational_invariance(waveform: npt.NDArray[np.float32], func: Callable):
+def test_rotational_invariance(
+    waveform: npt.NDArray[np.float32], func: Callable
+) -> None:
     # DS595 and DS575 won't work if the waveform has values that are too small.
     assume(
         all(
@@ -633,18 +643,18 @@ def test_rotational_invariance(waveform: npt.NDArray[np.float32], func: Callable
     ),
 )
 @settings(deadline=None)
-def test_component_orientation(waveform: npt.NDArray[np.float32]):
+def test_component_orientation(waveform: npt.NDArray[np.float32]) -> None:
     waveform_ims = ims.peak_ground_acceleration(waveform)
 
     assert_array_almost_equal(
-        waveform_ims["000"],
+        waveform_ims["000"].to_numpy(float),
         np.abs(waveform[:, :, ims.Component.COMP_0]).max(axis=1),
     )
     assert_array_almost_equal(
-        waveform_ims["090"],
+        waveform_ims["090"].to_numpy(float),
         np.abs(waveform[:, :, ims.Component.COMP_90]).max(axis=1),
     )
     assert_array_almost_equal(
-        waveform_ims["ver"],
+        waveform_ims["ver"].to_numpy(float),
         np.abs(waveform[:, :, ims.Component.COMP_VER]).max(axis=1),
     )
