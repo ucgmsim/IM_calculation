@@ -348,7 +348,7 @@ def test_all_ims_benchmark(use_numexpr: bool) -> None:
 
     for im in result.columns:
         assert result[im].values == pytest.approx(
-            data[im].values, abs=5e-4, rel=0.01, nan_ok=True
+            data.loc[result.index, im].values, abs=5e-4, rel=0.01, nan_ok=True
         ), (
             f"Results for {im} do not match!\n{result}"
         )  # 5e-6 implies rounding to five decimal places
@@ -509,7 +509,7 @@ def test_all_ims_benchmark_edge_cases(resource_dir: Path) -> None:
 
     for im in result.columns:
         assert result[im].values == pytest.approx(
-            data[im].values, abs=5e-4, rel=0.01, nan_ok=True
+            data.loc[result.index, im].values, abs=5e-4, rel=0.01, nan_ok=True
         ), (
             f"Results for {im} do not match!\n{result}"
         )  # 5e-6 implies rounding to five decimal places
