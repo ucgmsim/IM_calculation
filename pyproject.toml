@@ -7,7 +7,7 @@ name = "IM_calculation"
 authors = [{ name = "QuakeCoRE" }]
 description = "Intensity Measure Calculation for Ground Motion Waveforms"
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.11,<3.14"
 dynamic = ["version"]
 dependencies = [
   "numba",
