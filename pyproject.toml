@@ -64,13 +64,13 @@ convention = "numpy"
 
 [tool.ruff.lint.isort]
 known-first-party = [
-  "source-modelling",
+  "source_modelling",
   "workflow",
-  "pygmt-helper",
-  "qcore-utils",
+  "pygmt_helper",
+  "qcore",
   "empirical",
   "nshmdb",
-  "im-calculation",
+  "IM",
   "mera",
 ]
 
