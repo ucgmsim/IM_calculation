@@ -3,8 +3,8 @@ requires = ["setuptools", "setuptools-scm"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "IM_calculation"
-authors = [{ name = "QuakeCoRE" }]
+name = "im-calculation"
+authors = [{ name = "ucgmsim" }]
 description = "Intensity Measure Calculation for Ground Motion Waveforms"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -64,13 +64,13 @@ convention = "numpy"
 
 [tool.ruff.lint.isort]
 known-first-party = [
-  "source_modelling",
+  "source-modelling",
   "workflow",
-  "pygmt_helper",
-  "qcore",
+  "pygmt-helper",
+  "qcore-utils",
   "empirical",
   "nshmdb",
-  "IM_calculation",
+  "im-calculation",
   "mera",
 ]
 
