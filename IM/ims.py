@@ -8,7 +8,7 @@ from collections.abc import Callable, Generator, MutableMapping
 from contextlib import contextmanager
 from enum import IntEnum, StrEnum
 from pathlib import Path
-from typing import AnyStr, Optional
+from typing import Optional
 
 import numba
 import numexpr as ne
@@ -28,18 +28,18 @@ from IM import (
 
 @contextmanager
 def environment(
-    **environment: AnyStr,
+    **variables: str,
     # NOTE: the type here could be the os._Environ type defined in the
     # os module, but this means we don't rely on any specific
     # behaviour of that object which might change later down the line
     # (or indeed, they may remove the os._Environ object at any time
     # because it is an internal class).
-) -> Generator[MutableMapping[AnyStr, AnyStr]]:
+) -> Generator[MutableMapping[str, str]]:
     """Update an environment and revert after exit
 
     Parameters
     ----------
-    **environment : str or bytes
+    **variables : str or bytes
         Environment values to update inside the context manager.
 
     Yields
@@ -50,7 +50,7 @@ def environment(
     # Code to acquire resource, e.g.:
     old_environment: dict[str, str] = os.environ.copy()
     try:
-        os.environ.update(environment)  # type: ignore[no-matching-overload]
+        os.environ.update(variables)  # type: ignore[no-matching-overload]
         yield os.environ
     finally:
         for key in set(os.environ) - set(old_environment):
