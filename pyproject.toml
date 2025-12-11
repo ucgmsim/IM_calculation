@@ -22,6 +22,8 @@ dependencies = [
   "qcore-utils>=2025.12.1",
 ]
 
+[tool.setuptools_scm]
+
 [project.optional-dependencies]
 ko_matrix = ["obspy"]
 test = ["pytest", "hypothesis[numpy]", "obspy", "pytest-cov"]
