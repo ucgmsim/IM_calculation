@@ -19,7 +19,7 @@ dependencies = [
   "pint-xarray",
   "xarray[io]",
   "typer>0.12.3",
-  "qcore @ git+https://github.com/ucgmsim/qcore.git",
+  "qcore-utils>=2025.12.1",
 ]
 
 [project.optional-dependencies]
