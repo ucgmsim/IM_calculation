@@ -19,8 +19,8 @@ dependencies = [
   "pint-xarray",
   "xarray[io]",
   "typer>0.12.3",
-  "qcore-utils",
   "tqdm>=4.67.1",
+  "qcore-utils>=2025.12.1",
 ]
 
 [tool.setuptools_scm]
