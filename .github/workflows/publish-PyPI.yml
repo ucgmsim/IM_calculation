@@ -1,0 +1,95 @@
+name: Publish to PyPI
+run-name: Publish Python Package to PyPI for release ${{ github.event.release.tag_name || inputs.tag_name || github.ref_name }}
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: 'Git tag to checkout and publish'
+        required: false
+        type: string
+
+jobs:
+  build:
+    name: Build distribution 📦
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag_name || github.ref }}
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+        
+      - name: Install Rust
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        
+      - name: Install Rust targets for macOS
+        if: matrix.os == 'macos-latest'
+        run: |
+          rustup target add x86_64-apple-darwin
+          rustup target add aarch64-apple-darwin
+        
+      - name: Build wheels
+        uses: pypa/cibuildwheel@v2.22
+        env:
+          CIBW_SKIP: "pp* *-musllinux_*"  # Skip PyPy and musl builds
+          CIBW_ARCHS_MACOS: "x86_64 arm64"  # Build for Intel and Apple Silicon
+          CIBW_ARCHS_WINDOWS: "AMD64"
+          CIBW_ARCHS_LINUX: "x86_64"
+          # This is needed as for linux the wheel build process happens inside a container instead of the Github runner
+          # See https://cibuildwheel.pypa.io/en/stable/platforms/#linux-containers
+          CIBW_BEFORE_ALL_LINUX: "curl https://sh.rustup.rs -sSf | sh -s -- --default-toolchain stable -y && source $HOME/.cargo/env"
+          CIBW_ENVIRONMENT_LINUX: 'PATH="$HOME/.cargo/bin:$PATH"'
+          # Required to build wheels with Rust extensions on macOS
+          # See https://cibuildwheel.pypa.io/en/stable/platforms/#macos-version-compatibility
+          MACOSX_DEPLOYMENT_TARGET: "10.12"
+
+      - name: Build source distribution (Linux only)
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          python3 -m pip install build
+          python3 -m build --sdist
+
+      - name: Store the distribution packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: python-package-distributions-${{ matrix.os }}
+          path: |
+            wheelhouse/*.whl
+            dist/*.tar.gz
+          if-no-files-found: error
+
+  publish-to-pypi:
+    name: Publish to PyPI
+    needs:
+    - build
+    runs-on: ubuntu-latest
+
+    environment:
+      name: pypi
+      url: https://pypi.org/p/im-calculation
+
+    permissions:
+      id-token: write
+
+    steps:
+    - name: Download all the dists
+      uses: actions/download-artifact@v4
+      with:
+        pattern: python-package-distributions-*
+        merge-multiple: true
+        path: dist/
+        
+    - name: Publish distribution to PyPI
+      uses: pypa/gh-action-pypi-publish@release/v1

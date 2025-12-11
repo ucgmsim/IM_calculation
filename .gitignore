@@ -22,3 +22,4 @@ runs/
 
 # special cases to unignore
 !periods.out
+.venv/
