@@ -20,7 +20,7 @@ jobs:
 
       - name: Run tests
         run: |
-          pytest --cov=IM --cov-report=html tests
+          uv run pytest --cov=IM --cov-report=html tests
 
       - name: Upload coverage data
         uses: actions/upload-artifact@v4
