@@ -93,7 +93,7 @@ known-first-party = [
 
 [tool.ruff.lint.per-file-ignores]
 # Ignore no docstring in __init__.py
-"__init__.py" = ["D104"]
+"__init__.py" = ["D104", "N999"]
 # Ignore docstring errors in tests folder
 "tests/**.py" = ["D"]
 # Ignore the module name IM
