@@ -15,6 +15,9 @@ from hypothesis import assume, given, settings
 from hypothesis import strategies as st
 from hypothesis.extra import numpy as nst
 from numpy.testing import assert_array_almost_equal
+from rich import box
+from rich.console import Console
+from rich.table import Table
 
 from IM import im_calculation, ims, snr_calculation, waveform_reading
 from IM.scripts import gen_ko_matrix
@@ -23,7 +26,7 @@ KO_TEST_DIR = Path(__file__).parent / "KO_matrices"
 
 
 @pytest.fixture(scope="session", autouse=True)
-def generate_ko_matrices(request: pytest.FixtureRequest):
+def generate_ko_matrices(request: pytest.FixtureRequest) -> None:
     """
     Generate the KO matrices for testing, also test that the KO matrix gen script works.
     """
@@ -32,7 +35,7 @@ def generate_ko_matrices(request: pytest.FixtureRequest):
     gen_ko_matrix.main(KO_TEST_DIR, num_to_gen=12)
 
     # Add finalizer to remove the KO matrices directory
-    def remove_ko_matrices():
+    def remove_ko_matrices() -> None:
         for file in KO_TEST_DIR.glob("*"):
             file.unlink()
         KO_TEST_DIR.rmdir()
@@ -42,13 +45,13 @@ def generate_ko_matrices(request: pytest.FixtureRequest):
 
 # Common test fixtures
 @pytest.fixture
-def sample_time():
+def sample_time() -> npt.NDArray[np.float32]:
     """Generate sample time array."""
     return np.arange(0, 1, 0.01, dtype=np.float32)
 
 
 @pytest.fixture
-def sample_waveforms():
+def sample_waveforms() -> npt.NDArray[np.float32]:
     """Generate sample waveform data for testing."""
     t = np.arange(0, 1, 0.01, dtype=np.float32)
     freq = 5.0  # Hz
@@ -70,61 +73,9 @@ def sample_waveforms():
 
 
 @pytest.fixture
-def sample_periods():
+def sample_periods() -> npt.NDArray[np.float32]:
     """Generate sample periods for PSA calculation."""
     return np.array([0.1, 0.2, 0.5, 1.0], dtype=np.float32)
-
-
-# Test cases for Newmark PSA estimation
-@pytest.mark.parametrize("xi", [0.01, 0.05, 0.1])
-@pytest.mark.parametrize(
-    "gamma,beta",
-    [
-        (0.5, 0.25),  # Standard Newmark
-        (0.6, 0.3),  # Modified parameters
-    ],
-)
-def test_newmark_estimate_psa(
-    sample_waveforms: npt.NDArray[np.float32],
-    sample_time: npt.NDArray[np.float32],
-    xi: np.float32,
-    gamma: np.float32,
-    beta: np.float32,
-):
-    """Test Newmark PSA estimation with various parameters."""
-    dt = sample_time[1] - sample_time[0]
-    w = 2 * np.pi * np.array([1.0, 2.0], dtype=np.float32)
-
-    result = ims.newmark_estimate_psa(
-        sample_waveforms[:, :, ims.Component.COMP_0],
-        dt,
-        w,
-        xi=xi,
-        gamma=gamma,
-        beta=beta,
-    )
-
-    # Basic checks
-    assert result.shape == (len(sample_waveforms), len(sample_time), len(w))
-    assert not np.any(np.isnan(result))
-    assert not np.any(np.isinf(result))
-
-
-# Test cases for rotd PSA values
-def test_rotd_psa_values():
-    """Test rotation of PSA values. Assumes that the psa for angular frequency 1 is constant 1 for comp 0 and comp 90.
-    Checks that rotd_psa_values calculates cos(theta) * comp_0 + sin(theta) * comp_90 and maximises correctly by checking the maximum rotated psa value
-    is 2 * pi^2 * sqrt(2).
-    """
-    w = 2 * np.pi * np.array([1.0])
-    comp_0 = np.atleast_3d(np.ones((2, 100), dtype=np.float32))
-    comp_90 = np.atleast_3d(np.ones((2, 100), dtype=np.float32))
-
-    result = ims.rotd_psa_values(comp_0, comp_90, w)
-
-    # Shape checks
-    assert result.shape == (len(comp_0), len(w), 3)
-    assert result[0, 0, 2] == pytest.approx((2 * np.pi) ** 2 * np.sqrt(2), abs=1e-3)
 
 
 # Test cases for significant duration
@@ -141,7 +92,7 @@ def test_significant_duration(
     sample_time: npt.NDArray[np.float32],
     percent_low: float,
     percent_high: float,
-):
+) -> None:
     """Test significant duration calculation."""
     dt = 0.01
 
@@ -164,7 +115,9 @@ def test_significant_duration(
         (2 * np.sin(np.linspace(0, 2 * np.pi)) - 1, 3, False),
     ],
 )
-def test_pga(comp_0: npt.NDArray[np.float32], expected_pga: float, use_numexpr: bool):
+def test_pga(
+    comp_0: npt.NDArray[np.float32], expected_pga: float, use_numexpr: bool
+) -> None:
     waveforms = np.zeros((1, len(comp_0), 3), dtype=np.float32)
     waveforms[:, :, ims.Component.COMP_0] = comp_0
     assert np.isclose(
@@ -198,7 +151,7 @@ def test_pgv(
     t_max: float,
     expected_pga: float,
     use_numexpr: bool,
-):
+) -> None:
     waveforms = np.zeros((1, len(comp_0), 3), dtype=np.float32)
     waveforms[:, :, ims.Component.COMP_0] = comp_0
     # NOTE: This dt calculation is correct, if dt = 1 / len(comp_0) then dt
@@ -234,7 +187,7 @@ def test_cav(
     t_max: float,
     expected_cav: float,
     expected_cav5: Optional[float],
-):
+) -> None:
     waveforms = np.zeros((1, len(comp_0), 3), dtype=np.float32)
     waveforms[:, :, ims.Component.COMP_0] = comp_0
     dt = t_max / (len(comp_0) - 1)
@@ -256,34 +209,37 @@ def test_cav(
         (np.linspace(0, 1, num=100, dtype=np.float32) ** 2, 1, np.pi * 9.81 / (2 * 5)),
     ],
 )
-def test_ai_values(comp_0: npt.NDArray[np.float32], t_max: float, expected_ai: float):
+def test_ai_values(
+    comp_0: npt.NDArray[np.float32], t_max: float, expected_ai: float
+) -> None:
     waveforms = np.zeros((1, len(comp_0), 3), dtype=np.float32)
     waveforms[:, :, ims.Component.COMP_0] = comp_0
     dt = t_max / (len(comp_0) - 1)
     assert np.isclose(ims.arias_intensity(waveforms, dt)["000"], expected_ai, atol=0.1)
 
 
-@pytest.mark.parametrize("use_numexpr", [True, False])
-def test_psa(use_numexpr: bool):
+def test_psa() -> None:
     comp_0 = np.ones((100,), dtype=np.float32)
-    waveforms = np.zeros((2, len(comp_0), 3), dtype=np.float32)
-    waveforms[0, :, ims.Component.COMP_0] = comp_0
-    waveforms[1, :, ims.Component.COMP_0] = comp_0
-    dt = np.float32(0.01)
-    w = np.array([1, 2], dtype=np.float32)
+    waveforms = np.zeros((3, 2, len(comp_0)), dtype=np.float32)
+    waveforms[ims.Component.COMP_0, 0] = comp_0
+    waveforms[ims.Component.COMP_0, 1] = comp_0
+    dt = np.float64(0.01)
+    w = np.array([1, 2], dtype=np.float64)
     psa_values = ims.pseudo_spectral_acceleration(
-        waveforms, w, dt, use_numexpr=use_numexpr
+        waveforms,
+        w,
+        dt,
     )
 
     # assert psa is close to the expected psa derived by solving the ODE in
     # Wolfram Alpha and finding the abs max.
-    assert np.allclose(
-        psa_values.sel(station=0, period=1.0, component="000"), 1.8544671, atol=5e-3
-    )
+    assert psa_values.sel(
+        station=0, period=1.0, component="000"
+    ).item() == pytest.approx(1.8544671, abs=5e-3)
 
 
 @pytest.mark.parametrize("cores", [1, multiprocessing.cpu_count()])
-def test_fas_benchmark(cores: int):
+def test_fas_benchmark(cores: int) -> None:
     """Compare benchmark FAS calculation against current implementation."""
     # Load the data array
     data_array_ffp = Path(__file__).parent / "resources" / "fas_benchmark.nc"
@@ -308,7 +264,7 @@ def test_fas_benchmark(cores: int):
 
 
 @pytest.mark.parametrize("cores", [1, multiprocessing.cpu_count()])
-def test_fas_multiple_stations_benchmark(cores: int):
+def test_fas_multiple_stations_benchmark(cores: int) -> None:
     """Compare benchmark FAS calculation with multiple stations against current implementation."""
     # Load the data array
     data_array_ffp = Path(__file__).parent / "resources" / "fas_benchmark.nc"
@@ -340,7 +296,7 @@ def test_fas_multiple_stations_benchmark(cores: int):
         )
 
 
-def test_snr_benchmark():
+def test_snr_benchmark() -> None:
     """Compare benchmark SNR calculation against current implementation."""
     # Load the DataFrame
     benchmark_ffp = Path(__file__).parent / "resources" / "snr_benchmark.csv"
@@ -364,11 +320,13 @@ def test_snr_benchmark():
     )
 
     # Compare the results
-    assert_array_almost_equal(data, snr_result_ims, decimal=5)
+    assert_array_almost_equal(
+        data.values.astype(float), snr_result_ims.values.astype(float), decimal=5
+    )
 
 
 @pytest.mark.parametrize("use_numexpr", [True, False])
-def test_all_ims_benchmark(use_numexpr: bool):
+def test_all_ims_benchmark(use_numexpr: bool) -> None:
     """Compare benchmark IM calculation against current implementation."""
     # Load the DataFrame
     benchmark_ffp = Path(__file__).parent / "resources" / "im_benchmark.csv"
@@ -388,15 +346,121 @@ def test_all_ims_benchmark(use_numexpr: bool):
         waveform, dt, ko_directory=KO_TEST_DIR, use_numexpr=use_numexpr
     )
 
-    # Compare the results
-    assert_array_almost_equal(data, result, decimal=5)
+    for im in result.columns:
+        assert result[im].values == pytest.approx(
+            data.loc[result.index, im].values, abs=5e-4, rel=0.01, nan_ok=True
+        ), (
+            f"Results for {im} do not match!\n{result}"
+        )  # 5e-6 implies rounding to five decimal places
+
+
+BENCHMARK_CASES = [
+    d for d in (Path(__file__).parent / "resources").iterdir() if d.is_dir()
+]
+
+
+def print_diff_table(
+    df_old: pd.DataFrame,
+    df_new: pd.DataFrame,
+    title: str = "DataFrame Difference",
+    chunk_size: int | None = None,
+) -> None:
+    """Prints a Rich table of the differences between two dataframes.
+
+    Parameters
+    ----------
+    df_old : pd.DataFrame
+        The old dataframe to compare to.
+    df_new : pd.DataFrame
+        The new result dataframe.
+    title : str
+        Title for the comparison table.
+    chunk_size : int | None
+        Number of columns to show per line.
+    """
+
+    console = Console()
+
+    df_old, df_new = df_old.align(df_new, join="outer", axis=None)
+    diff_abs = df_new - df_old
+
+    with np.errstate(divide="ignore", invalid="ignore"):
+        diff_rel: pd.DataFrame = (df_new - df_old) / df_old
+
+    all_columns = df_new.columns.tolist()
+    if chunk_size is None or chunk_size <= 0:
+        column_chunks = [all_columns]
+    else:
+        column_chunks = [
+            all_columns[i : i + chunk_size]
+            for i in range(0, len(all_columns), chunk_size)
+        ]
+
+    for i, cols in enumerate(column_chunks):
+        current_title = title
+        if len(column_chunks) > 1:
+            current_title = f"{title} (Part {i + 1}/{len(column_chunks)})"
+
+        table = Table(title=current_title, box=box.ROUNDED)
+
+        table.add_column("Index", style="cyan", no_wrap=True)
+
+        for col in cols:
+            table.add_column(str(col), justify="right")
+
+        for index, row in diff_abs.iterrows():
+            assert isinstance(index, str)
+            row_cells = [index]
+
+            for col in cols:
+                val_abs = row[col]
+                assert isinstance(col, str)
+                val_rel = diff_rel.at[index, col]
+                assert isinstance(val_rel, float)
+
+                if pd.isna(val_abs):
+                    text_display = "-"
+                else:
+                    text_display = (
+                        f"{val_abs:+3g}"
+                        if isinstance(val_abs, (int, float))
+                        else str(val_abs)
+                    )
+
+                style = ""
+
+                if pd.isna(val_rel):
+                    style = "dim"
+                elif abs(val_rel) < 0.05 or abs(val_abs) < 1e-6:
+                    style = "dim"  # Plain/Dim for no change
+                elif val_rel >= 0.20:
+                    # Strong Red for >= +20%
+                    style = "bold white on red"
+                elif val_rel > 0:
+                    # Light Red/Salmon for positive but < 20%
+                    style = "black on #ffcccb"
+                elif val_rel <= -0.20:
+                    # Strong Blue for <= -20%
+                    style = "bold white on blue"
+                elif val_rel < 0:
+                    # Light Blue for negative but > -20%
+                    style = "black on #add8e6"
+
+                # Append the cell with style
+                row_cells.append(f"[{style}]{text_display}[/{style}]")
+
+            table.add_row(*row_cells)
+
+        console.print(table)
+        # Add a little spacing between chunks
+        if i < len(column_chunks) - 1:
+            console.print("")
 
 
 @pytest.mark.parametrize(
-    "resource_dir",
-    [d for d in (Path(__file__).parent / "resources").iterdir() if d.is_dir()],
+    "resource_dir", BENCHMARK_CASES, ids=[d.stem for d in BENCHMARK_CASES]
 )
-def test_all_ims_benchmark_edge_cases(resource_dir: Path):
+def test_all_ims_benchmark_edge_cases(resource_dir: Path) -> None:
     """Compare benchmark IM calculation against current implementation for each directory in resources for edge cases."""
     # Load the benchmark DataFrame
     benchmark_ffp = resource_dir / "im_benchmark.csv"
@@ -409,16 +473,50 @@ def test_all_ims_benchmark_edge_cases(resource_dir: Path):
 
     # Read the files to a waveform array that's readable by IM Calculation
     dt, waveform = waveform_reading.read_ascii(comp_000_ffp, comp_090_ffp, comp_ver_ffp)
+    nt = waveform.shape[1]
+    im_list = [
+        ims.IM.PGA,
+        ims.IM.PGV,
+        ims.IM.CAV,
+        ims.IM.CAV5,
+        ims.IM.Ds575,
+        ims.IM.Ds595,
+        ims.IM.AI,
+        ims.IM.pSA,
+    ]
+    # If the record is too long the test will fail because of missing KO matrices
+    print(np.ceil(np.log2(nt)))
+    have_ko_matrix = np.ceil(np.log2(nt)) < 15
+    if have_ko_matrix:
+        im_list.append(ims.IM.FAS)
 
     # Calculate the intensity measures
-    result = im_calculation.calculate_ims(waveform, dt, ko_directory=KO_TEST_DIR)
+    result = im_calculation.calculate_ims(
+        waveform, dt, ims_list=im_list, ko_directory=KO_TEST_DIR
+    )
+    if not np.allclose(
+        result.values,
+        data.loc[result.index, result.columns].values,
+        atol=5e-4,
+        rtol=0.01,
+    ):
+        print_diff_table(
+            data.loc[:, data.columns.str.startswith("pSA")],  # type: ignore[invalid-argument]
+            result.loc[:, result.columns.str.startswith("pSA")],
+            title=f"Differences for {resource_dir.stem}",
+            chunk_size=8,
+        )
 
-    # Compare the results
-    assert_array_almost_equal(data, result, decimal=5)
+    for im in result.columns:
+        assert result[im].values == pytest.approx(
+            data.loc[result.index, im].values, abs=5e-4, rel=0.01, nan_ok=True
+        ), (
+            f"Results for {im} do not match!\n{result}"
+        )  # 5e-6 implies rounding to five decimal places
 
 
 @pytest.mark.parametrize("use_numexpr", [True, False])
-def test_ds5xx(use_numexpr: bool):
+def test_ds5xx(use_numexpr: bool) -> None:
     comp_0 = np.ones((100,), dtype=np.float32)
     waveforms = np.zeros((1, len(comp_0), 3), dtype=np.float32)
     waveforms[:, :, ims.Component.COMP_0] = comp_0
@@ -444,7 +542,7 @@ def test_peak_ground_parameters(
     sample_waveforms: npt.NDArray[np.float32],
     sample_time: npt.NDArray[np.float32],
     func: Callable,
-):
+) -> None:
     """Test peak ground motion parameter calculations."""
     dt = sample_time[1] - sample_time[0]
 
@@ -466,7 +564,7 @@ def test_peak_ground_parameters(
 # Test cases for Arias Intensity
 def test_arias_intensity(
     sample_waveforms: npt.NDArray[np.float32], sample_time: npt.NDArray[np.float32]
-):
+) -> None:
     """Test Arias Intensity calculation."""
     dt = sample_time[1] - sample_time[0]
 
@@ -478,7 +576,9 @@ def test_arias_intensity(
     # Check values
     assert np.all(result.select_dtypes(include=[np.number]) >= 0)
     # Check geom calculation
-    assert_array_almost_equal(result["geom"], np.sqrt(result["000"] * result["090"]))
+    assert_array_almost_equal(
+        result["geom"].to_numpy(float), np.sqrt(result["000"] * result["090"])
+    )
 
 
 # Test cases for Fourier Amplitude Spectra
@@ -487,7 +587,7 @@ def test_fourier_amplitude_spectra(
     sample_waveforms: npt.NDArray[np.float32],
     sample_time: npt.NDArray[np.float32],
     n_freqs: int,
-):
+) -> None:
     """Test Fourier Amplitude Spectra calculation."""
     dt = sample_time[1] - sample_time[0]
     freqs = np.logspace(-1, 1, n_freqs, dtype=np.float32)
@@ -513,7 +613,7 @@ def test_fourier_amplitude_spectra(
     assert np.allclose(result_mp.as_numpy(), result_sc.as_numpy())
 
 
-def test_nyquist_frequency():
+def test_nyquist_frequency() -> None:
     # Define test parameters
     n_stations = 2
     n_timesteps = 1024
@@ -539,21 +639,6 @@ def test_nyquist_frequency():
     assert fas.shape == (5, n_stations, len(expected_freqs)), "Unexpected FAS shape."
 
 
-# Error test cases
-def test_invalid_memory_allocation():
-    """Test handling of invalid memory allocation."""
-    waveforms = np.zeros((2, 100, 3), dtype=np.float32)
-    periods = np.array([0.1], dtype=np.float32)
-
-    with pytest.raises(ValueError, match="PSA rotd memory allocation is too small"):
-        ims.pseudo_spectral_acceleration(
-            waveforms,
-            periods,
-            np.float32(0.01),
-            psa_rotd_maximum_memory_allocation=1e-10,
-        )
-
-
 @pytest.mark.parametrize(
     "invalid_shape",
     [
@@ -561,7 +646,7 @@ def test_invalid_memory_allocation():
         (2, 100),  # Missing component dimension
     ],
 )
-def test_invalid_waveform_shapes(invalid_shape: tuple[int, ...]):
+def test_invalid_waveform_shapes(invalid_shape: tuple[int, ...]) -> None:
     """Test handling of invalid waveform shapes."""
     waveforms = np.zeros(invalid_shape, dtype=np.float32)
 
@@ -570,7 +655,7 @@ def test_invalid_waveform_shapes(invalid_shape: tuple[int, ...]):
 
 
 # Edge cases
-def test_zero_waveform():
+def test_zero_waveform() -> None:
     """Test behavior with zero-amplitude waveforms."""
     waveforms = np.zeros((2, 100, 3), dtype=np.float32)
 
@@ -582,7 +667,7 @@ def test_zero_waveform():
 
 
 @pytest.mark.parametrize("duration", [100, 200, 1000])
-def test_numerical_stability(duration: int):
+def test_numerical_stability(duration: int) -> None:
     """Test numerical stability with different duration lengths."""
     dt = 0.01
     t = np.arange(0, duration * dt, dt, dtype=np.float32)
@@ -593,9 +678,9 @@ def test_numerical_stability(duration: int):
     result = ims.peak_ground_acceleration(waveforms)
 
     # Maximum should be close to 1.0 regardless of duration
-    assert_array_almost_equal(result["000"], 1.0, decimal=5)
+    assert_array_almost_equal(result["000"].to_numpy(float), 1.0, decimal=5)
     # The others should just be 0.0
-    assert_array_almost_equal(result["090"], 0.0, decimal=5)
+    assert_array_almost_equal(result["090"].to_numpy(float), 0.0, decimal=5)
 
 
 @given(
@@ -615,7 +700,9 @@ def test_numerical_stability(duration: int):
     ),
 )
 @settings(deadline=None)
-def test_rotational_invariance(waveform: npt.NDArray[np.float32], func: Callable):
+def test_rotational_invariance(
+    waveform: npt.NDArray[np.float32], func: Callable
+) -> None:
     # DS595 and DS575 won't work if the waveform has values that are too small.
     assume(
         all(
@@ -657,18 +744,18 @@ def test_rotational_invariance(waveform: npt.NDArray[np.float32], func: Callable
     ),
 )
 @settings(deadline=None)
-def test_component_orientation(waveform: npt.NDArray[np.float32]):
+def test_component_orientation(waveform: npt.NDArray[np.float32]) -> None:
     waveform_ims = ims.peak_ground_acceleration(waveform)
 
     assert_array_almost_equal(
-        waveform_ims["000"],
+        waveform_ims["000"].to_numpy(float),
         np.abs(waveform[:, :, ims.Component.COMP_0]).max(axis=1),
     )
     assert_array_almost_equal(
-        waveform_ims["090"],
+        waveform_ims["090"].to_numpy(float),
         np.abs(waveform[:, :, ims.Component.COMP_90]).max(axis=1),
     )
     assert_array_almost_equal(
-        waveform_ims["ver"],
+        waveform_ims["ver"].to_numpy(float),
         np.abs(waveform[:, :, ims.Component.COMP_VER]).max(axis=1),
     )

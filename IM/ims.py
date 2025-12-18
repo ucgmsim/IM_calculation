@@ -1,9 +1,11 @@
 """Intensity Measure Implementations."""
 
-import gc
+import itertools
 import multiprocessing
+import os
 import warnings
-from collections.abc import Callable
+from collections.abc import Callable, Generator, MutableMapping
+from contextlib import contextmanager
 from enum import IntEnum, StrEnum
 from pathlib import Path
 from typing import Optional
@@ -14,10 +16,46 @@ import numpy as np
 import numpy.typing as npt
 import pandas as pd
 import scipy as sp
+import tqdm
 import xarray as xr
 from pyfftw.interfaces import numpy_fft as fft
 
-from IM import ko_matrices
+from IM import (
+    _utils,  # type: ignore[unresolved-import]
+    ko_matrices,
+)
+
+
+@contextmanager
+def environment(
+    **variables: str,
+    # NOTE: the type here could be the os._Environ type defined in the
+    # os module, but this means we don't rely on any specific
+    # behaviour of that object which might change later down the line
+    # (or indeed, they may remove the os._Environ object at any time
+    # because it is an internal class).
+) -> Generator[MutableMapping[str, str]]:
+    """Update an environment and revert after exit
+
+    Parameters
+    ----------
+    **variables : str or bytes
+        Environment values to update inside the context manager.
+
+    Yields
+    ------
+    MutableMapping
+        The mapping object representing `os.environ`.
+    """
+    # Code to acquire resource, e.g.:
+    old_environment: dict[str, str] = os.environ.copy()
+    try:
+        os.environ.update(variables)  # type: ignore[no-matching-overload]
+        yield os.environ
+    finally:
+        for key in set(os.environ) - set(old_environment):
+            del os.environ[key]
+        os.environ.update(old_environment)
 
 
 class Component(IntEnum):
@@ -45,88 +83,13 @@ class IM(StrEnum):
     FAS = "FAS"
 
 
-@numba.njit(cache=True)
-def newmark_estimate_psa(
-    waveforms: npt.NDArray[np.float32],
-    dt: np.float32,
-    w: npt.NDArray[np.float32],
-    xi: np.float32 = np.float32(0.05),
-    gamma: np.float32 = np.float32(1 / 2),
-    beta: np.float32 = np.float32(1 / 4),
-    m: np.float32 = np.float32(1),
-) -> npt.NDArray[np.float32]:  # pragma: no cover
-    """Compute pseudo-spectral acceleration using the Newmark-beta method [1]_ [2]_.
-
-    Parameters
-    ----------
-    waveforms : ndarray of float32 with shape `(n_stations, n_timesteps)`
-        Acceleration waveforms array.
-    dt : float32
-        Time step between consecutive samples (s).
-    w : ndarray of float32
-        Angular frequencies of single-degree-of-freedom oscillators (Hz).
-    xi : float32, optional
-        Damping coefficient, by default 0.05
-    gamma : float32, optional
-        Newmark method gamma parameter, by default 0.5
-    beta : float32, optional
-        Newmark method beta parameter, by default 0.25
-    m : float32, optional
-        Mass parameter, by default 1.0
-
-    Returns
-    -------
-    ndarray of float32 with shape `(n_stations, n_timesteps, n_frequencies)`
-        Response curves for SDOF oscillators.
-
-    References
-    ----------
-    .. [1] https://en.wikipedia.org/wiki/Newmark-beta_method
-    .. [2] ENCI335 (Structural Analysis), Chapter 4: Course notes on Newmark-beta method
-    """
-    c = np.float32(2 * xi) * w
-    a = 1 / (beta * dt) * m + (gamma / beta) * c
-    b = 1 / (2 * beta) * m + dt * (gamma / (2 * beta) - 1) * c
-    k = np.square(w)
-    kbar = k + (gamma / (beta * dt)) * c + 1 / (beta * dt**2) * m
-    u = np.zeros(
-        shape=(waveforms.shape[0], waveforms.shape[1], w.size), dtype=np.float32
-    )
-    # calculations for each time step
-    dudt = np.zeros_like(w, dtype=np.float32)
-    #         ns         np x ns    np x ns
-    for i in range(waveforms.shape[0]):
-        d2udt2 = (-m * waveforms[i, 0] - c * dudt - k * u[i, 0]) / m
-        for j in range(1, waveforms.shape[1]):
-            d_pti = -m * (waveforms[i, j] - waveforms[i, j - 1])
-            d_pbari = d_pti + a * dudt + b * d2udt2
-            d_ui = d_pbari / kbar
-            d_dudti = (
-                (gamma / (beta * dt)) * d_ui
-                - (gamma / beta) * dudt
-                + dt * (1 - gamma / (2 * beta)) * d2udt2
-            )
-            d_d2udt2i = (
-                1 / (beta * dt**2) * d_ui
-                - 1 / (beta * dt) * dudt
-                - 1 / (2 * beta) * d2udt2
-            )
-            # Convert from incremental formulation and store values in vector
-            u[i, j] = u[i, j - 1] + d_ui
-            dudt += d_dudti
-            d2udt2 += d_d2udt2i
-
-        dudt[:] = np.float32(0.0)
-    return u
-
-
 def rotate_components(
     step_000: np.ndarray,
     step_090: np.ndarray,
     theta: np.ndarray,
     out: Optional[np.ndarray] = None,
     use_numexpr: bool = True,
-):
+) -> np.ndarray | None:
     """
     Helper function to handle rotation computation using either numexpr or numpy.
 
@@ -142,6 +105,11 @@ def rotate_components(
         Array to store the output of the computation, by default None.
     use_numexpr : bool, optional
         Use numexpr for computation, by default True.
+
+    Returns
+    -------
+    array of floats or None
+        The absolute value of ``cos(theta) * comp_0 + sin(theta) * comp_90``, or
     """
     if use_numexpr:
         return ne.evaluate(
@@ -161,71 +129,20 @@ def rotate_components(
         )
 
 
-def rotd_psa_values(
-    comp_000: npt.NDArray[np.float32],
-    comp_090: npt.NDArray[np.float32],
-    w: npt.NDArray[np.float32],
-    use_numexpr: bool = True,
-) -> npt.NDArray[np.float32]:
-    """Compute rotated pseudo-spectral acceleration statistics.
-
-    Parameters
-    ----------
-    comp_000 : ndarray of float32 with shape `(n_periods, n_stations, n_timesteps)`
-        PSA in 000 component (cm/s^2).
-    comp_090 : ndarray of float32 with shape `(n_periods, n_stations, n_timesteps)`
-        PSA in 090 component (cm/s^2).
-    w : ndarray of float32
-        Natural angular frequencies of oscillators (Hz).
-    use_numexpr : bool, optional
-        Use numexpr for computation, by default True.
-
-    Returns
-    -------
-    ndarray of float32 with shape `(n_stations, n_periods, 3)`
-        Array containing minimum (rotd0), median (rotd50) and maximum (rotd100) PSA values.
-    """
-    theta = np.linspace(0, np.pi, num=180, dtype=np.float32)
-    psa = np.zeros((comp_000.shape[0], comp_000.shape[-1], 3), dtype=np.float32)
-    out = np.zeros((comp_000.shape[0], *comp_000.shape[1:], 180), dtype=np.float32)
-    w2 = np.square(w, dtype=np.float32)
-
-    psa = np.transpose(
-        np.percentile(
-            np.max(
-                rotate_components(
-                    comp_000,
-                    comp_090,
-                    theta,
-                    out=out[: len(comp_000)],
-                    use_numexpr=use_numexpr,
-                )[: len(comp_000)],
-                axis=1,
-            ),
-            [0, 50, 100],
-            axis=-1,
-        ),
-        [1, 2, 0],
-    ).astype(np.float32)
-
-    del out
-    gc.collect()  # This is required because Python's GC is too lazy to remove the out array when it should
-    return w2[np.newaxis, :, np.newaxis] * psa
-
-
 def pseudo_spectral_acceleration(
-    waveforms: npt.NDArray[np.float32],
-    periods: npt.NDArray[np.float32],
-    dt: np.float32,
+    waveforms: npt.NDArray[np.float64 | np.float32],
+    periods: npt.NDArray[np.float64],
+    dt: np.float64,
     psa_rotd_maximum_memory_allocation: Optional[float] = None,
     cores: int = multiprocessing.cpu_count(),
-    use_numexpr: bool = True,
+    step: int | None = None,
+    use_tqdm: bool = False,
 ) -> xr.DataArray:
     """Compute pseudo-spectral acceleration statistics for waveforms.
 
     Parameters
     ----------
-    waveforms : ndarray of float32 with shape `(n_stations, n_timesteps, n_components)`
+    waveforms : ndarray of float32 with shape `(n_components, n_stations, n_timesteps)`
         Acceleration waveforms array (g).
     periods : ndarray of float32
         Periods for PSA computation (s). These correspond to SDOF oscillator natural frequencies.
@@ -235,8 +152,10 @@ def pseudo_spectral_acceleration(
         Maximum memory allocation for PSA rotation calculations (bytes).
     cores : int, optional
         Number of CPU cores to use, by default all available cores.
-    use_numexpr : bool, optional
-        Use numexpr for computation, by default True.
+    step : int, optional
+        Number of steps to use. If `None`, will use the number of cores as the default number of steps.
+    use_tqdm : bool, optional
+        If true, show tqdm progress bar.
 
     Returns
     -------
@@ -244,57 +163,65 @@ def pseudo_spectral_acceleration(
         DataArray containing PSA statistics for each
         station, period and component ['000', '090', 'ver', 'geom', 'rotd0', 'rotd50', 'rotd100'].
     """
-    w = 2 * np.pi / periods
+    waveforms = np.ascontiguousarray(waveforms)
+    angular_frequencies = 2 * np.pi / periods
 
-    # Step size is the minimum of either the CPU count, or the maximum number of
-    # steps that fits within the psa_rotd_maximum_memory_allocation.
-    if psa_rotd_maximum_memory_allocation:
-        step = min(
-            int(
-                psa_rotd_maximum_memory_allocation
-                / (180 * len(w) * waveforms[0].nbytes)
-            ),
-            cores,
+    # Step size *used* to be based on the cores available but that no
+    # longer holds because Rayon, the rust parallel work scheduler,
+    # manages this on its own. So the real bound on step size is now
+    # how much memory we have available.
+    step = step or cores
+    n_stations = waveforms.shape[1]
+    n_frequencies = len(angular_frequencies)
+    rotd_psa = np.zeros((n_frequencies, n_stations, 3), dtype=np.float64)
+
+    comp_0_psa = np.zeros((n_frequencies, n_stations), dtype=np.float64)
+    comp_90_psa = np.zeros((n_frequencies, n_stations), dtype=np.float64)
+    comp_ver_psa = np.zeros((n_frequencies, n_stations), dtype=np.float64)
+    xi = 0.05
+    with environment(RAYON_NUM_THREADS=str(cores)):
+        station_iter = range(0, n_stations, step)
+        n_steps = len(station_iter) * len(angular_frequencies)
+        station_period_iterator = itertools.product(
+            range(len(angular_frequencies)), station_iter
         )
-    else:
-        step = cores
-    if step < 1:
-        raise ValueError(
-            "PSA rotd memory allocation is too small (cannot even calculate a single station's pSA)."
-        )
+        if use_tqdm:
+            station_period_iterator = tqdm.tqdm(station_period_iterator, total=n_steps)
+        j_last: int | None = None
+        for j, i in station_period_iterator:
+            w = angular_frequencies[j]
+            if use_tqdm and j_last != j:
+                assert isinstance(station_period_iterator, tqdm.tqdm)
+                j_last = j
+                t0 = periods[j]
+                station_period_iterator.set_description(f"Period {t0:g}")
 
-    rotd_psa = np.zeros((waveforms.shape[0], len(w), 3), dtype=np.float32)
-
-    comp_0_psa = np.zeros((waveforms.shape[0], len(w)), dtype=np.float32)
-    comp_90_psa = np.zeros((waveforms.shape[0], len(w)), dtype=np.float32)
-    comp_ver_psa = np.zeros((waveforms.shape[0], len(w)), dtype=np.float32)
-
-    for i in range(0, waveforms.shape[0], step):
-        comp_0 = newmark_estimate_psa(
-            waveforms[i : i + step, :, Component.COMP_0.value],
-            dt,
-            w,
-        )
-
-        comp_90 = newmark_estimate_psa(
-            waveforms[i : i + step, :, Component.COMP_90.value],
-            dt,
-            w,
-        )
-
-        rotd_psa[i : i + step, :, :] = rotd_psa_values(
-            comp_0, comp_90, w, use_numexpr=use_numexpr
-        )
-
-        conversion_factor = np.square(w)[np.newaxis, :]
-        comp_0_psa[i : i + step, :] = conversion_factor * np.abs(comp_0).max(axis=1)
-        comp_90_psa[i : i + step, :] = conversion_factor * np.abs(comp_90).max(axis=1)
-
-        comp_ver_psa[i : i + step, :] = conversion_factor * np.abs(
-            newmark_estimate_psa(
-                waveforms[i : i + step, :, Component.COMP_VER.value], dt, w
+            comp_0_chunk = waveforms[Component.COMP_0.value, i : i + step].astype(
+                np.float64
             )
-        ).max(axis=1)
+            comp_90_chunk = waveforms[Component.COMP_90.value, i : i + step].astype(
+                np.float64
+            )
+            comp_0_response = _utils._newmark_beta_method(comp_0_chunk, dt, w, xi)
+            comp_90_response = _utils._newmark_beta_method(comp_90_chunk, dt, w, xi)
+            conversion_factor = w * w
+
+            rotd_psa[j, i : i + step] = conversion_factor * _utils._rotd_parallel(
+                comp_0_response, comp_90_response
+            )
+
+            comp_0_psa[j, i : i + step] = conversion_factor * np.abs(
+                comp_0_response
+            ).max(axis=1)
+            comp_90_psa[j, i : i + step] = conversion_factor * np.abs(
+                comp_90_response
+            ).max(axis=1)
+
+            z = waveforms[Component.COMP_VER.value, i : i + step].astype(np.float64)
+            z_response = _utils._newmark_beta_method(z, dt, w, xi)
+            comp_ver_psa[j, i : i + step] = conversion_factor * np.abs(z_response).max(
+                axis=1
+            )
 
     geom_psa = np.sqrt(comp_0_psa * comp_90_psa)
 
@@ -312,9 +239,13 @@ def pseudo_spectral_acceleration(
             axis=0,
         ),
         name=IM.pSA.value,
-        dims=("component", "station", "period"),
+        dims=(
+            "component",
+            "period",
+            "station",
+        ),
         coords={
-            "station": np.arange(waveforms.shape[0]),
+            "station": np.arange(waveforms.shape[1]),
             "period": periods,
             "component": ["000", "090", "ver", "geom", "rotd0", "rotd50", "rotd100"],
         },
@@ -345,6 +276,7 @@ def compute_intensity_measure_rotd(
         DataFrame containing intensity measure statistics. Each row represents
         statistics for a single station.
     """
+
     (stations, _, _) = waveforms.shape
     values = np.zeros(shape=(stations, 180), dtype=waveforms.dtype)
 
@@ -724,7 +656,7 @@ def peak_ground_velocity(
         Acceleration waveforms in g units.
     dt : float
         Timestep resolution of the waveform array.
-    use_numexpr: bool, optional
+    use_numexpr : bool, optional
         Use numexpr for computation, by default True.
 
     Returns
@@ -827,7 +759,7 @@ def ds575(
         Acceleration waveforms (g).
     dt : float
         Timestep resolution of the waveform array (s).
-    use_numexpr: bool, optional
+    use_numexpr : bool, optional
         Use numexpr for computation, by default True.
 
     Returns
@@ -866,7 +798,7 @@ def ds595(
         Acceleration waveforms (g).
     dt : float
         Timestep resolution of the waveform array (s).
-    use_numexpr: bool, optional
+    use_numexpr : bool, optional
         Use numexpr for computation, by default True.
 
     Returns
