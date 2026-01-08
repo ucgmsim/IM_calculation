@@ -1,38 +1,31 @@
-use std::ops::AddAssign;
-use std::ops::Div;
-
 use ndarray::parallel::prelude::*;
 use ndarray::prelude::*;
-use ndarray::{Ix1, Ix2};
-use num::traits::NumOps;
-use num::{Float, NumCast};
+use ndarray::{Array1, Ix1, Ix2};
 
 #[allow(clippy::too_many_arguments)]
-fn newmark_beta_solver<F: Float + NumOps + Div + AddAssign>(
-    waveform: ArrayView<F, Ix1>,
-    dt: F,
-    w: F,
-    xi: F,
-    gamma: F,
-    beta: F,
-    u0: F,
-    dudt0: F,
-) -> Array1<F> {
+fn newmark_beta_solver(
+    waveform: ArrayView<f64, Ix1>,
+    dt: f64,
+    w: f64,
+    xi: f64,
+    gamma: f64,
+    beta: f64,
+    u0: f64,
+    dudt0: f64,
+) -> Array1<f64> {
     let nt = waveform.dim();
-    let two: F = NumCast::from(2).unwrap();
-    let one: F = NumCast::from(1).unwrap();
     let mut u = Array1::zeros(nt);
-    let one_over_beta_dt_sq = one / (beta * dt * dt);
-    let one_over_beta_dt = one / (beta * dt);
+    let one_over_beta_dt_sq = 1.0 / (beta * dt * dt);
+    let one_over_beta_dt = 1.0 / (beta * dt);
     let k = w * w;
-    let c = two * xi * w;
+    let c = 2.0 * xi * w;
     let c_gamma_over_beta_dt = (gamma * c) / (beta * dt);
-    let one_over_two_beta = one / (two * beta);
+    let one_over_two_beta = 1.0 / (2.0 * beta);
     // Constants to solve for u_n+1:
     let kbar = one_over_beta_dt_sq + k + c_gamma_over_beta_dt; // u_n+1
     let a1 = c_gamma_over_beta_dt + one_over_beta_dt_sq; // u_n
-    let b1 = one_over_beta_dt + c * (gamma / beta - one); // udot_n
-    let c1 = c * dt * (gamma / (two * beta) - one) + one_over_two_beta - one; // uddot_n
+    let b1 = one_over_beta_dt + c * (gamma / beta - 1.0); // udot_n
+    let c1 = c * dt * (gamma / (2.0 * beta) - 1.0) + one_over_two_beta - 1.0; // uddot_n
 
     // Constants to solve for uddot_n+1
     let a2 = one_over_beta_dt_sq; // u_n+1 - u_n
@@ -40,7 +33,7 @@ fn newmark_beta_solver<F: Float + NumOps + Div + AddAssign>(
     let c2 = -c1; // uddot_n
                   // Constants to solve for udot_n+1
                   // a'3 = 1 for uddot_n
-    let a3 = one - gamma; // uddot_n
+    let a3 = 1.0 - gamma; // uddot_n
     let b3 = gamma; // uddot_n+1
 
     u[0] = u0;
@@ -66,13 +59,11 @@ fn newmark_beta_solver<F: Float + NumOps + Div + AddAssign>(
     }
     u
 }
-fn choose_gamma_beta<F: Float + NumOps + Div + AddAssign>(dt: F, w: F) -> (F, F) {
-    let two: F = NumCast::from(2).unwrap();
-    let one: F = NumCast::from(1).unwrap();
 
-    let gamma: F = one / two;
+fn choose_gamma_beta(dt: f64, w: f64) -> (f64, f64) {
+    let gamma = 0.5;
 
-    let stability_constant_f64 = 0.551328895421792;
+    let stability_constant = 0.551328895421792;
     // Whilst the linear solver is theoretically stable for ratios
     // dt/T up to 0.551-ish, we want to be a bit more conservative
     // about when we choose the linear solver instead of the constant
@@ -80,30 +71,26 @@ fn choose_gamma_beta<F: Float + NumOps + Div + AddAssign>(dt: F, w: F) -> (F, F)
     // some result accuracy on the table, but I can live with this
     // because it only affects very short period pSA with large
     // timesteps.
-    let stability_fraction_f64 = 0.8f64;
-    let effective_stability_constant: F =
-        NumCast::from(stability_fraction_f64 * stability_constant_f64).unwrap();
-    let pi_f64 = std::f64::consts::PI;
-    let pi = NumCast::from(pi_f64).unwrap();
-    let beta: F = if dt < effective_stability_constant * (two * pi) / w {
-        let beta_linear_f64: f64 = 1.0 / 6.0;
-        NumCast::from(beta_linear_f64)
+    let stability_fraction = 0.8;
+    let effective_stability_constant = stability_fraction * stability_constant;
+    let pi = std::f64::consts::PI;
+    let beta = if dt < effective_stability_constant * (2.0 * pi) / w {
+        1.0 / 6.0
     } else {
-        let beta_constant_f64: f64 = 1.0 / 4.0;
-        NumCast::from(beta_constant_f64)
-    }
-    .unwrap();
+        1.0 / 4.0
+    };
+
     (gamma, beta)
 }
 
-pub fn newmark_beta_method<F: Float + NumOps + Div + AddAssign>(
-    waveform: ArrayView<F, Ix1>,
-    dt: F,
-    w: F,
-    xi: F,
-    u0: F,
-    dudt0: F,
-) -> Array1<F> {
+pub fn newmark_beta_method(
+    waveform: ArrayView<f64, Ix1>,
+    dt: f64,
+    w: f64,
+    xi: f64,
+    u0: f64,
+    dudt0: f64,
+) -> Array1<f64> {
     let (gamma, beta) = choose_gamma_beta(dt, w);
     newmark_beta_solver(waveform, dt, w, xi, gamma, beta, u0, dudt0)
 }
