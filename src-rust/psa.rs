@@ -67,7 +67,7 @@ fn choose_gamma_beta(dt: f64, w: f64) -> (f64, f64) {
     // Whilst the linear solver is theoretically stable for ratios
     // dt/T up to 0.551-ish, we want to be a bit more conservative
     // about when we choose the linear solver instead of the constant
-    // solver. During testing Hence, we pick a conservative 80%. This means we leave
+    // solver. During testing, we pick a conservative 80%. This means we leave
     // some result accuracy on the table, but I can live with this
     // because it only affects very short period pSA with large
     // timesteps.
