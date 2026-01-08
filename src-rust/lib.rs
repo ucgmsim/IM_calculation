@@ -1,5 +1,10 @@
+mod arias_intensity;
+mod cav;
+mod constants;
 mod psa;
 mod rotd;
+mod trapz;
+mod utils;
 use pyo3::prelude::*;
 
 /// A Python module implemented in Rust. The name of this function must match
@@ -7,9 +12,11 @@ use pyo3::prelude::*;
 /// import the module.
 #[pymodule]
 mod _utils {
-    use numpy::{IntoPyArray, PyArray2, PyReadonlyArray2};
+    use numpy::{IntoPyArray, PyArray1, PyArray2, PyReadonlyArray2};
     use pyo3::prelude::*;
 
+    use crate::arias_intensity;
+    use crate::cav;
     use crate::psa;
     use crate::rotd;
 
@@ -25,6 +32,72 @@ mod _utils {
         let waveforms = waveforms_py.as_array();
         let waveform_psa = psa::newmark_beta_method_parallel(&waveforms, dt, w, xi);
         waveform_psa.into_pyarray(py)
+    }
+
+    #[pyfunction]
+    fn _arias_intensity<'py>(
+        py: Python<'py>,
+        waveforms_py: PyReadonlyArray2<f64>,
+        dt: f64,
+    ) -> Bound<'py, PyArray1<f64>> {
+        let waveforms = waveforms_py.as_array();
+        let waveform_ai = arias_intensity::arias_intensity(waveforms, dt);
+        waveform_ai.into_pyarray(py)
+    }
+
+    #[pyfunction]
+    fn _parallel_arias_intensity<'py>(
+        py: Python<'py>,
+        waveforms_py: PyReadonlyArray2<f64>,
+        dt: f64,
+    ) -> Bound<'py, PyArray1<f64>> {
+        let waveforms = waveforms_py.as_array();
+        let waveform_ai = arias_intensity::parallel_arias_intensity(waveforms, dt);
+        waveform_ai.into_pyarray(py)
+    }
+
+    #[pyfunction]
+    fn _cumulative_arias_intensity<'py>(
+        py: Python<'py>,
+        waveforms_py: PyReadonlyArray2<f64>,
+        dt: f64,
+    ) -> Bound<'py, PyArray2<f64>> {
+        let waveforms = waveforms_py.as_array();
+        let waveform_ai = arias_intensity::cumulative_arias_intensity(waveforms, dt);
+        waveform_ai.into_pyarray(py)
+    }
+
+    #[pyfunction]
+    fn _parallel_cumulative_arias_intensity<'py>(
+        py: Python<'py>,
+        waveforms_py: PyReadonlyArray2<f64>,
+        dt: f64,
+    ) -> Bound<'py, PyArray2<f64>> {
+        let waveforms = waveforms_py.as_array();
+        let waveform_ai = arias_intensity::parallel_cumulative_arias_intensity(waveforms, dt);
+        waveform_ai.into_pyarray(py)
+    }
+
+    #[pyfunction]
+    fn _cav<'py>(
+        py: Python<'py>,
+        waveforms_py: PyReadonlyArray2<f64>,
+        dt: f64,
+    ) -> Bound<'py, PyArray1<f64>> {
+        let waveforms = waveforms_py.as_array();
+        let waveform_cav = cav::cav(waveforms, dt);
+        waveform_cav.into_pyarray(py)
+    }
+
+    #[pyfunction]
+    fn _parallel_cav<'py>(
+        py: Python<'py>,
+        waveforms_py: PyReadonlyArray2<f64>,
+        dt: f64,
+    ) -> Bound<'py, PyArray1<f64>> {
+        let waveforms = waveforms_py.as_array();
+        let waveform_cav = cav::parallel_cav(waveforms, dt);
+        waveform_cav.into_pyarray(py)
     }
 
     #[pyfunction]
