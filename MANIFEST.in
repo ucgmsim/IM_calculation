@@ -2,3 +2,6 @@ prune tests
 prune wiki
 prune .github
 prune examples
+prune src-rust
+prune Cargo.toml
+prune Cargo.lock
