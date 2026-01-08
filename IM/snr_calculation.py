@@ -128,12 +128,12 @@ def calculate_snr(
     # Create FAS noise and signal DataFrames with 000, 090 and ver
     fas_signal_df = fas_signal.to_dataframe().unstack(level="component")
     fas_signal_df.index = fas_signal.coords["frequency"].values
-    fas_signal_df.columns = fas_signal_df.columns.droplevel(0)
+    fas_signal_df.columns = fas_signal_df.columns.droplevel(0)  # type: ignore[invalid-assignment]
     fas_signal_df = fas_signal_df[["000", "090", "ver"]]
 
     fas_noise_df = fas_noise.to_dataframe().unstack(level="component")
     fas_noise_df.index = fas_noise.coords["frequency"].values
-    fas_noise_df.columns = fas_noise_df.columns.droplevel(0)
+    fas_noise_df.columns = fas_noise_df.columns.droplevel(0)  # type: ignore[invalid-assignment]
     fas_noise_df = fas_noise_df[["000", "090", "ver"]]
 
     assert isinstance(snr_df, pd.DataFrame)

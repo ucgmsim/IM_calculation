@@ -213,7 +213,7 @@ def calculate_ims(
             result.index = [
                 f"{im.value}_{idx}" for idx in data_array.coords["period"].values
             ]
-            result.columns = result.columns.droplevel(0)
+            result.columns = result.columns.droplevel(0)  # type: ignore[invalid-assignment]
         elif im == IM.CAV:
             result = ims.cumulative_absolute_velocity(waveform, dt)
             result.index = [im.value]
@@ -244,7 +244,7 @@ def calculate_ims(
             result.index = [
                 f"{im.value}_{idx}" for idx in data_array.coords["frequency"].values
             ]
-            result.columns = result.columns.droplevel(0)
+            result.columns = result.columns.droplevel(0)  # type: ignore[invalid-assignment]
         else:
             raise ValueError(
                 f"IM {im} not recognized. Available IMs are {IM.__members__.keys()}"
