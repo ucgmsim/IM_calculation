@@ -3,3 +3,4 @@ prune wiki
 prune .github
 prune examples
 exclude .gitignore
+exclude uv.lock
