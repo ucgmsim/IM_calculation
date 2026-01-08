@@ -1,3 +1,5 @@
+"""IM reader utilities"""
+
 from pathlib import Path
 
 # Importing pint_xarray registers pint units with xarray, allowing for
