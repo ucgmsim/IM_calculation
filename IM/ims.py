@@ -83,52 +83,6 @@ class IM(StrEnum):
     FAS = "FAS"
 
 
-def rotate_components(
-    step_000: np.ndarray,
-    step_090: np.ndarray,
-    theta: np.ndarray,
-    out: Optional[np.ndarray] = None,
-    use_numexpr: bool = True,
-) -> np.ndarray | None:
-    """
-    Helper function to handle rotation computation using either numexpr or numpy.
-
-    Parameters
-    ----------
-    step_000 : np.ndarray
-        Array containing the 000 component of the waveforms.
-    step_090 : np.ndarray
-        Array containing the 090 component of the waveforms.
-    theta : np.ndarray
-        Array containing the angles at which to rotate the components.
-    out : np.ndarray, optional
-        Array to store the output of the computation, by default None.
-    use_numexpr : bool, optional
-        Use numexpr for computation, by default True.
-
-    Returns
-    -------
-    array of floats or None
-        The absolute value of ``cos(theta) * comp_0 + sin(theta) * comp_90``, or
-    """
-    if use_numexpr:
-        return ne.evaluate(
-            "abs(comp_000 * cos(theta) + comp_090 * sin(theta))",
-            {
-                "comp_000": step_000[..., np.newaxis],
-                "theta": theta[np.newaxis, ...],
-                "comp_090": step_090[..., np.newaxis],
-            },
-            # The out parameter should accept None, but doesn't because of a bug in numexpr
-            out=out,  # type: ignore
-        )
-    else:
-        return np.abs(
-            step_000[..., np.newaxis] * np.cos(theta)[np.newaxis, ...]
-            + step_090[..., np.newaxis] * np.sin(theta)[np.newaxis, ...]
-        )
-
-
 def pseudo_spectral_acceleration(
     waveforms: npt.NDArray[np.float64 | np.float32],
     periods: npt.NDArray[np.float64],
