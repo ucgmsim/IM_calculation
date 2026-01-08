@@ -2,3 +2,4 @@ prune tests
 prune wiki
 prune .github
 prune examples
+exclude .gitignore
