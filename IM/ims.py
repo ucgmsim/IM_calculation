@@ -24,6 +24,13 @@ from IM import (
     ko_matrices,
 )
 
+WaveformArray = (
+    # (n_components, n_stations, nt)
+    np.ndarray[tuple[int, int, int], np.dtype[np.float64]]
+    # (n_components, nt)
+    | np.ndarray[tuple[int, int], np.dtype[np.float64]]
+)
+
 
 @contextmanager
 def environment(
