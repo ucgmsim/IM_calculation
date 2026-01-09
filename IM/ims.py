@@ -4,7 +4,7 @@ import itertools
 import multiprocessing
 import os
 import warnings
-from collections.abc import Callable, Generator, MutableMapping
+from collections.abc import Generator, MutableMapping
 from contextlib import contextmanager
 from enum import IntEnum, StrEnum
 from pathlib import Path
@@ -24,12 +24,12 @@ from IM import (
     ko_matrices,
 )
 
-WaveformArray = (
-    # (n_components, n_stations, nt)
-    np.ndarray[tuple[int, int, int], np.dtype[np.float64]]
-    # (n_components, nt)
-    | np.ndarray[tuple[int, int], np.dtype[np.float64]]
-)
+# (n_components, n_stations, nt)
+ChunkedWaveformArray = np.ndarray[tuple[int, int, int], np.dtype[np.float64]]
+# (n_stations, nt)
+SingleWaveformArray = np.ndarray[tuple[int, int], np.dtype[np.float64]]
+WaveformArray = ChunkedWaveformArray | SingleWaveformArray
+Array1 = np.ndarray[tuple[int], np.dtype[np.float64]]
 
 
 @contextmanager
@@ -90,7 +90,7 @@ class IM(StrEnum):
 
 
 def pseudo_spectral_acceleration(
-    waveforms: npt.NDArray[np.float64 | np.float32],
+    waveforms: ChunkedWaveformArray,
     periods: npt.NDArray[np.float64],
     dt: np.float64,
     psa_rotd_maximum_memory_allocation: Optional[float] = None,
@@ -212,73 +212,8 @@ def pseudo_spectral_acceleration(
     )
 
 
-def compute_intensity_measure_rotd(
-    waveforms: npt.NDArray[np.float32],
-    intensity_measure: Callable,
-    use_numexpr: bool = True,
-) -> pd.DataFrame:
-    """Compute rotated intensity measure statistics for multiple waveforms.
-
-    Parameters
-    ----------
-    waveforms : ndarray of float32 with shape `(n_stations, n_timesteps, n_components)`
-        Acceleration waveforms array (g).
-    intensity_measure : callable
-        Function that computes the intensity measure. Should accept a 2D array
-        of shape `(n_stations, n_timesteps)` and return a 1D array of shape
-        `(n_stations,)`.
-    use_numexpr : bool, optional
-        Use numexpr for computation, by default True.
-
-    Returns
-    -------
-    pandas.DataFrame with columns `['000', '090', 'ver', 'geom', 'rotd100', 'rotd50', 'rotd0']`
-        DataFrame containing intensity measure statistics. Each row represents
-        statistics for a single station.
-    """
-
-    (stations, _, _) = waveforms.shape
-    values = np.zeros(shape=(stations, 180), dtype=waveforms.dtype)
-
-    comp_0 = waveforms[:, :, Component.COMP_0.value]
-    comp_90 = waveforms[:, :, Component.COMP_90.value]
-    for i in range(180):
-        theta = np.deg2rad(i).astype(np.float32)
-
-        if use_numexpr:
-            values[:, i] = intensity_measure(
-                ne.evaluate(
-                    "cos(theta) * comp_0 + sin(theta) * comp_90",
-                    {"comp_0": comp_0, "comp_90": comp_90, "theta": theta},
-                ),
-            )
-        else:
-            values[:, i] = intensity_measure(
-                np.cos(theta) * comp_0 + np.sin(theta) * comp_90
-            )
-
-    comp_0 = values[:, 0]
-    comp_90 = values[:, 90]
-    comp_ver = waveforms[:, :, Component.COMP_VER.value]
-    ver = intensity_measure(comp_ver)
-    rotated_max = np.max(values, axis=1)
-    rotated_median = np.median(values, axis=1)
-    rotated_min = np.min(values, axis=1)
-    return pd.DataFrame(
-        {
-            "000": comp_0,
-            "090": comp_90,
-            "ver": ver,
-            "geom": np.sqrt(comp_0 * comp_90),
-            "rotd100": rotated_max,
-            "rotd50": rotated_median,
-            "rotd0": rotated_min,
-        }
-    )
-
-
 def significant_duration(
-    waveforms: npt.NDArray[np.float32],
+    waveforms: SingleWaveformArray,
     dt: float,
     percent_low: float,
     percent_high: float,
@@ -319,7 +254,7 @@ def significant_duration(
 
 
 def fourier_amplitude_spectra(
-    waveforms: npt.NDArray[np.float32],
+    waveforms: ChunkedWaveformArray,
     dt: float,
     freqs: npt.NDArray[np.float32],
     ko_directory: Path,
@@ -427,7 +362,7 @@ def fourier_amplitude_spectra(
 
 
 def peak_ground_acceleration(
-    waveform: npt.NDArray[np.float32], use_numexpr: bool = True
+    waveform: ChunkedWaveformArray, use_numexpr: bool = True
 ) -> pd.DataFrame:
     """Compute Peak Ground Acceleration (PGA) for waveforms.
 
@@ -449,7 +384,7 @@ def peak_ground_acceleration(
 
 
 def peak_ground_velocity(
-    waveform: npt.NDArray[np.float32], dt: float, use_numexpr: bool = True
+    waveform: ChunkedWaveformArray, dt: float, use_numexpr: bool = True
 ) -> pd.DataFrame:
     """Compute Peak Ground Velocity (PGV) for waveforms.
 
@@ -477,7 +412,7 @@ def peak_ground_velocity(
 
 
 def cumulative_absolute_velocity(
-    waveform: npt.NDArray[np.float32], dt: float, threshold: Optional[float] = None
+    waveform: ChunkedWaveformArray, dt: float, threshold: Optional[float] = None
 ) -> pd.DataFrame:
     """Compute Cumulative Absolute Velocity (CAV) for waveforms.
 
@@ -521,7 +456,7 @@ def cumulative_absolute_velocity(
     )
 
 
-def arias_intensity(waveform: npt.NDArray[np.float32], dt: float) -> pd.DataFrame:
+def arias_intensity(waveform: ChunkedWaveformArray, dt: float) -> pd.DataFrame:
     """Compute Arias Intensity (AI) for waveforms.
 
     Parameters
@@ -558,7 +493,7 @@ def arias_intensity(waveform: npt.NDArray[np.float32], dt: float) -> pd.DataFram
 
 
 def ds575(
-    waveform: npt.NDArray[np.float32], dt: float, use_numexpr: bool = True
+    waveform: ChunkedWaveformArray, dt: float, use_numexpr: bool = True
 ) -> pd.DataFrame:
     """Compute 5-75% Significant Duration (DS575) for waveforms.
 
@@ -597,7 +532,7 @@ def ds575(
 
 
 def ds595(
-    waveform: npt.NDArray[np.float32], dt: float, use_numexpr: bool = True
+    waveform: ChunkedWaveformArray, dt: float, use_numexpr: bool = True
 ) -> pd.DataFrame:
     """Compute 5-95% Significant Duration (DS595) for waveforms.
 
