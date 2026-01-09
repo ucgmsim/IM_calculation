@@ -10,7 +10,6 @@ readme = "README.md"
 requires-python = ">=3.11,<3.14"
 dynamic = ["version"]
 dependencies = [
-  "numba",
   "numpy",
   "numexpr",
   "pandas[hdf5]",

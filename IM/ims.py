@@ -10,7 +10,6 @@ from enum import IntEnum, StrEnum
 from pathlib import Path
 from typing import Optional
 
-import numba
 import numexpr as ne
 import numpy as np
 import numpy.typing as npt
@@ -271,39 +270,6 @@ def compute_intensity_measure_rotd(
     )
 
 
-@numba.njit(parallel=True, cache=True)
-def trapz(
-    waveforms: npt.NDArray[np.float32], dt: float
-) -> npt.NDArray[np.float32]:  # pragma: no cover
-    """Compute parallel trapezium numerical integration.
-
-    Parameters
-    ----------
-    waveforms : ndarray of float32 with shape `(n_stations, n_timesteps)`
-        Waveform accelerations to integrate (units).
-    dt : float
-        Timestep resolution of the waveform array (t).
-
-    Returns
-    -------
-    ndarray of float32 with shape (n_stations,)
-        Integrated values for each waveform (units-sec).
-
-    Notes
-    -----
-    This is a parallel implementation equivalent to np.trapz, optimized for
-    performance with numba.
-    """
-    sums = np.zeros((waveforms.shape[0],), np.float32)
-    for i in numba.prange(waveforms.shape[0]):  # type: ignore
-        for j in range(waveforms.shape[1]):
-            if j == 0 or j == waveforms.shape[1] - 1:
-                sums[i] += waveforms[i, j] / 2
-            else:
-                sums[i] += waveforms[i, j]
-    return sums * dt
-
-
 def significant_duration(
     waveforms: npt.NDArray[np.float32],
     dt: float,
@@ -331,7 +297,7 @@ def significant_duration(
     ndarray of float32
         Significant duration values in seconds. Shape: (n_stations,).
     """
-    arias_intensity = _cumulative_arias_intensity(waveforms, dt)
+    arias_intensity = _utils._cumulative_arias_intensity(waveforms, dt)
     arias_intensity /= arias_intensity[:, -1][:, np.newaxis]
     if use_numexpr:
         sum_mask = ne.evaluate(
@@ -453,130 +419,6 @@ def fourier_amplitude_spectra(
     )
 
 
-@numba.njit(parallel=True, cache=True)
-def _cumulative_absolute_velocity(
-    waveform: npt.NDArray[np.float32], dt: float
-) -> npt.NDArray[np.float32]:  # pragma: no cover
-    """Compute Cumulative Absolute Velocity (CAV) of waveforms.
-
-    Parameters
-    ----------
-    waveform : ndarray of float32 with shape `(n_stations, n_timesteps)`
-        Waveform accelerations (g).
-    dt : float
-        Timestep resolution of the waveform array (s).
-
-    Returns
-    -------
-    ndarray of float32 with shape `(n_stations,)`
-        CAV values for each waveform (m/s).
-
-    Notes
-    -----
-    Implementation optimized by Jérôme Richard[0]_ for accurate integration of
-    signals with sign changes.
-
-    References
-    ----------
-    .. [0] https://stackoverflow.com/questions/79164983/numerically-integrating-signals-with-absolute-value/79173972#79173972
-    """
-    cav = np.zeros((waveform.shape[0],), dtype=np.float32)
-    dtf = np.float32(dt)
-    half = np.float32(0.5)
-    for i in numba.prange(np.int32(waveform.shape[0])):  # type: ignore
-        tmp = np.float32(0)
-        for j in range(np.int32(waveform.shape[1] - 1)):
-            v1 = waveform[i, j]
-            v2 = waveform[i, j + 1]
-            if min(v1, v2) >= 0 or max(v1, v2) <= 0:
-                tmp += dtf * (np.abs(v1) + np.abs(v2))
-            else:
-                inv_slope = dtf / (v2 - v1)
-                x0 = -v1 * inv_slope
-                tmp += x0 * np.abs(v1) + (dtf - x0) * np.abs(v2)
-        cav[i] = tmp * half
-    g = np.float32(9.81)
-    return g * cav
-
-
-@numba.njit(parallel=True, cache=True)
-def _arias_intensity(
-    waveform: npt.NDArray[np.float32], dt: float
-) -> npt.NDArray[np.float32]:  # pragma: no cover
-    """Compute Arias Intensity (AI) of waveforms.
-
-    Parameters
-    ----------
-    waveform : ndarray of float32 with shape `(n_stations, n_timesteps)`
-        Waveform accelerations (g).
-    dt : float
-        Timestep resolution of the waveform array (s).
-
-    Returns
-    -------
-    ndarray of float32 with shape `(n_stations,)`
-        AI values for each waveform (m/s).
-    """
-    ai = np.zeros((waveform.shape[0],), dtype=np.float32)
-    dtf = np.float32(dt)
-    half = np.float32(0.5)
-    for i in numba.prange(np.int32(waveform.shape[0])):  # type: ignore
-        tmp = np.float32(0)
-        for j in range(np.int32(waveform.shape[1] - 1)):
-            v1 = waveform[i, j]
-            v2 = waveform[i, j + 1]
-            if min(v1, v2) >= 0 or max(v1, v2) <= 0:
-                tmp += dtf * (np.square(v1) + np.square(v2))
-            else:
-                inv_slope = dtf / (v2 - v1)
-                x0 = -v1 * inv_slope
-                tmp += x0 * np.square(v1) + (dtf - x0) * np.square(v2)
-        ai[i] = tmp * half
-    g = np.float32(9.81)
-    return np.pi * half * g * ai
-
-
-@numba.njit(parallel=True, cache=True)
-def _cumulative_arias_intensity(
-    waveform: npt.NDArray[np.float32], dt: float
-) -> npt.NDArray[np.float32]:  # pragma: no cover
-    """Compute the cumulative Arias Intensity (AI) of a waveform.
-
-    Parameters
-    ----------
-    waveform : npt.NDArray[np.float32]
-        A 3D array of shape `(n_stations, n_samples, n_components)` for each
-        waveform in each measured component (g).
-    dt : float
-        The time step (in seconds) between consecutive samples in the waveform (s).
-
-    Returns
-    -------
-    npt.NDArray[np.float32]
-        A 1D array of shape `(n_signals,)` containing the AI values for each
-        input waveform.
-    """
-    ai = np.zeros_like(waveform, dtype=np.float32)
-    dtf = np.float32(dt)
-    half = np.float32(0.5)
-    for i in numba.prange(np.int32(waveform.shape[0])):  # type: ignore
-        tmp = np.float32(0)
-        for j in range(np.int32(waveform.shape[1] - 1)):
-            v1 = waveform[i, j]
-            v2 = waveform[i, j + 1]
-            if min(v1, v2) >= 0 or max(v1, v2) <= 0:
-                tmp += dtf * (np.square(v1) + np.square(v2))
-            else:
-                inv_slope = dtf / (v2 - v1)
-                x0 = -v1 * inv_slope
-                tmp += x0 * np.square(v1) + (dtf - x0) * np.square(v2)
-
-            ai[i, j + 1] = tmp
-
-    g = np.float32(9.81)
-    return ai * np.pi * half * g
-
-
 def peak_ground_acceleration(
     waveform: npt.NDArray[np.float32], use_numexpr: bool = True
 ) -> pd.DataFrame:
@@ -658,9 +500,9 @@ def cumulative_absolute_velocity(
         comp_90 = np.where(np.abs(comp_90) < threshold / g, np.float32(0), comp_90)
         comp_ver = np.where(np.abs(comp_ver) < threshold / g, np.float32(0), comp_ver)
 
-    comp_0_cav = _cumulative_absolute_velocity(comp_0, dt)
-    comp_90_cav = _cumulative_absolute_velocity(comp_90, dt)
-    comp_ver_cav = _cumulative_absolute_velocity(comp_ver, dt)
+    comp_0_cav = _utils._cumulative_absolute_velocity(comp_0, dt)
+    comp_90_cav = _utils._cumulative_absolute_velocity(comp_90, dt)
+    comp_ver_cav = _utils._cumulative_absolute_velocity(comp_ver, dt)
 
     return pd.DataFrame(
         {
@@ -688,9 +530,15 @@ def arias_intensity(waveform: npt.NDArray[np.float32], dt: float) -> pd.DataFram
         DataFrame containing Arias Intensity values (m/s). The 'geom' component
         is the geometric mean of the 000 and 090 components.
     """
-    arias_intensity_0 = _arias_intensity(waveform[:, :, Component.COMP_0.value], dt)
-    arias_intensity_90 = _arias_intensity(waveform[:, :, Component.COMP_90.value], dt)
-    arias_intensity_ver = _arias_intensity(waveform[:, :, Component.COMP_VER.value], dt)
+    arias_intensity_0 = _utils._arias_intensity(
+        waveform[:, :, Component.COMP_0.value], dt
+    )
+    arias_intensity_90 = _utils._arias_intensity(
+        waveform[:, :, Component.COMP_90.value], dt
+    )
+    arias_intensity_ver = _utils._arias_intensity(
+        waveform[:, :, Component.COMP_VER.value], dt
+    )
 
     return pd.DataFrame(
         {

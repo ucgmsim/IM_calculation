@@ -699,7 +699,6 @@ wheels = [
 name = "im-calculation"
 source = { editable = "." }
 dependencies = [
-    { name = "numba" },
     { name = "numexpr" },
     { name = "numpy" },
     { name = "pandas", extra = ["hdf5"] },
@@ -737,7 +736,6 @@ types = [
 requires-dist = [
     { name = "deptry", marker = "extra == 'dev'" },
     { name = "hypothesis", extras = ["numpy"], marker = "extra == 'test'" },
-    { name = "numba" },
     { name = "numexpr" },
     { name = "numpy" },
     { name = "numpydoc", marker = "extra == 'dev'" },
