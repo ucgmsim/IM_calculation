@@ -63,3 +63,73 @@ pub fn parallel_cumulative_arias_intensity(waveforms: ArrayView2<f64>, dt: f64) 
 pub fn cumulative_arias_intensity(waveforms: ArrayView2<f64>, dt: f64) -> Array2<f64> {
     ARIAS_CONSTANT * cumulative_trapz_with_fun(waveforms, dt, |x| x * x)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use approx::assert_abs_diff_eq;
+    use ndarray::array;
+
+    #[test]
+    fn test_arias_physical_constant() {
+        // If a = 1.0 cm/s^2 (constant) for 1 second with dt=1
+        // Integral of a^2 dt from 0 to 1 is 1.0.
+        // Result should be PI / (2.0 * 981.0)
+        let waveforms = array![[1.0, 1.0]];
+        let dt = 1.0;
+        let result = arias_intensity(waveforms.view(), dt);
+
+        let expected = ARIAS_CONSTANT;
+        assert_abs_diff_eq!(result[0], expected, epsilon = 1e-10);
+    }
+
+    #[test]
+    fn test_husid_plot_monotonicity() {
+        // Even with negative acceleration, the intensity must increase
+        let waveforms = array![[1.0, -2.0, 3.0, -4.0]];
+        let dt = 0.1;
+        let husid = cumulative_arias_intensity(waveforms.view(), dt);
+
+        // Check each step is >= previous step
+        for window in husid.windows((1, 2)).into_iter() {
+            assert!(
+                window[[0, 1]] >= window[[0, 0]],
+                "Husid plot must be monotonic"
+            );
+        }
+    }
+
+    #[test]
+    fn test_output_shapes() {
+        let waveforms = Array2::<f64>::zeros((3, 100));
+        let dt = 0.01;
+
+        let total = arias_intensity(waveforms.view(), dt);
+        let cumulative = cumulative_arias_intensity(waveforms.view(), dt);
+
+        assert_eq!(total.shape(), &[3]);
+        assert_eq!(cumulative.shape(), &[3, 100]);
+    }
+
+    #[test]
+    fn test_parallel_equals_sequential_total_intensity() {
+        let waveforms = array![[0.0, 1.0, 2.0], [2.0, 1.0, 0.0]];
+        let dt = 0.02;
+
+        let seq_res = arias_intensity(waveforms.view(), dt);
+        let par_res = parallel_arias_intensity(waveforms.view(), dt);
+
+        assert_abs_diff_eq!(seq_res, par_res, epsilon = 1e-10);
+    }
+
+    #[test]
+    fn test_parallel_equals_sequential_cumulative_intensity() {
+        let waveforms = array![[0.0, 1.0, 2.0], [2.0, 1.0, 0.0]];
+        let dt = 0.02;
+
+        let seq_res = cumulative_arias_intensity(waveforms.view(), dt);
+        let par_res = parallel_cumulative_arias_intensity(waveforms.view(), dt);
+
+        assert_abs_diff_eq!(seq_res, par_res, epsilon = 1e-10);
+    }
+}
