@@ -10,7 +10,6 @@ from enum import IntEnum, StrEnum
 from pathlib import Path
 from typing import Optional
 
-import numexpr as ne
 import numpy as np
 import numpy.typing as npt
 import pandas as pd
@@ -213,12 +212,12 @@ def pseudo_spectral_acceleration(
 
 
 def significant_duration(
-    waveforms: SingleWaveformArray,
+    waveforms: ChunkedWaveformArray,
     dt: float,
     percent_low: float,
     percent_high: float,
-    use_numexpr: bool = True,
-) -> npt.NDArray[np.float64]:
+    cores: int,
+) -> pd.DataFrame:
     """Compute significant duration based on Arias Intensity accumulation.
 
     Parameters
@@ -236,21 +235,45 @@ def significant_duration(
 
     Returns
     -------
-    ndarray of float64
+    DataFrame
         Significant duration values in seconds. Shape: (n_stations,).
     """
-    arias_intensity = _utils._cumulative_arias_intensity(waveforms, dt)
-    arias_intensity /= arias_intensity[:, -1][:, np.newaxis]
-    if use_numexpr:
-        sum_mask = ne.evaluate(
-            "(arias_intensity >= percent_low / 100) & (arias_intensity <= percent_high / 100)"
+    comp_0 = waveforms[Component.COMP_0]
+    comp_90 = waveforms[Component.COMP_90]
+    comp_ver = waveforms[Component.COMP_VER]
+    quant_low = percent_low / 100
+    quant_high = percent_high / 100
+
+    if cores == 1:
+        significant_duration_0 = _utils._significant_duration(
+            comp_0, dt, quant_low, quant_high
+        )
+        significant_duration_90 = _utils._significant_duration(
+            comp_90, dt, quant_low, quant_high
+        )
+        significant_duration_ver = _utils._significant_duration(
+            comp_ver, dt, quant_low, quant_high
         )
     else:
-        sum_mask = (arias_intensity >= percent_low / 100) & (
-            arias_intensity <= percent_high / 100
-        )
-    threshold_values = np.count_nonzero(sum_mask, axis=1) * dt
-    return threshold_values.ravel()
+        with environment(RAYON_NUM_THREADS=str(cores)):
+            significant_duration_0 = _utils._parallel_significant_duration(
+                comp_0, dt, quant_low, quant_high
+            )
+            significant_duration_90 = _utils._parallel_significant_duration(
+                comp_90, dt, quant_low, quant_high
+            )
+            significant_duration_ver = _utils._parallel_significant_duration(
+                comp_ver, dt, quant_low, quant_high
+            )
+
+    return pd.DataFrame(
+        {
+            "000": significant_duration_0,
+            "090": significant_duration_90,
+            "ver": significant_duration_ver,
+            "geom": np.sqrt(significant_duration_0 * significant_duration_90),
+        }
+    )
 
 
 def fourier_amplitude_spectra(
@@ -361,14 +384,44 @@ def fourier_amplitude_spectra(
     )
 
 
+def compute_intensity_measure_rotd(
+    waveforms: ChunkedWaveformArray, cores: int | None = None
+) -> pd.DataFrame:
+    comp_0 = waveforms[Component.COMP_0]
+    comp_90 = waveforms[Component.COMP_90]
+    comp_ver = waveforms[Component.COMP_VER]
+    if cores == 1:
+        rotd_stats = _utils._rotd(comp_0, comp_90)
+    else:
+        with environment(RAYON_NUM_THREADS=str(cores)):
+            rotd_stats = _utils._rotd_parallel(comp_0, comp_90)
+    pga_comp_0 = np.abs(comp_0).max(axis=1)
+    pga_comp_90 = np.abs(comp_90).max(axis=1)
+    pga_ver = np.abs(comp_ver).max(axis=1)
+    rotd0 = rotd_stats[:, 0]
+    rotd50 = rotd_stats[:, 1]
+    rotd100 = rotd_stats[:, 2]
+    return pd.DataFrame(
+        {
+            "000": pga_comp_0,
+            "090": pga_comp_90,
+            "ver": pga_ver,
+            "geom": np.sqrt(pga_comp_0 * pga_comp_90),
+            "rotd100": rotd100,
+            "rotd50": rotd50,
+            "rotd0": rotd0,
+        }
+    )
+
+
 def peak_ground_acceleration(
-    waveform: ChunkedWaveformArray, use_numexpr: bool = True
+    waveform: ChunkedWaveformArray, cores: int | None = None
 ) -> pd.DataFrame:
     """Compute Peak Ground Acceleration (PGA) for waveforms.
 
     Parameters
     ----------
-    waveform : ndarray of float64 with shape `(n_stations, n_timesteps, n_components)`
+    waveform : ndarray of float64 with shape `(n_components, n_stations, n_timesteps)`
         Acceleration waveforms in g units.
     use_numexpr : bool, optional
         Use numexpr for computation, by default True.
@@ -378,19 +431,17 @@ def peak_ground_acceleration(
     pandas.DataFrame with columns `['000', '090', 'ver', 'geom', 'rotd100', 'rotd50', 'rotd0']`
         DataFrame containing PGA values with rotated components in g-units.
     """
-    return compute_intensity_measure_rotd(
-        waveform, lambda v: np.abs(v).max(axis=1), use_numexpr=use_numexpr
-    )
+    return compute_intensity_measure_rotd(waveform, cores=cores)
 
 
 def peak_ground_velocity(
-    waveform: ChunkedWaveformArray, dt: float, use_numexpr: bool = True
+    waveform: ChunkedWaveformArray, dt: float, cores: int | None = None
 ) -> pd.DataFrame:
     """Compute Peak Ground Velocity (PGV) for waveforms.
 
     Parameters
     ----------
-    waveform : ndarray of float64 with shape `(n_stations, n_timesteps, n_components)`
+    waveform : ndarray of float64 with shape `(n_components, n_stations, n_timesteps)`
         Acceleration waveforms in g units.
     dt : float
         Timestep resolution of the waveform array.
@@ -405,9 +456,7 @@ def peak_ground_velocity(
     """
     g = 981
     return compute_intensity_measure_rotd(
-        sp.integrate.cumulative_trapezoid(waveform, dx=dt, axis=1),
-        lambda v: g * np.abs(v).max(axis=1),
-        use_numexpr=use_numexpr,
+        g * sp.integrate.cumulative_trapezoid(waveform, dx=dt, axis=-1), cores=cores
     )
 
 
@@ -415,7 +464,7 @@ def cumulative_absolute_velocity(
     waveform: ChunkedWaveformArray,
     dt: float,
     threshold: Optional[float] = None,
-    cores: float | None = None,
+    cores: int | None = None,
 ) -> pd.DataFrame:
     """Compute Cumulative Absolute Velocity (CAV) for waveforms.
 
@@ -444,6 +493,7 @@ def cumulative_absolute_velocity(
         comp_0 = np.where(np.abs(comp_0) < threshold / g, np.float64(0), comp_0)
         comp_90 = np.where(np.abs(comp_90) < threshold / g, np.float64(0), comp_90)
         comp_ver = np.where(np.abs(comp_ver) < threshold / g, np.float64(0), comp_ver)
+
     if cores == 1:
         comp_0_cav = _utils._cav(comp_0, dt)
         comp_90_cav = _utils._cav(comp_90, dt)
@@ -464,7 +514,9 @@ def cumulative_absolute_velocity(
     )
 
 
-def arias_intensity(waveform: ChunkedWaveformArray, dt: float) -> pd.DataFrame:
+def arias_intensity(
+    waveform: ChunkedWaveformArray, dt: float, cores: int | None = None
+) -> pd.DataFrame:
     """Compute Arias Intensity (AI) for waveforms.
 
     Parameters
@@ -480,29 +532,31 @@ def arias_intensity(waveform: ChunkedWaveformArray, dt: float) -> pd.DataFrame:
         DataFrame containing Arias Intensity values (m/s). The 'geom' component
         is the geometric mean of the 000 and 090 components.
     """
-    arias_intensity_0 = _utils._arias_intensity(
-        waveform[:, :, Component.COMP_0.value], dt
-    )
-    arias_intensity_90 = _utils._arias_intensity(
-        waveform[:, :, Component.COMP_90.value], dt
-    )
-    arias_intensity_ver = _utils._arias_intensity(
-        waveform[:, :, Component.COMP_VER.value], dt
-    )
+    comp_0 = waveform[Component.COMP_0]
+    comp_90 = waveform[Component.COMP_90]
+    comp_ver = waveform[Component.COMP_VER]
+
+    if cores == 1:
+        comp_0_ai = _utils._arias_intensity(comp_0, dt)
+        comp_90_ai = _utils._arias_intensity(comp_90, dt)
+        comp_ver_ai = _utils._arias_intensity(comp_ver, dt)
+    else:
+        with environment(RAYON_NUM_THREADS=str(cores)):
+            comp_0_ai = _utils._parallel_arias_intensity(comp_0, dt)
+            comp_90_ai = _utils._parallel_arias_intensity(comp_90, dt)
+            comp_ver_ai = _utils._parallel_arias_intensity(comp_ver, dt)
 
     return pd.DataFrame(
         {
-            "000": arias_intensity_0,
-            "090": arias_intensity_90,
-            "ver": arias_intensity_ver,
-            "geom": np.sqrt(arias_intensity_0 * arias_intensity_90),
+            "000": comp_0_ai,
+            "090": comp_90_ai,
+            "ver": comp_ver_ai,
+            "geom": np.sqrt(comp_0_ai * comp_90_ai),
         }
     )
 
 
-def ds575(
-    waveform: ChunkedWaveformArray, dt: float, use_numexpr: bool = True
-) -> pd.DataFrame:
+def ds575(waveform: ChunkedWaveformArray, dt: float, cores: int) -> pd.DataFrame:
     """Compute 5-75% Significant Duration (DS575) for waveforms.
 
     Parameters
@@ -519,29 +573,10 @@ def ds575(
     pandas.DataFrame with columns `['000', '090', 'ver', 'geom', 'rotd100', 'rotd50', 'rotd0']`
         DataFrame containing DS575 values (in seconds) with rotated components.
     """
-    significant_duration_0 = significant_duration(
-        waveform[:, :, Component.COMP_0.value], dt, 5, 75, use_numexpr
-    )
-    significant_duration_90 = significant_duration(
-        waveform[:, :, Component.COMP_90.value], dt, 5, 75, use_numexpr
-    )
-    significant_duration_ver = significant_duration(
-        waveform[:, :, Component.COMP_VER.value], dt, 5, 75, use_numexpr
-    )
-
-    return pd.DataFrame(
-        {
-            "000": significant_duration_0,
-            "090": significant_duration_90,
-            "ver": significant_duration_ver,
-            "geom": np.sqrt(significant_duration_0 * significant_duration_90),
-        }
-    )
+    return significant_duration(waveform, dt, 5, 75, cores)
 
 
-def ds595(
-    waveform: ChunkedWaveformArray, dt: float, use_numexpr: bool = True
-) -> pd.DataFrame:
+def ds595(waveform: ChunkedWaveformArray, dt: float, cores: int) -> pd.DataFrame:
     """Compute 5-95% Significant Duration (DS595) for waveforms.
 
     Parameters
@@ -558,21 +593,4 @@ def ds595(
     pandas.DataFrame with columns `['000', '090', 'ver', 'geom', 'rotd100', 'rotd50', 'rotd0']`
         DataFrame containing DS595 values (in seconds) with rotated components.
     """
-    significant_duration_0 = significant_duration(
-        waveform[:, :, Component.COMP_0.value], dt, 5, 95, use_numexpr
-    )
-    significant_duration_90 = significant_duration(
-        waveform[:, :, Component.COMP_90.value], dt, 5, 95, use_numexpr
-    )
-    significant_duration_ver = significant_duration(
-        waveform[:, :, Component.COMP_VER.value], dt, 5, 95, use_numexpr
-    )
-
-    return pd.DataFrame(
-        {
-            "000": significant_duration_0,
-            "090": significant_duration_90,
-            "ver": significant_duration_ver,
-            "geom": np.sqrt(significant_duration_0 * significant_duration_90),
-        }
-    )
+    return significant_duration(waveform, dt, 5, 95, cores)
