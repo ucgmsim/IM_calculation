@@ -136,5 +136,129 @@ where
     out
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use approx::assert_abs_diff_eq;
+    use ndarray::array;
 
+    // A helper to define a linear function for testing
+    fn identity(x: f64) -> f64 {
+        x
+    }
+    fn rectified(x: f64) -> f64 {
+        x.abs()
+    }
+
+    #[test]
+    fn test_trapz_step_zero_crossing_precision() {
+        //
+        // Scenario: A signal goes from -1.0 to 1.0 over dt=2.0.
+        // It crosses zero exactly in the middle.
+        // We integrate |x| (rectified).
+
+        // STANDARD TRAPEZIUM MATH:
+        // Area = 0.5 * dt * (|v1| + |v2|)
+        //      = 0.5 * 2.0 * (1.0 + 1.0) = 2.0
+        // This is WRONG for |x|. The actual area of two triangles is 1.0.
+
+        // `trapz_step` detects the crossing and splits the interval.
+        // It should return exactly 1.0 * 2 (since the 0.5 factor is applied later).
+
+        let v1 = -1.0;
+        let v2 = 1.0;
+        let dt = 2.0;
+
+        // Note: trapz_step returns 2x the area (the 0.5 is in trapz_one)
+        let result_2x = trapz_step(v1, v2, dt, &rectified);
+
+        // We expect the area to be 1.0, so the function returns 2.0
+        assert_abs_diff_eq!(result_2x, 2.0, epsilon = 1e-10);
+    }
+
+    #[test]
+    fn test_trapz_matches_analytical_result() {
+        // Integrate f(x) = x over [0, 5]
+        // Analytical integral of x is x^2/2.
+        // From 0 to 5, Area = 12.5.
+
+        let waveform = array![0.0, 1.0, 2.0, 3.0, 4.0, 5.0];
+        let dt = 1.0;
+
+        let area = trapz_one_with_fun(waveform.view(), dt, &identity);
+
+        assert_abs_diff_eq!(area, 12.5, epsilon = 1e-10);
+    }
+
+    #[test]
+    fn test_cumulative_matches_total() {
+        // Guarantee: The last point of a cumulative integral MUST
+        // equal the result of the total integral.
+        let waveform = array![0.5, -0.5, 1.0, -2.0, 3.0];
+        let dt = 0.1;
+
+        let total = trapz_one_with_fun(waveform.view(), dt, &rectified);
+        let cumulative = cumulative_trapz_one_with_fun(waveform.view(), dt, &rectified);
+
+        assert_abs_diff_eq!(*cumulative.last().unwrap(), total, epsilon = 1e-10);
+    }
+
+    #[test]
+    fn test_linearity_scaling() {
+        // Guarantee: If we double dt, the area should double.
+        // This ensures variables aren't hardcoded.
+        let waveform = array![1.0, 2.0, 3.0];
+
+        let area_dt1 = trapz_one_with_fun(waveform.view(), 1.0, &identity);
+        let area_dt2 = trapz_one_with_fun(waveform.view(), 2.0, &identity);
+
+        assert_abs_diff_eq!(area_dt2, area_dt1 * 2.0, epsilon = 1e-10);
+    }
+
+    #[test]
+    fn test_parallel_equals_sequential() {
+        // This test prevents "implementation drift" where the parallel version
+        // gets updated but the sequential one is forgotten.
+
+        // Shape (2 rows, 3 cols)
+        let waveforms = array![[0.0, 1.0, 2.0], [2.0, 1.0, 0.0]];
+        let dt = 1.0;
+
+        let seq_res = trapz_with_fun(waveforms.view(), dt, identity);
+        let par_res = parallel_trapz_with_fun(waveforms.view(), dt, identity);
+
+        // Check if shapes match
+        assert_eq!(
+            seq_res.dim(),
+            par_res.dim(),
+            "Sequential and Parallel output shapes mismatch"
+        );
+
+        // Check if values match
+        assert_abs_diff_eq!(seq_res, par_res, epsilon = 1e-10);
+    }
+
+    #[test]
+    fn test_orientation_consistency() {
+        // Checks code integrates along rows (Axis 1).
+        let waveforms = array![
+            [1.0, 1.0, 1.0], // Constant 1, Length 3, Area should be 2.0
+            [2.0, 2.0, 2.0]  // Constant 2, Length 3, Area should be 4.0
+        ];
+        let dt = 1.0;
+
+        let result = trapz_with_fun(waveforms.view(), dt, identity);
+
+        // If the code integrates correctly (Batch, Time), result should have 2 elements.
+        // If it integrates incorrectly (Time, Batch), it will have 3 elements.
+        assert_eq!(
+            result.len(),
+            2,
+            "Orientation Bug: Output should have 2 elements (one per row), found {}",
+            result.len()
+        );
+
+        assert_abs_diff_eq!(result[0], 2.0, epsilon = 1e-10);
+        assert_abs_diff_eq!(result[1], 4.0, epsilon = 1e-10);
+    }
 }
