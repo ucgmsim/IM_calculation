@@ -2,6 +2,7 @@
 name = "utils"
 version = "0.1.0"
 edition = "2024"
+resolver = "2"
 
 [lib]
 name = "_utils"
@@ -12,3 +13,7 @@ path = "src-rust/lib.rs"
 ndarray = { version = "0.17.1", features = ["rayon"] }
 numpy = "0.27"
 pyo3 = "0.27"
+
+[dev-dependencies]
+ndarray = { version = "0.17.1", features = ["rayon", "approx"] }
+approx = "0.5.1"
