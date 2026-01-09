@@ -88,10 +88,5 @@ where
     out
 }
 
-pub fn parallel_trapz(waveforms: ArrayView2<f64>, dt: f64) -> Array1<f64> {
-    parallel_reduce_rows(waveforms, |waveform| trapz_one(waveform, dt))
-}
 
-pub fn trapz(waveforms: ArrayView2<f64>, dt: f64) -> Array1<f64> {
-    waveforms.map_axis(Axis(0), |waveform| trapz_one(waveform, dt))
 }
