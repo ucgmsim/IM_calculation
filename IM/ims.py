@@ -432,9 +432,9 @@ def cumulative_absolute_velocity(
         DataFrame containing CAV values (m/s) with rotated components.
     """
 
-    comp_0 = waveform[:, :, Component.COMP_0]
-    comp_90 = waveform[:, :, Component.COMP_90]
-    comp_ver = waveform[:, :, Component.COMP_VER]
+    comp_0 = waveform[Component.COMP_0]
+    comp_90 = waveform[Component.COMP_90]
+    comp_ver = waveform[Component.COMP_VER]
 
     if threshold:
         g = 981
