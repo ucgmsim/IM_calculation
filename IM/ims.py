@@ -442,9 +442,9 @@ def cumulative_absolute_velocity(
         comp_90 = np.where(np.abs(comp_90) < threshold / g, np.float64(0), comp_90)
         comp_ver = np.where(np.abs(comp_ver) < threshold / g, np.float64(0), comp_ver)
 
-    comp_0_cav = _utils._cumulative_absolute_velocity(comp_0, dt)
-    comp_90_cav = _utils._cumulative_absolute_velocity(comp_90, dt)
-    comp_ver_cav = _utils._cumulative_absolute_velocity(comp_ver, dt)
+    comp_0_cav = _utils._cav(comp_0, dt)
+    comp_90_cav = _utils._cav(comp_90, dt)
+    comp_ver_cav = _utils._cav(comp_ver, dt)
 
     return pd.DataFrame(
         {
