@@ -124,11 +124,8 @@ pub fn newmark_beta_method_parallel(
 #[cfg(test)]
 mod tests {
 
-    use ndarray::Zip;
-
-    // Tests are conducted with 64-bit floating point precision.
-    // 32-bit floating point precision accumulates too many errors, which results in the tests failing!
     use super::*;
+    use approx::assert_abs_diff_eq;
     use std::f64::consts::PI;
     const XI: f64 = 0.05;
     // Linear gamma and beta settings
@@ -174,17 +171,6 @@ mod tests {
                 (waveform[i] - 2.0 * waveform[i - 1] + waveform[i - 2]) / (dt * dt)
             } else {
                 (waveform[i + 1] - 2.0 * waveform[i] + waveform[i - 1]) / (dt * dt)
-            }
-        })
-    }
-
-    fn absolute_error(y_true: &Array<f64, Ix1>, y_est: &Array<f64, Ix1>) -> f64 {
-        Zip::from(y_true).and(y_est).fold(0.0, |max_error, &x, &y| {
-            let error = (x - y).abs();
-            if error > max_error {
-                error
-            } else {
-                max_error
             }
         })
     }
@@ -247,17 +233,12 @@ mod tests {
         let k = M * w * w;
         let sdof_invariant = M * du2 + c * du + k * u + M * waveform;
         // Skipping the first and last value of u because the differentiation is less accurate at the boundary.
+
         let max_deviation = sdof_invariant
             .slice(s![1..sdof_invariant.len() - 1])
-            .iter()
-            .fold(0.0, |x, &y| if x < y.abs() { y.abs() } else { x });
-        assert!(
-            max_deviation < 5e-4,
-            "SDOF equation not solved, invariant = {}, mean deviation = {:?}, max deviation = {}",
-            sdof_invariant,
-            sdof_invariant.mean(),
-            max_deviation
-        );
+            .map(|&x| x.abs())
+            .fold(0.0, |x: f64, &y| x.max(y));
+        assert_abs_diff_eq!(max_deviation, 0.0, epsilon = 5e-4);
     }
 
     #[test]
@@ -269,13 +250,7 @@ mod tests {
 
         let u = newmark_beta_solver(waveform.view(), dt, w, 0.0, GAMMA, BETA, 1.0, 0.0);
         let analytical = (t * w).cos();
-        let max_deviation = absolute_error(&analytical, &u);
-
-        assert!(
-            max_deviation < 5e-4,
-            "SDOF equation not solved, deviation = {}",
-            max_deviation
-        );
+        assert_abs_diff_eq!(u, analytical, epsilon = 5e-4);
     }
 
     #[test]
@@ -287,13 +262,7 @@ mod tests {
         let xi = 1.0;
         let u = newmark_beta_solver(waveform.view(), dt, w, xi, GAMMA, BETA, 1.0, 0.0);
         let analytical = t.map(|&x| (-x).exp() * (x + 1.0));
-        let max_deviation = absolute_error(&analytical, &u);
-
-        assert!(
-            max_deviation < 5e-4,
-            "SDOF equation not solved, deviation = {}",
-            max_deviation
-        );
+        assert_abs_diff_eq!(u, analytical, epsilon = 5e-4);
     }
 
     #[test]
@@ -306,12 +275,6 @@ mod tests {
         let u = newmark_beta_solver(waveform.view(), dt, w, xi, GAMMA, BETA, 0.0, 0.0);
 
         let analytical = t.map(|&x| -0.5 * (-x).exp() * (x - x.exp() * x.cos() + 1.0));
-        let max_deviation = absolute_error(&analytical, &u);
-
-        assert!(
-            max_deviation < 5e-4,
-            "SDOF equation not solved, deviation = {}",
-            max_deviation
-        );
+        assert_abs_diff_eq!(u, analytical, epsilon = 5e-4);
     }
 }
