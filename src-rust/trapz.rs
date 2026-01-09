@@ -1,11 +1,6 @@
 use crate::utils::{parallel_map_rows, parallel_reduce_rows};
 use ndarray::prelude::*;
 
-fn trapz_one(waveform: ArrayView1<f64>, dt: f64) -> f64 {
-    let sum = waveform.sum() - waveform[0] / 2.0 - waveform[waveform.dim() - 1] / 2.0;
-    sum * dt
-}
-
 fn trapz_step<F>(v1: f64, v2: f64, dt: f64, f: &F) -> f64
 where
     F: Fn(f64) -> f64,
