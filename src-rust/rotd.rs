@@ -51,7 +51,7 @@ mod tests {
         let comp_0 = array![1.0f64, 0.0f64];
         let comp_90 = array![0.0f64, 1.0f64];
         let (min, median, max) = rotd_calculation(comp_0.view(), comp_90.view());
-        let expected_min = 2.0.sqrt() / 2.0; // e.g. at pi / 4 degrees
+        let expected_min = 2.0f64.sqrt() / 2.0; // e.g. at pi / 4 degrees
         let expected_max = 1.0; // e.g. at 0 degrees
         let expected_median = 0.9238443540096138; // at 23 degrees, derived independently with numpy
         assert!(
