@@ -412,7 +412,10 @@ def peak_ground_velocity(
 
 
 def cumulative_absolute_velocity(
-    waveform: ChunkedWaveformArray, dt: float, threshold: Optional[float] = None
+    waveform: ChunkedWaveformArray,
+    dt: float,
+    threshold: Optional[float] = None,
+    cores: float | None = None,
 ) -> pd.DataFrame:
     """Compute Cumulative Absolute Velocity (CAV) for waveforms.
 
@@ -441,10 +444,15 @@ def cumulative_absolute_velocity(
         comp_0 = np.where(np.abs(comp_0) < threshold / g, np.float64(0), comp_0)
         comp_90 = np.where(np.abs(comp_90) < threshold / g, np.float64(0), comp_90)
         comp_ver = np.where(np.abs(comp_ver) < threshold / g, np.float64(0), comp_ver)
-
-    comp_0_cav = _utils._cav(comp_0, dt)
-    comp_90_cav = _utils._cav(comp_90, dt)
-    comp_ver_cav = _utils._cav(comp_ver, dt)
+    if cores == 1:
+        comp_0_cav = _utils._cav(comp_0, dt)
+        comp_90_cav = _utils._cav(comp_90, dt)
+        comp_ver_cav = _utils._cav(comp_ver, dt)
+    else:
+        with environment(RAYON_NUM_THREADS=str(cores)):
+            comp_0_cav = _utils._parallel_cav(comp_0, dt)
+            comp_90_cav = _utils._parallel_cav(comp_90, dt)
+            comp_ver_cav = _utils._parallel_cav(comp_ver, dt)
 
     return pd.DataFrame(
         {
