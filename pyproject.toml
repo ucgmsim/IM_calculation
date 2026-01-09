@@ -117,3 +117,10 @@ checks = [
   "RT04",
   "YD01",
 ]
+
+[tool.uv]
+cache-keys = [
+  { file = "pyproject.toml" },
+  { file = "Cargo.toml" },
+  { file = "**/*.rs" },
+]
