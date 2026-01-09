@@ -115,6 +115,18 @@ mod _utils {
     }
 
     #[pyfunction]
+    fn _rotd<'py>(
+        py: Python<'py>,
+        comp_0_py: PyReadonlyArray2<f64>,
+        comp_90_py: PyReadonlyArray2<f64>,
+    ) -> Bound<'py, PyArray2<f64>> {
+        let comp_0 = comp_0_py.as_array();
+        let comp_90 = comp_90_py.as_array();
+        let rotd_stats = rotd::rotd(comp_0, comp_90);
+        rotd_stats.into_pyarray(py)
+    }
+
+    #[pyfunction]
     fn _significant_duration<'py>(
         py: Python<'py>,
         waveforms_py: PyReadonlyArray2<f64>,
