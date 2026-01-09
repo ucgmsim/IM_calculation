@@ -3,6 +3,7 @@ mod cav;
 mod constants;
 mod psa;
 mod rotd;
+mod significant_duration;
 mod trapz;
 mod utils;
 use pyo3::prelude::*;
@@ -19,6 +20,7 @@ mod _utils {
     use crate::cav;
     use crate::psa;
     use crate::rotd;
+    use crate::significant_duration;
 
     /// Newmark-beta method
     #[pyfunction]
@@ -110,5 +112,34 @@ mod _utils {
         let comp_90 = comp_90_py.as_array();
         let rotd_stats = rotd::rotd_parallel(comp_0, comp_90);
         rotd_stats.into_pyarray(py)
+    }
+
+    #[pyfunction]
+    fn _significant_duration<'py>(
+        py: Python<'py>,
+        waveforms_py: PyReadonlyArray2<f64>,
+        dt: f64,
+        low: f64,
+        high: f64,
+    ) -> Bound<'py, PyArray1<f64>> {
+        let waveforms = waveforms_py.as_array();
+        let arias_intensity = arias_intensity::cumulative_arias_intensity(waveforms, dt);
+        let ds = significant_duration::significant_duration(arias_intensity, dt, low, high);
+        ds.into_pyarray(py)
+    }
+
+    #[pyfunction]
+    fn _parallel_significant_duration<'py>(
+        py: Python<'py>,
+        waveforms_py: PyReadonlyArray2<f64>,
+        dt: f64,
+        low: f64,
+        high: f64,
+    ) -> Bound<'py, PyArray1<f64>> {
+        let waveforms = waveforms_py.as_array();
+        let arias_intensity = arias_intensity::parallel_cumulative_arias_intensity(waveforms, dt);
+        let ds =
+            significant_duration::parallel_significant_duration(arias_intensity, dt, low, high);
+        ds.into_pyarray(py)
     }
 }
