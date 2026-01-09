@@ -26,7 +26,7 @@ where
     let sum = waveform.windows(2).into_iter().fold(0.0, |sum, window| {
         let v1 = window[0];
         let v2 = window[1];
-        trapz_step(v1, v2, dt, f)
+        sum + trapz_step(v1, v2, dt, f)
     });
 
     0.5 * sum
