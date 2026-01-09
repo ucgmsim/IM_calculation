@@ -58,7 +58,7 @@ pub fn trapz_with_fun<F>(waveforms: ArrayView2<f64>, dt: f64, f: F) -> Array1<f6
 where
     F: Fn(f64) -> f64,
 {
-    waveforms.map_axis(Axis(0), |waveform| trapz_one_with_fun(waveform, dt, &f))
+    waveforms.map_axis(Axis(1), |waveform| trapz_one_with_fun(waveform, dt, &f))
 }
 
 pub fn parallel_cumulative_trapz_with_fun<F>(
