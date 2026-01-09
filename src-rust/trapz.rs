@@ -37,7 +37,7 @@ where
     for (window, v) in waveform
         .windows(2)
         .into_iter()
-        .zip(cumulative_sum.iter_mut())
+        .zip(cumulative_sum.iter_mut().skip(1))
     {
         let v1 = window[0];
         let v2 = window[1];
