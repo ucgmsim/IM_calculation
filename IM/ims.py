@@ -102,9 +102,9 @@ def pseudo_spectral_acceleration(
 
     Parameters
     ----------
-    waveforms : ndarray of float32 with shape `(n_components, n_stations, n_timesteps)`
+    waveforms : ndarray of float64 with shape `(n_components, n_stations, n_timesteps)`
         Acceleration waveforms array (g).
-    periods : ndarray of float32
+    periods : ndarray of float64
         Periods for PSA computation (s). These correspond to SDOF oscillator natural frequencies.
     dt : float
         Timestep resolution of waveform array (s).
@@ -218,12 +218,12 @@ def significant_duration(
     percent_low: float,
     percent_high: float,
     use_numexpr: bool = True,
-) -> npt.NDArray[np.float32]:
+) -> npt.NDArray[np.float64]:
     """Compute significant duration based on Arias Intensity accumulation.
 
     Parameters
     ----------
-    waveforms : ndarray of float32 with shape `(n_stations, n_timesteps)`
+    waveforms : ndarray of float64 with shape `(n_stations, n_timesteps)`
         Waveform accelerations (g).
     dt : float
         Timestep resolution of the waveform array (s).
@@ -236,7 +236,7 @@ def significant_duration(
 
     Returns
     -------
-    ndarray of float32
+    ndarray of float64
         Significant duration values in seconds. Shape: (n_stations,).
     """
     arias_intensity = _utils._cumulative_arias_intensity(waveforms, dt)
@@ -256,7 +256,7 @@ def significant_duration(
 def fourier_amplitude_spectra(
     waveforms: ChunkedWaveformArray,
     dt: float,
-    freqs: npt.NDArray[np.float32],
+    freqs: npt.NDArray[np.float64],
     ko_directory: Path,
     cores: int = multiprocessing.cpu_count(),
 ) -> xr.DataArray:
@@ -267,11 +267,11 @@ def fourier_amplitude_spectra(
 
     Parameters
     ----------
-    waveforms : ndarray of float32 with shape `(n_stations, n_timesteps, n_components)`
+    waveforms : ndarray of float64 with shape `(n_stations, n_timesteps, n_components)`
         Waveform array (g).
     dt : float
         Timestep resolution of the waveforms (s).
-    freqs : ndarray of float32
+    freqs : ndarray of float64
         Frequencies at which to compute FAS (Hz).
     ko_directory : Path
         Directory containing precomputed Konno-Ohmachi matrices.
@@ -368,7 +368,7 @@ def peak_ground_acceleration(
 
     Parameters
     ----------
-    waveform : ndarray of float32 with shape `(n_stations, n_timesteps, n_components)`
+    waveform : ndarray of float64 with shape `(n_stations, n_timesteps, n_components)`
         Acceleration waveforms in g units.
     use_numexpr : bool, optional
         Use numexpr for computation, by default True.
@@ -390,7 +390,7 @@ def peak_ground_velocity(
 
     Parameters
     ----------
-    waveform : ndarray of float32 with shape `(n_stations, n_timesteps, n_components)`
+    waveform : ndarray of float64 with shape `(n_stations, n_timesteps, n_components)`
         Acceleration waveforms in g units.
     dt : float
         Timestep resolution of the waveform array.
@@ -418,7 +418,7 @@ def cumulative_absolute_velocity(
 
     Parameters
     ----------
-    waveform : ndarray of float32 with shape `(n_stations, n_timesteps, n_components)`
+    waveform : ndarray of float64 with shape `(n_stations, n_timesteps, n_components)`
         Acceleration waveforms (g).
     dt : float
         Timestep resolution of the waveform array (s).
@@ -438,9 +438,9 @@ def cumulative_absolute_velocity(
 
     if threshold:
         g = 981
-        comp_0 = np.where(np.abs(comp_0) < threshold / g, np.float32(0), comp_0)
-        comp_90 = np.where(np.abs(comp_90) < threshold / g, np.float32(0), comp_90)
-        comp_ver = np.where(np.abs(comp_ver) < threshold / g, np.float32(0), comp_ver)
+        comp_0 = np.where(np.abs(comp_0) < threshold / g, np.float64(0), comp_0)
+        comp_90 = np.where(np.abs(comp_90) < threshold / g, np.float64(0), comp_90)
+        comp_ver = np.where(np.abs(comp_ver) < threshold / g, np.float64(0), comp_ver)
 
     comp_0_cav = _utils._cumulative_absolute_velocity(comp_0, dt)
     comp_90_cav = _utils._cumulative_absolute_velocity(comp_90, dt)
@@ -461,7 +461,7 @@ def arias_intensity(waveform: ChunkedWaveformArray, dt: float) -> pd.DataFrame:
 
     Parameters
     ----------
-    waveform : ndarray of float32 with shape `(n_stations, n_timesteps, n_components)`
+    waveform : ndarray of float64 with shape `(n_stations, n_timesteps, n_components)`
         Acceleration waveforms (g).
     dt : float
         Timestep resolution of the waveform array (s).
@@ -499,7 +499,7 @@ def ds575(
 
     Parameters
     ----------
-    waveform : ndarray of float32 with shape `(n_stations, n_timesteps, n_components)`
+    waveform : ndarray of float64 with shape `(n_stations, n_timesteps, n_components)`
         Acceleration waveforms (g).
     dt : float
         Timestep resolution of the waveform array (s).
@@ -538,7 +538,7 @@ def ds595(
 
     Parameters
     ----------
-    waveform : ndarray of float32 with shape `(n_stations, n_timesteps, n_components)`
+    waveform : ndarray of float64 with shape `(n_stations, n_timesteps, n_components)`
         Acceleration waveforms (g).
     dt : float
         Timestep resolution of the waveform array (s).
