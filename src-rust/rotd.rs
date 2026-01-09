@@ -41,6 +41,21 @@ pub fn rotd_parallel(comp_0: ArrayView2<f64>, comp_90: ArrayView2<f64>) -> Array
     out
 }
 
+pub fn rotd(comp_0: ArrayView2<f64>, comp_90: ArrayView2<f64>) -> Array<f64, Ix2> {
+    let (ns, _) = comp_0.dim();
+    let (ns2, _) = comp_90.dim();
+    assert_eq!(ns, ns2);
+    let mut out = Array::<f64, Ix2>::zeros((ns, 3));
+    Zip::from(out.rows_mut())
+        .and(comp_0.rows())
+        .and(comp_90.rows())
+        .for_each(|mut stats, comp_0, comp_90| {
+            let (min, median, max) = rotd_calculation(comp_0, comp_90);
+            stats.assign(&array![min, median, max]);
+        });
+    out
+}
+
 #[cfg(test)]
 mod tests {
     use ndarray::array;
