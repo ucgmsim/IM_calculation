@@ -90,37 +90,40 @@ class IM(StrEnum):
 
 def pseudo_spectral_acceleration(
     waveforms: ChunkedWaveformArray,
-    periods: npt.NDArray[np.float64],
+    periods: Array1,
     dt: np.float64,
     psa_rotd_maximum_memory_allocation: Optional[float] = None,
     cores: int = multiprocessing.cpu_count(),
     step: int | None = None,
     use_tqdm: bool = False,
 ) -> xr.DataArray:
-    """Compute pseudo-spectral acceleration statistics for waveforms.
+    """Compute pseudo-spectral acceleration (PSA) statistics.
+
+    Calculates PSA for single-degree-of-freedom oscillators across various
+    periods using the Newmark-beta method and computes rotated (RotD) statistics.
 
     Parameters
     ----------
-    waveforms : ndarray of float64 with shape `(n_components, n_stations, n_timesteps)`
-        Acceleration waveforms array (g).
-    periods : ndarray of float64
-        Periods for PSA computation (s). These correspond to SDOF oscillator natural frequencies.
-    dt : float
-        Timestep resolution of waveform array (s).
+    waveforms : ChunkedWaveformArray
+        Acceleration waveforms (g) with shape (n_components, n_stations, nt).
+    periods : Array1
+        Natural periods of the oscillators (s).
+    dt : np.float64
+        Timestep resolution of the waveforms (s).
     psa_rotd_maximum_memory_allocation : float, optional
-        Maximum memory allocation for PSA rotation calculations (bytes).
+        Target maximum memory limit for rotation calculations.
     cores : int, optional
-        Number of CPU cores to use, by default all available cores.
+        Number of CPU cores for parallel processing via Rayon.
     step : int, optional
-        Number of steps to use. If `None`, will use the number of cores as the default number of steps.
+        Station chunk size for processing. Defaults to `cores` if None.
     use_tqdm : bool, optional
-        If true, show tqdm progress bar.
+        Whether to display a progress bar.
 
     Returns
     -------
     xr.DataArray
-        DataArray containing PSA statistics for each
-        station, period and component ['000', '090', 'ver', 'geom', 'rotd0', 'rotd50', 'rotd100'].
+        A 3D DataArray (component, period, station) containing PSA for
+        ['000', '090', 'ver', 'geom', 'rotd0', 'rotd50', 'rotd100'].
     """
     waveforms = np.ascontiguousarray(waveforms)
     angular_frequencies = 2 * np.pi / periods
@@ -222,21 +225,21 @@ def significant_duration(
 
     Parameters
     ----------
-    waveforms : ndarray of float64 with shape `(n_stations, n_timesteps)`
-        Waveform accelerations (g).
+    waveforms : ChunkedWaveformArray
+        Acceleration waveforms (g) with shape (n_components, n_stations, nt).
     dt : float
-        Timestep resolution of the waveform array (s).
+        Timestep resolution (s).
     percent_low : float
-        Lower bound percentage for significant duration (e.g., 5 for 5%).
+        Lower bound percentage (e.g., 5.0 for 5%).
     percent_high : float
-        Upper bound percentage for significant duration (e.g., 95 for 95%).
-    use_numexpr : bool, optional
-        Use numexpr for computation, by default True.
+        Upper bound percentage (e.g., 95.0 for 95%).
+    cores : int
+        Number of CPU cores for parallel execution.
 
     Returns
     -------
-    DataFrame
-        Significant duration values in seconds. Shape: (n_stations,).
+    pd.DataFrame
+        Significant duration (s) for components ['000', '090', 'ver', 'geom'].
     """
     comp_0 = waveforms[Component.COMP_0]
     comp_90 = waveforms[Component.COMP_90]
@@ -387,6 +390,21 @@ def fourier_amplitude_spectra(
 def compute_intensity_measure_rotd(
     waveforms: ChunkedWaveformArray, cores: int
 ) -> pd.DataFrame:
+    """Generic wrapper to compute peak values and RotD statistics for IMs.
+
+    Parameters
+    ----------
+    waveforms : ChunkedWaveformArray
+        Waveform data with shape (n_components, n_stations, nt).
+    cores : int
+        Number of CPU cores for parallel rotation computation.
+
+    Returns
+    -------
+    pd.DataFrame
+        Peak ground values with columns ['000', '090', 'ver', 'geom',
+        'rotd100', 'rotd50', 'rotd0'].
+    """
     comp_0 = waveforms[Component.COMP_0]
     comp_90 = waveforms[Component.COMP_90]
     comp_ver = waveforms[Component.COMP_VER]
@@ -417,19 +435,19 @@ def compute_intensity_measure_rotd(
 def peak_ground_acceleration(
     waveform: ChunkedWaveformArray, cores: int
 ) -> pd.DataFrame:
-    """Compute Peak Ground Acceleration (PGA) for waveforms.
+    """Compute Peak Ground Acceleration (PGA) in g.
 
     Parameters
     ----------
-    waveform : ndarray of float64 with shape `(n_components, n_stations, n_timesteps)`
-        Acceleration waveforms in g units.
-    use_numexpr : bool, optional
-        Use numexpr for computation, by default True.
+    waveform : ChunkedWaveformArray
+        Acceleration waveforms with shape (n_components, n_stations, nt).
+    cores : int
+        Number of CPU cores for parallel processing.
 
     Returns
     -------
-    pandas.DataFrame with columns `['000', '090', 'ver', 'geom', 'rotd100', 'rotd50', 'rotd0']`
-        DataFrame containing PGA values with rotated components in g-units.
+    pd.DataFrame
+        PGA values (g) for standard and rotated components.
     """
     return compute_intensity_measure_rotd(waveform, cores=cores)
 
@@ -437,22 +455,21 @@ def peak_ground_acceleration(
 def peak_ground_velocity(
     waveform: ChunkedWaveformArray, dt: float, cores: int
 ) -> pd.DataFrame:
-    """Compute Peak Ground Velocity (PGV) for waveforms.
+    """Compute Peak Ground Velocity (PGV) in cm/s via trapezoidal integration.
 
     Parameters
     ----------
-    waveform : ndarray of float64 with shape `(n_components, n_stations, n_timesteps)`
-        Acceleration waveforms in g units.
+    waveform : ChunkedWaveformArray
+        Acceleration waveforms (g) with shape (n_components, n_stations, nt).
     dt : float
-        Timestep resolution of the waveform array.
-    use_numexpr : bool, optional
-        Use numexpr for computation, by default True.
+        Timestep resolution (s).
+    cores : int
+        Number of CPU cores for parallel processing.
 
     Returns
     -------
-    pandas.DataFrame with columns `['000', '090', 'ver', 'geom', 'rotd100', 'rotd50', 'rotd0']`
-        DataFrame containing PGV values with rotated components. Values are
-        in cm/s.
+    pd.DataFrame
+        PGV values (cm/s) for standard and rotated components.
     """
     g = 981
     return compute_intensity_measure_rotd(
@@ -466,22 +483,23 @@ def cumulative_absolute_velocity(
     cores: int,
     threshold: float | None = None,
 ) -> pd.DataFrame:
-    """Compute Cumulative Absolute Velocity (CAV) for waveforms.
+    """Compute Cumulative Absolute Velocity (CAV) in m/s.
 
     Parameters
     ----------
-    waveform : ndarray of float64 with shape `(n_stations, n_timesteps, n_components)`
-        Acceleration waveforms (g).
+    waveform : ChunkedWaveformArray
+        Acceleration waveforms (g) with shape (n_components, n_stations, nt).
     dt : float
-        Timestep resolution of the waveform array (s).
+        Timestep resolution (s).
+    cores : int
+        Number of CPU cores for parallel processing.
     threshold : float, optional
-        The minimum acceleration threshold, in cm/s^2. CAV5 is found by using
-        `threshold` = 5. Acceleration values below `threshold` are set to zero.
+        Acceleration threshold ($cm/s^2$). Values below this are ignored (e.g. 5 for CAV5).
 
     Returns
     -------
-    pandas.DataFrame with columns `['000', '090', 'ver', 'geom', 'rotd100', 'rotd50', 'rotd0']`
-        DataFrame containing CAV values (m/s) with rotated components.
+    pd.DataFrame
+        CAV values (m/s) for ['000', '090', 'ver', 'geom'].
     """
 
     comp_0 = waveform[Component.COMP_0]
@@ -517,20 +535,21 @@ def cumulative_absolute_velocity(
 def arias_intensity(
     waveform: ChunkedWaveformArray, dt: float, cores: int
 ) -> pd.DataFrame:
-    """Compute Arias Intensity (AI) for waveforms.
+    """Compute Arias Intensity (AI) in m/s.
 
     Parameters
     ----------
-    waveform : ndarray of float64 with shape `(n_stations, n_timesteps, n_components)`
-        Acceleration waveforms (g).
+    waveform : ChunkedWaveformArray
+        Acceleration waveforms (g) with shape (n_components, n_stations, nt).
     dt : float
-        Timestep resolution of the waveform array (s).
+        Timestep resolution (s).
+    cores : int
+        Number of CPU cores for parallel processing.
 
     Returns
     -------
-    pandas.DataFrame with columns `['intensity_measure', '000', '090', 'ver', 'geom']`
-        DataFrame containing Arias Intensity values (m/s). The 'geom' component
-        is the geometric mean of the 000 and 090 components.
+    pd.DataFrame
+        AI values (m/s) for ['000', '090', 'ver', 'geom'].
     """
     comp_0 = waveform[Component.COMP_0]
     comp_90 = waveform[Component.COMP_90]
@@ -557,40 +576,40 @@ def arias_intensity(
 
 
 def ds575(waveform: ChunkedWaveformArray, dt: float, cores: int) -> pd.DataFrame:
-    """Compute 5-75% Significant Duration (DS575) for waveforms.
+    """Compute 5-75% Significant Duration (DS575) in seconds.
 
     Parameters
     ----------
-    waveform : ndarray of float64 with shape `(n_stations, n_timesteps, n_components)`
-        Acceleration waveforms (g).
+    waveform : ChunkedWaveformArray
+        Acceleration waveforms (g) with shape (n_components, n_stations, nt).
     dt : float
-        Timestep resolution of the waveform array (s).
-    use_numexpr : bool, optional
-        Use numexpr for computation, by default True.
+        Timestep resolution (s).
+    cores : int
+        Number of CPU cores for parallel processing.
 
     Returns
     -------
-    pandas.DataFrame with columns `['000', '090', 'ver', 'geom', 'rotd100', 'rotd50', 'rotd0']`
-        DataFrame containing DS575 values (in seconds) with rotated components.
+    pd.DataFrame
+        Duration values (s) for ['000', '090', 'ver', 'geom'].
     """
     return significant_duration(waveform, dt, 5, 75, cores)
 
 
 def ds595(waveform: ChunkedWaveformArray, dt: float, cores: int) -> pd.DataFrame:
-    """Compute 5-95% Significant Duration (DS595) for waveforms.
+    """Compute 5-95% Significant Duration (DS595) in seconds.
 
     Parameters
     ----------
-    waveform : ndarray of float64 with shape `(n_stations, n_timesteps, n_components)`
-        Acceleration waveforms (g).
+    waveform : ChunkedWaveformArray
+        Acceleration waveforms (g) with shape (n_components, n_stations, nt).
     dt : float
-        Timestep resolution of the waveform array (s).
-    use_numexpr : bool, optional
-        Use numexpr for computation, by default True.
+        Timestep resolution (s).
+    cores : int
+        Number of CPU cores for parallel processing.
 
     Returns
     -------
-    pandas.DataFrame with columns `['000', '090', 'ver', 'geom', 'rotd100', 'rotd50', 'rotd0']`
-        DataFrame containing DS595 values (in seconds) with rotated components.
+    pd.DataFrame
+        Duration values (s) for ['000', '090', 'ver', 'geom'].
     """
     return significant_duration(waveform, dt, 5, 95, cores)
