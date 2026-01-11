@@ -385,7 +385,7 @@ def fourier_amplitude_spectra(
 
 
 def compute_intensity_measure_rotd(
-    waveforms: ChunkedWaveformArray, cores: int | None = None
+    waveforms: ChunkedWaveformArray, cores: int
 ) -> pd.DataFrame:
     comp_0 = waveforms[Component.COMP_0]
     comp_90 = waveforms[Component.COMP_90]
@@ -415,7 +415,7 @@ def compute_intensity_measure_rotd(
 
 
 def peak_ground_acceleration(
-    waveform: ChunkedWaveformArray, cores: int | None = None
+    waveform: ChunkedWaveformArray, cores: int
 ) -> pd.DataFrame:
     """Compute Peak Ground Acceleration (PGA) for waveforms.
 
@@ -435,7 +435,7 @@ def peak_ground_acceleration(
 
 
 def peak_ground_velocity(
-    waveform: ChunkedWaveformArray, dt: float, cores: int | None = None
+    waveform: ChunkedWaveformArray, dt: float, cores: int
 ) -> pd.DataFrame:
     """Compute Peak Ground Velocity (PGV) for waveforms.
 
@@ -463,8 +463,8 @@ def peak_ground_velocity(
 def cumulative_absolute_velocity(
     waveform: ChunkedWaveformArray,
     dt: float,
-    threshold: Optional[float] = None,
-    cores: int | None = None,
+    cores: int,
+    threshold: float | None = None,
 ) -> pd.DataFrame:
     """Compute Cumulative Absolute Velocity (CAV) for waveforms.
 
@@ -515,7 +515,7 @@ def cumulative_absolute_velocity(
 
 
 def arias_intensity(
-    waveform: ChunkedWaveformArray, dt: float, cores: int | None = None
+    waveform: ChunkedWaveformArray, dt: float, cores: int
 ) -> pd.DataFrame:
     """Compute Arias Intensity (AI) for waveforms.
 
