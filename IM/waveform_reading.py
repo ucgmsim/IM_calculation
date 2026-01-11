@@ -98,8 +98,8 @@ def read_ascii(
     if np.any(np.isnan(waveform_data)):
         raise ValueError("Components contain NaN values.")
 
-    # Ensure dtype is float 32
-    waveform_data = waveform_data.astype(np.float32)
+    # Ensure dtype is float 64
+    waveform_data = waveform_data.astype(np.float64)
 
     # Reshape the waveform to have the correct shape for the IM calculation
     reshaped_waveform = waveform_data[np.newaxis, :, :]
