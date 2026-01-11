@@ -449,6 +449,12 @@ def peak_ground_acceleration(
     pd.DataFrame
         PGA values (g) for standard and rotated components.
     """
+    if waveform.ndim != 3:
+        raise TypeError(
+            f"Waveform must have shape (n_components, n_stations, nt), but {waveform.shape=}"
+        )
+    elif waveform.dtype != np.float64:
+        raise TypeError(f"Waveform must have dtype float64, but {waveform.dtype=}")
     return compute_intensity_measure_rotd(waveform, cores=cores)
 
 
