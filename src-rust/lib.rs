@@ -136,7 +136,7 @@ mod _utils {
     ) -> Bound<'py, PyArray1<f64>> {
         let waveforms = waveforms_py.as_array();
         let arias_intensity = arias_intensity::cumulative_arias_intensity(waveforms, dt);
-        let ds = significant_duration::significant_duration(arias_intensity, dt, low, high);
+        let ds = significant_duration::significant_duration(arias_intensity.view(), dt, low, high);
         ds.into_pyarray(py)
     }
 
@@ -150,8 +150,12 @@ mod _utils {
     ) -> Bound<'py, PyArray1<f64>> {
         let waveforms = waveforms_py.as_array();
         let arias_intensity = arias_intensity::parallel_cumulative_arias_intensity(waveforms, dt);
-        let ds =
-            significant_duration::parallel_significant_duration(arias_intensity, dt, low, high);
+        let ds = significant_duration::parallel_significant_duration(
+            arias_intensity.view(),
+            dt,
+            low,
+            high,
+        );
         ds.into_pyarray(py)
     }
 }

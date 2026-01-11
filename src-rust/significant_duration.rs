@@ -1,39 +1,30 @@
 use crate::utils::parallel_reduce_rows;
-use ndarray::parallel::prelude::*;
 use ndarray::prelude::*;
 
 fn threshold_search(normalised_intensities: ArrayView1<f64>, dt: f64, low: f64, high: f64) -> f64 {
-    if *normalised_intensities.last().unwrap() < 1e-10 {
-        return 0.0;
-    }
-    let low_idx = normalised_intensities
-        .as_slice()
-        .unwrap()
-        .binary_search_by(|x| x.total_cmp(&low))
-        .unwrap_or_else(|i| i);
+    if let Some(&max) = normalised_intensities.last()
+        && max >= 1e-10
+    {
+        let intensities = normalised_intensities.as_slice().unwrap();
+        let low_idx = intensities
+            .binary_search_by(|x| (x / max).total_cmp(&low))
+            .unwrap_or_else(|i| i);
 
-    let high_idx = normalised_intensities
-        .as_slice()
-        .unwrap()
-        .binary_search_by(|x| x.total_cmp(&high))
-        .unwrap_or_else(|i| i);
-    let dx = high_idx - low_idx;
-    (dx as f64) * dt
+        let dx = intensities[low_idx..]
+            .binary_search_by(|x| (x / max).total_cmp(&high))
+            .unwrap_or_else(|i| i);
+        (dx as f64) * dt
+    } else {
+        0.0
+    }
 }
 
 pub fn significant_duration(
-    mut arias_intensity: Array2<f64>,
+    arias_intensity: ArrayView2<f64>,
     dt: f64,
     low: f64,
     high: f64,
 ) -> Array1<f64> {
-    // Normalise arias intensity
-    arias_intensity.axis_iter_mut(Axis(0)).for_each(|mut row| {
-        let last_val = *row.last().unwrap();
-        if last_val > 1e-10 {
-            row /= last_val;
-        }
-    });
     // Binary search for values above threshold
     arias_intensity.map_axis(Axis(1), |normalised_intensity| {
         threshold_search(normalised_intensity, dt, low, high)
@@ -41,7 +32,7 @@ pub fn significant_duration(
 }
 
 pub fn parallel_significant_duration(
-    mut arias_intensity: Array2<f64>,
+    arias_intensity: ArrayView2<f64>,
     dt: f64,
     low: f64,
     high: f64,
@@ -49,16 +40,6 @@ pub fn parallel_significant_duration(
     // Normalise arias intensity
     // NOTE: this is subtly different to parallel_map because it does
     // not create a copy of the array for output. It simply updates in-place.
-    arias_intensity
-        .axis_iter_mut(Axis(0))
-        .into_par_iter()
-        .for_each(|mut row| {
-            let last_val = *row.last().unwrap();
-            if last_val > 1e-10 {
-                row /= last_val;
-            }
-        });
-
     parallel_reduce_rows(arias_intensity.view(), |normalised_intensity| {
         threshold_search(normalised_intensity, dt, low, high)
     })
@@ -80,7 +61,7 @@ mod tests {
 
         // D_20-80: should find index 2 (val 0.2) and index 8 (val 0.8)
         // Duration = (8 - 2) * 1.0 = 6.0
-        let result = significant_duration(arias, dt, 0.2, 0.8);
+        let result = significant_duration(arias.view(), dt, 0.2, 0.8);
 
         assert_abs_diff_eq!(result[0], 6.0, epsilon = 1e-10);
     }
@@ -90,7 +71,7 @@ mod tests {
         // If low and high are the same, duration should be 0
         let arias = array![[0.0, 5.0, 10.0]];
         let dt = 0.1;
-        let result = significant_duration(arias, dt, 0.5, 0.5);
+        let result = significant_duration(arias.view(), dt, 0.5, 0.5);
 
         assert_eq!(result[0], 0.0);
     }
@@ -102,8 +83,8 @@ mod tests {
         let low = 0.05;
         let high = 0.95;
 
-        let seq = significant_duration(arias.clone(), dt, low, high);
-        let par = parallel_significant_duration(arias, dt, low, high);
+        let seq = significant_duration(arias.view(), dt, low, high);
+        let par = parallel_significant_duration(arias.view(), dt, low, high);
 
         assert_abs_diff_eq!(seq, par, epsilon = 1e-10);
     }
@@ -111,7 +92,7 @@ mod tests {
     #[test]
     fn test_output_shape() {
         let arias = Array2::<f64>::zeros((5, 100));
-        let result = significant_duration(arias, 0.01, 0.05, 0.95);
+        let result = significant_duration(arias.view(), 0.01, 0.05, 0.95);
 
         assert_eq!(result.len(), 5);
     }
