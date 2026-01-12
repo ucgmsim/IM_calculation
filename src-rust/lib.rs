@@ -1,9 +1,9 @@
-mod arias_intensity;
-mod cav;
-mod constants;
-mod psa;
-mod rotd;
-mod significant_duration;
+pub mod arias_intensity;
+pub mod cav;
+pub mod constants;
+pub mod psa;
+pub mod rotd;
+pub mod significant_duration;
 mod trapz;
 mod utils;
 use pyo3::prelude::*;
