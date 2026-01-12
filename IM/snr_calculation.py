@@ -81,31 +81,34 @@ def calculate_snr(
     """
     # This extra time is to ensure that when a taper is applied, the signal part of the waveform
     # is not affected by the tapering. The tapering is applied to the signal and noise separately.
-    tp_extra = waveform[:, tp:].shape[1] / 19
+    (_, _, nt) = waveform.shape
+    tp_extra = (nt - tp) / 19
     # Round up the tp_extra to the nearest highest integer
     tp_extra = int(np.ceil(tp_extra))
 
     # Calculate signal and noise areas
-    signal_acc, noise_acc = waveform[:, max(tp - tp_extra, 0) :], waveform[:, :tp]
-    signal_duration, noise_duration = signal_acc.shape[1] * dt, noise_acc.shape[1] * dt
+    signal_duration, noise_duration = (nt - max(tp - tp_extra, 0), tp)
+
+    signal_acc, noise_acc = (
+        waveform[:, :, nt - signal_duration :],
+        waveform[:, :, :noise_duration],
+    )
 
     # Ensure the noise is not shorter than 1s, if not then skip the calculation
     if noise_duration < 1:
         raise ValueError("Noise duration is less than 1s")
 
     # Apply Taper
-    taper_signal_acc = (
-        sp.signal.windows.tukey(signal_acc.shape[1], alpha=0.05).reshape(-1, 1)
-        * signal_acc[:]
+    taper_signal_acc = signal_acc * sp.signal.windows.tukey(
+        signal_acc.shape[-1], alpha=0.05
     )
-    taper_noise_acc = (
-        sp.signal.windows.tukey(noise_acc.shape[1], alpha=0.05).reshape(-1, 1)
-        * noise_acc[:]
+    taper_noise_acc = noise_acc * sp.signal.windows.tukey(
+        noise_acc.shape[-1], alpha=0.05
     )
 
-    # Ensure float 32 for the waveform
-    taper_signal_acc = taper_signal_acc.astype(np.float32)
-    taper_noise_acc = taper_noise_acc.astype(np.float32)
+    # Ensure float 64 for the waveform
+    taper_signal_acc = taper_signal_acc.astype(np.float64)
+    taper_noise_acc = taper_noise_acc.astype(np.float64)
 
     # Generate FFT for the signal and noise
     fas_signal = ims.fourier_amplitude_spectra(

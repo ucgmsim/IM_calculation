@@ -1,7 +1,6 @@
 """IM calculation script for ascii waveforms"""
 
 import multiprocessing
-import os
 from pathlib import Path
 
 import numpy as np
@@ -173,18 +172,7 @@ def calculate_ims(
     ValueError
         If the IM is not recognized or if required environment variables are not set to 1.
     """
-    if cores == 1:
-        required_env_vars = [
-            "NUMEXPR_NUM_THREADS",
-            "NUMBA_MAX_THREADS",
-            "NUMBA_NUM_THREADS",
-            "OPENBLAS_NUM_THREADS",
-        ]
-        unset_vars = [var for var in required_env_vars if os.getenv(var) != "1"]
-        if unset_vars:
-            raise ValueError(
-                f"The following environment variables must be set to 1: {', '.join(unset_vars)}"
-            )
+
     if ko_directory is None and IM.FAS in ims_list:
         raise ValueError(
             "The Konno-Ohmachi directory must be provided if Fourier amplitude spectrum is in the list of IMs."

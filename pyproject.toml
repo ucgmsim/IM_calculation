@@ -29,6 +29,10 @@ test = ["pytest", "hypothesis[numpy]", "pytest-cov", "rich>=14.2.0"]
 types = ["pandas-stubs", "scipy-stubs"]
 dev = ["deptry", "ruff", "ty", "numpydoc"]
 
+
+[tool.pytest]
+markers = ["slow: mark a test as slow"]
+
 [tool.setuptools.packages]
 find = { where = [
   ".",

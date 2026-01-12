@@ -1,46 +1,36 @@
 """Test cases for intensity measure implementations."""
 
-import functools
 import multiprocessing
 from collections.abc import Callable
 from pathlib import Path
-from typing import Optional
 
 import numpy as np
 import numpy.typing as npt
 import pandas as pd
 import pytest
 import xarray as xr
-from hypothesis import assume, given, settings
+from hypothesis import given, settings
 from hypothesis import strategies as st
 from hypothesis.extra import numpy as nst
 from numpy.testing import assert_array_almost_equal
-from rich import box
-from rich.console import Console
-from rich.table import Table
+from pytest import TempPathFactory
 
 from IM import im_calculation, ims, snr_calculation, waveform_reading
 from IM.scripts import gen_ko_matrix
 
-KO_TEST_DIR = Path(__file__).parent / "KO_matrices"
-
 
 @pytest.fixture(scope="session", autouse=True)
-def generate_ko_matrices(request: pytest.FixtureRequest) -> None:
-    KO_TEST_DIR.mkdir(exist_ok=True)
-    gen_ko_matrix.main(KO_TEST_DIR, num_to_gen=12)
-
-    def remove_ko_matrices() -> None:
-        for file in KO_TEST_DIR.glob("*"):
-            file.unlink()
-        KO_TEST_DIR.rmdir()
-
-    request.addfinalizer(remove_ko_matrices)
+def ko_matrices(
+    request: pytest.FixtureRequest, tmp_path_factory: TempPathFactory
+) -> Path:
+    ko_matrix_directory = tmp_path_factory.mktemp("ko_matrices")
+    gen_ko_matrix.main(ko_matrix_directory, num_to_gen=12)
+    return ko_matrix_directory
 
 
 @pytest.fixture
-def sample_time() -> npt.NDArray[np.float32]:
-    return np.arange(0, 1, 0.01, dtype=np.float32)
+def sample_time() -> npt.NDArray[np.float64]:
+    return np.arange(0, 1, 0.01, dtype=np.float64)
 
 
 @pytest.fixture
@@ -63,10 +53,16 @@ def sample_waveforms() -> npt.NDArray[np.float64]:
     return waveforms
 
 
+@pytest.fixture
+def sample_periods() -> npt.NDArray[np.float64]:
+    """Generate sample periods for PSA calculation."""
+    return np.array([0.1, 0.2, 0.5, 1.0], dtype=np.float64)
+
+
 @pytest.mark.parametrize("percent_low,percent_high", [(5, 75), (5, 95), (20, 80)])
 def test_significant_duration(
     sample_waveforms: npt.NDArray[np.float64],
-    sample_time: npt.NDArray[np.float32],
+    sample_time: npt.NDArray[np.float64],
     percent_low: float,
     percent_high: float,
 ) -> None:
@@ -101,6 +97,16 @@ def test_pga(comp_0: npt.NDArray[np.float64], expected_pga: float) -> None:
     [
         (np.ones((100,), dtype=np.float64), 1, 981),
         (np.linspace(0, 1, num=100, dtype=np.float64) ** 2, 1, 981 / 3),
+        (
+            2 * np.sin(np.linspace(0, 2 * np.pi, num=100, dtype=np.float64)) - 1,
+            2 * np.pi,
+            981 * 2 * np.pi,
+        ),
+        (
+            2 * np.sin(np.linspace(0, 2 * np.pi, num=100, dtype=np.float64)) - 1,
+            2 * np.pi,
+            981 * 2 * np.pi,
+        ),
     ],
 )
 def test_pgv(
@@ -111,6 +117,47 @@ def test_pgv(
     dt = t_max / (len(comp_0) - 1)
     result = ims.peak_ground_velocity(waveforms, dt, cores=1)
     assert np.isclose(result["000"].iloc[0], expected_pgv, atol=0.1)
+
+
+@pytest.mark.parametrize(
+    "comp_0,t_max,expected_cav,expected_cav5",
+    [
+        (np.ones((100,), dtype=np.float64), 1, 9.81, 9.81),
+        (
+            np.linspace(0, 1, num=100, dtype=np.float64) ** 2,
+            1,
+            9.81 / 3,
+            9.81 / 3 * (1 - np.sqrt(5 / 981) ** 3),
+        ),
+        (
+            2 * np.sin(np.linspace(0, 2 * np.pi, num=1000, dtype=np.float64)) - 1,
+            2 * np.pi,
+            9.81 * 2 / 3 * (6 * np.sqrt(3) + np.pi),
+            None,
+        ),
+    ],
+)
+def test_cav(
+    comp_0: npt.NDArray[np.float64],
+    t_max: float,
+    expected_cav: float,
+    expected_cav5: float | None,
+) -> None:
+    waveforms = np.zeros((3, 1, len(comp_0)), dtype=np.float64)
+    waveforms[ims.Component.COMP_0] = comp_0
+    dt = t_max / (len(comp_0) - 1)
+    assert np.isclose(
+        ims.cumulative_absolute_velocity(waveforms, dt, 1)["000"],
+        expected_cav,
+        1,
+        atol=0.1,
+    )
+    if expected_cav5:
+        assert np.isclose(
+            ims.cumulative_absolute_velocity(waveforms, dt, 1, threshold=5)["000"],
+            expected_cav5,
+            atol=0.1,
+        )
 
 
 def test_psa() -> None:
@@ -130,7 +177,8 @@ def test_psa() -> None:
 
 
 @pytest.mark.parametrize("cores", [1, 2])
-def test_fas_benchmark(cores: int) -> None:
+@pytest.mark.slow
+def test_fas_benchmark(cores: int, ko_matrices: Path) -> None:
     data_array_ffp = Path(__file__).parent / "resources" / "fas_benchmark.nc"
     if not data_array_ffp.exists():
         pytest.skip("Benchmark file missing")
@@ -145,10 +193,291 @@ def test_fas_benchmark(cores: int) -> None:
 
     # Input: (n_stations, nt, n_components) as per fourier_amplitude_spectra logic
     fas_result_ims = ims.fourier_amplitude_spectra(
-        waveform, dt, data.frequency.values, KO_TEST_DIR, cores=cores
+        waveform, dt, data.frequency.values, ko_matrices, cores=cores
     )
 
     assert_array_almost_equal(data.values, fas_result_ims.values, decimal=5)
+
+
+@pytest.mark.parametrize("cores", [1, multiprocessing.cpu_count()])
+def test_fas_multiple_stations_benchmark(cores: int, ko_matrices: Path) -> None:
+    """Compare benchmark FAS calculation with multiple stations against current implementation."""
+    # Load the data array
+    data_array_ffp = Path(__file__).parent / "resources" / "fas_benchmark.nc"
+    data = xr.open_dataarray(data_array_ffp)
+
+    # Read the example waveform
+    data_dir = Path(__file__).parent.parent / "examples" / "resources"
+    comp_000_ffp = data_dir / "2024p950420_MWFS_HN_20.000"
+    comp_090_ffp = data_dir / "2024p950420_MWFS_HN_20.090"
+    comp_ver_ffp = data_dir / "2024p950420_MWFS_HN_20.ver"
+
+    # Read the files to a waveform array that's readable by IM Calculation
+    dt, waveform = waveform_reading.read_ascii(comp_000_ffp, comp_090_ffp, comp_ver_ffp)
+    waveform = np.ascontiguousarray(np.moveaxis(waveform, -1, 0))
+    # Duplicate the waveform array to simulate multiple stations (2 stations)
+    duplicated_array = np.tile(waveform, (1, 2, 1))
+
+    # Compute the Fourier Amplitude Spectra
+    fas_result_ims = ims.fourier_amplitude_spectra(
+        duplicated_array, dt, data.frequency, ko_matrices, cores=cores
+    )
+
+    # Compare the results
+    for i in range(fas_result_ims.shape[1]):
+        assert_array_almost_equal(
+            fas_result_ims[:, i, :],
+            data[:, 0, :],
+            decimal=5,
+        )
+
+
+@pytest.mark.slow
+def test_snr_benchmark(ko_matrices: Path) -> None:
+    """Compare benchmark SNR calculation against current implementation."""
+    # Load the DataFrame
+    benchmark_ffp = Path(__file__).parent / "resources" / "snr_benchmark.csv"
+    data = pd.read_csv(benchmark_ffp, index_col=0)
+
+    # Read the example waveform
+    data_dir = Path(__file__).parent.parent / "examples" / "resources"
+    comp_000_ffp = data_dir / "2024p950420_MWFS_HN_20.000"
+    comp_090_ffp = data_dir / "2024p950420_MWFS_HN_20.090"
+    comp_ver_ffp = data_dir / "2024p950420_MWFS_HN_20.ver"
+
+    # Read the files to a waveform array that's readable by IM Calculation
+    dt, waveform = waveform_reading.read_ascii(comp_000_ffp, comp_090_ffp, comp_ver_ffp)
+    waveform = np.ascontiguousarray(np.moveaxis(waveform, -1, 0))
+
+    # Index of the start of the P-wave
+    tp = 3170
+
+    # Compute the SNR
+    snr_result_ims, _, _, _, _ = snr_calculation.calculate_snr(
+        waveform, dt, tp, ko_matrices
+    )
+
+    # Compare the results
+    assert_array_almost_equal(
+        data.values.astype(float), snr_result_ims.values.astype(float), decimal=5
+    )
+
+
+def test_all_ims_benchmark(ko_matrices: Path) -> None:
+    """Compare benchmark IM calculation against current implementation."""
+    # Load the DataFrame
+    benchmark_ffp = Path(__file__).parent / "resources" / "im_benchmark.csv"
+    data = pd.read_csv(benchmark_ffp, index_col=0)
+
+    # Read the example waveform
+    data_dir = Path(__file__).parent.parent / "examples" / "resources"
+    comp_000_ffp = data_dir / "2024p950420_MWFS_HN_20.000"
+    comp_090_ffp = data_dir / "2024p950420_MWFS_HN_20.090"
+    comp_ver_ffp = data_dir / "2024p950420_MWFS_HN_20.ver"
+
+    # Read the files to a waveform array that's readable by IM Calculation
+    dt, waveform = waveform_reading.read_ascii(comp_000_ffp, comp_090_ffp, comp_ver_ffp)
+
+    # Calculate the intensity measures
+    result = im_calculation.calculate_ims(
+        waveform,
+        dt,
+        ko_directory=ko_matrices,
+    )
+
+    for im in result.columns:
+        assert result[im].values == pytest.approx(
+            data.loc[result.index, im].values, abs=5e-4, rel=0.01, nan_ok=True
+        ), (
+            f"Results for {im} do not match!\n{result}"
+        )  # 5e-6 implies rounding to five decimal places
+
+
+BENCHMARK_CASES = [
+    d for d in (Path(__file__).parent / "resources").iterdir() if d.is_dir()
+]
+
+
+# Assuming these are imported from your project context
+# from your_module import waveform_reading, ims, im_calculation, BENCHMARK_CASES
+
+
+def save_diff_html(
+    df_old: pd.DataFrame,
+    df_new: pd.DataFrame,
+    output_path: Path,
+    title: str = "DataFrame Difference",
+) -> None:
+    """
+    Generates an HTML file highlighting differences between two dataframes.
+
+    Cells are colored based on the relative difference:
+    - >= 20%: Bold White on Red
+    - > 0%: Black on Salmon
+    - <= -20%: Bold White on Blue
+    - < 0%: Black on Light Blue
+    - No change / small change: Grey text
+    """
+    # Align dataframes to ensure dimensions match
+    df_old, df_new = df_old.align(df_new, join="outer", axis=None)
+
+    # Calculate differences
+    diff_abs = df_new - df_old
+
+    # Calculate relative difference safely
+    with np.errstate(divide="ignore", invalid="ignore"):
+        diff_rel = (df_new - df_old) / df_old
+
+    def style_diff(data: pd.DataFrame) -> pd.DataFrame:
+        """
+        Styler function that receives the diff_abs DataFrame (data)
+        but uses the diff_rel DataFrame from the outer scope to determine colors.
+        """
+        # Create a DataFrame of empty strings with same shape as data
+        styles = pd.DataFrame("", index=data.index, columns=data.columns)
+
+        # Ensure diff_rel aligns with the subset currently being styled
+        # (Though with axis=None, 'data' is the full dataframe)
+        rel_aligned = diff_rel.loc[data.index, data.columns]
+
+        # --- Define Styles (Matching Rich output) ---
+        style_high_pos = (
+            "background-color: #d9534f; color: white; font-weight: bold;"  # Strong Red
+        )
+        style_low_pos = "background-color: #ffcccb; color: black;"  # Salmon
+        style_high_neg = (
+            "background-color: #0275d8; color: white; font-weight: bold;"  # Strong Blue
+        )
+        style_low_neg = "background-color: #add8e6; color: black;"  # Light Blue
+        style_dim = "color: #999999;"  # Dim/Grey
+
+        # --- Apply Logic ---
+
+        # 1. Dim (Small changes or NaNs in relative diff)
+        # Note: We use .fillna(False) to handle NaNs in the boolean mask creation
+        is_small_change = (rel_aligned.abs() < 0.05) | (data.abs() < 1e-6)
+        mask_dim = is_small_change | rel_aligned.isna()
+        styles[mask_dim] = style_dim
+
+        # 2. Strong Positive (>= 20%)
+        mask_high_pos = (rel_aligned >= 0.20) & ~mask_dim
+        styles[mask_high_pos] = style_high_pos
+
+        # 3. Low Positive (> 0 and < 20%)
+        mask_low_pos = (rel_aligned > 0) & (rel_aligned < 0.20) & ~mask_dim
+        styles[mask_low_pos] = style_low_pos
+
+        # 4. Strong Negative (<= -20%)
+        mask_high_neg = (rel_aligned <= -0.20) & ~mask_dim
+        styles[mask_high_neg] = style_high_neg
+
+        # 5. Low Negative (< 0 and > -20%)
+        mask_low_neg = (rel_aligned < 0) & (rel_aligned > -0.20) & ~mask_dim
+        styles[mask_low_neg] = style_low_neg
+
+        return styles
+
+    # Create the Styler object
+    # We display diff_abs, but color it based on relative diff logic
+    styler = (
+        diff_abs.style.apply(style_diff, axis=None)
+        .format("{:+.3g}", na_rep="-")
+        .set_caption(title)
+        .set_table_styles(
+            [
+                {
+                    "selector": "caption",
+                    "props": [("font-size", "1.5em"), ("font-weight", "bold")],
+                },
+                {
+                    "selector": "th",
+                    "props": [
+                        ("background-color", "#f2f2f2"),
+                        ("text-align", "center"),
+                    ],
+                },
+                {
+                    "selector": "td",
+                    "props": [("padding", "5px"), ("border", "1px solid #ddd")],
+                },
+            ]  # type: ignore[invalid-argument-type]
+        )
+    )
+
+    # Save to file
+    with open(output_path, "w") as f:
+        f.write(styler.to_html())
+
+
+@pytest.mark.parametrize(
+    "resource_dir", BENCHMARK_CASES, ids=[d.stem for d in BENCHMARK_CASES]
+)
+@pytest.mark.parametrize("cores", [1, multiprocessing.cpu_count()])
+@pytest.mark.slow
+def test_all_ims_benchmark_edge_cases(
+    resource_dir: Path, cores: int, ko_matrices: Path
+) -> None:
+    """Compare benchmark IM calculation against current implementation for each directory in resources for edge cases."""
+    # Load the benchmark DataFrame
+    benchmark_ffp = resource_dir / "im_benchmark.csv"
+    data = pd.read_csv(benchmark_ffp, index_col=0)
+
+    # Read the edge case waveform files
+    comp_000_ffp = resource_dir / f"{resource_dir.stem}.000"
+    comp_090_ffp = resource_dir / f"{resource_dir.stem}.090"
+    comp_ver_ffp = resource_dir / f"{resource_dir.stem}.ver"
+
+    # Read the files to a waveform array that's readable by IM Calculation
+    dt, waveform = waveform_reading.read_ascii(comp_000_ffp, comp_090_ffp, comp_ver_ffp)
+    nt = waveform.shape[1]
+
+    im_list = [
+        ims.IM.PGA,
+        ims.IM.PGV,
+        ims.IM.CAV,
+        ims.IM.CAV5,
+        ims.IM.Ds575,
+        ims.IM.Ds595,
+        ims.IM.AI,
+        ims.IM.pSA,
+    ]
+
+    # If the record is too long the test will fail because of missing KO matrices
+    have_ko_matrix = np.ceil(np.log2(nt)) < 15
+    if have_ko_matrix:
+        im_list.append(ims.IM.FAS)
+
+    # Calculate the intensity measures
+    result = im_calculation.calculate_ims(
+        waveform, dt, ims_list=im_list, ko_directory=ko_matrices, cores=cores
+    )
+
+    # Align columns and indices for comparison
+    expected = data.loc[result.index, result.columns]
+
+    # Check for failure
+    if not np.allclose(
+        result.values, expected.values, atol=5e-4, rtol=0.01, equal_nan=True
+    ):
+        # Define output filename
+        diff_filename = f"diff_fail_{resource_dir.stem}.html"
+        diff_path = Path.cwd() / diff_filename  # Or use a specific artifacts dir
+
+        print(f"\n[!] Benchmark mismatch. Saving HTML diff report to: {diff_path}")
+
+        # Select only pSA columns as per original logic, or remove filter to show all
+        save_diff_html(
+            expected,  # type: ignore[invalid-argument]
+            result,
+            output_path=diff_path,
+            title=f"Differences for {resource_dir.stem}",
+        )
+
+    # Perform standard assertions
+    for im in result.columns:
+        assert result[im].values == pytest.approx(
+            data.loc[result.index, im].values, abs=5e-4, rel=0.01, nan_ok=True
+        ), f"Results for {im} do not match!\n{result}"
 
 
 def test_ds5xx() -> None:
@@ -168,12 +497,13 @@ def test_ds5xx() -> None:
     [
         ims.peak_ground_acceleration,
         ims.peak_ground_velocity,
+        ims.arias_intensity,
         ims.cumulative_absolute_velocity,
     ],
 )
 def test_peak_ground_parameters(
     sample_waveforms: npt.NDArray[np.float64],
-    sample_time: npt.NDArray[np.float32],
+    sample_time: npt.NDArray[np.float64],
     func: Callable,
 ) -> None:
     dt = float(sample_time[1] - sample_time[0])
@@ -188,13 +518,117 @@ def test_peak_ground_parameters(
     assert np.all(result.select_dtypes(include=[np.number]) >= 0)
 
 
-def test_fourier_amplitude_spectra_shape() -> None:
+# Test cases for Fourier Amplitude Spectra
+@pytest.mark.parametrize("n_freqs", [1024, 2048])
+def test_fourier_amplitude_spectra(
+    sample_waveforms: npt.NDArray[np.float64],
+    sample_time: npt.NDArray[np.float64],
+    ko_matrices: Path,
+    n_freqs: int,
+) -> None:
+    """Test Fourier Amplitude Spectra calculation."""
+    dt = sample_time[1] - sample_time[0]
+    freqs = np.logspace(-1, 1, n_freqs, dtype=np.float64)
+    # Force the multiprocessing code path if necessary.
+    result_mp = ims.fourier_amplitude_spectra(
+        sample_waveforms,
+        dt,
+        freqs,
+        ko_matrices,
+        cores=max(2, multiprocessing.cpu_count()),
+    )
+    # Force the single core path.
+    result_sc = ims.fourier_amplitude_spectra(
+        sample_waveforms, dt, freqs, ko_matrices, cores=1
+    )
+
+    # Check DataFrame structure
+    assert isinstance(result_mp, xr.DataArray)
+    assert list(result_mp.coords["component"]) == ["000", "090", "ver", "geom", "eas"]
+    assert np.allclose(result_mp.coords["frequency"], freqs)
+    assert np.all(result_mp.as_numpy() >= 0)
+    # Check that multi-core result and single-core result produce the same output.
+    assert np.allclose(result_mp.as_numpy(), result_sc.as_numpy())
+
+
+def test_nyquist_frequency(ko_matrices: Path) -> None:
+    # Define test parameters
+    n_stations = 2
+    n_timesteps = 1024
+    n_components = 3
+    dt = 0.01  # Timestep resolution (s)
+    nyquist_frequency = 1 / (2 * dt)
+
+    # Generate test waveforms (random data for simplicity)
+    waveforms = np.random.rand(n_components, n_stations, n_timesteps).astype(np.float64)
+
+    # Define frequencies, including some above the Nyquist frequency
+    freqs = np.array(
+        [1.0, 10.0, 20.0, 60.0], dtype=np.float64
+    )  # 60 Hz > Nyquist (50 Hz)
+    with pytest.warns(RuntimeWarning):
+        fas = ims.fourier_amplitude_spectra(waveforms, dt, freqs, ko_matrices)
+
+    # Verify that frequencies above Nyquist are filtered out
+    expected_freqs = freqs[freqs <= nyquist_frequency]
+    np.testing.assert_array_equal(fas.coords["frequency"].values, expected_freqs)
+
+    # Verify the shape of the output
+    assert fas.shape == (5, n_stations, len(expected_freqs)), "Unexpected FAS shape."
+
+
+@pytest.mark.parametrize(
+    "invalid_shape",
+    [
+        (100,),  # 1D array
+        (2, 100),  # Missing component dimension
+    ],
+)
+def test_invalid_waveform_shapes(invalid_shape: tuple[int, ...]) -> None:
+    """Test handling of invalid waveform shapes."""
+    waveforms = np.zeros(invalid_shape, dtype=np.float64)
+
+    with pytest.raises((TypeError)):
+        ims.peak_ground_acceleration(waveforms, cores=1)  # type: ignore[invalid-argument-type]
+
+
+# Edge cases
+def test_zero_waveform() -> None:
+    """Test behavior with zero-amplitude waveforms."""
+    waveforms = np.zeros((3, 2, 100), dtype=np.float64)
+
+    # Test various intensity measures with zero input
+    pga_result = ims.peak_ground_acceleration(waveforms, cores=1)
+
+    # All results should be zero
+    assert np.all(pga_result.select_dtypes(include=[np.number]) == 0)
+
+
+@pytest.mark.parametrize("duration", [100, 200, 1000])
+def test_numerical_stability(duration: int) -> None:
+    """Test numerical stability with different duration lengths."""
+    dt = 0.01
+    t = np.arange(0, duration * dt, dt, dtype=np.float64)
+    waveforms = np.zeros((3, 2, len(t)), dtype=np.float64)
+    # Add sine wave
+    waveforms[ims.Component.COMP_0] = np.sin(2 * np.pi / (duration * dt) * t)
+
+    result = ims.peak_ground_acceleration(waveforms, cores=1)
+
+    # Maximum should be close to 1.0 regardless of duration
+    assert_array_almost_equal(result["000"].to_numpy(float), 1.0, decimal=5)
+    # The others should just be 0.0
+    assert_array_almost_equal(result["090"].to_numpy(float), 0.0, decimal=5)
+
+
+@pytest.mark.slow
+def test_fourier_amplitude_spectra_shape(ko_matrices: Path) -> None:
     n_stations, n_timesteps, n_components = 2, 1024, 3
     dt = 0.01
     waveforms = np.random.rand(n_stations, n_timesteps, n_components).astype(np.float64)
     freqs = np.array([1.0, 10.0, 20.0], dtype=np.float64)
 
-    fas = ims.fourier_amplitude_spectra(waveforms, dt, freqs, KO_TEST_DIR, cores=1)
+    fas = ims.fourier_amplitude_spectra(waveforms, dt, freqs, ko_matrices, cores=1)
     assert fas.shape == (
         5,
         n_stations,
@@ -202,10 +636,33 @@ def test_fourier_amplitude_spectra_shape() -> None:
     )  # 5 components: 0, 90, ver, geom, eas
 
 
-def test_invalid_waveform_shapes() -> None:
-    waveforms = np.zeros((100,), dtype=np.float64)
-    with pytest.raises(TypeError):
-        ims.peak_ground_acceleration(waveforms, cores=1)
+@given(
+    waveform=nst.arrays(
+        np.float64,
+        shape=st.tuples(st.just(3), st.integers(2, 10), st.integers(10, 100)),
+        elements=st.floats(0.01, 1, width=64).flatmap(
+            lambda x: st.sampled_from([-1, 1]).flatmap(lambda sign: st.just(sign * x))
+        ),
+    ),
+)
+@settings(deadline=None)
+def test_rotational_invariance(
+    waveform: npt.NDArray[np.float64],
+) -> None:
+    old_waveform = np.copy(waveform)
+    waveform_ims = ims.peak_ground_acceleration(waveform, cores=1)
+    assert np.allclose(old_waveform, waveform)
+    waveform_ims_transposed = ims.peak_ground_acceleration(waveform[[1, 0, 2]], cores=1)
+
+    assert_array_almost_equal(
+        waveform_ims["rotd0"], waveform_ims_transposed["rotd0"], decimal=3
+    )
+    assert_array_almost_equal(
+        waveform_ims["rotd50"], waveform_ims_transposed["rotd50"], decimal=3
+    )
+    assert_array_almost_equal(
+        waveform_ims["rotd100"], waveform_ims_transposed["rotd100"], decimal=3
+    )
 
 
 @given(
@@ -220,10 +677,10 @@ def test_component_orientation(waveform: npt.NDArray[np.float64]) -> None:
     waveform_ims = ims.peak_ground_acceleration(waveform, cores=1)
 
     assert_array_almost_equal(
-        waveform_ims["000"].values,
+        waveform_ims["000"].values,  # type: ignore[invalid-argument-type]
         np.abs(waveform[ims.Component.COMP_0, :, :]).max(axis=1),
     )
     assert_array_almost_equal(
-        waveform_ims["ver"].values,
+        waveform_ims["ver"].values,  # type: ignore[invalid-argument-type]
         np.abs(waveform[ims.Component.COMP_VER, :, :]).max(axis=1),
     )

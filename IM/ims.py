@@ -293,7 +293,7 @@ def fourier_amplitude_spectra(
 
     Parameters
     ----------
-    waveforms : ndarray of float64 with shape `(n_stations, n_timesteps, n_components)`
+    waveforms : ndarray of float64 with shape `(n_components, n_stations, n_timesteps)`
         Waveform array (g).
     dt : float
         Timestep resolution of the waveforms (s).
@@ -319,10 +319,7 @@ def fourier_amplitude_spectra(
         )
         freqs = freqs[freqs <= nyquist_frequency]
 
-    n_fft = 2 ** int(np.ceil(np.log2(waveforms.shape[1])))
-    # Swap the first and last axes to ensure array has shape
-    # (n_components, n_stations, nt) or (n_components, nt).
-    waveforms = np.moveaxis(waveforms, -1, 0)
+    n_fft = 2 ** int(np.ceil(np.log2(waveforms.shape[-1])))
     # Essential! Repack the waveform array so that the rows are
     # contiguous in memory.
     waveforms = np.ascontiguousarray(waveforms)

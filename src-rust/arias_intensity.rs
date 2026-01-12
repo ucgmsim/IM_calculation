@@ -18,7 +18,7 @@ use ndarray::prelude::*;
 use std::f64::consts::PI;
 
 /// Precomputed scaling factor: $\frac{\pi}{2g}$
-const ARIAS_CONSTANT: f64 = PI / (2.0 * G);
+const ARIAS_CONSTANT: f64 = G * PI / 2.0;
 
 /// Computes the total Arias Intensity ($I_A$) for each row in parallel.
 ///
