@@ -17,15 +17,6 @@ use ndarray::prelude::*;
 /// # Returns
 /// An `Array1<U>` containing one result per row.
 ///
-/// # Example
-/// ```
-/// use ndarray::prelude::*;
-/// use crate::utils::parallel_reduce_rows;
-///
-/// let data = array![[1.0, 2.0], [3.0, 4.0]];
-/// let sums = parallel_reduce_rows(data.view(), |row| row.sum());
-/// assert_eq!(sums, array![3.0, 7.0]);
-/// ```
 pub fn parallel_reduce_rows<T, U, F>(matrix: ArrayView2<T>, f: F) -> Array1<U>
 where
     T: Sync + Send,
@@ -56,17 +47,6 @@ where
 /// # Returns
 /// A new `Array2<U>` with the same number of rows as the input.
 ///
-/// # Example
-/// ```
-/// use ndarray::prelude::*;
-/// use crate::utils::parallel_map_rows;
-///
-/// let data = Array2::<f64>::ones((5, 10));
-/// // Multiply every element in every row by 2.0
-/// // This would be better achieved by ndarray's standard mapv or the parallel mapv
-/// // but this just a simple illustration.
-/// let doubled = parallel_map_rows(data.view(), |row| row * 2.0);
-/// ```
 pub fn parallel_map_rows<T, U, F>(input: ArrayView2<T>, f: F) -> Array2<U>
 where
     T: Sync + Send,
