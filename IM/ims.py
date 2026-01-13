@@ -241,13 +241,16 @@ def significant_duration(
     pd.DataFrame
         Significant duration (s) for components ['000', '090', 'ver', 'geom'].
     """
+    (_, n_stations, _) = waveforms.shape
     comp_0 = waveforms[Component.COMP_0]
     comp_90 = waveforms[Component.COMP_90]
     comp_ver = waveforms[Component.COMP_VER]
     quant_low = percent_low / 100
     quant_high = percent_high / 100
 
-    if cores == 1:
+    if (
+        cores == 1 or n_stations < 1000
+    ):  # from benchmarks: for < 1000 stations the parallel overhead is not worth it.
         significant_duration_0 = _utils._significant_duration(
             comp_0, dt, quant_low, quant_high
         )
