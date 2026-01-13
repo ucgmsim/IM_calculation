@@ -185,12 +185,13 @@ def test_fas_benchmark(cores: int, ko_matrices: Path) -> None:
     data = xr.open_dataarray(data_array_ffp)
 
     data_dir = Path(__file__).parent.parent / "examples" / "resources"
+
     dt, waveform = waveform_reading.read_ascii(
         data_dir / "2024p950420_MWFS_HN_20.000",
         data_dir / "2024p950420_MWFS_HN_20.090",
         data_dir / "2024p950420_MWFS_HN_20.ver",
     )
-
+    waveform = np.ascontiguousarray(np.moveaxis(waveform, -1, 0))
     # Input: (n_stations, nt, n_components) as per fourier_amplitude_spectra logic
     fas_result_ims = ims.fourier_amplitude_spectra(
         waveform, dt, data.frequency.values, ko_matrices, cores=cores
@@ -625,7 +626,7 @@ def test_numerical_stability(duration: int) -> None:
 def test_fourier_amplitude_spectra_shape(ko_matrices: Path) -> None:
     n_stations, n_timesteps, n_components = 2, 1024, 3
     dt = 0.01
-    waveforms = np.random.rand(n_stations, n_timesteps, n_components).astype(np.float64)
+    waveforms = np.random.rand(n_components, n_stations, n_timesteps).astype(np.float64)
     freqs = np.array([1.0, 10.0, 20.0], dtype=np.float64)
 
     fas = ims.fourier_amplitude_spectra(waveforms, dt, freqs, ko_matrices, cores=1)
