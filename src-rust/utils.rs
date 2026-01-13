@@ -47,20 +47,18 @@ where
 /// # Returns
 /// A new `Array2<U>` with the same number of rows as the input.
 ///
-pub fn parallel_map_rows<T, U, F>(input: ArrayView2<T>, f: F) -> Array2<U>
+pub fn parallel_map_rows<T, F>(input: ArrayView2<T>, f: F) -> Array2<T>
 where
-    T: Sync + Send,
-    U: Send + Sync + Default + Clone,
-    F: Fn(ArrayView1<T>) -> Array1<U> + Sync + Send,
+    T: Sync + Send + Default,
+    F: Fn(ArrayView1<T>, ArrayViewMut1<T>) + Sync + Send,
 {
-    let mut out = Array2::<U>::default(input.dim());
+    let mut out = Array2::<T>::default(input.dim());
 
     out.axis_iter_mut(Axis(0))
         .into_par_iter()
         .zip(input.axis_iter(Axis(0)).into_par_iter())
-        .for_each(|(mut out_row, in_row)| {
-            let result_row = f(in_row);
-            out_row.assign(&result_row);
+        .for_each(|(out_row, in_row)| {
+            f(in_row, out_row);
         });
 
     out

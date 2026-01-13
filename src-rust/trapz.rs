@@ -55,28 +55,22 @@ where
 }
 
 /// Computes the cumulative integral of a 1D waveform.
-///
-/// # Returns
-/// An `Array1` of the same length as the input, where the first element is $0.0$
-/// and each subsequent element $j$ is the integral from index $0$ to $j$.
-fn cumulative_trapz_one_with_fun<F>(waveform: ArrayView1<f64>, dt: f64, f: F) -> Array1<f64>
-where
+fn cumulative_trapz_one_with_fun<F>(
+    waveform: ArrayView1<f64>,
+    mut out: ArrayViewMut1<f64>,
+    dt: f64,
+    f: F,
+) where
     F: Fn(f64) -> f64,
 {
-    let nt = waveform.dim();
-    let mut cumulative_sum = Array1::zeros(nt);
     let mut sum = 0.0;
-    for (window, v) in waveform
-        .windows(2)
-        .into_iter()
-        .zip(cumulative_sum.iter_mut().skip(1))
-    {
+    for (window, v) in waveform.windows(2).into_iter().zip(out.iter_mut().skip(1)) {
         let v1 = window[0];
         let v2 = window[1];
         sum += trapz_step(v1, v2, dt, &f);
         *v = sum;
     }
-    0.5 * cumulative_sum
+    out *= 0.5;
 }
 
 /// Computes the total integral for each row of a 2D array in parallel.
@@ -114,8 +108,8 @@ pub fn parallel_cumulative_trapz_with_fun<F>(
 where
     F: Fn(f64) -> f64 + Send + Sync,
 {
-    parallel_map_rows(waveforms, |waveform| {
-        cumulative_trapz_one_with_fun(waveform, dt, &f)
+    parallel_map_rows(waveforms, |waveform, out| {
+        cumulative_trapz_one_with_fun(waveform, out, dt, &f)
     })
 }
 
@@ -129,9 +123,8 @@ where
     let mut out = Array2::zeros(waveforms.dim());
     out.axis_iter_mut(Axis(0))
         .zip(waveforms.axis_iter(Axis(0)))
-        .for_each(|(mut out_row, in_row)| {
-            let result_row = cumulative_trapz_one_with_fun(in_row, dt, &f);
-            out_row.assign(&result_row);
+        .for_each(|(out_row, in_row)| {
+            cumulative_trapz_one_with_fun(in_row, out_row, dt, &f);
         });
     out
 }
@@ -195,12 +188,13 @@ mod tests {
         // Guarantee: The last point of a cumulative integral MUST
         // equal the result of the total integral.
         let waveform = array![0.5, -0.5, 1.0, -2.0, 3.0];
+        let mut out = Array1::zeros(waveform.dim());
         let dt = 0.1;
 
         let total = trapz_one_with_fun(waveform.view(), dt, &rectified);
-        let cumulative = cumulative_trapz_one_with_fun(waveform.view(), dt, &rectified);
+        cumulative_trapz_one_with_fun(waveform.view(), out.view_mut(), dt, &rectified);
 
-        assert_abs_diff_eq!(*cumulative.last().unwrap(), total, epsilon = 1e-10);
+        assert_abs_diff_eq!(*out.last().unwrap(), total, epsilon = 1e-10);
     }
 
     #[test]

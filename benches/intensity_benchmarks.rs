@@ -180,7 +180,6 @@ fn bench_psa(c: &mut Criterion) {
 
                 group.throughput(Throughput::Bytes((stations * samples * 8) as u64));
 
-                // Note: Only parallel version exists in your original code
                 group.bench_with_input(BenchmarkId::new("Parallel", &param), &view, |b, &v| {
                     b.iter(|| {
                         psa::newmark_beta_method_parallel(
