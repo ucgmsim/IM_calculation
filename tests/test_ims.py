@@ -1,5 +1,6 @@
 """Test cases for intensity measure implementations."""
 
+import functools
 import multiprocessing
 from collections.abc import Callable
 from pathlib import Path
@@ -59,21 +60,7 @@ def sample_periods() -> npt.NDArray[np.float64]:
     return np.array([0.1, 0.2, 0.5, 1.0], dtype=np.float64)
 
 
-@pytest.mark.parametrize("percent_low,percent_high", [(5, 75), (5, 95), (20, 80)])
-def test_significant_duration(
-    sample_waveforms: npt.NDArray[np.float64],
-    sample_time: npt.NDArray[np.float64],
-    percent_low: float,
-    percent_high: float,
-) -> None:
-    dt = 0.01
-    result = ims.significant_duration(
-        sample_waveforms, dt, percent_low, percent_high, cores=1
-    )
-
-    assert result.shape == (sample_waveforms.shape[1], 4)  # 4 components
-    assert np.all(result.values >= 0)
-    assert np.all(result.values <= len(sample_time) * dt)
+# NOTE: The following unit tests PGA and PGV exist because there is no direct implementation of PGA/PGV in the rust code.
 
 
 @pytest.mark.parametrize(
@@ -119,61 +106,30 @@ def test_pgv(
     assert np.isclose(result["000"].iloc[0], expected_pgv, atol=0.1)
 
 
+# CAV5 is partly a python function, so we test expected CAV5 results. CAV tests are in rust.
 @pytest.mark.parametrize(
-    "comp_0,t_max,expected_cav,expected_cav5",
+    "comp_0,t_max,expected_cav5",
     [
-        (np.ones((100,), dtype=np.float64), 1, 9.81, 9.81),
+        (np.ones((100,), dtype=np.float64), 1, 9.81),
         (
             np.linspace(0, 1, num=100, dtype=np.float64) ** 2,
             1,
-            9.81 / 3,
             9.81 / 3 * (1 - np.sqrt(5 / 981) ** 3),
-        ),
-        (
-            2 * np.sin(np.linspace(0, 2 * np.pi, num=1000, dtype=np.float64)) - 1,
-            2 * np.pi,
-            9.81 * 2 / 3 * (6 * np.sqrt(3) + np.pi),
-            None,
         ),
     ],
 )
-def test_cav(
-    comp_0: npt.NDArray[np.float64],
-    t_max: float,
-    expected_cav: float,
-    expected_cav5: float | None,
+def test_cav5(
+    comp_0: npt.NDArray[np.float64], t_max: float, expected_cav5: float
 ) -> None:
     waveforms = np.zeros((3, 1, len(comp_0)), dtype=np.float64)
     waveforms[ims.Component.COMP_0] = comp_0
     dt = t_max / (len(comp_0) - 1)
+
     assert np.isclose(
-        ims.cumulative_absolute_velocity(waveforms, dt, 1)["000"],
-        expected_cav,
-        1,
+        ims.cumulative_absolute_velocity(waveforms, dt, 1, threshold=5)["000"],
+        expected_cav5,
         atol=0.1,
     )
-    if expected_cav5:
-        assert np.isclose(
-            ims.cumulative_absolute_velocity(waveforms, dt, 1, threshold=5)["000"],
-            expected_cav5,
-            atol=0.1,
-        )
-
-
-def test_psa() -> None:
-    comp_0 = np.ones((100,), dtype=np.float64)
-    waveforms = np.zeros((3, 2, len(comp_0)), dtype=np.float64)
-    waveforms[ims.Component.COMP_0, 0, :] = comp_0
-    waveforms[ims.Component.COMP_0, 1, :] = comp_0
-    dt = np.float64(0.01)
-    periods = np.array([0.1, 1.0], dtype=np.float64)
-
-    psa_values = ims.pseudo_spectral_acceleration(waveforms, periods, dt, cores=1)
-
-    # Check value for period 1.0 (Wolfram Alpha derived approx)
-    assert psa_values.sel(
-        station=0, period=1.0, component="000"
-    ).item() == pytest.approx(1.8544671, abs=5e-3)
 
 
 @pytest.mark.parametrize("cores", [1, 2])
@@ -481,6 +437,28 @@ def test_all_ims_benchmark_edge_cases(
         ), f"Results for {im} do not match!\n{result}"
 
 
+# Significant duration calculations are a combination of two
+# independently tested rust functions, this integration test checks
+# they are called correctly through the python interface
+
+
+@pytest.mark.parametrize("percent_low,percent_high", [(5, 75), (5, 95), (20, 80)])
+def test_significant_duration(
+    sample_waveforms: npt.NDArray[np.float64],
+    sample_time: npt.NDArray[np.float64],
+    percent_low: float,
+    percent_high: float,
+) -> None:
+    dt = 0.01
+    result = ims.significant_duration(
+        sample_waveforms, dt, percent_low, percent_high, cores=1
+    )
+
+    assert result.shape == (sample_waveforms.shape[1], 4)  # 4 components
+    assert np.all(result.values >= 0)
+    assert np.all(result.values <= len(sample_time) * dt)
+
+
 def test_ds5xx() -> None:
     comp_0 = np.ones((100,), dtype=np.float64)
     waveforms = np.zeros((3, 1, len(comp_0)), dtype=np.float64)
@@ -493,6 +471,7 @@ def test_ds5xx() -> None:
     assert ims.ds595(waveforms, dt, cores=1)["000"].iloc[0] == pytest.approx(0.9)
 
 
+# Contract guarantee on output shapes
 @pytest.mark.parametrize(
     "func",
     [
@@ -515,7 +494,7 @@ def test_peak_ground_parameters(
         result = func(sample_waveforms, dt, cores=1)
 
     assert isinstance(result, pd.DataFrame)
-    assert "geom" in result.columns
+    assert set(result.columns) == {"000", "090", "ver", "geom"}
     assert np.all(result.select_dtypes(include=[np.number]) >= 0)
 
 
@@ -593,35 +572,6 @@ def test_invalid_waveform_shapes(invalid_shape: tuple[int, ...]) -> None:
         ims.peak_ground_acceleration(waveforms, cores=1)  # type: ignore[invalid-argument-type]
 
 
-# Edge cases
-def test_zero_waveform() -> None:
-    """Test behavior with zero-amplitude waveforms."""
-    waveforms = np.zeros((3, 2, 100), dtype=np.float64)
-
-    # Test various intensity measures with zero input
-    pga_result = ims.peak_ground_acceleration(waveforms, cores=1)
-
-    # All results should be zero
-    assert np.all(pga_result.select_dtypes(include=[np.number]) == 0)
-
-
-@pytest.mark.parametrize("duration", [100, 200, 1000])
-def test_numerical_stability(duration: int) -> None:
-    """Test numerical stability with different duration lengths."""
-    dt = 0.01
-    t = np.arange(0, duration * dt, dt, dtype=np.float64)
-    waveforms = np.zeros((3, 2, len(t)), dtype=np.float64)
-    # Add sine wave
-    waveforms[ims.Component.COMP_0] = np.sin(2 * np.pi / (duration * dt) * t)
-
-    result = ims.peak_ground_acceleration(waveforms, cores=1)
-
-    # Maximum should be close to 1.0 regardless of duration
-    assert_array_almost_equal(result["000"].to_numpy(float), 1.0, decimal=5)
-    # The others should just be 0.0
-    assert_array_almost_equal(result["090"].to_numpy(float), 0.0, decimal=5)
-
-
 @pytest.mark.slow
 def test_fourier_amplitude_spectra_shape(ko_matrices: Path) -> None:
     n_stations, n_timesteps, n_components = 2, 1024, 3
@@ -637,6 +587,7 @@ def test_fourier_amplitude_spectra_shape(ko_matrices: Path) -> None:
     )  # 5 components: 0, 90, ver, geom, eas
 
 
+# Asserts that the RotDx values of PGA, PGV and pSA are invariant of the order of 000 and 090.
 @given(
     waveform=nst.arrays(
         np.float64,
@@ -645,27 +596,46 @@ def test_fourier_amplitude_spectra_shape(ko_matrices: Path) -> None:
             lambda x: st.sampled_from([-1, 1]).flatmap(lambda sign: st.just(sign * x))
         ),
     ),
+    im=st.sampled_from(
+        [
+            functools.partial(ims.peak_ground_acceleration, cores=1),
+            functools.partial(ims.peak_ground_velocity, dt=0.01, cores=1),
+            functools.partial(
+                ims.pseudo_spectral_acceleration,
+                periods=np.array([1.0]),
+                dt=0.01,
+                cores=1,
+            ),
+        ]
+    ),
 )
 @settings(deadline=None)
+@pytest.mark.slow
 def test_rotational_invariance(
     waveform: npt.NDArray[np.float64],
+    im: Callable[[ims.ChunkedWaveformArray], pd.DataFrame | xr.DataArray],
 ) -> None:
     old_waveform = np.copy(waveform)
-    waveform_ims = ims.peak_ground_acceleration(waveform, cores=1)
+    waveform_ims = im(old_waveform)
     assert np.allclose(old_waveform, waveform)
-    waveform_ims_transposed = ims.peak_ground_acceleration(waveform[[1, 0, 2]], cores=1)
+    waveform_ims_transposed = im(waveform[[1, 0, 2]])
+    if isinstance(waveform_ims_transposed, pd.DataFrame) and isinstance(
+        waveform_ims, pd.DataFrame
+    ):
+        for component in ["rotd0", "rotd50", "rotd100"]:
+            value = waveform_ims[component].values
+            value_t = waveform_ims_transposed[component].values
+            assert value == pytest.approx(value_t)
+    else:
+        assert isinstance(waveform_ims, xr.DataArray)
+        assert isinstance(waveform_ims_transposed, xr.DataArray)
+        for component in ["rotd0", "rotd50", "rotd100"]:
+            value = waveform_ims.sel(component=component).values.squeeze()
+            value_t = waveform_ims_transposed.sel(component=component).values.squeeze()
+            assert value == pytest.approx(value_t)
 
-    assert_array_almost_equal(
-        waveform_ims["rotd0"], waveform_ims_transposed["rotd0"], decimal=3
-    )
-    assert_array_almost_equal(
-        waveform_ims["rotd50"], waveform_ims_transposed["rotd50"], decimal=3
-    )
-    assert_array_almost_equal(
-        waveform_ims["rotd100"], waveform_ims_transposed["rotd100"], decimal=3
-    )
 
-
+# Asserts that 090, 000, and ver components are computed for the corresponding COMP_* enum values.
 @given(
     waveform=nst.arrays(
         np.float64,
@@ -679,9 +649,13 @@ def test_component_orientation(waveform: npt.NDArray[np.float64]) -> None:
 
     assert_array_almost_equal(
         waveform_ims["000"].values,  # type: ignore[invalid-argument-type]
-        np.abs(waveform[ims.Component.COMP_0, :, :]).max(axis=1),
+        np.abs(waveform[ims.Component.COMP_0]).max(axis=1),
+    )
+    assert_array_almost_equal(
+        waveform_ims["090"].values,  # type: ignore[invalid-argument-type]
+        np.abs(waveform[ims.Component.COMP_90]).max(axis=1),
     )
     assert_array_almost_equal(
         waveform_ims["ver"].values,  # type: ignore[invalid-argument-type]
-        np.abs(waveform[ims.Component.COMP_VER, :, :]).max(axis=1),
+        np.abs(waveform[ims.Component.COMP_VER]).max(axis=1),
     )
