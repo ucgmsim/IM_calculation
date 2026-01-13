@@ -14,7 +14,7 @@ from hypothesis import given, settings
 from hypothesis import strategies as st
 from hypothesis.extra import numpy as nst
 from numpy.testing import assert_array_almost_equal
-from pytest import TempPathFactory
+from pytest import Metafunc, TempPathFactory
 
 from IM import im_calculation, ims, snr_calculation, waveform_reading
 from IM.scripts import gen_ko_matrix
@@ -250,11 +250,6 @@ def test_all_ims_benchmark(ko_matrices: Path) -> None:
         )  # 5e-6 implies rounding to five decimal places
 
 
-BENCHMARK_CASES = [
-    d for d in (Path(__file__).parent / "resources").iterdir() if d.is_dir()
-]
-
-
 # Assuming these are imported from your project context
 # from your_module import waveform_reading, ims, im_calculation, BENCHMARK_CASES
 
@@ -366,9 +361,14 @@ def save_diff_html(
         f.write(styler.to_html())
 
 
-@pytest.mark.parametrize(
-    "resource_dir", BENCHMARK_CASES, ids=[d.stem for d in BENCHMARK_CASES]
-)
+def pytest_generate_tests(metafunc: Metafunc) -> None:
+    if "resource_dir" in metafunc.fixturenames:
+        benchmark_cases = [
+            d for d in (Path(__file__).parent / "resources").iterdir() if d.is_dir()
+        ]
+        metafunc.parametrize("resource_dir", benchmark_cases, ids=lambda p: p.stem)
+
+
 @pytest.mark.parametrize("cores", [1, multiprocessing.cpu_count()])
 @pytest.mark.slow
 def test_all_ims_benchmark_edge_cases(
