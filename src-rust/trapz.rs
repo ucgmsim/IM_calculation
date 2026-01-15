@@ -192,7 +192,7 @@ mod tests {
         let dt = 0.1;
 
         let total = trapz_one_with_fun(waveform.view(), dt, &rectified);
-        cumulative_trapz_one_with_fun(waveform.view(), out.view_mut(), dt, &rectified);
+        cumulative_trapz_one_with_fun(waveform.view(), out.view_mut(), dt, rectified);
 
         assert_abs_diff_eq!(*out.last().unwrap(), total, epsilon = 1e-10);
     }
