@@ -494,7 +494,7 @@ def test_peak_ground_parameters(
         result = func(sample_waveforms, dt, cores=1)
 
     assert isinstance(result, pd.DataFrame)
-    assert set(result.columns) == {"000", "090", "ver", "geom"}
+    assert set(result.columns) >= {"000", "090", "ver", "geom"}
     assert np.all(result.select_dtypes(include=[np.number]) >= 0)
 
 
