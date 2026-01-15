@@ -79,6 +79,7 @@ class IM(StrEnum):
 
     PGA = "PGA"
     PGV = "PGV"
+    PGD = "PGD"
     CAV = "CAV"
     CAV5 = "CAV5"
     Ds575 = "Ds575"
@@ -481,6 +482,35 @@ def peak_ground_velocity(
     return compute_intensity_measure_rotd(
         g * sp.integrate.cumulative_trapezoid(waveform, dx=dt, axis=-1), cores=cores
     )
+
+
+def peak_ground_displacement(
+    waveform: ChunkedWaveformArray, dt: float, cores: int
+) -> pd.DataFrame:
+    """Compute Peak Ground Displacement (PGD) for waveforms.
+
+    Parameters
+    ----------
+    waveform : ChunkedWaveformArray
+        Acceleration waveforms in g units.
+    dt : float
+        Timestep resolution of the waveform array.
+    cores : int
+        Number of CPU cores for parallel processing.
+
+    Returns
+    -------
+    pandas.DataFrame with columns `['000', '090', 'ver', 'geom', 'rotd100', 'rotd50', 'rotd0']`
+        DataFrame containing PGD values with rotated components. Values are
+        in cm.
+    """
+    g = 981
+    # Integrate twice to get displacement in cm
+    velocity = sp.integrate.cumulative_trapezoid(waveform, dx=dt, axis=1, initial=0)
+    # In-place multiplication to avoid yet another allocation
+    np.multiply(g, velocity, out=velocity)
+    displacement = sp.integrate.cumulative_trapezoid(velocity, dx=dt, axis=1, initial=0)
+    return compute_intensity_measure_rotd(displacement, cores=cores)
 
 
 def cumulative_absolute_velocity(

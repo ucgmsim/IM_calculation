@@ -189,6 +189,9 @@ def calculate_ims(
         elif im == IM.PGV:
             result = ims.peak_ground_velocity(waveform, dt, cores)
             result.index = [im.value]
+        elif im == IM.PGD:
+            result = ims.peak_ground_displacement(waveform, dt, cores)
+            result.index = [im.value]
         elif im == IM.pSA:
             data_array = ims.pseudo_spectral_acceleration(
                 waveform, periods, np.float64(dt), cores=cores
