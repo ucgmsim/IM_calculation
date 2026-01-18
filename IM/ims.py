@@ -506,10 +506,12 @@ def peak_ground_displacement(
     """
     g = 981
     # Integrate twice to get displacement in cm
-    velocity = sp.integrate.cumulative_trapezoid(waveform, dx=dt, axis=1, initial=0)
+    velocity = sp.integrate.cumulative_trapezoid(waveform, dx=dt, axis=-1, initial=0)
     # In-place multiplication to avoid yet another allocation
     np.multiply(g, velocity, out=velocity)
-    displacement = sp.integrate.cumulative_trapezoid(velocity, dx=dt, axis=1, initial=0)
+    displacement = sp.integrate.cumulative_trapezoid(
+        velocity, dx=dt, axis=-1, initial=0
+    )
     return compute_intensity_measure_rotd(displacement, cores=cores)
 
 
