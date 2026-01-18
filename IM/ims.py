@@ -250,7 +250,7 @@ def significant_duration(
     quant_high = percent_high / 100
 
     if (
-        cores == 1 or n_stations < 1000
+        cores == 1
     ):  # from benchmarks: for < 1000 stations the parallel overhead is not worth it.
         significant_duration_0 = _utils._significant_duration(
             comp_0, dt, quant_low, quant_high
