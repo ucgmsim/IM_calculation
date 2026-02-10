@@ -19,7 +19,7 @@ import xarray as xr
 from pyfftw.interfaces import numpy_fft as fft
 
 from IM import (
-    _utils,  # type: ignore[unresolved-import]
+    _core,  # type: ignore[unresolved-import]
     ko_matrices,
 )
 
@@ -28,7 +28,7 @@ ChunkedWaveformArray = np.ndarray[tuple[int, int, int], np.dtype[np.float64]]
 # (n_stations, nt)
 SingleWaveformArray = np.ndarray[tuple[int, int], np.dtype[np.float64]]
 WaveformArray = ChunkedWaveformArray | SingleWaveformArray
-Array1 = np.ndarray[tuple[int], np.dtype[np.float64]]
+Array1D = np.ndarray[tuple[int], np.dtype[np.float64]]
 
 
 @contextmanager
@@ -91,7 +91,7 @@ class IM(StrEnum):
 
 def pseudo_spectral_acceleration(
     waveforms: ChunkedWaveformArray,
-    periods: Array1,
+    periods: Array1D,
     dt: np.float64,
     psa_rotd_maximum_memory_allocation: Optional[float] = None,
     cores: int = multiprocessing.cpu_count(),
@@ -165,11 +165,11 @@ def pseudo_spectral_acceleration(
             comp_90_chunk = waveforms[Component.COMP_90.value, i : i + step].astype(
                 np.float64
             )
-            comp_0_response = _utils._newmark_beta_method(comp_0_chunk, dt, w, xi)
-            comp_90_response = _utils._newmark_beta_method(comp_90_chunk, dt, w, xi)
+            comp_0_response = _core._newmark_beta_method(comp_0_chunk, dt, w, xi)
+            comp_90_response = _core._newmark_beta_method(comp_90_chunk, dt, w, xi)
             conversion_factor = w * w
 
-            rotd_psa[j, i : i + step] = conversion_factor * _utils._rotd_parallel(
+            rotd_psa[j, i : i + step] = conversion_factor * _core._rotd_parallel(
                 comp_0_response, comp_90_response
             )
 
@@ -181,7 +181,7 @@ def pseudo_spectral_acceleration(
             ).max(axis=1)
 
             z = waveforms[Component.COMP_VER.value, i : i + step].astype(np.float64)
-            z_response = _utils._newmark_beta_method(z, dt, w, xi)
+            z_response = _core._newmark_beta_method(z, dt, w, xi)
             comp_ver_psa[j, i : i + step] = conversion_factor * np.abs(z_response).max(
                 axis=1
             )
@@ -250,26 +250,26 @@ def significant_duration(
     quant_high = percent_high / 100
 
     if (
-        cores == 1
+        cores == 1 or n_stations < 1000
     ):  # from benchmarks: for < 1000 stations the parallel overhead is not worth it.
-        significant_duration_0 = _utils._significant_duration(
+        significant_duration_0 = _core._significant_duration(
             comp_0, dt, quant_low, quant_high
         )
-        significant_duration_90 = _utils._significant_duration(
+        significant_duration_90 = _core._significant_duration(
             comp_90, dt, quant_low, quant_high
         )
-        significant_duration_ver = _utils._significant_duration(
+        significant_duration_ver = _core._significant_duration(
             comp_ver, dt, quant_low, quant_high
         )
     else:
         with environment(RAYON_NUM_THREADS=str(cores)):
-            significant_duration_0 = _utils._parallel_significant_duration(
+            significant_duration_0 = _core._parallel_significant_duration(
                 comp_0, dt, quant_low, quant_high
             )
-            significant_duration_90 = _utils._parallel_significant_duration(
+            significant_duration_90 = _core._parallel_significant_duration(
                 comp_90, dt, quant_low, quant_high
             )
-            significant_duration_ver = _utils._parallel_significant_duration(
+            significant_duration_ver = _core._parallel_significant_duration(
                 comp_ver, dt, quant_low, quant_high
             )
 
@@ -410,10 +410,10 @@ def compute_intensity_measure_rotd(
     comp_90 = waveforms[Component.COMP_90]
     comp_ver = waveforms[Component.COMP_VER]
     if cores == 1:
-        rotd_stats = _utils._rotd(comp_0, comp_90)
+        rotd_stats = _core._rotd(comp_0, comp_90)
     else:
         with environment(RAYON_NUM_THREADS=str(cores)):
-            rotd_stats = _utils._rotd_parallel(comp_0, comp_90)
+            rotd_stats = _core._rotd_parallel(comp_0, comp_90)
     pga_comp_0 = np.abs(comp_0).max(axis=1)
     pga_comp_90 = np.abs(comp_90).max(axis=1)
     pga_ver = np.abs(comp_ver).max(axis=1)
@@ -551,14 +551,14 @@ def cumulative_absolute_velocity(
         comp_ver = np.where(np.abs(comp_ver) < threshold / g, np.float64(0), comp_ver)
 
     if cores == 1:
-        comp_0_cav = _utils._cav(comp_0, dt)
-        comp_90_cav = _utils._cav(comp_90, dt)
-        comp_ver_cav = _utils._cav(comp_ver, dt)
+        comp_0_cav = _core._cav(comp_0, dt)
+        comp_90_cav = _core._cav(comp_90, dt)
+        comp_ver_cav = _core._cav(comp_ver, dt)
     else:
         with environment(RAYON_NUM_THREADS=str(cores)):
-            comp_0_cav = _utils._parallel_cav(comp_0, dt)
-            comp_90_cav = _utils._parallel_cav(comp_90, dt)
-            comp_ver_cav = _utils._parallel_cav(comp_ver, dt)
+            comp_0_cav = _core._parallel_cav(comp_0, dt)
+            comp_90_cav = _core._parallel_cav(comp_90, dt)
+            comp_ver_cav = _core._parallel_cav(comp_ver, dt)
 
     return pd.DataFrame(
         {
@@ -594,14 +594,14 @@ def arias_intensity(
     comp_ver = waveform[Component.COMP_VER]
 
     if cores == 1:
-        comp_0_ai = _utils._arias_intensity(comp_0, dt)
-        comp_90_ai = _utils._arias_intensity(comp_90, dt)
-        comp_ver_ai = _utils._arias_intensity(comp_ver, dt)
+        comp_0_ai = _core._arias_intensity(comp_0, dt)
+        comp_90_ai = _core._arias_intensity(comp_90, dt)
+        comp_ver_ai = _core._arias_intensity(comp_ver, dt)
     else:
         with environment(RAYON_NUM_THREADS=str(cores)):
-            comp_0_ai = _utils._parallel_arias_intensity(comp_0, dt)
-            comp_90_ai = _utils._parallel_arias_intensity(comp_90, dt)
-            comp_ver_ai = _utils._parallel_arias_intensity(comp_ver, dt)
+            comp_0_ai = _core._parallel_arias_intensity(comp_0, dt)
+            comp_90_ai = _core._parallel_arias_intensity(comp_90, dt)
+            comp_ver_ai = _core._parallel_arias_intensity(comp_ver, dt)
 
     return pd.DataFrame(
         {

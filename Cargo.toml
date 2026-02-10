@@ -1,11 +1,11 @@
 [package]
-name = "utils"
+name = "core"
 version = "0.1.0"
 edition = "2024"
 resolver = "2"
 
 [lib]
-name = "_utils"
+name = "_core"
 crate-type = ["cdylib", "lib"]
 path = "src-rust/lib.rs"
 

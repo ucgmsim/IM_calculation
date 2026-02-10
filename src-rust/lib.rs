@@ -12,7 +12,7 @@ use pyo3::prelude::*;
 /// the `lib.name` setting in the `Cargo.toml`, else Python will not be able to
 /// import the module.
 #[pymodule]
-mod _utils {
+mod _core {
     use numpy::{IntoPyArray, PyArray1, PyArray2, PyReadonlyArray2};
     use pyo3::prelude::*;
 

@@ -98,7 +98,7 @@ known-first-party = [
 
 
 [[tool.setuptools-rust.ext-modules]]
-target = "IM._utils"
+target = "IM._core"
 binding = "PyO3"
 
 

@@ -128,6 +128,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a1d728cc89cf3aee9ff92b05e62b19ee65a02b5702cff7d5a377e32c6ae29d8d"
 
 [[package]]
+name = "core"
+version = "0.1.0"
+dependencies = [
+ "approx",
+ "criterion",
+ "ndarray",
+ "numpy",
+ "pyo3",
+]
+
+[[package]]
 name = "criterion"
 version = "0.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -654,17 +665,6 @@ name = "unindent"
 version = "0.2.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7264e107f553ccae879d21fbea1d6724ac785e8c3bfc762137959b5802826ef3"
-
-[[package]]
-name = "utils"
-version = "0.1.0"
-dependencies = [
- "approx",
- "criterion",
- "ndarray",
- "numpy",
- "pyo3",
-]
 
 [[package]]
 name = "walkdir"
