@@ -1,7 +1,7 @@
 //! Cumulative absolute velocity (CAV) calculation module.
 //!
 //! This module provides functions to calculate the intensity of earthquake ground motion
-//! based on the integral of the absolute value of accelaration.
+//! based on the integral of the absolute value of acceleration.
 //!
 //! The formula used is:
 //! $$CAV = \int_{0}^{T} |a(t)| \, dt$$
@@ -12,19 +12,19 @@ use crate::trapz::{parallel_trapz_with_fun, trapz_with_fun};
 
 use ndarray::prelude::*;
 
-/// Computes the total Cumulative Absolute Velocity ($I_A$) for each row in parallel.
+/// Computes the total Cumulative Absolute Velocity ($CAV$) for each row in parallel.
 ///
 /// # Arguments
 /// * `waveforms` - A 2D array view where each row is an acceleration time-series.
 /// * `dt` - The time step (sampling interval) of the waveforms.
 ///
 /// # Returns
-/// An `Array1<f64>` containing the final $I_A$ value for each station.
+/// An `Array1<f64>` containing the final CAV value for each station.
 pub fn parallel_cav(waveforms: ArrayView2<f64>, dt: f64) -> Array1<f64> {
     G * parallel_trapz_with_fun(waveforms, dt, |x| x.abs())
 }
 
-/// Computes the total Cumulative Absolute Velocity ($I_A$) for each row using a single thread.
+/// Computes the total Cumulative Absolute Velocity ($CAV$) for each row using a single thread.
 ///
 /// # Arguments
 /// * `waveforms` - A 2D array view where each row is an acceleration time-series.
@@ -42,9 +42,9 @@ mod tests {
 
     #[test]
     fn test_cav_constant() {
-        // If a = 1.0 cm/s^2 (constant) for 1 second with dt=1
-        // Integral of a^2 dt from 0 to 1 is 1.0.
-        // Result should be PI / (2.0 * 981.0)
+        // If a = 1.0 cm/s^2 (constant) for 1 second with dt = 1
+        // Integral of |a| dt from 0 to 1 is 1.0.
+        // Result should be G (9.81 cm/s)
         let waveforms = array![[1.0, 1.0]];
         let dt = 1.0;
         let result = cav(waveforms.view(), dt);
