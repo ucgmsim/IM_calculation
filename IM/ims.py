@@ -148,12 +148,14 @@ def pseudo_spectral_acceleration(
         station_period_iterator = itertools.product(
             range(len(angular_frequencies)), station_iter
         )
-        if use_tqdm:
+        # Coverage tests don't cover this interactive usage (because
+        # it doesn't change the calculations).
+        if use_tqdm:  # pragma no cover
             station_period_iterator = tqdm.tqdm(station_period_iterator, total=n_steps)
         j_last: int | None = None
         for j, i in station_period_iterator:
             w = angular_frequencies[j]
-            if use_tqdm and j_last != j:
+            if use_tqdm and j_last != j:  # pragma: no cover
                 assert isinstance(station_period_iterator, tqdm.tqdm)
                 j_last = j
                 t0 = periods[j]
@@ -262,7 +264,8 @@ def significant_duration(
             comp_ver, dt, quant_low, quant_high
         )
     else:
-        with environment(RAYON_NUM_THREADS=str(cores)):
+        # Testing is not big enough for multi-core execution so this codepath is not covered.
+        with environment(RAYON_NUM_THREADS=str(cores)):  # pragma: no cover
             significant_duration_0 = _core._parallel_significant_duration(
                 comp_0, dt, quant_low, quant_high
             )
