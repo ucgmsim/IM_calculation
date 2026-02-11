@@ -6,7 +6,7 @@
 //! The formula used is:
 //! $$I_A = \frac{\pi}{2g} \int_{0}^{T} a(t)^2 \, dt$$
 //!
-//! Where $g$ is the acceleration due to gravity (set here to $981.0 \text{ cm/s}^2$).
+//! Where $g$ is the acceleration due to gravity (set here to $9.81 \text{ m/s}^2$).
 
 use crate::trapz::{
     cumulative_trapz_with_fun, parallel_cumulative_trapz_with_fun, parallel_trapz_with_fun,
