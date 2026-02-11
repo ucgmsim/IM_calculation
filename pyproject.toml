@@ -7,7 +7,7 @@ name = "im-calculation"
 authors = [{ name = "ucgmsim" }]
 description = "Intensity Measure Calculation for Ground Motion Waveforms"
 readme = "README.md"
-requires-python = ">=3.11,<3.14"
+requires-python = ">=3.11"
 dynamic = ["version"]
 dependencies = [
   "numpy",
