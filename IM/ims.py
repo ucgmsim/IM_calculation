@@ -8,7 +8,6 @@ from collections.abc import Generator, MutableMapping
 from contextlib import contextmanager
 from enum import IntEnum, StrEnum
 from pathlib import Path
-from typing import Optional
 
 import numpy as np
 import numpy.typing as npt
