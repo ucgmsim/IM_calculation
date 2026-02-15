@@ -41,6 +41,12 @@ jobs:
           CIBW_ARCHS_MACOS: "x86_64 arm64"
           CIBW_ARCHS_LINUX: "x86_64"
           CIBW_ARCHS_WINDOWS: "AMD64"
+          # cibuildwheel runs the linux versions only inside a
+          # container. This means we need to install rust inside that
+          # container before we go ahead and build.
+          CIBW_BEFORE_ALL_LINUX: >
+            curl https://sh.rustup.rs -sSf | sh -s -- -y &&
+            source "$HOME/.cargo/env"
 
       - name: Store the distribution packages
         uses: actions/upload-artifact@v4
