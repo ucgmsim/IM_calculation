@@ -93,7 +93,6 @@ def pseudo_spectral_acceleration(
     waveforms: ChunkedWaveformArray,
     periods: Array1D,
     dt: np.float64,
-    psa_rotd_maximum_memory_allocation: Optional[float] = None,
     cores: int = multiprocessing.cpu_count(),
     step: int | None = None,
     use_tqdm: bool = False,
@@ -111,8 +110,6 @@ def pseudo_spectral_acceleration(
         Natural periods of the oscillators (s).
     dt : np.float64
         Timestep resolution of the waveforms (s).
-    psa_rotd_maximum_memory_allocation : float, optional
-        Target maximum memory limit for rotation calculations.
     cores : int, optional
         Number of CPU cores for parallel processing via Rayon.
     step : int, optional
