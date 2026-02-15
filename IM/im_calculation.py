@@ -1,5 +1,6 @@
+"""IM calculation script for ascii waveforms"""
+
 import multiprocessing
-import os
 from pathlib import Path
 
 import numpy as np
@@ -138,7 +139,6 @@ def calculate_ims(
     frequencies: np.ndarray = DEFAULT_FREQUENCIES,
     cores: int = multiprocessing.cpu_count(),
     ko_directory: Path | None = None,
-    use_numexpr: bool = False,
 ):
     """
     Calculate intensity measures for a single waveform.
@@ -160,9 +160,6 @@ def calculate_ims(
     ko_directory : Path, optional
         Path to the directory containing the Konno-Ohmachi matrices.
         Only required if FAS is in the list of IMs.
-    use_numexpr : bool, optional
-        If True, use numexpr for calculations. (Faster off for single waveform and multiprocessing)
-        Default is False.
 
     Returns
     -------
@@ -175,60 +172,50 @@ def calculate_ims(
     ValueError
         If the IM is not recognized or if required environment variables are not set to 1.
     """
-    if cores == 1:
-        required_env_vars = [
-            "NUMEXPR_NUM_THREADS",
-            "NUMBA_MAX_THREADS",
-            "NUMBA_NUM_THREADS",
-            "OPENBLAS_NUM_THREADS",
-        ]
-        unset_vars = [var for var in required_env_vars if os.getenv(var) != "1"]
-        if unset_vars:
-            raise ValueError(
-                f"The following environment variables must be set to 1: {', '.join(unset_vars)}"
-            )
+
     if ko_directory is None and IM.FAS in ims_list:
         raise ValueError(
             "The Konno-Ohmachi directory must be provided if Fourier amplitude spectrum is in the list of IMs."
         )
 
     results = []
-
+    waveform = np.atleast_3d(waveform)
+    waveform = np.ascontiguousarray(np.moveaxis(waveform, -1, 0))
     # Iterate through IMs and calculate them
     for im in ims_list:
         if im == IM.PGA:
-            result = ims.peak_ground_acceleration(waveform, use_numexpr=use_numexpr)
+            result = ims.peak_ground_acceleration(waveform, cores)
             result.index = [im.value]
         elif im == IM.PGV:
-            result = ims.peak_ground_velocity(waveform, dt, use_numexpr=use_numexpr)
+            result = ims.peak_ground_velocity(waveform, dt, cores)
             result.index = [im.value]
         elif im == IM.PGD:
-            result = ims.peak_ground_displacement(waveform, dt, use_numexpr=use_numexpr)
+            result = ims.peak_ground_displacement(waveform, dt, cores)
             result.index = [im.value]
         elif im == IM.pSA:
             data_array = ims.pseudo_spectral_acceleration(
-                waveform, periods, np.float32(dt), cores=cores, use_numexpr=use_numexpr
+                waveform, periods, np.float64(dt), cores=cores
             )
             # Convert the data array to a DataFrame
             result = data_array.to_dataframe().unstack(level="component")
             result.index = [
                 f"{im.value}_{idx}" for idx in data_array.coords["period"].values
             ]
-            result.columns = result.columns.droplevel(0)
+            result.columns = result.columns.droplevel(0)  # type: ignore[invalid-assignment]
         elif im == IM.CAV:
-            result = ims.cumulative_absolute_velocity(waveform, dt)
+            result = ims.cumulative_absolute_velocity(waveform, dt, cores)
             result.index = [im.value]
         elif im == IM.CAV5:
-            result = ims.cumulative_absolute_velocity(waveform, dt, 5)
+            result = ims.cumulative_absolute_velocity(waveform, dt, cores, threshold=5)
             result.index = [im.value]
         elif im == IM.Ds575:
-            result = ims.ds575(waveform, dt, use_numexpr=use_numexpr)
+            result = ims.ds575(waveform, dt, cores)
             result.index = [im.value]
         elif im == IM.Ds595:
-            result = ims.ds595(waveform, dt, use_numexpr=use_numexpr)
+            result = ims.ds595(waveform, dt, cores)
             result.index = [im.value]
         elif im == IM.AI:
-            result = ims.arias_intensity(waveform, dt)
+            result = ims.arias_intensity(waveform, dt, cores)
             result.index = [im.value]
         elif im == IM.FAS:
             assert ko_directory
@@ -245,7 +232,7 @@ def calculate_ims(
             result.index = [
                 f"{im.value}_{idx}" for idx in data_array.coords["frequency"].values
             ]
-            result.columns = result.columns.droplevel(0)
+            result.columns = result.columns.droplevel(0)  # type: ignore[invalid-assignment]
         else:
             raise ValueError(
                 f"IM {im} not recognized. Available IMs are {IM.__members__.keys()}"

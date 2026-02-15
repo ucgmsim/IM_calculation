@@ -1,3 +1,5 @@
+"""ASCII Waveform reading code."""
+
 from pathlib import Path
 
 import numpy as np
@@ -91,12 +93,13 @@ def read_ascii(
     delta = pd.read_csv(file_000, sep=r"\s+", header=None, nrows=2, skiprows=1).iloc[
         0, 1
     ]
+    assert isinstance(delta, float)
 
     if np.any(np.isnan(waveform_data)):
         raise ValueError("Components contain NaN values.")
 
-    # Ensure dtype is float 32
-    waveform_data = waveform_data.astype(np.float32)
+    # Ensure dtype is float 64
+    waveform_data = waveform_data.astype(np.float64)
 
     # Reshape the waveform to have the correct shape for the IM calculation
     reshaped_waveform = waveform_data[np.newaxis, :, :]

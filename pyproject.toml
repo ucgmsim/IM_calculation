@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools", "setuptools-scm"]
+requires = ["setuptools", "setuptools-scm", "setuptools-rust>=1.1.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -10,15 +10,14 @@ readme = "README.md"
 requires-python = ">=3.11"
 dynamic = ["version"]
 dependencies = [
-  "numba",
   "numpy",
-  "numexpr",
   "pandas[hdf5]",
   "pyfftw",
   "scipy",
   "pint-xarray",
   "xarray[io]",
   "typer>0.12.3",
+  "tqdm>=4.67.1",
   "qcore-utils>=2025.12.1",
 ]
 
@@ -26,12 +25,25 @@ dependencies = [
 
 [project.optional-dependencies]
 ko_matrix = ["obspy"]
-test = ["pytest", "hypothesis[numpy]", "obspy", "pytest-cov"]
+test = ["pytest", "hypothesis[numpy]", "pytest-cov", "rich>=14.2.0"]
 types = ["pandas-stubs", "scipy-stubs"]
-dev = ["deptry", "ruff", "ty"]
+dev = ["deptry", "ruff", "ty", "numpydoc"]
 
-[tool.setuptools.packages.find]
-exclude = ["wiki", "tests"]
+
+[tool.pytest]
+markers = ["slow: mark a test as slow"]
+
+[tool.setuptools.packages]
+find = { where = [
+  ".",
+], include = [
+  "IM",
+], exclude = [
+  "wiki",
+  "tests",
+  "src-rust",
+] }
+
 
 [project.scripts]
 calculate-ims-ascii = "IM.scripts.calculate_ims:app"
@@ -78,8 +90,40 @@ known-first-party = [
 
 [tool.ruff.lint.per-file-ignores]
 # Ignore no docstring in __init__.py
-"__init__.py" = ["D104"]
+"__init__.py" = ["D104", "N999"]
 # Ignore docstring errors in tests folder
 "tests/**.py" = ["D"]
 # Ignore the module name IM
 "IM/__init__.py" = ["N999"]
+
+
+[[tool.setuptools-rust.ext-modules]]
+target = "IM._core"
+binding = "PyO3"
+
+
+[tool.numpydoc_validation]
+checks = [
+  "GL05",
+  "GL08",
+  "GL10",
+  "PR01",
+  "PR02",
+  "PR03",
+  "PR04",
+  "PR05",
+  "PR06",
+  "PR07",
+  "RT01",
+  "RT02",
+  "RT03",
+  "RT04",
+  "YD01",
+]
+
+[tool.uv]
+cache-keys = [
+  { file = "pyproject.toml" },
+  { file = "Cargo.toml" },
+  { file = "**/*.rs" },
+]
