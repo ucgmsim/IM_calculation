@@ -28,8 +28,11 @@ jobs:
 
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@stable
+
+      - name: Add macOS Rust targets
+        if: runner.os == 'macOS'
+        uses: dtolnay/rust-toolchain@stable
         with:
-          # Adds both Mac architectures and Windows/Linux defaults
           targets: x86_64-apple-darwin, aarch64-apple-darwin
 
       - name: Build wheels
