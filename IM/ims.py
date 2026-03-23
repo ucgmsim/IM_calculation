@@ -355,16 +355,24 @@ def fourier_amplitude_spectra(
     )
     fas_smooth = interpolator(freqs)
 
-    eas = np.sqrt(
-        0.5
-        * (
-            np.square(fas_smooth[Component.COMP_0.value])
-            + np.square(fas_smooth[Component.COMP_90.value])
-        )
-    )
     geom_fas = np.sqrt(
         fas_smooth[Component.COMP_0.value] * fas_smooth[Component.COMP_90.value]
     )
+    # For EAS, we first we compute with the unsmoothed spectrum to avoid smoothing-induced bias, and then we apply the same smoothing to the EAS values.
+    eas_unsmoothed = np.sqrt(
+        0.5
+        * (
+            np.square(fa_spectrum[Component.COMP_0.value])
+            + np.square(fa_spectrum[Component.COMP_90.value])
+        )
+    )
+    eas_smooth = eas_unsmoothed @ konno
+    if np.ndim(eas_smooth) == 2:
+        eas_smooth = np.expand_dims(eas_smooth, axis=1)
+    interpolator = sp.interpolate.make_interp_spline(
+        fa_frequencies, eas_smooth, axis=-1, k=1
+    )
+    eas = interpolator(freqs)
 
     return xr.DataArray(
         np.stack(
