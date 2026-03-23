@@ -358,7 +358,7 @@ def fourier_amplitude_spectra(
     geom_fas = np.sqrt(
         fas_smooth[Component.COMP_0.value] * fas_smooth[Component.COMP_90.value]
     )
-    # For EAS, we first we compute with the unsmoothed spectrum to avoid smoothing-induced bias, and then we apply the same smoothing to the EAS values.
+    # For EAS, we first we compute with the unsmoothed spectrum to avoid distortion of inter-frequency correlations, and then we apply the same smoothing to the EAS values.
     eas_unsmoothed = np.sqrt(
         0.5
         * (
