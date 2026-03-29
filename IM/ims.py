@@ -281,6 +281,32 @@ def significant_duration(
         }
     )
 
+def smooth_and_interpolate(spectrum_data: np.ndarray, konno: np.ndarray, freqs: npt.NDArray[np.float64], fa_frequencies: np.ndarray) -> np.ndarray:
+    """
+    Smooths and interpolates a spectrum.
+
+    Parameters
+    ----------
+    spectrum_data : ndarray
+        The spectrum data to be smoothed and interpolated.
+    konno : ndarray
+        The Konno-Ohmachi smoothing matrix to apply to the spectrum data.
+    freqs : ndarray of float64
+        The frequencies at which to interpolate the smoothed spectrum data.
+    fa_frequencies : ndarray
+        The original frequencies corresponding to the spectrum data before smoothing.
+
+    Returns
+    -------
+    ndarray
+        The smoothed and interpolated spectrum data at the specified frequencies.
+    """
+    smoothed = spectrum_data @ konno
+    interpolator = sp.interpolate.make_interp_spline(
+        fa_frequencies, smoothed, axis=-1, k=1
+    )
+    return interpolator(freqs)
+
 
 def fourier_amplitude_spectra(
     waveforms: ChunkedWaveformArray,
@@ -347,24 +373,20 @@ def fourier_amplitude_spectra(
     # gen_ko_matrix.py, this is a no-op because the arrays are already
     # Fortran contiguous. Hence it creates no copy in memory.
     konno = np.asfortranarray(konno)
-    fas_smooth = fa_spectrum @ konno
-    if np.ndim(fas_smooth) == 2:
-        fas_smooth = np.expand_dims(fas_smooth, axis=1)
-    interpolator = sp.interpolate.make_interp_spline(
-        fa_frequencies, fas_smooth, axis=-1, k=1
-    )
-    fas_smooth = interpolator(freqs)
+    fas_smooth = smooth_and_interpolate(fa_spectrum, konno, freqs, fa_frequencies)
 
-    eas = np.sqrt(
-        0.5
-        * (
-            np.square(fas_smooth[Component.COMP_0.value])
-            + np.square(fas_smooth[Component.COMP_90.value])
-        )
-    )
     geom_fas = np.sqrt(
         fas_smooth[Component.COMP_0.value] * fas_smooth[Component.COMP_90.value]
     )
+    # For EAS, we first we compute with the unsmoothed spectrum to avoid distortion of inter-frequency correlations, and then we apply the same smoothing to the EAS values.
+    eas_unsmoothed = np.sqrt(
+        0.5
+        * (
+            np.square(fa_spectrum[Component.COMP_0.value])
+            + np.square(fa_spectrum[Component.COMP_90.value])
+        )
+    )
+    eas = smooth_and_interpolate(eas_unsmoothed, konno, freqs, fa_frequencies)
 
     return xr.DataArray(
         np.stack(
