@@ -1,0 +1,375 @@
+name: AI Code Review
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
+jobs:
+  review:
+    if: ${{ github.event.pull_request.head.repo.full_name == github.repository }}
+    runs-on: self-hosted
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get PR diff
+        id: diff
+        run: |
+          curl -L \
+            -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+            -H "Accept: application/vnd.github.v3.diff" \
+            "${{ github.event.pull_request.diff_url }}" > pr.diff
+
+      - name: Debug - Original diff size
+        run: |
+          echo "📏 Original diff size: $(wc -c < pr.diff) bytes"
+          echo "📊 Files in diff:"
+          grep '^diff --git' pr.diff | wc -l || echo "No diff entries found"
+
+      - name: Run Ollama Cloud review
+        id: review
+        run: |
+          # Ensure jq is installed
+          if ! command -v jq &> /dev/null; then
+            sudo apt-get update && sudo apt-get install -y jq
+          fi
+
+          if [ ! -s pr.diff ]; then
+            echo "✅ PR diff is empty. Nothing to review." > review.txt
+            exit 0
+          fi
+
+          DIFF_SIZE=$(wc -c < pr.diff)
+          echo "📏 Original diff size: $DIFF_SIZE bytes"
+          MAX_BYTES=700000
+          if [ "$DIFF_SIZE" -gt "$MAX_BYTES" ]; then
+            echo "⚠️ Diff is too large. Truncating to $MAX_BYTES bytes."
+            head -c "$MAX_BYTES" pr.diff > pr.diff.truncated
+            mv pr.diff.truncated pr.diff
+          else
+            echo "✅ Diff size OK"
+          fi
+
+          # Create prompt
+          cat > prompt.txt << 'EOF'
+          You are a senior code reviewer. Review the following code diff.
+          CRITICAL RULES:
+          1. DO NOT summarize what the code does.
+          2. ONLY point out SPECIFIC problems in the code changes.
+          3. For each problem, provide:
+             - The EXACT file name
+             - The EXACT problematic code line (copy the code)
+             - WHY it's a problem
+             - HOW to fix it
+          4. Focus on: bugs, security flaws, performance issues, bad practices.
+          5. If you find no issues, output: "✅ No issues found. The code looks good."
+          FORMAT (MUST FOLLOW EXACTLY):
+          ### FILE: filename.py
+          - LINE: [line number if available]
+          - CODE: [the exact problematic line]
+          - PROBLEM: [what's wrong]
+          - FIX: [how to fix]
+          Code diff to review:
+          EOF
+          cat pr.diff >> prompt.txt
+
+          # Save model name for later use in comments
+          MODEL_NAME="deepseek-v4-flash:cloud"
+          echo "$MODEL_NAME" > model.txt
+
+          # Build payload
+          jq -n --arg model "$MODEL_NAME" --rawfile prompt prompt.txt '{
+            model: $model,
+            messages: [
+              { role: "system", content: "You are a harsh code reviewer. Only output issues in the exact format specified. Do not include any thinking or reasoning in your output. Output only the final review in the specified format." },
+              { role: "user", content: $prompt }
+            ],
+            stream: false,
+            options: {
+              temperature: 0.1,
+              num_predict: 16000
+            }
+          }' > payload.json
+
+          PAYLOAD_SIZE=$(wc -c < payload.json)
+          echo "📤 Payload size: $PAYLOAD_SIZE bytes"
+
+          # Call API
+          curl -s -w "\n%{http_code}" -X POST https://ollama.com/api/chat \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer ${{ secrets.OLLAMA_API_KEY }}" \
+            -d @payload.json > response_with_status.txt
+
+          HTTP_STATUS=$(tail -n1 response_with_status.txt)
+          head -n -1 response_with_status.txt > response.json
+
+          echo "📥 HTTP Status: $HTTP_STATUS"
+
+          if [ "$HTTP_STATUS" != "200" ]; then
+            echo "❌ API request failed with status $HTTP_STATUS"
+            echo "📝 Response body:"
+            cat response.json
+            echo "❌ API request failed" > review.txt
+            rm -f prompt.txt payload.json response.json response_with_status.txt model.txt
+            exit 1
+          fi
+
+          echo "📄 Full API response:"
+          cat response.json
+
+          # Extract content
+          CONTENT=$(jq -r '.message.content // ""' response.json)
+          if [ -z "$CONTENT" ]; then
+            CONTENT=$(jq -r '.choices[0].message.content // ""' response.json)
+          fi
+
+          if [ -z "$CONTENT" ]; then
+            echo "⚠️ No content found in response. Full response shown above."
+            echo "❌ No review content" > review.txt
+          else
+            echo "$CONTENT" > review.txt
+            echo "📝 Review extracted successfully. First 500 chars:"
+            head -c 500 review.txt
+            echo ""
+          fi
+
+          rm -f prompt.txt payload.json response.json response_with_status.txt
+
+
+      - name: Post inline review comments
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require('fs');
+            const review = fs.readFileSync('review.txt', 'utf8');
+      
+            const model = fs.existsSync('model.txt') ? fs.readFileSync('model.txt', 'utf8').trim() : 'unknown';
+      
+            if (!review || review.trim() === '') {
+              console.log('⚠️ Review is empty, skipping.');
+              await github.rest.issues.createComment({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: `## 🤖 AI Code Review (${model})\n\n⚠️ No review content was generated.`
+              });
+              return;
+            }
+      
+            // --- Parse the review to extract issues ---
+            function parseReview(text) {
+              const issues = [];
+              const blocks = text.split(/### FILE:/);
+              for (const block of blocks) {
+                if (!block.trim()) continue;
+                const lines = block.split('\n');
+                const fileLine = lines[0].trim();
+                if (!fileLine) continue;
+                let filePath = fileLine.replace(/^['"]?|['"]?$/g, '').trim();
+                filePath = filePath.replace(/[:\s]+$/, '');
+                const content = lines.slice(1).join('\n');
+                const lineMatch = content.match(/- LINE:\s*(.+?)(?=\n- CODE:|\n- PROBLEM:|\n- FIX:|$)/is);
+                const codeMatch = content.match(/- CODE:\s*(.+?)(?=\n- LINE:|\n- PROBLEM:|\n- FIX:|$)/is);
+                const problemMatch = content.match(/- PROBLEM:\s*(.+?)(?=\n- CODE:|\n- LINE:|\n- FIX:|$)/is);
+                const fixMatch = content.match(/- FIX:\s*(.+?)(?=\n- CODE:|\n- LINE:|\n- PROBLEM:|$)/is);
+                if (problemMatch && fixMatch) {
+                  issues.push({
+                    path: filePath,
+                    line: lineMatch ? parseInt(lineMatch[1].trim()) : null,
+                    code: codeMatch ? codeMatch[1].trim() : null,
+                    problem: problemMatch[1].trim(),
+                    fix: fixMatch[1].trim()
+                  });
+                }
+              }
+              return issues;
+            }
+      
+            const issues = parseReview(review);
+            console.log(`📊 Parsed ${issues.length} issues.`);
+            if (issues.length === 0) {
+              await github.rest.issues.createComment({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: `## 🤖 AI Code Review (${model})\n\n${review}`
+              });
+              return;
+            }
+      
+            // --- Helper: get file content and find line number (with debug) ---
+            async function findLineNumber(path, codeSnippet) {
+              try {
+                const { data: fileContent } = await github.rest.repos.getContent({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  path: path,
+                  ref: context.payload.pull_request.head.sha
+                });
+                const content = Buffer.from(fileContent.content, 'base64').toString('utf-8');
+                const lines = content.split('\n');
+                // Try exact match first, then partial match
+                const searchKeys = [
+                  codeSnippet.trim(),
+                  codeSnippet.trim().replace(/\s+/g, ' '),
+                  codeSnippet.trim().substring(0, 80)
+                ];
+                for (const key of searchKeys) {
+                  for (let i = 0; i < lines.length; i++) {
+                    if (lines[i].includes(key)) {
+                      console.log(`✅ Found line ${i+1} for ${path} using key: "${key.substring(0, 50)}..."`);
+                      return i + 1;
+                    }
+                  }
+                }
+                console.log(`❌ Could not find code snippet in ${path}`);
+                return null;
+              } catch (e) {
+                console.log(`⚠️ Could not fetch ${path}: ${e.message}`);
+                return null;
+              }
+            }
+      
+            // --- Helper: get context snippet around a line ---
+            async function getLineContext(path, lineNumber, contextLines = 3) {
+              try {
+                const { data: fileContent } = await github.rest.repos.getContent({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  path: path,
+                  ref: context.payload.pull_request.head.sha
+                });
+                const content = Buffer.from(fileContent.content, 'base64').toString('utf-8');
+                const lines = content.split('\n');
+                if (lineNumber < 1 || lineNumber > lines.length) return null;
+                const start = Math.max(0, lineNumber - contextLines - 1);
+                const end = Math.min(lines.length, lineNumber + contextLines);
+                const snippetLines = lines.slice(start, end);
+                const markerIndex = lineNumber - start - 1;
+                if (markerIndex >= 0 && markerIndex < snippetLines.length) {
+                  snippetLines[markerIndex] = '👉 ' + snippetLines[markerIndex];
+                }
+                return snippetLines.join('\n');
+              } catch (e) {
+                console.log(`⚠️ Could not fetch context for ${path}: ${e.message}`);
+                return null;
+              }
+            }
+      
+            // --- Post comments ---
+            const reviewComments = [];
+            for (const issue of issues) {
+              let lineNumber = issue.line;
+              // If line not provided, try to find it
+              if (!lineNumber && issue.code) {
+                lineNumber = await findLineNumber(issue.path, issue.code);
+              }
+      
+              let commentBody;
+              let snippet = null;
+              if (lineNumber) {
+                snippet = await getLineContext(issue.path, lineNumber, 6);
+                if (snippet) {
+                  commentBody = `**📍 Line ${lineNumber}**\n\n\`\`\`\n${snippet}\n\`\`\`\n\n**⚠️ Problem:** ${issue.problem}\n\n**✅ Fix:** ${issue.fix}`;
+                } else {
+                  commentBody = `**⚠️ Problem:** ${issue.problem}\n\n**✅ Fix:** ${issue.fix}`;
+                }
+                reviewComments.push({
+                  path: issue.path,
+                  line: lineNumber,
+                  side: 'RIGHT',
+                  body: commentBody
+                });
+              } else {
+                // No line number found – try to get context by searching the file
+                if (issue.code) {
+                  // Try to find line number again with more relaxed search
+                  const foundLine = await findLineNumber(issue.path, issue.code);
+                  if (foundLine) {
+                    const snippet2 = await getLineContext(issue.path, foundLine, 3);
+                    if (snippet2) {
+                      commentBody = `**📍 Approximate Line ${foundLine}**\n\n\`\`\`\n${snippet2}\n\`\`\`\n\n**⚠️ Problem:** ${issue.problem}\n\n**✅ Fix:** ${issue.fix}`;
+                    } else {
+                      commentBody = `**💻 Code:** \`${issue.code}\`\n\n**⚠️ Problem:** ${issue.problem}\n\n**✅ Fix:** ${issue.fix}`;
+                    }
+                  } else {
+                    commentBody = `**💻 Code:** \`${issue.code}\`\n\n**⚠️ Problem:** ${issue.problem}\n\n**✅ Fix:** ${issue.fix}`;
+                  }
+                } else {
+                  commentBody = `**⚠️ Problem:** ${issue.problem}\n\n**✅ Fix:** ${issue.fix}`;
+                }
+                console.log(`⚠️ No line number for ${issue.path}, posting as regular comment.`);
+                await github.rest.issues.createComment({
+                  issue_number: context.issue.number,
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  body: `## 📁 ${issue.path} (${model})\n\n${commentBody}`
+                });
+              }
+            }
+      
+            // Post all inline comments as a single review
+            if (reviewComments.length > 0) {
+              try {
+                const { data: reviewData } = await github.rest.pulls.createReview({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  pull_number: context.issue.number,
+                  commit_id: context.payload.pull_request.head.sha,
+                  body: `## 🤖 AI Code Review (${model})`,
+                  event: 'COMMENT',
+                  comments: reviewComments
+                });
+                console.log(`✅ Created review with ${reviewComments.length} inline comments.`);
+              } catch (error) {
+                console.log(`❌ Failed to create review: ${error.message}`);
+                // Fallback: post each inline comment individually
+                for (const comment of reviewComments) {
+                  try {
+                    await github.rest.pulls.createReviewComment({
+                      owner: context.repo.owner,
+                      repo: context.repo.repo,
+                      pull_number: context.issue.number,
+                      commit_id: context.payload.pull_request.head.sha,
+                      body: comment.body,
+                      path: comment.path,
+                      line: comment.line,
+                      side: 'RIGHT'
+                    });
+                  } catch (e) {
+                    console.log(`⚠️ Failed to post inline comment: ${e.message}`);
+                    await github.rest.issues.createComment({
+                      issue_number: context.issue.number,
+                      owner: context.repo.owner,
+                      repo: context.repo.repo,
+                      body: `## 📁 ${comment.path} (${model})\n\n${comment.body}`
+                    });
+                  }
+                }
+              }
+            }
+      
+            // Summary comment
+            if (reviewComments.length > 0) {
+              await github.rest.issues.createComment({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: `## 🤖 AI Code Review (${model})\n\nFound **${reviewComments.length}** issues. See inline comments for details.`
+              });
+            }
+      
+            // Clean up
+            if (fs.existsSync('model.txt')) {
+              fs.unlinkSync('model.txt');
+            }
+      
+      
