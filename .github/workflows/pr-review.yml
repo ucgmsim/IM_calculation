@@ -322,6 +322,7 @@ jobs:
                   owner: context.repo.owner,
                   repo: context.repo.repo,
                   pull_number: context.issue.number,
+                  commit_id: context.payload.pull_request.head.sha,
                   body: `## 🤖 AI Code Review (${model})`,
                   event: 'COMMENT',
                   comments: reviewComments
