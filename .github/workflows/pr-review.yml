@@ -53,6 +53,7 @@ jobs:
 
           DIFF_SIZE=$(wc -c < pr.diff)
           echo "📏 Original diff size: $DIFF_SIZE bytes"
+          echo "$DIFF_SIZE" > diff_size.txt
           MAX_BYTES=700000
           if [ "$DIFF_SIZE" -gt "$MAX_BYTES" ]; then
             echo "⚠️ Diff is too large. Truncating to $MAX_BYTES bytes."
