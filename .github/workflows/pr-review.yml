@@ -53,13 +53,16 @@ jobs:
 
           DIFF_SIZE=$(wc -c < pr.diff)
           echo "📏 Original diff size: $DIFF_SIZE bytes"
+          echo "$DIFF_SIZE" > diff_size.txt
           MAX_BYTES=700000
           if [ "$DIFF_SIZE" -gt "$MAX_BYTES" ]; then
             echo "⚠️ Diff is too large. Truncating to $MAX_BYTES bytes."
             head -c "$MAX_BYTES" pr.diff > pr.diff.truncated
+            echo "true" > was_truncated.txt
             mv pr.diff.truncated pr.diff
           else
             echo "✅ Diff size OK"
+            echo "false" > was_truncated.txt
           fi
 
           # Create prompt
@@ -155,8 +158,9 @@ jobs:
           script: |
             const fs = require('fs');
             const review = fs.readFileSync('review.txt', 'utf8');
-      
             const model = fs.existsSync('model.txt') ? fs.readFileSync('model.txt', 'utf8').trim() : 'unknown';
+            const diffSize = fs.existsSync('diff_size.txt') ? fs.readFileSync('diff_size.txt', 'utf8').trim() : 'unknown';
+            const truncated = fs.existsSync('was_truncated.txt') ? fs.readFileSync('was_truncated.txt', 'utf8').trim() : 'false';
       
             if (!review || review.trim() === '') {
               console.log('⚠️ Review is empty, skipping.');
@@ -368,13 +372,17 @@ jobs:
                 issue_number: context.issue.number,
                 owner: context.repo.owner,
                 repo: context.repo.repo,
-                body: `## 🤖 AI Code Review (${model})\n\nFound **${reviewComments.length}** issues. See inline comments for details.`
+                body: `## 🤖 AI Code Review (${model})\n\nFound **${reviewComments.length}** issues.\n\n**Diff size:** ${diffSize} bytes\n**Truncated:** ${truncated}\n\nSee inline comments for details.`
               });
             }
       
             // Clean up
-            if (fs.existsSync('model.txt')) {
-              fs.unlinkSync('model.txt');
+
+            const filesToClean = ['review.txt', 'model.txt', 'diff_size.txt', 'was_truncated.txt'];
+            for (const file of filesToClean) {
+              if (fs.existsSync(file)) {
+                fs.unlinkSync(file);
+              }
             }
       
       
