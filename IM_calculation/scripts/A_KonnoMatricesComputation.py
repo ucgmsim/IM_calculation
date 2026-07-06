@@ -5,7 +5,7 @@ import numpy as np
 from obspy.signal.konnoohmachismoothing import calculate_smoothing_matrix
 
 
-def createKonnoMatrix_single(ft_len: int, bandwidth: int = 20):
+def createKonnoMatrix_single(ft_len: int, bandwidth: int = 40):
     """
     Creates a single Konno Ohmachi matrix
     :param ft_len: Length of Fourier transform
@@ -18,7 +18,7 @@ def createKonnoMatrix_single(ft_len: int, bandwidth: int = 20):
 
 
 def createKonnoMatrices(
-    install_directory: Path, num_to_gen: int = 7, bandwidth: int = 20
+    install_directory: Path, num_to_gen: int = 7, bandwidth: int = 40
 ):
     """
     Creates several Konno Ohmachi matrices
@@ -58,7 +58,7 @@ def load_args():
         "--bandwidth",
         help="Bandwidth of Konno matrices",
         type=int,
-        default=20,
+        default=40,
     )
 
     args = parser.parse_args()
