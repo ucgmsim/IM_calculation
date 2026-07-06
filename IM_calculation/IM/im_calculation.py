@@ -17,7 +17,10 @@ from qcore.im import order_im_cols_df
 from IM_calculation.Advanced_IM import advanced_IM_factory
 from IM_calculation.IM import read_waveform, intensity_measures
 from IM_calculation.IM.intensity_measures import G
-from IM_calculation.IM.computeFAS import get_fourier_spectrum
+from IM_calculation.IM.computeFAS import (
+    get_fourier_spectrum,
+    get_fourier_spectrum_with_eas,
+)
 
 
 DEFAULT_IMS = ("PGA", "PGV", "CAV", "AI", "Ds575", "Ds595", "MMI", "pSA")
@@ -306,8 +309,10 @@ def calc_FAS(
     comps_to_calculate,
 ):
     try:
-        value = get_fourier_spectrum(accelerations[:, :2], DT, im_options[im])
-        values_to_store = array_to_dict(value, comps_to_calculate, im, comps_to_store)
+        fas, eas = get_fourier_spectrum_with_eas(
+            accelerations[:, : len(comps_to_calculate)], DT, im_options[im]
+        )
+        values_to_store = array_to_dict(fas, comps_to_calculate, im, comps_to_store)
         if check_rotd(comps_to_store):
             func = lambda rotated_waveform: get_fourier_spectrum(
                 rotated_waveform.squeeze(), dt=DT, fa_frequencies_int=im_options[im]
@@ -319,11 +324,9 @@ def calc_FAS(
             f"Attempting to compute fourier spectrum raised exception: {e}\nThis was most likely caused by attempting to compute for a waveform with more than 16384 timesteps."
         )
     else:
-        # compute EAS, the euclidean distance of FAS 000 and 090
-        if Components.ceas in comps_to_store:
-            values_to_store[
-                Components.ceas.str_value
-            ] = intensity_measures.get_euclidean_dist(value[:, 0], value[:, 1])
+        # EAS = KOsmooth(sqrt(0.5*(raw000^2 + raw090^2)))  (NGA-West2, combine-then-smooth)
+        if Components.ceas in comps_to_store and eas is not None:
+            values_to_store[Components.ceas.str_value] = eas
 
         for comp in comps_to_store:
             if comp.str_value in values_to_store:
