@@ -58,3 +58,34 @@ def get_fourier_spectrum(
     # interpolate at output frequencies
     interpolator = interp1d(fa_frequencies, fa_smooth, axis=0, fill_value="extrapolate")
     return interpolator(fa_frequencies_int)
+
+
+def get_fourier_spectrum_with_eas(waveform, dt, fa_frequencies_int, ko_directory=None):
+    """Smoothed per-component FAS plus the NGA-West2 EAS.
+
+    waveform: (nt, n_comp) acceleration; columns are [090, 000[, ver]].
+    Returns (fas, eas):
+      fas: (n_out, n_comp) Konno-Ohmachi-smoothed FAS per component, interpolated
+           to fa_frequencies_int.
+      eas: (n_out,) = interp(KOsmooth(sqrt(0.5*(raw090^2 + raw000^2)))) -- the two
+           horizontals are combined on the RAW spectra, then smoothed. None if the
+           waveform has fewer than two components.
+    """
+    fa_spectrum, fa_frequencies = generate_fa_spectrum(waveform, dt, waveform.shape[0])
+    fa_spectrum = np.abs(fa_spectrum)                    # raw |rfft|*dt per component
+    konno = get_konno_matrix(len(fa_spectrum), directory=ko_directory)
+
+    fas_smooth = np.dot(fa_spectrum.T, konno).T          # smooth each component
+    fas = interp1d(fa_frequencies, fas_smooth, axis=0, fill_value="extrapolate")(
+        fa_frequencies_int
+    )
+
+    eas = None
+    if fa_spectrum.shape[1] >= 2:
+        eas_unsmoothed = np.sqrt(
+            0.5 * (fa_spectrum[:, 0] ** 2 + fa_spectrum[:, 1] ** 2)
+        )
+        eas = interp1d(
+            fa_frequencies, np.dot(eas_unsmoothed, konno), fill_value="extrapolate"
+        )(fa_frequencies_int)
+    return fas, eas
