@@ -21,6 +21,7 @@ from IM_calculation.IM.computeFAS import (
     get_fourier_spectrum,
     get_fourier_spectrum_with_eas,
 )
+from IM_calculation.IM.period_utils import collapse_fp_duplicates
 
 
 DEFAULT_IMS = ("PGA", "PGV", "CAV", "AI", "Ds575", "Ds595", "MMI", "pSA")
@@ -814,7 +815,12 @@ def validate_period(arg_period, arg_extended_period):
     period = np.array(arg_period, dtype="float64")
 
     if arg_extended_period:
-        period = np.unique(np.append(period, constants.EXT_PERIOD))
+        # np.logspace in EXT_PERIOD can render a power of ten as the adjacent double
+        # (e.g. 0.09999999999999999 for 0.1); np.unique would then keep it as a spurious
+        # duplicate pSA column. Snap such values onto the requested period first.
+        period = collapse_fp_duplicates(
+            np.append(period, constants.EXT_PERIOD), canonical=arg_period
+        )
 
     return period
 
