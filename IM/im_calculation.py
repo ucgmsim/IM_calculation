@@ -130,6 +130,26 @@ DEFAULT_FREQUENCIES = np.logspace(
     num=389,
 )
 
+FREQUENCY_LABEL_SIGNIFICANT_FIGURES = 6
+"""Significant figures used when labelling FAS columns (e.g. FAS_0.0131826)."""
+
+
+def frequency_label(frequency: float) -> str:
+    """Format a frequency as it appears in FAS column names.
+
+    Parameters
+    ----------
+    frequency : float
+        Frequency in Hz.
+
+    Returns
+    -------
+    str
+        The frequency rounded to `FREQUENCY_LABEL_SIGNIFICANT_FIGURES`
+        significant figures.
+    """
+    return f"{frequency:.{FREQUENCY_LABEL_SIGNIFICANT_FIGURES}g}"
+
 
 def calculate_ims(
     waveform: np.ndarray,
@@ -231,7 +251,8 @@ def calculate_ims(
             # Convert the data array to a DataFrame
             result = data_array.to_dataframe().unstack(level="component")
             result.index = [
-                f"{im.value}_{idx}" for idx in data_array.coords["frequency"].values
+                f"{im.value}_{frequency_label(idx)}"
+                for idx in data_array.coords["frequency"].values
             ]
             result.columns = result.columns.droplevel(0)  # ty: ignore[invalid-assignment, invalid-argument-type]
         else:
