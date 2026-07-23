@@ -18,12 +18,11 @@ fn rotd_calculation(comp_0: ArrayView1<f64>, comp_90: ArrayView1<f64>) -> (f64, 
             acc.max((cos_theta * x + sin_theta * y).abs())
         });
     }
-    let (small, middle, large) = rotd_values.select_nth_unstable_by(90, f64::total_cmp);
-    let min = small.iter().min_by(|a, b| a.total_cmp(b)).unwrap();
-    let lower_middle = small.iter().max_by(|a, b| a.total_cmp(b)).unwrap();
-    let max = large.iter().max_by(|a, b| a.total_cmp(b)).unwrap();
-    let median = (lower_middle + *middle) / 2.0;
-    (*min, median, *max)
+    rotd_values.sort_by(f64::total_cmp);
+    let min = rotd_values[0];
+    let max = rotd_values[179];
+    let median = (rotd_values[89] + rotd_values[90]) / 2.0;
+    (min, median, max)
 }
 
 pub fn rotd_parallel(comp_0: ArrayView2<f64>, comp_90: ArrayView2<f64>) -> Array<f64, Ix2> {
