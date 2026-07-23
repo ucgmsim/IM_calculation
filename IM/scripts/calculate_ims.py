@@ -41,12 +41,8 @@ def calculate_ims_ascii(
         list[im_calculation.IM],
         typer.Argument(),
     ],
-    periods: Annotated[list[float], typer.Option()] = list(
-        im_calculation.DEFAULT_PERIODS
-    ),
-    frequencies: Annotated[list[float], typer.Option()] = list(
-        im_calculation.DEFAULT_FREQUENCIES
-    ),
+    periods: Annotated[list[float] | None, typer.Option()] = None,
+    frequencies: Annotated[list[float] | None, typer.Option()] = None,
     cores: Annotated[
         int,
         typer.Option(),
@@ -78,6 +74,11 @@ def calculate_ims_ascii(
         Path to the directory containing the Konno-Ohmachi matrices.
         Only required if FAS is in the list of IMs.
     """
+    if periods is None:
+        periods = list(im_calculation.DEFAULT_PERIODS)
+    if frequencies is None:
+        frequencies = list(im_calculation.DEFAULT_FREQUENCIES)
+
     # Read the ASCII files
     dt, waveform = waveform_reading.read_ascii(file_000, file_090, file_ver)
 

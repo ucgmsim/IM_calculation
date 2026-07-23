@@ -134,7 +134,7 @@ DEFAULT_FREQUENCIES = np.logspace(
 def calculate_ims(
     waveform: np.ndarray,
     dt: float,
-    ims_list: list[IM] = list(IM),
+    ims_list: list[IM] | None = None,
     periods: np.ndarray = DEFAULT_PERIODS,
     frequencies: np.ndarray = DEFAULT_FREQUENCIES,
     cores: int = multiprocessing.cpu_count(),
@@ -172,7 +172,8 @@ def calculate_ims(
     ValueError
         If the IM is not recognized or if required environment variables are not set to 1.
     """
-
+    if ims_list is None:
+        ims_list = list(IM)
     if ko_directory is None and IM.FAS in ims_list:
         raise ValueError(
             "The Konno-Ohmachi directory must be provided if Fourier amplitude spectrum is in the list of IMs."
@@ -201,7 +202,7 @@ def calculate_ims(
             result.index = [
                 f"{im.value}_{idx}" for idx in data_array.coords["period"].values
             ]
-            result.columns = result.columns.droplevel(0)  # type: ignore[invalid-assignment]
+            result.columns = result.columns.droplevel(0)  # ty: ignore[invalid-assignment, invalid-argument-type]
         elif im == IM.CAV:
             result = ims.cumulative_absolute_velocity(waveform, dt, cores)
             result.index = [im.value]
@@ -232,7 +233,7 @@ def calculate_ims(
             result.index = [
                 f"{im.value}_{idx}" for idx in data_array.coords["frequency"].values
             ]
-            result.columns = result.columns.droplevel(0)  # type: ignore[invalid-assignment]
+            result.columns = result.columns.droplevel(0)  # ty: ignore[invalid-assignment, invalid-argument-type]
         else:
             raise ValueError(
                 f"IM {im} not recognized. Available IMs are {IM.__members__.keys()}"

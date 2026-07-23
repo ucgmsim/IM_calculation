@@ -18,7 +18,7 @@ import xarray as xr
 from pyfftw.interfaces import numpy_fft as fft
 
 from IM import (
-    _core,  # type: ignore[unresolved-import]
+    _core,  # ty: ignore[unresolved-import]
     ko_matrices,
 )
 
@@ -54,7 +54,7 @@ def environment(
     # Code to acquire resource, e.g.:
     old_environment: dict[str, str] = os.environ.copy()
     try:
-        os.environ.update(variables)  # type: ignore[no-matching-overload]
+        os.environ.update(variables)
         yield os.environ
     finally:
         for key in set(os.environ) - set(old_environment):
@@ -281,7 +281,13 @@ def significant_duration(
         }
     )
 
-def smooth_and_interpolate(spectrum_data: np.ndarray, konno: np.ndarray, freqs: npt.NDArray[np.float64], fa_frequencies: np.ndarray) -> np.ndarray:
+
+def smooth_and_interpolate(
+    spectrum_data: np.ndarray,
+    konno: np.ndarray,
+    freqs: npt.NDArray[np.float64],
+    fa_frequencies: np.ndarray,
+) -> np.ndarray:
     """
     Smooths and interpolates a spectrum.
 
