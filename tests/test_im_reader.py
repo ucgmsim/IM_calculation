@@ -52,7 +52,7 @@ def test_read_intensity_measures_with_units(tmp_path: Path, sample_dataset: xr.D
     result = read_intensity_measures(file_path)
 
     assert isinstance(result, xr.Dataset)
-    for im_name in IM_METADATA.keys():
+    for im_name in IM_METADATA:
         assert im_name in result
         assert hasattr(result[im_name], "pint")
         assert result[im_name].pint.units is not None
@@ -78,7 +78,7 @@ def test_write_intensity_measures(tmp_path: Path, sample_dataset: xr.Dataset):
             assert result[im_name].attrs["description"] == description
 
     # Ensure units were applied and then dequantified
-    for im_name in IM_METADATA.keys():
+    for im_name in IM_METADATA:
         if im_name in result:
             assert "units" in result[im_name].attrs
 
@@ -99,6 +99,6 @@ def test_write_intensity_measures_missing_metadata(
     assert "station" in result.coords
     assert "description" in result.coords["station"].attrs
 
-    for im_name in IM_METADATA.keys():
+    for im_name in IM_METADATA:
         if im_name in result:
             assert "description" in result[im_name].attrs
