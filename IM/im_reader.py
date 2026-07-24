@@ -90,12 +90,12 @@ def write_intensity_measures(dataset: xr.Dataset, output_ffp: str | Path) -> Non
     for name, description in COORDINATE_METADATA.items():
         if name not in dataset.coords:
             continue
-        dataset.coords[name].attrs.update(COORDINATE_METADATA[name])
+        dataset.coords[name].attrs.update(description)
 
     for im_name, description in IM_METADATA.items():
         if im_name not in dataset:
             continue
-        dataset[im_name].attrs["description"] = IM_METADATA[im_name]
+        dataset[im_name].attrs["description"] = description
 
     dataset = dataset.pint.quantify(IM_UNITS)
 

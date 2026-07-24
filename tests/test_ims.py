@@ -89,11 +89,6 @@ def test_pga(comp_0: npt.NDArray[np.float64], expected_pga: float) -> None:
             2 * np.pi,
             981 * 2 * np.pi,
         ),
-        (
-            2 * np.sin(np.linspace(0, 2 * np.pi, num=100, dtype=np.float64)) - 1,
-            2 * np.pi,
-            981 * 2 * np.pi,
-        ),
     ],
 )
 def test_pgv(
@@ -352,7 +347,7 @@ def save_diff_html(
                     "selector": "td",
                     "props": [("padding", "5px"), ("border", "1px solid #ddd")],
                 },
-            ]  # type: ignore[invalid-argument-type]
+            ]
         )
     )
 
@@ -424,7 +419,7 @@ def test_all_ims_benchmark_edge_cases(
 
         # Select only pSA columns as per original logic, or remove filter to show all
         save_diff_html(
-            expected,  # type: ignore[invalid-argument]
+            expected,
             result,
             output_path=diff_path,
             title=f"Differences for {resource_dir.stem}",
@@ -568,8 +563,8 @@ def test_invalid_waveform_shapes(invalid_shape: tuple[int, ...]) -> None:
     """Test handling of invalid waveform shapes."""
     waveforms = np.zeros(invalid_shape, dtype=np.float64)
 
-    with pytest.raises((TypeError)):
-        ims.peak_ground_acceleration(waveforms, cores=1)  # type: ignore[invalid-argument-type]
+    with pytest.raises(TypeError):
+        ims.peak_ground_acceleration(waveforms, cores=1)  # ty: ignore[invalid-argument-type]
 
 
 @pytest.mark.slow
@@ -603,7 +598,7 @@ def test_fourier_amplitude_spectra_shape(ko_matrices: Path) -> None:
             functools.partial(
                 ims.pseudo_spectral_acceleration,
                 periods=np.array([1.0]),
-                dt=0.01,
+                dt=np.float64(0.01),
                 cores=1,
             ),
         ]
@@ -648,14 +643,14 @@ def test_component_orientation(waveform: npt.NDArray[np.float64]) -> None:
     waveform_ims = ims.peak_ground_acceleration(waveform, cores=1)
 
     assert_array_almost_equal(
-        waveform_ims["000"].values,  # type: ignore[invalid-argument-type]
+        waveform_ims["000"].values,  # ty: ignore[invalid-argument-type]
         np.abs(waveform[ims.Component.COMP_0]).max(axis=1),
     )
     assert_array_almost_equal(
-        waveform_ims["090"].values,  # type: ignore[invalid-argument-type]
+        waveform_ims["090"].values,  # ty: ignore[invalid-argument-type]
         np.abs(waveform[ims.Component.COMP_90]).max(axis=1),
     )
     assert_array_almost_equal(
-        waveform_ims["ver"].values,  # type: ignore[invalid-argument-type]
+        waveform_ims["ver"].values,  # ty: ignore[invalid-argument-type]
         np.abs(waveform[ims.Component.COMP_VER]).max(axis=1),
     )

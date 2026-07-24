@@ -130,11 +130,31 @@ DEFAULT_FREQUENCIES = np.logspace(
     num=389,
 )
 
+FREQUENCY_LABEL_SIGNIFICANT_FIGURES = 6
+"""Significant figures used when labelling FAS columns (e.g. FAS_0.0131826)."""
+
+
+def frequency_label(frequency: float) -> str:
+    """Format a frequency as it appears in FAS column names.
+
+    Parameters
+    ----------
+    frequency : float
+        Frequency in Hz.
+
+    Returns
+    -------
+    str
+        The frequency rounded to `FREQUENCY_LABEL_SIGNIFICANT_FIGURES`
+        significant figures.
+    """
+    return f"{frequency:.{FREQUENCY_LABEL_SIGNIFICANT_FIGURES}g}"
+
 
 def calculate_ims(
     waveform: np.ndarray,
     dt: float,
-    ims_list: list[IM] = list(IM),
+    ims_list: list[IM] | None = None,
     periods: np.ndarray = DEFAULT_PERIODS,
     frequencies: np.ndarray = DEFAULT_FREQUENCIES,
     cores: int = multiprocessing.cpu_count(),
@@ -172,7 +192,8 @@ def calculate_ims(
     ValueError
         If the IM is not recognized or if required environment variables are not set to 1.
     """
-
+    if ims_list is None:
+        ims_list = list(IM)
     if ko_directory is None and IM.FAS in ims_list:
         raise ValueError(
             "The Konno-Ohmachi directory must be provided if Fourier amplitude spectrum is in the list of IMs."
@@ -201,7 +222,7 @@ def calculate_ims(
             result.index = [
                 f"{im.value}_{idx}" for idx in data_array.coords["period"].values
             ]
-            result.columns = result.columns.droplevel(0)  # type: ignore[invalid-assignment]
+            result.columns = result.columns.droplevel(0)  # ty: ignore[invalid-assignment, invalid-argument-type]
         elif im == IM.CAV:
             result = ims.cumulative_absolute_velocity(waveform, dt, cores)
             result.index = [im.value]
@@ -230,9 +251,10 @@ def calculate_ims(
             # Convert the data array to a DataFrame
             result = data_array.to_dataframe().unstack(level="component")
             result.index = [
-                f"{im.value}_{idx}" for idx in data_array.coords["frequency"].values
+                f"{im.value}_{frequency_label(idx)}"
+                for idx in data_array.coords["frequency"].values
             ]
-            result.columns = result.columns.droplevel(0)  # type: ignore[invalid-assignment]
+            result.columns = result.columns.droplevel(0)  # ty: ignore[invalid-assignment, invalid-argument-type]
         else:
             raise ValueError(
                 f"IM {im} not recognized. Available IMs are {IM.__members__.keys()}"
