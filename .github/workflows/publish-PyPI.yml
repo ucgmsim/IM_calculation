@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       tag_name:
-        description: 'Git tag to checkout and publish'
+        description: "Git tag to checkout and publish"
         required: false
         type: string
 
@@ -36,7 +36,7 @@ jobs:
           targets: x86_64-apple-darwin, aarch64-apple-darwin
 
       - name: Build wheels
-        uses: pypa/cibuildwheel@v2.22.0
+        uses: pypa/cibuildwheel@v4.1.0
         env:
           CIBW_BUILD: cp312-* cp313-* cp314-*
           CIBW_PRERELEASE_PYTHONS: True
