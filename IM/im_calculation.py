@@ -1,10 +1,10 @@
 """IM calculation script for ascii waveforms"""
 
-import multiprocessing
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
+import xarray as xr
 
 from IM import ims
 from IM.ims import IM
@@ -151,13 +151,37 @@ def frequency_label(frequency: float) -> str:
     return f"{frequency:.{FREQUENCY_LABEL_SIGNIFICANT_FIGURES}g}"
 
 
+def _dataset_to_frame(dataset: xr.Dataset, index: list[str]) -> pd.DataFrame:
+    """Convert a component-per-variable IM dataset into a wide DataFrame.
+
+    Each component (`000`, `090`, ..., `rotd100`) is already a data variable,
+    so the dataset's own columns are the frame's columns; this just drops
+    any non-dimension coordinates (e.g. `latitude`/`longitude`, when a real
+    DataArray is passed in) and replaces the row index with `index`.
+
+    Parameters
+    ----------
+    dataset : xr.Dataset
+        Dataset with one data variable per component.
+    index : list of str
+        Row labels to assign to the resulting DataFrame.
+
+    Returns
+    -------
+    pd.DataFrame
+        Wide-format DataFrame with component names as columns.
+    """
+    frame = dataset.reset_coords(drop=True).to_dataframe()
+    frame.index = index
+    return frame
+
+
 def calculate_ims(
     waveform: np.ndarray,
     dt: float,
     ims_list: list[IM] | None = None,
     periods: np.ndarray = DEFAULT_PERIODS,
     frequencies: np.ndarray = DEFAULT_FREQUENCIES,
-    cores: int = multiprocessing.cpu_count(),
     ko_directory: Path | None = None,
 ):
     """
@@ -175,8 +199,6 @@ def calculate_ims(
         List of periods required for calculating the pseudo-spectral acceleration (pSA).
     frequencies : np.ndarray, optional
         List of frequencies required for calculating the Fourier amplitude spectrum (FAS).
-    cores : int, optional
-        Number of cores to use for parallel processing in pSA and FAS calculations.
     ko_directory : Path, optional
         Path to the directory containing the Konno-Ohmachi matrices.
         Only required if FAS is in the list of IMs.
@@ -205,56 +227,51 @@ def calculate_ims(
     # Iterate through IMs and calculate them
     for im in ims_list:
         if im == IM.PGA:
-            result = ims.peak_ground_acceleration(waveform, cores)
-            result.index = [im.value]
+            dataset = ims.peak_ground_acceleration(waveform)
+            result = _dataset_to_frame(dataset, [im.value])
         elif im == IM.PGV:
-            result = ims.peak_ground_velocity(waveform, dt, cores)
-            result.index = [im.value]
+            dataset = ims.peak_ground_velocity(waveform, dt)
+            result = _dataset_to_frame(dataset, [im.value])
         elif im == IM.PGD:
-            result = ims.peak_ground_displacement(waveform, dt, cores)
-            result.index = [im.value]
+            dataset = ims.peak_ground_displacement(waveform, dt)
+            result = _dataset_to_frame(dataset, [im.value])
         elif im == IM.pSA:
-            data_array = ims.pseudo_spectral_acceleration(
-                waveform, periods, np.float64(dt), cores=cores
+            dataset = ims.pseudo_spectral_acceleration(waveform, periods, dt)
+            result = _dataset_to_frame(
+                dataset,
+                [f"{im.value}_{idx}" for idx in dataset.coords["period"].values],
             )
-            # Convert the data array to a DataFrame
-            result = data_array.to_dataframe().unstack(level="component")
-            result.index = [
-                f"{im.value}_{idx}" for idx in data_array.coords["period"].values
-            ]
-            result.columns = result.columns.droplevel(0)  # ty: ignore[invalid-assignment, invalid-argument-type]
         elif im == IM.CAV:
-            result = ims.cumulative_absolute_velocity(waveform, dt, cores)
-            result.index = [im.value]
+            dataset = ims.cumulative_absolute_velocity(waveform, dt)
+            result = _dataset_to_frame(dataset, [im.value])
         elif im == IM.CAV5:
-            result = ims.cumulative_absolute_velocity(waveform, dt, cores, threshold=5)
-            result.index = [im.value]
+            dataset = ims.cumulative_absolute_velocity(waveform, dt, threshold=5)
+            result = _dataset_to_frame(dataset, [im.value])
         elif im == IM.Ds575:
-            result = ims.ds575(waveform, dt, cores)
-            result.index = [im.value]
+            dataset = ims.ds575(waveform, dt)
+            result = _dataset_to_frame(dataset, [im.value])
         elif im == IM.Ds595:
-            result = ims.ds595(waveform, dt, cores)
-            result.index = [im.value]
+            dataset = ims.ds595(waveform, dt)
+            result = _dataset_to_frame(dataset, [im.value])
         elif im == IM.AI:
-            result = ims.arias_intensity(waveform, dt, cores)
-            result.index = [im.value]
+            dataset = ims.arias_intensity(waveform, dt)
+            result = _dataset_to_frame(dataset, [im.value])
         elif im == IM.FAS:
             assert ko_directory
-            data_array = ims.fourier_amplitude_spectra(
+            dataset = ims.fourier_amplitude_spectra(
                 waveform,
                 dt,
                 frequencies,
-                cores=cores,
                 # ko_directory must be Path because of the check earlier.
                 ko_directory=ko_directory,
             )
-            # Convert the data array to a DataFrame
-            result = data_array.to_dataframe().unstack(level="component")
-            result.index = [
-                f"{im.value}_{frequency_label(idx)}"
-                for idx in data_array.coords["frequency"].values
-            ]
-            result.columns = result.columns.droplevel(0)  # ty: ignore[invalid-assignment, invalid-argument-type]
+            result = _dataset_to_frame(
+                dataset,
+                [
+                    f"{im.value}_{frequency_label(idx)}"
+                    for idx in dataset.coords["frequency"].values
+                ],
+            )
         else:
             raise ValueError(
                 f"IM {im} not recognized. Available IMs are {IM.__members__.keys()}"

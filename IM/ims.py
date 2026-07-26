@@ -1,16 +1,14 @@
 """Intensity Measure Implementations."""
 
-import itertools
-import multiprocessing
+import functools
 import warnings
+from collections.abc import Callable, Mapping, Sequence
 from enum import IntEnum, StrEnum
 from pathlib import Path
 
 import numpy as np
 import numpy.typing as npt
-import pandas as pd
 import scipy as sp
-import tqdm
 import xarray as xr
 from pyfftw.interfaces import numpy_fft as fft
 
@@ -19,12 +17,24 @@ from IM import (
     ko_matrices,
 )
 
-# (n_components, n_stations, nt)
+# Concrete (n_components, n_stations, nt) block, as seen inside a kernel once
+# `_components` has flattened any leading (broadcast) axes into `n_stations`.
 ChunkedWaveformArray = np.ndarray[tuple[int, int, int], np.dtype[np.float64]]
-# (n_stations, nt)
-SingleWaveformArray = np.ndarray[tuple[int, int], np.dtype[np.float64]]
-WaveformArray = ChunkedWaveformArray | SingleWaveformArray
-Array1D = np.ndarray[tuple[int], np.dtype[np.float64]]
+
+# A (component, station, time) waveform. A bare ndarray is wrapped eagerly by
+# `_as_waveform`; a dask-backed DataArray stays lazy end to end.
+Waveform = xr.DataArray | np.ndarray
+
+WAVEFORM_DIMS = ("component", "station", "time")
+ROTD_COMPONENTS = ("000", "090", "ver", "geom", "rotd0", "rotd50", "rotd100")
+GEOM_COMPONENTS = ("000", "090", "ver", "geom")
+FAS_COMPONENTS = ("000", "090", "ver", "geom", "eas")
+
+DAMPING = 0.05
+G = 981
+# Bounds how much of a (possibly multi-gigabyte, float32, memmapped) Konno
+# matrix gets promoted to float64 at once by `_konno_smooth`.
+KONNO_BLOCK_BYTES = 64 * 2**20
 
 
 class Component(IntEnum):
@@ -53,141 +63,407 @@ class IM(StrEnum):
     FAS = "FAS"
 
 
-def pseudo_spectral_acceleration(
-    waveforms: ChunkedWaveformArray,
-    periods: Array1D,
-    dt: np.float64,
-    cores: int = multiprocessing.cpu_count(),
-    step: int | None = None,
-    use_tqdm: bool = False,
-) -> xr.DataArray:
-    """Compute pseudo-spectral acceleration (PSA) statistics.
+def _as_waveform(waveform: Waveform) -> xr.DataArray:
+    """Normalise a waveform into a DataArray with `component` and `time` dims.
 
-    Calculates PSA for single-degree-of-freedom oscillators across various
-    periods using the Newmark-beta method and computes rotated (RotD) statistics.
+    A bare `(n_components, n_stations, nt)` ndarray is wrapped as an eager
+    DataArray with dims `("component", "station", "time")`. A dask-backed
+    DataArray is rechunked so that `component` and `time` -- the core
+    dimensions every kernel operates on -- are each a single chunk; any
+    `station` chunking is left untouched.
 
     Parameters
     ----------
-    waveforms : ChunkedWaveformArray
-        Acceleration waveforms (g) with shape (n_components, n_stations, nt).
-    periods : Array1
-        Natural periods of the oscillators (s).
-    dt : np.float64
-        Timestep resolution of the waveforms (s).
-    cores : int, optional
-        Retained for API compatibility; only sets the default station chunk
-        size. The solve itself is single-threaded.
-    step : int, optional
-        Station chunk size for processing. Defaults to `cores` if None.
-    use_tqdm : bool, optional
-        Whether to display a progress bar.
+    waveform : Waveform
+        Either a bare `(n_components, n_stations, nt)` ndarray, or an
+        `xr.DataArray` with `component` and `time` dimensions.
 
     Returns
     -------
     xr.DataArray
-        A 3D DataArray (component, period, station) containing PSA for
-        ['000', '090', 'ver', 'geom', 'rotd0', 'rotd50', 'rotd100'].
+        The waveform as a DataArray suitable to pass to `xr.apply_ufunc`.
+
+    Raises
+    ------
+    TypeError
+        If the waveform has the wrong number of dimensions, is missing the
+        `component`/`time` dimensions, or does not have 3 components.
     """
-    waveforms = np.ascontiguousarray(waveforms)
-    angular_frequencies = 2 * np.pi / periods
+    if not isinstance(waveform, xr.DataArray):
+        array = np.asarray(waveform)
+        if array.ndim != 3:
+            raise TypeError(
+                "Waveform must have shape (n_components, n_stations, nt), "
+                f"but {array.shape=}"
+            )
+        waveform = xr.DataArray(array, dims=WAVEFORM_DIMS)
 
-    # Step size bounds how many stations are solved per Rust call; the real
-    # limit is now how much memory we have available for a chunk.
-    step = step or cores
-    n_stations = waveforms.shape[1]
-    n_frequencies = len(angular_frequencies)
-    rotd_psa = np.zeros((n_frequencies, n_stations, 3), dtype=np.float64)
-
-    comp_0_psa = np.zeros((n_frequencies, n_stations), dtype=np.float64)
-    comp_90_psa = np.zeros((n_frequencies, n_stations), dtype=np.float64)
-    comp_ver_psa = np.zeros((n_frequencies, n_stations), dtype=np.float64)
-    xi = 0.05
-    station_iter = range(0, n_stations, step)
-    n_steps = len(station_iter) * len(angular_frequencies)
-    station_period_iterator = itertools.product(
-        range(len(angular_frequencies)), station_iter
-    )
-    # Coverage tests don't cover this interactive usage (because
-    # it doesn't change the calculations).
-    if use_tqdm:  # pragma no cover
-        station_period_iterator = tqdm.tqdm(station_period_iterator, total=n_steps)
-    j_last: int | None = None
-    for j, i in station_period_iterator:
-        w = angular_frequencies[j]
-        if use_tqdm and j_last != j:  # pragma: no cover
-            assert isinstance(station_period_iterator, tqdm.tqdm)
-            j_last = j
-            t0 = periods[j]
-            station_period_iterator.set_description(f"Period {t0:g}")
-
-        comp_0_chunk = waveforms[Component.COMP_0.value, i : i + step].astype(
-            np.float64
+    missing = {"component", "time"}.difference(waveform.dims)
+    if missing:
+        raise TypeError(f"Waveform is missing dimensions {sorted(missing)}")
+    if waveform.sizes["component"] != len(Component):
+        raise TypeError(
+            f"Waveform must have {len(Component)} components, "
+            f"but {waveform.sizes['component']=}"
         )
-        comp_90_chunk = waveforms[Component.COMP_90.value, i : i + step].astype(
-            np.float64
-        )
-        comp_0_response = _core._newmark_beta_method(comp_0_chunk, dt, w, xi)
-        comp_90_response = _core._newmark_beta_method(comp_90_chunk, dt, w, xi)
-        conversion_factor = w * w
+    if waveform.chunks is not None:
+        waveform = waveform.chunk({"component": -1, "time": -1})
+    return waveform
 
-        rotd_psa[j, i : i + step] = conversion_factor * _core._rotd(
-            comp_0_response, comp_90_response
-        )
 
-        comp_0_psa[j, i : i + step] = conversion_factor * np.abs(comp_0_response).max(
-            axis=1
-        )
-        comp_90_psa[j, i : i + step] = conversion_factor * np.abs(comp_90_response).max(
-            axis=1
-        )
+def _components(block: np.ndarray) -> tuple[ChunkedWaveformArray, tuple[int, ...]]:
+    """Split an `apply_ufunc` block into contiguous per-component matrices.
 
-        z = waveforms[Component.COMP_VER.value, i : i + step].astype(np.float64)
-        z_response = _core._newmark_beta_method(z, dt, w, xi)
-        comp_ver_psa[j, i : i + step] = conversion_factor * np.abs(z_response).max(
-            axis=1
-        )
+    `apply_ufunc` moves core dimensions to the end, so `block` arrives as
+    `(*lead, n_components, nt)`, where `lead` is whatever loop dimensions the
+    input had (normally just `station`, but there may be none or several).
+    Moving the component axis to the front and forcing a contiguous float64
+    copy collapses `lead` into a single row axis, so `components[i]` is a
+    contiguous `(n_rows, nt)` matrix -- what every `_core` kernel expects.
+    Callers restore the original leading shape with `out.reshape(lead + (...))`.
 
-    geom_psa = np.sqrt(comp_0_psa * comp_90_psa)
+    Parameters
+    ----------
+    block : ndarray
+        A block as received by an `apply_ufunc` kernel, of shape
+        `(*lead, n_components, nt)`.
 
-    return xr.DataArray(
-        np.stack(
-            [
-                comp_0_psa,
-                comp_90_psa,
-                comp_ver_psa,
-                geom_psa,
-                rotd_psa[:, :, 0],
-                rotd_psa[:, :, 1],
-                rotd_psa[:, :, 2],
-            ],
-            axis=0,
-        ),
-        name=IM.pSA.value,
-        dims=(
-            "component",
-            "period",
-            "station",
-        ),
-        coords={
-            "station": np.arange(waveforms.shape[1]),
-            "period": periods,
-            "component": ["000", "090", "ver", "geom", "rotd0", "rotd50", "rotd100"],
+    Returns
+    -------
+    ChunkedWaveformArray
+        The per-component matrices, contiguous float64, shape
+        `(n_components, prod(lead), nt)`.
+    tuple of int
+        The original leading shape, to reshape kernel output back into.
+    """
+    n_components, nt = block.shape[-2:]
+    lead = block.shape[:-2]
+    components = np.ascontiguousarray(np.moveaxis(block, -2, 0), dtype=np.float64)
+    return components.reshape(n_components, -1, nt), lead
+
+
+def _im_dataset(
+    kernel: Callable[..., np.ndarray],
+    waveform: Waveform,
+    components: Sequence[str],
+    *,
+    name: str,
+    extra_dims: Mapping[str, npt.NDArray] | None = None,
+    kwargs: Mapping[str, object] | None = None,
+) -> xr.Dataset:
+    """Run a per-station kernel over a waveform, one data variable per component.
+
+    The kernel receives a `(*lead, n_components, nt)` block (see
+    `_components`) and must return a `(*lead, *extra_sizes, len(components))`
+    array. The trailing component axis is unstacked into data variables, so
+    the result is a `Dataset` with one variable per component -- lazy if the
+    waveform was lazy.
+
+    Parameters
+    ----------
+    kernel : callable
+        Function to apply to each waveform block.
+    waveform : Waveform
+        The waveform to compute the IM for.
+    components : sequence of str
+        Names of the components the kernel produces, in output order.
+    name : str
+        Name recorded in `dataset.attrs["name"]`, identifying the IM. This is
+        the only place the IM name is carried, since `components` become
+        data variables rather than a `component` dimension.
+    extra_dims : mapping of str to ndarray, optional
+        Extra output dimensions the kernel introduces (e.g. `period` for pSA,
+        `frequency` for FAS), mapping dimension name to coordinate values.
+    kwargs : mapping, optional
+        Extra keyword arguments passed through to `kernel`.
+
+    Returns
+    -------
+    xr.Dataset
+        One data variable per component, sharing the input's `station`
+        dimension and any non-dimension coordinates (e.g. real station
+        names, `latitude`, `longitude`).
+    """
+    extra_dims = extra_dims or {}
+    kwargs = kwargs or {}
+    waveform = _as_waveform(waveform)
+
+    result = xr.apply_ufunc(
+        kernel,
+        waveform,
+        input_core_dims=[["component", "time"]],
+        output_core_dims=[[*extra_dims, "im_component"]],
+        kwargs=dict(kwargs),
+        keep_attrs=False,
+        dask="parallelized",
+        output_dtypes=[np.float64],
+        dask_gufunc_kwargs={
+            "output_sizes": {"im_component": len(components)}
+            | {dim: len(values) for dim, values in extra_dims.items()}
         },
     )
+    result = result.assign_coords(im_component=list(components), **extra_dims)
+    dataset = result.to_dataset("im_component")
+    dataset.attrs = {"name": name}
+    return dataset
+
+
+def _rotd_kernel(
+    block: np.ndarray,
+    *,
+    transform: Callable[[ChunkedWaveformArray], ChunkedWaveformArray] | None = None,
+) -> np.ndarray:
+    """Kernel for `compute_intensity_measure_rotd`.
+
+    Parameters
+    ----------
+    block : ndarray
+        A `(*lead, n_components, nt)` waveform block.
+    transform : callable, optional
+        Applied to the `(3, n_rows, nt)` component matrices before taking
+        peaks (e.g. integration for PGV/PGD). Must preserve the leading
+        `(3, n_rows, ...)` shape.
+
+    Returns
+    -------
+    ndarray
+        A `(*lead, len(ROTD_COMPONENTS))` array.
+    """
+    components, lead = _components(block)
+    if transform is not None:
+        components = transform(components)
+    comp_0, comp_90, comp_ver = components
+    peak_0 = np.abs(comp_0).max(axis=-1)
+    peak_90 = np.abs(comp_90).max(axis=-1)
+    peak_ver = np.abs(comp_ver).max(axis=-1)
+    stats = _core._rotd(comp_0, comp_90)  # (rows, 3) = rotd0, rotd50, rotd100
+    out = np.stack(
+        [
+            peak_0,
+            peak_90,
+            peak_ver,
+            np.sqrt(peak_0 * peak_90),
+            stats[:, 0],
+            stats[:, 1],
+            stats[:, 2],
+        ],
+        axis=-1,
+    )
+    return out.reshape(lead + (len(ROTD_COMPONENTS),))
+
+
+def compute_intensity_measure_rotd(
+    waveforms: Waveform,
+    name: str,
+    *,
+    transform: Callable[[ChunkedWaveformArray], ChunkedWaveformArray] | None = None,
+) -> xr.Dataset:
+    """Generic wrapper to compute peak values and RotD statistics for IMs.
+
+    Parameters
+    ----------
+    waveforms : Waveform
+        Waveform data with shape (n_components, n_stations, nt).
+    name : str
+        Name of the resulting dataset (recorded in `dataset.attrs["name"]`).
+    transform : callable, optional
+        Applied to the acceleration components before taking peaks (e.g.
+        integration to velocity/displacement for PGV/PGD).
+
+    Returns
+    -------
+    xr.Dataset
+        One data variable per component in
+        `['000', '090', 'ver', 'geom', 'rotd0', 'rotd50', 'rotd100']`.
+    """
+    return _im_dataset(
+        functools.partial(_rotd_kernel, transform=transform),
+        waveforms,
+        ROTD_COMPONENTS,
+        name=name,
+    )
+
+
+def _velocity(components: ChunkedWaveformArray, dt: float) -> ChunkedWaveformArray:
+    """Integrate acceleration (g) to velocity (cm/s)."""
+    return G * sp.integrate.cumulative_trapezoid(components, dx=dt, axis=-1)
+
+
+def _displacement(components: ChunkedWaveformArray, dt: float) -> ChunkedWaveformArray:
+    """Integrate acceleration (g) to displacement (cm)."""
+    velocity = sp.integrate.cumulative_trapezoid(components, dx=dt, axis=-1, initial=0)
+    # In-place multiplication to avoid yet another allocation
+    np.multiply(G, velocity, out=velocity)
+    return sp.integrate.cumulative_trapezoid(velocity, dx=dt, axis=-1, initial=0)
+
+
+def peak_ground_acceleration(waveform: Waveform) -> xr.Dataset:
+    """Compute Peak Ground Acceleration (PGA) in g.
+
+    Parameters
+    ----------
+    waveform : Waveform
+        Acceleration waveforms with shape (n_components, n_stations, nt).
+
+    Returns
+    -------
+    xr.Dataset
+        One data variable per component containing PGA values (g) for
+        standard and rotated components.
+    """
+    return compute_intensity_measure_rotd(waveform, IM.PGA.value)
+
+
+def peak_ground_velocity(waveform: Waveform, dt: float) -> xr.Dataset:
+    """Compute Peak Ground Velocity (PGV) in cm/s via trapezoidal integration.
+
+    Parameters
+    ----------
+    waveform : Waveform
+        Acceleration waveforms (g) with shape (n_components, n_stations, nt).
+    dt : float
+        Timestep resolution (s).
+
+    Returns
+    -------
+    xr.Dataset
+        One data variable per component containing PGV values (cm/s) for
+        standard and rotated components.
+    """
+    return compute_intensity_measure_rotd(
+        waveform, IM.PGV.value, transform=functools.partial(_velocity, dt=dt)
+    )
+
+
+def peak_ground_displacement(waveform: Waveform, dt: float) -> xr.Dataset:
+    """Compute Peak Ground Displacement (PGD) for waveforms.
+
+    Parameters
+    ----------
+    waveform : Waveform
+        Acceleration waveforms in g units.
+    dt : float
+        Timestep resolution of the waveform array.
+
+    Returns
+    -------
+    xr.Dataset
+        One data variable per component containing PGD values (cm) with
+        rotated components.
+    """
+    return compute_intensity_measure_rotd(
+        waveform, IM.PGD.value, transform=functools.partial(_displacement, dt=dt)
+    )
+
+
+def _cav_kernel(
+    block: np.ndarray, *, dt: float, threshold: float | None
+) -> np.ndarray:
+    """Kernel for `cumulative_absolute_velocity`."""
+    components, lead = _components(block)
+    if threshold:
+        components = np.where(np.abs(components) < threshold / G, 0.0, components)
+    comp_0, comp_90, comp_ver = components
+    cav_0 = _core._cav(comp_0, dt)
+    cav_90 = _core._cav(comp_90, dt)
+    cav_ver = _core._cav(comp_ver, dt)
+    out = np.stack([cav_0, cav_90, cav_ver, np.sqrt(cav_0 * cav_90)], axis=-1)
+    return out.reshape(lead + (len(GEOM_COMPONENTS),))
+
+
+def cumulative_absolute_velocity(
+    waveform: Waveform,
+    dt: float,
+    threshold: float | None = None,
+) -> xr.Dataset:
+    """Compute Cumulative Absolute Velocity (CAV) in m/s.
+
+    Parameters
+    ----------
+    waveform : Waveform
+        Acceleration waveforms (g) with shape (n_components, n_stations, nt).
+    dt : float
+        Timestep resolution (s).
+    threshold : float, optional
+        Acceleration threshold ($cm/s^2$). Values below this are ignored (e.g. 5 for CAV5).
+
+    Returns
+    -------
+    xr.Dataset
+        One data variable per component (`attrs["name"]` is `CAV5` if
+        `threshold` is set, else `CAV`) containing CAV values (m/s) for
+        ['000', '090', 'ver', 'geom'].
+    """
+    name = IM.CAV5.value if threshold else IM.CAV.value
+    return _im_dataset(
+        _cav_kernel,
+        waveform,
+        GEOM_COMPONENTS,
+        name=name,
+        kwargs={"dt": dt, "threshold": threshold},
+    )
+
+
+def _arias_kernel(block: np.ndarray, *, dt: float) -> np.ndarray:
+    """Kernel for `arias_intensity`."""
+    components, lead = _components(block)
+    comp_0, comp_90, comp_ver = components
+    ai_0 = _core._arias_intensity(comp_0, dt)
+    ai_90 = _core._arias_intensity(comp_90, dt)
+    ai_ver = _core._arias_intensity(comp_ver, dt)
+    out = np.stack([ai_0, ai_90, ai_ver, np.sqrt(ai_0 * ai_90)], axis=-1)
+    return out.reshape(lead + (len(GEOM_COMPONENTS),))
+
+
+def arias_intensity(waveform: Waveform, dt: float) -> xr.Dataset:
+    """Compute Arias Intensity (AI) in m/s.
+
+    Parameters
+    ----------
+    waveform : Waveform
+        Acceleration waveforms (g) with shape (n_components, n_stations, nt).
+    dt : float
+        Timestep resolution (s).
+
+    Returns
+    -------
+    xr.Dataset
+        One data variable per component containing AI values (m/s) for
+        ['000', '090', 'ver', 'geom'].
+    """
+    return _im_dataset(
+        _arias_kernel, waveform, GEOM_COMPONENTS, name=IM.AI.value, kwargs={"dt": dt}
+    )
+
+
+def _duration_kernel(
+    block: np.ndarray, *, dt: float, quantile_low: float, quantile_high: float
+) -> np.ndarray:
+    """Kernel for `significant_duration`."""
+    components, lead = _components(block)
+    comp_0, comp_90, comp_ver = components
+    duration_0 = _core._significant_duration(comp_0, dt, quantile_low, quantile_high)
+    duration_90 = _core._significant_duration(comp_90, dt, quantile_low, quantile_high)
+    duration_ver = _core._significant_duration(
+        comp_ver, dt, quantile_low, quantile_high
+    )
+    geom = np.sqrt(duration_0 * duration_90)
+    out = np.stack([duration_0, duration_90, duration_ver, geom], axis=-1)
+    return out.reshape(lead + (len(GEOM_COMPONENTS),))
 
 
 def significant_duration(
-    waveforms: ChunkedWaveformArray,
+    waveforms: Waveform,
     dt: float,
     percent_low: float,
     percent_high: float,
-    cores: int,
-) -> pd.DataFrame:
+    name: str = "duration",
+) -> xr.Dataset:
     """Compute significant duration based on Arias Intensity accumulation.
 
     Parameters
     ----------
-    waveforms : ChunkedWaveformArray
+    waveforms : Waveform
         Acceleration waveforms (g) with shape (n_components, n_stations, nt).
     dt : float
         Timestep resolution (s).
@@ -195,39 +471,223 @@ def significant_duration(
         Lower bound percentage (e.g., 5.0 for 5%).
     percent_high : float
         Upper bound percentage (e.g., 95.0 for 95%).
-    cores : int
-        Number of CPU cores for parallel execution.
+    name : str, optional
+        Name of the resulting dataset.
 
     Returns
     -------
-    pd.DataFrame
-        Significant duration (s) for components ['000', '090', 'ver', 'geom'].
+    xr.Dataset
+        One data variable per component containing the significant duration
+        (s) for ['000', '090', 'ver', 'geom'].
     """
-    (_, n_stations, _) = waveforms.shape
-    comp_0 = waveforms[Component.COMP_0]
-    comp_90 = waveforms[Component.COMP_90]
-    comp_ver = waveforms[Component.COMP_VER]
-    quant_low = percent_low / 100
-    quant_high = percent_high / 100
-
-    significant_duration_0 = _core._significant_duration(
-        comp_0, dt, quant_low, quant_high
-    )
-    significant_duration_90 = _core._significant_duration(
-        comp_90, dt, quant_low, quant_high
-    )
-    significant_duration_ver = _core._significant_duration(
-        comp_ver, dt, quant_low, quant_high
+    return _im_dataset(
+        _duration_kernel,
+        waveforms,
+        GEOM_COMPONENTS,
+        name=name,
+        kwargs={
+            "dt": dt,
+            "quantile_low": percent_low / 100,
+            "quantile_high": percent_high / 100,
+        },
     )
 
-    return pd.DataFrame(
-        {
-            "000": significant_duration_0,
-            "090": significant_duration_90,
-            "ver": significant_duration_ver,
-            "geom": np.sqrt(significant_duration_0 * significant_duration_90),
-        }
+
+def ds575(waveform: Waveform, dt: float) -> xr.Dataset:
+    """Compute 5-75% Significant Duration (DS575) in seconds.
+
+    Parameters
+    ----------
+    waveform : Waveform
+        Acceleration waveforms (g) with shape (n_components, n_stations, nt).
+    dt : float
+        Timestep resolution (s).
+
+    Returns
+    -------
+    xr.Dataset
+        One data variable per component containing duration values (s) for
+        ['000', '090', 'ver', 'geom'].
+    """
+    return significant_duration(waveform, dt, 5, 75, IM.Ds575.value)
+
+
+def ds595(waveform: Waveform, dt: float) -> xr.Dataset:
+    """Compute 5-95% Significant Duration (DS595) in seconds.
+
+    Parameters
+    ----------
+    waveform : Waveform
+        Acceleration waveforms (g) with shape (n_components, n_stations, nt).
+    dt : float
+        Timestep resolution (s).
+
+    Returns
+    -------
+    xr.Dataset
+        One data variable per component containing duration values (s) for
+        ['000', '090', 'ver', 'geom'].
+    """
+    return significant_duration(waveform, dt, 5, 95, IM.Ds595.value)
+
+
+N_ROTD180_ANGLES = 180
+ROTD180_ANGLES = np.arange(N_ROTD180_ANGLES)
+
+
+def _psa_kernel(
+    block: np.ndarray,
+    *,
+    periods: npt.NDArray[np.float64],
+    dt: float,
+    full_rotd180: bool,
+) -> np.ndarray | tuple[np.ndarray, np.ndarray]:
+    """Kernel for `pseudo_spectral_acceleration`.
+
+    Loops over periods internally (rather than treating `period` as a
+    broadcast input) so every IM kernel shares one contract: `(*lead,
+    n_components, nt) -> (*lead, *extra, k)`. Station-chunk parallelism is
+    already ample, so nothing is lost by not also parallelising over period.
+
+    When `full_rotd180` is set, the full 180-angle RotD curve computed for
+    the summary statistics is also returned rather than discarded, so the
+    Newmark-beta solve never runs twice for the same (period, station chunk).
+    """
+    components, lead = _components(block)
+    comp_0, comp_90, comp_ver = components
+    rows = comp_0.shape[0]
+    out = np.empty((rows, len(periods), len(ROTD_COMPONENTS)), dtype=np.float64)
+    rotd180 = (
+        np.empty((rows, len(periods), N_ROTD180_ANGLES), dtype=np.float64)
+        if full_rotd180
+        else None
     )
+    for index, period in enumerate(periods):
+        w = 2 * np.pi / period
+        # (rows, 182): 180 rotated peaks, then the exact 000 and 090 peaks.
+        psa = _core._psa_rotd180(comp_0, comp_90, dt, w, DAMPING)
+        rotated = np.sort(psa[:, :180], axis=1)
+        peak_0, peak_90 = psa[:, 180], psa[:, 181]
+        peak_ver = _core._psa_peak(comp_ver, dt, w, DAMPING)
+        out[:, index] = np.stack(
+            [
+                peak_0,
+                peak_90,
+                peak_ver,
+                np.sqrt(peak_0 * peak_90),
+                rotated[:, 0],
+                (rotated[:, 89] + rotated[:, 90]) / 2,
+                rotated[:, 179],
+            ],
+            axis=-1,
+        )
+        if rotd180 is not None:
+            rotd180[:, index] = psa[:, :180]
+
+    out = out.reshape(lead + (len(periods), len(ROTD_COMPONENTS)))
+    if rotd180 is None:
+        return out
+    return out, rotd180.reshape(lead + (len(periods), N_ROTD180_ANGLES))
+
+
+def pseudo_spectral_acceleration(
+    waveforms: Waveform,
+    periods: npt.ArrayLike,
+    dt: float,
+    full_rotd180: bool = False,
+) -> xr.Dataset:
+    """Compute pseudo-spectral acceleration (PSA) statistics.
+
+    Calculates PSA for single-degree-of-freedom oscillators across various
+    periods using the Newmark-beta method and computes rotated (RotD) statistics.
+
+    Parameters
+    ----------
+    waveforms : Waveform
+        Acceleration waveforms (g) with shape (n_components, n_stations, nt).
+    periods : array_like
+        Natural periods of the oscillators (s).
+    dt : float
+        Timestep resolution of the waveforms (s).
+    full_rotd180 : bool, optional
+        If set, also include a `rotd180` data variable with an extra `angle`
+        dimension (0..179 degrees), holding pSA (g) at every rotation angle.
+        This reuses the same Newmark-beta solve already run for the summary
+        statistics, rather than repeating it.
+
+    Returns
+    -------
+    xr.Dataset
+        One data variable per component, each with a `period` dimension,
+        containing PSA for
+        ['000', '090', 'ver', 'geom', 'rotd0', 'rotd50', 'rotd100']. If
+        `full_rotd180` is set, also a `rotd180` variable with dims
+        (..., period, angle).
+    """
+    periods = np.asarray(periods, dtype=np.float64)
+    waveform = _as_waveform(waveforms)
+    kernel = functools.partial(
+        _psa_kernel, periods=periods, dt=dt, full_rotd180=full_rotd180
+    )
+
+    output_core_dims = [["period", "im_component"]]
+    output_sizes = {"period": len(periods), "im_component": len(ROTD_COMPONENTS)}
+    if full_rotd180:
+        output_core_dims.append(["period", "angle"])
+        output_sizes["angle"] = N_ROTD180_ANGLES
+
+    outputs = xr.apply_ufunc(
+        kernel,
+        waveform,
+        input_core_dims=[["component", "time"]],
+        output_core_dims=output_core_dims,
+        keep_attrs=False,
+        dask="parallelized",
+        output_dtypes=[np.float64] * len(output_core_dims),
+        dask_gufunc_kwargs={"output_sizes": output_sizes},
+    )
+    summary, rotd180 = outputs if full_rotd180 else (outputs, None)
+
+    summary = summary.assign_coords(im_component=list(ROTD_COMPONENTS), period=periods)
+    dataset = summary.to_dataset("im_component")
+    dataset.attrs = {"name": IM.pSA.value}
+    if rotd180 is not None:
+        dataset["rotd180"] = rotd180.assign_coords(
+            period=periods, angle=ROTD180_ANGLES
+        )
+    return dataset
+
+
+def _konno_smooth(spectrum_data: np.ndarray, konno: np.ndarray) -> np.ndarray:
+    """Multiply a spectrum by a Konno-Ohmachi matrix, a block of columns at a time.
+
+    `konno` is a float32 memmap that can reach tens of gigabytes. Writing
+    `spectrum_data @ konno` directly makes numpy promote the *entire* matrix
+    to float64 before the product. Taking a block of output columns at a
+    time bounds the promoted array to `KONNO_BLOCK_BYTES` while leaving each
+    output element a single full-length float64 accumulation, so the result
+    is the same product, not an approximation of it -- only the contraction
+    axis (the matrix's rows) must never be split, and it isn't here.
+
+    Parameters
+    ----------
+    spectrum_data : ndarray
+        Spectrum values, shape `(..., n_fa)`.
+    konno : ndarray
+        Konno-Ohmachi smoothing matrix, shape `(n_fa, n_fa)`.
+
+    Returns
+    -------
+    ndarray
+        Smoothed spectrum, shape `(..., n_fa)`.
+    """
+    n_output = konno.shape[1]
+    columns = max(1, KONNO_BLOCK_BYTES // (konno.shape[0] * np.float64().itemsize))
+    smoothed = np.empty(spectrum_data.shape[:-1] + (n_output,), dtype=np.float64)
+    for start in range(0, n_output, columns):
+        block = slice(start, start + columns)
+        smoothed[..., block] = spectrum_data @ np.asarray(konno[:, block], dtype=np.float64)
+    return smoothed
 
 
 def smooth_and_interpolate(
@@ -255,20 +715,59 @@ def smooth_and_interpolate(
     ndarray
         The smoothed and interpolated spectrum data at the specified frequencies.
     """
-    smoothed = spectrum_data @ konno
+    smoothed = _konno_smooth(spectrum_data, konno)
     interpolator = sp.interpolate.make_interp_spline(
         fa_frequencies, smoothed, axis=-1, k=1
     )
     return interpolator(freqs)
 
 
+def _fas_kernel(
+    block: np.ndarray,
+    *,
+    dt: float,
+    n_fft: int,
+    freqs: npt.NDArray[np.float64],
+    fa_frequencies: npt.NDArray[np.float64],
+    ko_directory: Path,
+) -> np.ndarray:
+    """Kernel for `fourier_amplitude_spectra`."""
+    components, lead = _components(block)
+    n_components, rows, _ = components.shape
+    n_fa = len(fa_frequencies)
+
+    spectra = np.empty((n_components, rows, n_fa), dtype=np.float64)
+    for index in range(n_components):
+        spectra[index] = np.abs(fft.rfft(components[index], n=n_fft, axis=-1) * dt)
+
+    # EAS is computed from the *unsmoothed* spectrum to avoid distortion of
+    # inter-frequency correlations, then smoothed alongside 000/090/ver in a
+    # single pass over the (potentially huge) Konno matrix.
+    eas_unsmoothed = np.sqrt(
+        0.5
+        * (
+            np.square(spectra[Component.COMP_0])
+            + np.square(spectra[Component.COMP_90])
+        )
+    )
+    spectra_and_eas = np.concatenate([spectra, eas_unsmoothed[np.newaxis]], axis=0)
+
+    konno = ko_matrices.get_konno_matrix(n_fa, ko_directory)
+    smoothed = smooth_and_interpolate(spectra_and_eas, konno, freqs, fa_frequencies)
+
+    geom = np.sqrt(smoothed[Component.COMP_0] * smoothed[Component.COMP_90])
+    out = np.stack(
+        [smoothed[0], smoothed[1], smoothed[2], geom, smoothed[3]], axis=-1
+    )
+    return out.reshape(lead + (len(freqs), len(FAS_COMPONENTS)))
+
+
 def fourier_amplitude_spectra(
-    waveforms: ChunkedWaveformArray,
+    waveforms: Waveform,
     dt: float,
     freqs: npt.NDArray[np.float64],
     ko_directory: Path,
-    cores: int = multiprocessing.cpu_count(),
-) -> xr.DataArray:
+) -> xr.Dataset:
     """Compute Fourier Amplitude Spectrum (FAS) of seismic waveforms.
 
     The FAS is computed using FFT and then smoothed using the Konno-Ohmachi
@@ -276,22 +775,23 @@ def fourier_amplitude_spectra(
 
     Parameters
     ----------
-    waveforms : ndarray of float64 with shape `(n_components, n_stations, n_timesteps)`
-        Waveform array (g).
+    waveforms : Waveform
+        Waveform array (g) with shape `(n_components, n_stations, n_timesteps)`.
     dt : float
         Timestep resolution of the waveforms (s).
     freqs : ndarray of float64
         Frequencies at which to compute FAS (Hz).
     ko_directory : Path
         Directory containing precomputed Konno-Ohmachi matrices.
-    cores : int, optional
-        Number of CPU cores to use, by default all available cores.
 
     Returns
     -------
-    xr.DataArray
-        DataArray containing FAS values for each station, frequency and component ['000', '090', 'ver', 'eas'].
+    xr.Dataset
+        One data variable per component, each with a `frequency` dimension,
+        containing FAS values for ['000', '090', 'ver', 'geom', 'eas'].
     """
+    waveform = _as_waveform(waveforms)
+
     nyquist_frequency = 1 / (2 * dt)
     max_frequency = freqs.max()
     if max_frequency > nyquist_frequency:
@@ -302,309 +802,20 @@ def fourier_amplitude_spectra(
         )
         freqs = freqs[freqs <= nyquist_frequency]
 
-    n_fft = 2 ** int(np.ceil(np.log2(waveforms.shape[-1])))
-    # Essential! Repack the waveform array so that the rows are
-    # contiguous in memory.
-    waveforms = np.ascontiguousarray(waveforms)
+    n_fft = 2 ** int(np.ceil(np.log2(waveform.sizes["time"])))
     fa_frequencies = np.fft.rfftfreq(n_fft, dt)
-    waveform_shape = list(waveforms.shape)
 
-    waveform_shape[-1] = len(fa_frequencies)
-    n_components = waveform_shape[0]
-    fa_spectrum = np.empty(waveform_shape, dtype=waveforms.dtype)
-    for i in range(n_components):
-        fa_spectrum[i] = np.abs(fft.rfft(waveforms[i], n=n_fft, axis=-1) * dt)
-
-    # Get appropriate konno ohmachi matrix
-    konno = ko_matrices.get_konno_matrix(fa_spectrum.shape[-1], ko_directory)
-    # For optimal matrix-product calculation, repack the matrix in column-major order
-    # (i.e. Fortran order) to optimise cache efficiency and allow
-    # multi-threaded BLAS if enabled.
-    #
-    # NOTE: for matrices generated by new versions of
-    # gen_ko_matrix.py, this is a no-op because the arrays are already
-    # Fortran contiguous. Hence it creates no copy in memory.
-    konno = np.asfortranarray(konno)
-    fas_smooth = smooth_and_interpolate(fa_spectrum, konno, freqs, fa_frequencies)
-
-    geom_fas = np.sqrt(
-        fas_smooth[Component.COMP_0.value] * fas_smooth[Component.COMP_90.value]
-    )
-    # For EAS, we first we compute with the unsmoothed spectrum to avoid distortion of inter-frequency correlations, and then we apply the same smoothing to the EAS values.
-    eas_unsmoothed = np.sqrt(
-        0.5
-        * (
-            np.square(fa_spectrum[Component.COMP_0.value])
-            + np.square(fa_spectrum[Component.COMP_90.value])
-        )
-    )
-    eas = smooth_and_interpolate(eas_unsmoothed, konno, freqs, fa_frequencies)
-
-    return xr.DataArray(
-        np.stack(
-            [
-                fas_smooth[Component.COMP_0.value],
-                fas_smooth[Component.COMP_90.value],
-                fas_smooth[Component.COMP_VER.value],
-                geom_fas,
-                eas,
-            ],
-            axis=0,
-        ),
+    return _im_dataset(
+        _fas_kernel,
+        waveform,
+        FAS_COMPONENTS,
         name=IM.FAS.value,
-        dims=("component", "station", "frequency"),
-        coords={
-            "component": ["000", "090", "ver", "geom", "eas"],
-            "frequency": freqs,
-            "station": np.arange(fas_smooth.shape[1]),
+        extra_dims={"frequency": freqs},
+        kwargs={
+            "dt": dt,
+            "n_fft": n_fft,
+            "freqs": freqs,
+            "fa_frequencies": fa_frequencies,
+            "ko_directory": ko_directory,
         },
     )
-
-
-def compute_intensity_measure_rotd(
-    waveforms: ChunkedWaveformArray, cores: int
-) -> pd.DataFrame:
-    """Generic wrapper to compute peak values and RotD statistics for IMs.
-
-    Parameters
-    ----------
-    waveforms : ChunkedWaveformArray
-        Waveform data with shape (n_components, n_stations, nt).
-    cores : int
-        Number of CPU cores for parallel rotation computation.
-
-    Returns
-    -------
-    pd.DataFrame
-        Peak ground values with columns ['000', '090', 'ver', 'geom',
-        'rotd100', 'rotd50', 'rotd0'].
-    """
-    comp_0 = waveforms[Component.COMP_0]
-    comp_90 = waveforms[Component.COMP_90]
-    comp_ver = waveforms[Component.COMP_VER]
-    rotd_stats = _core._rotd(comp_0, comp_90)
-    pga_comp_0 = np.abs(comp_0).max(axis=1)
-    pga_comp_90 = np.abs(comp_90).max(axis=1)
-    pga_ver = np.abs(comp_ver).max(axis=1)
-    rotd0 = rotd_stats[:, 0]
-    rotd50 = rotd_stats[:, 1]
-    rotd100 = rotd_stats[:, 2]
-    return pd.DataFrame(
-        {
-            "000": pga_comp_0,
-            "090": pga_comp_90,
-            "ver": pga_ver,
-            "geom": np.sqrt(pga_comp_0 * pga_comp_90),
-            "rotd100": rotd100,
-            "rotd50": rotd50,
-            "rotd0": rotd0,
-        }
-    )
-
-
-def peak_ground_acceleration(
-    waveform: ChunkedWaveformArray, cores: int
-) -> pd.DataFrame:
-    """Compute Peak Ground Acceleration (PGA) in g.
-
-    Parameters
-    ----------
-    waveform : ChunkedWaveformArray
-        Acceleration waveforms with shape (n_components, n_stations, nt).
-    cores : int
-        Number of CPU cores for parallel processing.
-
-    Returns
-    -------
-    pd.DataFrame
-        PGA values (g) for standard and rotated components.
-    """
-    if waveform.ndim != 3:
-        raise TypeError(
-            f"Waveform must have shape (n_components, n_stations, nt), but {waveform.shape=}"
-        )
-    elif waveform.dtype != np.float64:
-        raise TypeError(f"Waveform must have dtype float64, but {waveform.dtype=}")
-    return compute_intensity_measure_rotd(waveform, cores=cores)
-
-
-def peak_ground_velocity(
-    waveform: ChunkedWaveformArray, dt: float, cores: int
-) -> pd.DataFrame:
-    """Compute Peak Ground Velocity (PGV) in cm/s via trapezoidal integration.
-
-    Parameters
-    ----------
-    waveform : ChunkedWaveformArray
-        Acceleration waveforms (g) with shape (n_components, n_stations, nt).
-    dt : float
-        Timestep resolution (s).
-    cores : int
-        Number of CPU cores for parallel processing.
-
-    Returns
-    -------
-    pd.DataFrame
-        PGV values (cm/s) for standard and rotated components.
-    """
-    g = 981
-    return compute_intensity_measure_rotd(
-        g * sp.integrate.cumulative_trapezoid(waveform, dx=dt, axis=-1), cores=cores
-    )
-
-
-def peak_ground_displacement(
-    waveform: ChunkedWaveformArray, dt: float, cores: int
-) -> pd.DataFrame:
-    """Compute Peak Ground Displacement (PGD) for waveforms.
-
-    Parameters
-    ----------
-    waveform : ChunkedWaveformArray
-        Acceleration waveforms in g units.
-    dt : float
-        Timestep resolution of the waveform array.
-    cores : int
-        Number of CPU cores for parallel processing.
-
-    Returns
-    -------
-    pandas.DataFrame with columns `['000', '090', 'ver', 'geom', 'rotd100', 'rotd50', 'rotd0']`
-        DataFrame containing PGD values with rotated components. Values are
-        in cm.
-    """
-    g = 981
-    # Integrate twice to get displacement in cm
-    velocity = sp.integrate.cumulative_trapezoid(waveform, dx=dt, axis=-1, initial=0)
-    # In-place multiplication to avoid yet another allocation
-    np.multiply(g, velocity, out=velocity)
-    displacement = sp.integrate.cumulative_trapezoid(
-        velocity, dx=dt, axis=-1, initial=0
-    )
-    return compute_intensity_measure_rotd(displacement, cores=cores)
-
-
-def cumulative_absolute_velocity(
-    waveform: ChunkedWaveformArray,
-    dt: float,
-    cores: int,
-    threshold: float | None = None,
-) -> pd.DataFrame:
-    """Compute Cumulative Absolute Velocity (CAV) in m/s.
-
-    Parameters
-    ----------
-    waveform : ChunkedWaveformArray
-        Acceleration waveforms (g) with shape (n_components, n_stations, nt).
-    dt : float
-        Timestep resolution (s).
-    cores : int
-        Number of CPU cores for parallel processing.
-    threshold : float, optional
-        Acceleration threshold ($cm/s^2$). Values below this are ignored (e.g. 5 for CAV5).
-
-    Returns
-    -------
-    pd.DataFrame
-        CAV values (m/s) for ['000', '090', 'ver', 'geom'].
-    """
-
-    comp_0 = waveform[Component.COMP_0]
-    comp_90 = waveform[Component.COMP_90]
-    comp_ver = waveform[Component.COMP_VER]
-
-    if threshold:
-        g = 981
-        comp_0 = np.where(np.abs(comp_0) < threshold / g, np.float64(0), comp_0)
-        comp_90 = np.where(np.abs(comp_90) < threshold / g, np.float64(0), comp_90)
-        comp_ver = np.where(np.abs(comp_ver) < threshold / g, np.float64(0), comp_ver)
-
-    comp_0_cav = _core._cav(comp_0, dt)
-    comp_90_cav = _core._cav(comp_90, dt)
-    comp_ver_cav = _core._cav(comp_ver, dt)
-
-    return pd.DataFrame(
-        {
-            "000": comp_0_cav,
-            "090": comp_90_cav,
-            "ver": comp_ver_cav,
-            "geom": np.sqrt(comp_0_cav * comp_90_cav),
-        }
-    )
-
-
-def arias_intensity(
-    waveform: ChunkedWaveformArray, dt: float, cores: int
-) -> pd.DataFrame:
-    """Compute Arias Intensity (AI) in m/s.
-
-    Parameters
-    ----------
-    waveform : ChunkedWaveformArray
-        Acceleration waveforms (g) with shape (n_components, n_stations, nt).
-    dt : float
-        Timestep resolution (s).
-    cores : int
-        Number of CPU cores for parallel processing.
-
-    Returns
-    -------
-    pd.DataFrame
-        AI values (m/s) for ['000', '090', 'ver', 'geom'].
-    """
-    comp_0 = waveform[Component.COMP_0]
-    comp_90 = waveform[Component.COMP_90]
-    comp_ver = waveform[Component.COMP_VER]
-
-    comp_0_ai = _core._arias_intensity(comp_0, dt)
-    comp_90_ai = _core._arias_intensity(comp_90, dt)
-    comp_ver_ai = _core._arias_intensity(comp_ver, dt)
-
-    return pd.DataFrame(
-        {
-            "000": comp_0_ai,
-            "090": comp_90_ai,
-            "ver": comp_ver_ai,
-            "geom": np.sqrt(comp_0_ai * comp_90_ai),
-        }
-    )
-
-
-def ds575(waveform: ChunkedWaveformArray, dt: float, cores: int) -> pd.DataFrame:
-    """Compute 5-75% Significant Duration (DS575) in seconds.
-
-    Parameters
-    ----------
-    waveform : ChunkedWaveformArray
-        Acceleration waveforms (g) with shape (n_components, n_stations, nt).
-    dt : float
-        Timestep resolution (s).
-    cores : int
-        Number of CPU cores for parallel processing.
-
-    Returns
-    -------
-    pd.DataFrame
-        Duration values (s) for ['000', '090', 'ver', 'geom'].
-    """
-    return significant_duration(waveform, dt, 5, 75, cores)
-
-
-def ds595(waveform: ChunkedWaveformArray, dt: float, cores: int) -> pd.DataFrame:
-    """Compute 5-95% Significant Duration (DS595) in seconds.
-
-    Parameters
-    ----------
-    waveform : ChunkedWaveformArray
-        Acceleration waveforms (g) with shape (n_components, n_stations, nt).
-    dt : float
-        Timestep resolution (s).
-    cores : int
-        Number of CPU cores for parallel processing.
-
-    Returns
-    -------
-    pd.DataFrame
-        Duration values (s) for ['000', '090', 'ver', 'geom'].
-    """
-    return significant_duration(waveform, dt, 5, 95, cores)

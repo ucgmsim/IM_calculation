@@ -10,14 +10,13 @@ readme = "README.md"
 requires-python = ">=3.12"
 dynamic = ["version"]
 dependencies = [
-  "numpy",
+  "numpy>=2",
   "pandas[hdf5]",
   "pyfftw",
   "scipy",
   "pint-xarray",
-  "xarray[io]",
+  "xarray[io]>=2025.1",
   "typer>0.12.3",
-  "tqdm>=4.67.1",
   "qcore-utils>=2025.12.1",
 ]
 
@@ -25,7 +24,11 @@ dependencies = [
 
 [project.optional-dependencies]
 ko_matrix = ["obspy"]
-test = ["pytest", "hypothesis[numpy]", "pytest-cov", "rich>=14.2.0"]
+# Only needed by callers that want to pass dask-backed (lazy) waveforms in
+# and get lazy datasets out; xr.apply_ufunc(..., dask="parallelized") never
+# imports dask for plain numpy/eager xarray input.
+lazy = ["dask[array]"]
+test = ["pytest", "hypothesis[numpy]", "pytest-cov", "rich>=14.2.0", "dask[array]"]
 types = ["pandas-stubs", "scipy-stubs"]
 dev = ["deptry", "ruff", "ty", "numpydoc"]
 

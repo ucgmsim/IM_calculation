@@ -1,13 +1,18 @@
 """KO matrix generation module"""
 
+import functools
 from pathlib import Path
 
 import numpy as np
 
 
+@functools.cache
 def get_konno_matrix(size: int, directory: Path) -> np.memmap:
     """
     Retrieves the precomputed Konno matrix from a file.
+
+    Cached per `(size, directory)`: the memmap is opened once per process
+    and reused, since it may be called once per dask task/chunk.
 
     Parameters
     ----------

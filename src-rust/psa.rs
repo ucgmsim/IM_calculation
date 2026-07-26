@@ -132,7 +132,12 @@ pub fn newmark_beta_method_batch(
 /// The two RotD work buffers are allocated once and reused for every station.
 ///
 /// `comp_0` and `comp_90` are the 000 and 090 acceleration waveforms with
-/// shape `(ns, nt)`. The result has shape `(ns, 180)`.
+/// shape `(ns, nt)`. The result has shape `(ns, 182)`: columns 0..=179 are
+/// the rotated peaks at each integer angle, and columns 180 and 181 are the
+/// exact peaks of the unrotated 000 and 090 responses (`w^2 * max|response|`),
+/// so a caller who only needs those two components does not have to re-derive
+/// them from angle 0 / angle 90, which are off by `cos(90 deg) ~= 6.12e-17`
+/// rather than being exactly zero.
 pub fn psa_rotd180(
     comp_0: &ArrayView2<f64>,
     comp_90: &ArrayView2<f64>,
@@ -147,7 +152,7 @@ pub fn psa_rotd180(
     );
     let ns = comp_0.nrows();
     let conversion_factor = w * w;
-    let mut out = Array2::<f64>::zeros((ns, 180));
+    let mut out = Array2::<f64>::zeros((ns, 182));
     let mut survivors: Vec<[f64; 2]> = Vec::with_capacity(comp_0.ncols());
     let mut hull: Vec<[f64; 2]> = Vec::with_capacity(256);
     for s in 0..ns {
@@ -163,8 +168,24 @@ pub fn psa_rotd180(
         for (angle, &peak) in peaks.iter().enumerate() {
             row[angle] = conversion_factor * peak;
         }
+        row[180] = conversion_factor * response_0.iter().fold(0.0f64, |m, &u| m.max(u.abs()));
+        row[181] = conversion_factor * response_90.iter().fold(0.0f64, |m, &u| m.max(u.abs()));
     }
     out
+}
+
+/// Pseudo-spectral acceleration peak for a single component, one period.
+///
+/// `waveforms` has shape `(ns, nt)`. Only the peak response is returned
+/// (shape `(ns,)`), so a caller that needs just one component -- e.g. the
+/// vertical, which never participates in RotD -- does not have to carry a
+/// full `(ns, nt)` displacement response back into Python.
+pub fn psa_peak(waveforms: &ArrayView2<f64>, dt: f64, w: f64, xi: f64) -> Array1<f64> {
+    let conversion_factor = w * w;
+    Array1::from_shape_fn(waveforms.nrows(), |s| {
+        let response = newmark_beta_method(waveforms.row(s), dt, w, xi, 0.0, 0.0);
+        conversion_factor * response.iter().fold(0.0f64, |m, &u| m.max(u.abs()))
+    })
 }
 
 #[cfg(test)]
@@ -309,6 +330,27 @@ mod tests {
         let u = newmark_beta_solver(waveform.view(), dt, w, xi, GAMMA, BETA, 1.0, 0.0);
         let analytical = t.map(|&x| (-x).exp() * (x + 1.0));
         assert_abs_diff_eq!(u, analytical, epsilon = 5e-4);
+    }
+
+    #[test]
+    fn test_psa_rotd180_columns_180_181_match_component_peaks() {
+        // Columns 180/181 must agree with an independent per-component
+        // psa_peak computation (which is also what column 0 / column 90
+        // approximate, up to cos(90 deg) != 0 exactly in f64).
+        let t = Array1::<f64>::linspace(0.0, 2.0, 512);
+        let dt = t[1] - t[0];
+        let comp_0 = t.map(|&x| (3.0 * x).sin());
+        let comp_90 = t.map(|&x| 0.7 * (5.0 * x).cos());
+        let comp_0_2d = comp_0.clone().insert_axis(Axis(0));
+        let comp_90_2d = comp_90.clone().insert_axis(Axis(0));
+        let w = 2.0 * PI;
+
+        let combined = psa_rotd180(&comp_0_2d.view(), &comp_90_2d.view(), dt, w, XI);
+        let peak_0 = psa_peak(&comp_0_2d.view(), dt, w, XI);
+        let peak_90 = psa_peak(&comp_90_2d.view(), dt, w, XI);
+
+        assert_abs_diff_eq!(combined[[0, 180]], peak_0[0], epsilon = 1e-12);
+        assert_abs_diff_eq!(combined[[0, 181]], peak_90[0], epsilon = 1e-12);
     }
 
     #[test]

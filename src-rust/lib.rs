@@ -31,7 +31,10 @@ mod _core {
         xi: f64,
     ) -> Bound<'py, PyArray2<f64>> {
         let waveforms = waveforms_py.as_array();
-        let waveform_psa = psa::newmark_beta_method_batch(&waveforms, dt, w, xi);
+        // Touches no Python objects, so drop the GIL for the whole solve: a
+        // threaded caller (e.g. Dask's threaded scheduler) can then run one
+        // of these per core in parallel within a single process.
+        let waveform_psa = py.detach(|| psa::newmark_beta_method_batch(&waveforms, dt, w, xi));
         waveform_psa.into_pyarray(py)
     }
 
@@ -42,18 +45,7 @@ mod _core {
         dt: f64,
     ) -> Bound<'py, PyArray1<f64>> {
         let waveforms = waveforms_py.as_array();
-        let waveform_ai = arias_intensity::arias_intensity(waveforms, dt);
-        waveform_ai.into_pyarray(py)
-    }
-
-    #[pyfunction]
-    fn _cumulative_arias_intensity<'py>(
-        py: Python<'py>,
-        waveforms_py: PyReadonlyArray2<f64>,
-        dt: f64,
-    ) -> Bound<'py, PyArray2<f64>> {
-        let waveforms = waveforms_py.as_array();
-        let waveform_ai = arias_intensity::cumulative_arias_intensity(waveforms, dt);
+        let waveform_ai = py.detach(|| arias_intensity::arias_intensity(waveforms, dt));
         waveform_ai.into_pyarray(py)
     }
 
@@ -64,7 +56,7 @@ mod _core {
         dt: f64,
     ) -> Bound<'py, PyArray1<f64>> {
         let waveforms = waveforms_py.as_array();
-        let waveform_cav = cav::cav(waveforms, dt);
+        let waveform_cav = py.detach(|| cav::cav(waveforms, dt));
         waveform_cav.into_pyarray(py)
     }
 
@@ -72,7 +64,9 @@ mod _core {
     ///
     /// Runs the Newmark-beta solver (f64) and the RotD reduction entirely in
     /// Rust, one station after another, so a Dask worker holding a single core
-    /// gets no competing Rayon threads. Returns an `(ns, 180)` array of pSA.
+    /// gets no competing Rayon threads. Returns an `(ns, 182)` array: columns
+    /// 0..=179 are the rotated peaks, and columns 180/181 are the exact 000
+    /// and 090 peaks (see [`psa::psa_rotd180`]).
     #[pyfunction]
     fn _psa_rotd180<'py>(
         py: Python<'py>,
@@ -91,6 +85,23 @@ mod _core {
         psa_rotd.into_pyarray(py)
     }
 
+    /// Pseudo-spectral acceleration peak for a single component, one period.
+    ///
+    /// Used for the vertical component, which never participates in RotD, so
+    /// only its peak response (shape `(ns,)`) is needed.
+    #[pyfunction]
+    fn _psa_peak<'py>(
+        py: Python<'py>,
+        waveforms_py: PyReadonlyArray2<f64>,
+        dt: f64,
+        w: f64,
+        xi: f64,
+    ) -> Bound<'py, PyArray1<f64>> {
+        let waveforms = waveforms_py.as_array();
+        let peak = py.detach(|| psa::psa_peak(&waveforms, dt, w, xi));
+        peak.into_pyarray(py)
+    }
+
     #[pyfunction]
     fn _rotd<'py>(
         py: Python<'py>,
@@ -99,7 +110,7 @@ mod _core {
     ) -> Bound<'py, PyArray2<f64>> {
         let comp_0 = comp_0_py.as_array();
         let comp_90 = comp_90_py.as_array();
-        let rotd_stats = rotd::rotd(comp_0, comp_90);
+        let rotd_stats = py.detach(|| rotd::rotd(comp_0, comp_90));
         rotd_stats.into_pyarray(py)
     }
 
@@ -112,8 +123,10 @@ mod _core {
         high: f64,
     ) -> Bound<'py, PyArray1<f64>> {
         let waveforms = waveforms_py.as_array();
-        let arias_intensity = arias_intensity::cumulative_arias_intensity(waveforms, dt);
-        let ds = significant_duration::significant_duration(arias_intensity.view(), dt, low, high);
+        let ds = py.detach(|| {
+            let arias_intensity = arias_intensity::cumulative_arias_intensity(waveforms, dt);
+            significant_duration::significant_duration(arias_intensity.view(), dt, low, high)
+        });
         ds.into_pyarray(py)
     }
 }

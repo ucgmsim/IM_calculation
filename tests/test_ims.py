@@ -1,10 +1,10 @@
 """Test cases for intensity measure implementations."""
 
 import functools
-import multiprocessing
 from collections.abc import Callable
 from pathlib import Path
 
+import dask.array as da
 import numpy as np
 import numpy.typing as npt
 import pandas as pd
@@ -13,7 +13,7 @@ import xarray as xr
 from hypothesis import given, settings
 from hypothesis import strategies as st
 from hypothesis.extra import numpy as nst
-from numpy.testing import assert_array_almost_equal
+from numpy.testing import assert_array_almost_equal, assert_array_equal
 from pytest import Metafunc, TempPathFactory
 
 from IM import im_calculation, ims, snr_calculation, waveform_reading
@@ -60,6 +60,18 @@ def sample_periods() -> npt.NDArray[np.float64]:
     return np.array([0.1, 0.2, 0.5, 1.0], dtype=np.float64)
 
 
+def _to_dask(waveform: npt.NDArray[np.float64], station_chunk: int) -> xr.DataArray:
+    """Wrap a bare waveform array as a dask-backed DataArray with real station
+    names, chunked over `station` only (component/time as single chunks)."""
+    n_stations = waveform.shape[1]
+    return xr.DataArray(
+        da.from_array(waveform, chunks=(waveform.shape[0], station_chunk, waveform.shape[2])),
+        dims=("component", "station", "time"),
+        coords={"station": [f"stat_{i}" for i in range(n_stations)]},
+        attrs={"units": "g"},
+    )
+
+
 # NOTE: The following unit tests PGA and PGV exist because there is no direct implementation of PGA/PGV in the rust code.
 
 
@@ -75,8 +87,9 @@ def test_pga(comp_0: npt.NDArray[np.float64], expected_pga: float) -> None:
     # Shape (n_comp, n_stat, nt)
     waveforms = np.zeros((3, 1, len(comp_0)), dtype=np.float64)
     waveforms[ims.Component.COMP_0, 0, :] = comp_0
-    result = ims.peak_ground_acceleration(waveforms, cores=1)
-    assert np.isclose(result["000"].iloc[0], expected_pga, atol=1e-3)
+    result = ims.peak_ground_acceleration(waveforms)
+    assert result.attrs["name"] == "PGA"
+    assert np.isclose(result["000"].item(), expected_pga, atol=1e-3)
 
 
 @pytest.mark.parametrize(
@@ -97,8 +110,9 @@ def test_pgv(
     waveforms = np.zeros((3, 1, len(comp_0)), dtype=np.float64)
     waveforms[ims.Component.COMP_0, 0, :] = comp_0
     dt = t_max / (len(comp_0) - 1)
-    result = ims.peak_ground_velocity(waveforms, dt, cores=1)
-    assert np.isclose(result["000"].iloc[0], expected_pgv, atol=0.1)
+    result = ims.peak_ground_velocity(waveforms, dt)
+    assert result.attrs["name"] == "PGV"
+    assert np.isclose(result["000"].item(), expected_pgv, atol=0.1)
 
 
 # CAV5 is partly a python function, so we test expected CAV5 results. CAV tests are in rust.
@@ -120,16 +134,26 @@ def test_cav5(
     waveforms[ims.Component.COMP_0] = comp_0
     dt = t_max / (len(comp_0) - 1)
 
-    assert np.isclose(
-        ims.cumulative_absolute_velocity(waveforms, dt, 1, threshold=5)["000"],
-        expected_cav5,
-        atol=0.1,
+    result = ims.cumulative_absolute_velocity(waveforms, dt, threshold=5)
+    assert result.attrs["name"] == "CAV5"
+    assert np.isclose(result["000"].item(), expected_cav5, atol=0.1)
+
+
+def test_cav_name_depends_on_threshold(sample_waveforms: npt.NDArray[np.float64]) -> None:
+    """threshold=0 is falsy, so it must name the result CAV, not CAV5."""
+    assert ims.cumulative_absolute_velocity(sample_waveforms, 0.01).attrs["name"] == "CAV"
+    assert (
+        ims.cumulative_absolute_velocity(sample_waveforms, 0.01, threshold=0).attrs["name"]
+        == "CAV"
+    )
+    assert (
+        ims.cumulative_absolute_velocity(sample_waveforms, 0.01, threshold=5).attrs["name"]
+        == "CAV5"
     )
 
 
-@pytest.mark.parametrize("cores", [1, 2])
 @pytest.mark.slow
-def test_fas_benchmark(cores: int, ko_matrices: Path) -> None:
+def test_fas_benchmark(ko_matrices: Path) -> None:
     data_array_ffp = Path(__file__).parent / "resources" / "fas_benchmark.nc"
     if not data_array_ffp.exists():
         pytest.skip("Benchmark file missing")
@@ -145,14 +169,18 @@ def test_fas_benchmark(cores: int, ko_matrices: Path) -> None:
     waveform = np.ascontiguousarray(np.moveaxis(waveform, -1, 0))
     # Input: (n_stations, nt, n_components) as per fourier_amplitude_spectra logic
     fas_result_ims = ims.fourier_amplitude_spectra(
-        waveform, dt, data.frequency.values, ko_matrices, cores=cores
+        waveform, dt, data.frequency.values, ko_matrices
     )
 
-    assert_array_almost_equal(data.values, fas_result_ims.values, decimal=5)
+    for component in data.component.values:
+        assert_array_almost_equal(
+            data.sel(component=component).values,
+            fas_result_ims[str(component)].values,
+            decimal=5,
+        )
 
 
-@pytest.mark.parametrize("cores", [1, multiprocessing.cpu_count()])
-def test_fas_multiple_stations_benchmark(cores: int, ko_matrices: Path) -> None:
+def test_fas_multiple_stations_benchmark(ko_matrices: Path) -> None:
     """Compare benchmark FAS calculation with multiple stations against current implementation."""
     # Load the data array
     data_array_ffp = Path(__file__).parent / "resources" / "fas_benchmark.nc"
@@ -172,16 +200,18 @@ def test_fas_multiple_stations_benchmark(cores: int, ko_matrices: Path) -> None:
 
     # Compute the Fourier Amplitude Spectra
     fas_result_ims = ims.fourier_amplitude_spectra(
-        duplicated_array, dt, data.frequency, ko_matrices, cores=cores
+        duplicated_array, dt, data.frequency, ko_matrices
     )
 
     # Compare the results
-    for i in range(fas_result_ims.shape[1]):
-        assert_array_almost_equal(
-            fas_result_ims[:, i, :],
-            data[:, 0, :],
-            decimal=5,
-        )
+    for component in data.component.values:
+        expected = data.sel(component=component)[0, :]
+        for station in range(2):
+            assert_array_almost_equal(
+                fas_result_ims[str(component)].isel(station=station).values,
+                expected,
+                decimal=5,
+            )
 
 
 @pytest.mark.slow
@@ -364,11 +394,8 @@ def pytest_generate_tests(metafunc: Metafunc) -> None:
         metafunc.parametrize("resource_dir", benchmark_cases, ids=lambda p: p.stem)
 
 
-@pytest.mark.parametrize("cores", [1, multiprocessing.cpu_count()])
 @pytest.mark.slow
-def test_all_ims_benchmark_edge_cases(
-    resource_dir: Path, cores: int, ko_matrices: Path
-) -> None:
+def test_all_ims_benchmark_edge_cases(resource_dir: Path, ko_matrices: Path) -> None:
     """Compare benchmark IM calculation against current implementation for each directory in resources for edge cases."""
     # Load the benchmark DataFrame
     benchmark_ffp = resource_dir / "im_benchmark.csv"
@@ -401,7 +428,7 @@ def test_all_ims_benchmark_edge_cases(
 
     # Calculate the intensity measures
     result = im_calculation.calculate_ims(
-        waveform, dt, ims_list=im_list, ko_directory=ko_matrices, cores=cores
+        waveform, dt, ims_list=im_list, ko_directory=ko_matrices
     )
 
     # Align columns and indices for comparison
@@ -445,13 +472,14 @@ def test_significant_duration(
     percent_high: float,
 ) -> None:
     dt = 0.01
-    result = ims.significant_duration(
-        sample_waveforms, dt, percent_low, percent_high, cores=1
-    )
+    result = ims.significant_duration(sample_waveforms, dt, percent_low, percent_high)
 
-    assert result.shape == (sample_waveforms.shape[1], 4)  # 4 components
-    assert np.all(result.values >= 0)
-    assert np.all(result.values <= len(sample_time) * dt)
+    assert result.attrs["name"] == "duration"
+    assert set(result.data_vars) == set(ims.GEOM_COMPONENTS)
+    for component in ims.GEOM_COMPONENTS:
+        assert result[component].shape == (sample_waveforms.shape[1],)
+        assert np.all(result[component].values >= 0)
+        assert np.all(result[component].values <= len(sample_time) * dt)
 
 
 def test_ds5xx() -> None:
@@ -462,8 +490,12 @@ def test_ds5xx() -> None:
     waveforms[ims.Component.COMP_VER, 0, :] = comp_0 * 3
     dt = 1.0 / len(comp_0)
 
-    assert ims.ds575(waveforms, dt, cores=1)["000"].iloc[0] == pytest.approx(0.7)
-    assert ims.ds595(waveforms, dt, cores=1)["000"].iloc[0] == pytest.approx(0.9)
+    ds575 = ims.ds575(waveforms, dt)
+    ds595 = ims.ds595(waveforms, dt)
+    assert ds575.attrs["name"] == "Ds575"
+    assert ds595.attrs["name"] == "Ds595"
+    assert ds575["000"].item() == pytest.approx(0.7)
+    assert ds595["000"].item() == pytest.approx(0.9)
 
 
 # Contract guarantee on output shapes
@@ -484,13 +516,13 @@ def test_peak_ground_parameters(
     dt = float(sample_time[1] - sample_time[0])
 
     if func == ims.peak_ground_acceleration:
-        result = func(sample_waveforms, cores=1)
+        result = func(sample_waveforms)
     else:
-        result = func(sample_waveforms, dt, cores=1)
+        result = func(sample_waveforms, dt)
 
-    assert isinstance(result, pd.DataFrame)
-    assert set(result.columns) >= {"000", "090", "ver", "geom"}
-    assert np.all(result.select_dtypes(include=[np.number]) >= 0)
+    assert isinstance(result, xr.Dataset)
+    assert set(result.data_vars) >= {"000", "090", "ver", "geom"}
+    assert all((variable.values >= 0).all() for variable in result.data_vars.values())
 
 
 # Test cases for Fourier Amplitude Spectra
@@ -504,26 +536,14 @@ def test_fourier_amplitude_spectra(
     """Test Fourier Amplitude Spectra calculation."""
     dt = sample_time[1] - sample_time[0]
     freqs = np.logspace(-1, 1, n_freqs, dtype=np.float64)
-    # Force the multiprocessing code path if necessary.
-    result_mp = ims.fourier_amplitude_spectra(
-        sample_waveforms,
-        dt,
-        freqs,
-        ko_matrices,
-        cores=max(2, multiprocessing.cpu_count()),
-    )
-    # Force the single core path.
-    result_sc = ims.fourier_amplitude_spectra(
-        sample_waveforms, dt, freqs, ko_matrices, cores=1
-    )
+    result = ims.fourier_amplitude_spectra(sample_waveforms, dt, freqs, ko_matrices)
 
-    # Check DataFrame structure
-    assert isinstance(result_mp, xr.DataArray)
-    assert list(result_mp.coords["component"]) == ["000", "090", "ver", "geom", "eas"]
-    assert np.allclose(result_mp.coords["frequency"], freqs)
-    assert np.all(result_mp.as_numpy() >= 0)
-    # Check that multi-core result and single-core result produce the same output.
-    assert np.allclose(result_mp.as_numpy(), result_sc.as_numpy())
+    # Check Dataset structure
+    assert isinstance(result, xr.Dataset)
+    assert result.attrs["name"] == "FAS"
+    assert list(result.data_vars) == list(ims.FAS_COMPONENTS)
+    assert np.allclose(result.coords["frequency"], freqs)
+    assert all((variable.values >= 0).all() for variable in result.data_vars.values())
 
 
 def test_nyquist_frequency(ko_matrices: Path) -> None:
@@ -549,7 +569,11 @@ def test_nyquist_frequency(ko_matrices: Path) -> None:
     np.testing.assert_array_equal(fas.coords["frequency"].values, expected_freqs)
 
     # Verify the shape of the output
-    assert fas.shape == (5, n_stations, len(expected_freqs)), "Unexpected FAS shape."
+    assert len(fas.data_vars) == 5
+    for component in ims.FAS_COMPONENTS:
+        assert fas[component].shape == (n_stations, len(expected_freqs)), (
+            "Unexpected FAS shape."
+        )
 
 
 @pytest.mark.parametrize(
@@ -564,7 +588,7 @@ def test_invalid_waveform_shapes(invalid_shape: tuple[int, ...]) -> None:
     waveforms = np.zeros(invalid_shape, dtype=np.float64)
 
     with pytest.raises(TypeError):
-        ims.peak_ground_acceleration(waveforms, cores=1)  # ty: ignore[invalid-argument-type]
+        ims.peak_ground_acceleration(waveforms)  # ty: ignore[invalid-argument-type]
 
 
 @pytest.mark.slow
@@ -574,12 +598,10 @@ def test_fourier_amplitude_spectra_shape(ko_matrices: Path) -> None:
     waveforms = np.random.rand(n_components, n_stations, n_timesteps).astype(np.float64)
     freqs = np.array([1.0, 10.0, 20.0], dtype=np.float64)
 
-    fas = ims.fourier_amplitude_spectra(waveforms, dt, freqs, ko_matrices, cores=1)
-    assert fas.shape == (
-        5,
-        n_stations,
-        len(freqs),
-    )  # 5 components: 0, 90, ver, geom, eas
+    fas = ims.fourier_amplitude_spectra(waveforms, dt, freqs, ko_matrices)
+    assert len(fas.data_vars) == 5  # 5 components: 0, 90, ver, geom, eas
+    for component in ims.FAS_COMPONENTS:
+        assert fas[component].shape == (n_stations, len(freqs))
 
 
 # Asserts that the RotDx values of PGA, PGV and pSA are invariant of the order of 000 and 090.
@@ -593,13 +615,12 @@ def test_fourier_amplitude_spectra_shape(ko_matrices: Path) -> None:
     ),
     im=st.sampled_from(
         [
-            functools.partial(ims.peak_ground_acceleration, cores=1),
-            functools.partial(ims.peak_ground_velocity, dt=0.01, cores=1),
+            ims.peak_ground_acceleration,
+            functools.partial(ims.peak_ground_velocity, dt=0.01),
             functools.partial(
                 ims.pseudo_spectral_acceleration,
                 periods=np.array([1.0]),
-                dt=np.float64(0.01),
-                cores=1,
+                dt=0.01,
             ),
         ]
     ),
@@ -608,26 +629,18 @@ def test_fourier_amplitude_spectra_shape(ko_matrices: Path) -> None:
 @pytest.mark.slow
 def test_rotational_invariance(
     waveform: npt.NDArray[np.float64],
-    im: Callable[[ims.ChunkedWaveformArray], pd.DataFrame | xr.DataArray],
+    im: Callable[[ims.Waveform], xr.Dataset],
 ) -> None:
     old_waveform = np.copy(waveform)
     waveform_ims = im(old_waveform)
     assert np.allclose(old_waveform, waveform)
     waveform_ims_transposed = im(waveform[[1, 0, 2]])
-    if isinstance(waveform_ims_transposed, pd.DataFrame) and isinstance(
-        waveform_ims, pd.DataFrame
-    ):
-        for component in ["rotd0", "rotd50", "rotd100"]:
-            value = waveform_ims[component].values
-            value_t = waveform_ims_transposed[component].values
-            assert value == pytest.approx(value_t)
-    else:
-        assert isinstance(waveform_ims, xr.DataArray)
-        assert isinstance(waveform_ims_transposed, xr.DataArray)
-        for component in ["rotd0", "rotd50", "rotd100"]:
-            value = waveform_ims.sel(component=component).values.squeeze()
-            value_t = waveform_ims_transposed.sel(component=component).values.squeeze()
-            assert value == pytest.approx(value_t)
+    assert isinstance(waveform_ims, xr.Dataset)
+    assert isinstance(waveform_ims_transposed, xr.Dataset)
+    for component in ["rotd0", "rotd50", "rotd100"]:
+        value = waveform_ims[component].values.squeeze()
+        value_t = waveform_ims_transposed[component].values.squeeze()
+        assert value == pytest.approx(value_t)
 
 
 # Asserts that 090, 000, and ver components are computed for the corresponding COMP_* enum values.
@@ -640,17 +653,220 @@ def test_rotational_invariance(
 )
 @settings(deadline=None)
 def test_component_orientation(waveform: npt.NDArray[np.float64]) -> None:
-    waveform_ims = ims.peak_ground_acceleration(waveform, cores=1)
+    waveform_ims = ims.peak_ground_acceleration(waveform)
 
     assert_array_almost_equal(
-        waveform_ims["000"].values,  # ty: ignore[invalid-argument-type]
+        waveform_ims["000"].values,
         np.abs(waveform[ims.Component.COMP_0]).max(axis=1),
     )
     assert_array_almost_equal(
-        waveform_ims["090"].values,  # ty: ignore[invalid-argument-type]
+        waveform_ims["090"].values,
         np.abs(waveform[ims.Component.COMP_90]).max(axis=1),
     )
     assert_array_almost_equal(
-        waveform_ims["ver"].values,  # ty: ignore[invalid-argument-type]
+        waveform_ims["ver"].values,
         np.abs(waveform[ims.Component.COMP_VER]).max(axis=1),
     )
+
+
+def test_component_orientation_with_named_components(
+    sample_waveforms: npt.NDArray[np.float64],
+) -> None:
+    """Component mapping is positional: index 0/1/2 -> 000/090/ver, regardless
+    of how the input DataArray's `component` coordinate is labelled."""
+    waveform = xr.DataArray(
+        sample_waveforms,
+        dims=("component", "station", "time"),
+        coords={"component": ["x", "y", "z"]},
+    )
+    result = ims.peak_ground_acceleration(waveform)
+    assert_array_almost_equal(
+        result["000"].values, np.abs(sample_waveforms[0]).max(axis=-1)
+    )
+    assert_array_almost_equal(
+        result["090"].values, np.abs(sample_waveforms[1]).max(axis=-1)
+    )
+    assert_array_almost_equal(
+        result["ver"].values, np.abs(sample_waveforms[2]).max(axis=-1)
+    )
+
+
+# Lazy (dask-backed) input must produce a lazy Dataset whose computed values
+# are bit-identical to the eager result -- station chunking never mixes rows,
+# so nothing about laziness should change the numbers.
+LAZY_CASES = [
+    pytest.param(ims.peak_ground_acceleration, {}, id="pga"),
+    pytest.param(ims.peak_ground_velocity, {"dt": 0.01}, id="pgv"),
+    pytest.param(ims.peak_ground_displacement, {"dt": 0.01}, id="pgd"),
+    pytest.param(ims.cumulative_absolute_velocity, {"dt": 0.01}, id="cav"),
+    pytest.param(
+        ims.cumulative_absolute_velocity, {"dt": 0.01, "threshold": 5}, id="cav5"
+    ),
+    pytest.param(ims.arias_intensity, {"dt": 0.01}, id="ai"),
+    pytest.param(ims.ds575, {"dt": 0.01}, id="ds575"),
+]
+
+
+@pytest.mark.parametrize("func,kwargs", LAZY_CASES)
+def test_lazy_matches_eager(
+    sample_waveforms: npt.NDArray[np.float64],
+    func: Callable[..., xr.Dataset],
+    kwargs: dict,
+) -> None:
+    lazy_input = _to_dask(sample_waveforms, station_chunk=1)
+    eager = func(sample_waveforms, **kwargs)
+    lazy = func(lazy_input, **kwargs)
+
+    assert all(v.chunks is not None for v in lazy.data_vars.values())
+    assert "units" not in lazy.attrs  # keep_attrs=False: input attrs must not leak
+
+    computed = lazy.compute()
+    for component in eager.data_vars:
+        assert_array_equal(eager[component].values, computed[component].values)
+
+
+def test_lazy_matches_eager_psa(sample_waveforms: npt.NDArray[np.float64]) -> None:
+    periods = np.array([0.1, 0.5, 1.0])
+    lazy_input = _to_dask(sample_waveforms, station_chunk=1)
+    eager = ims.pseudo_spectral_acceleration(sample_waveforms, periods, 0.01)
+    lazy = ims.pseudo_spectral_acceleration(lazy_input, periods, 0.01)
+
+    assert all(v.chunks is not None for v in lazy.data_vars.values())
+    computed = lazy.compute()
+    for component in eager.data_vars:
+        assert_array_equal(eager[component].values, computed[component].values)
+
+
+def test_psa_full_rotd180(sample_waveforms: npt.NDArray[np.float64]) -> None:
+    """The full 180-angle curve must be internally consistent with the
+    summary statistics computed from the same solve."""
+    periods = np.array([0.1, 0.5, 1.0])
+    dt = 0.01
+
+    without = ims.pseudo_spectral_acceleration(sample_waveforms, periods, dt)
+    with_curve = ims.pseudo_spectral_acceleration(
+        sample_waveforms, periods, dt, full_rotd180=True
+    )
+
+    assert "rotd180" not in without.data_vars
+    assert set(with_curve.data_vars) == set(without.data_vars) | {"rotd180"}
+    assert with_curve["rotd180"].dims == ("station", "period", "angle")
+    assert with_curve["rotd180"].shape == (
+        sample_waveforms.shape[1],
+        len(periods),
+        180,
+    )
+    assert_array_equal(with_curve.angle.values, np.arange(180))
+
+    # Angle 0 is exact (cos(0) == 1.0 exactly), so it must equal 000 exactly.
+    assert_array_equal(with_curve["rotd180"].isel(angle=0).values, with_curve["000"].values)
+
+    # The other summary components must be unaffected by asking for the curve.
+    for component in without.data_vars:
+        assert_array_equal(without[component].values, with_curve[component].values)
+
+    # rotd0/50/100 must be exactly the min/median/max over the angle axis.
+    sorted_curve = np.sort(with_curve["rotd180"].values, axis=-1)
+    assert_array_equal(sorted_curve[..., 0], with_curve["rotd0"].values)
+    assert_array_equal(
+        (sorted_curve[..., 89] + sorted_curve[..., 90]) / 2,
+        with_curve["rotd50"].values,
+    )
+    assert_array_equal(sorted_curve[..., 179], with_curve["rotd100"].values)
+
+
+def test_psa_full_rotd180_does_not_duplicate_the_solve(
+    sample_waveforms: npt.NDArray[np.float64], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Requesting the full curve must reuse the same per-period solve as the
+    summary statistics, not run it a second time."""
+    periods = np.array([0.1, 0.5, 1.0])
+    dt = 0.01
+    calls = []
+    original = ims._core._psa_rotd180
+    monkeypatch.setattr(
+        ims._core,
+        "_psa_rotd180",
+        lambda *args, **kwargs: (calls.append(1), original(*args, **kwargs))[1],
+    )
+
+    ims.pseudo_spectral_acceleration(sample_waveforms, periods, dt, full_rotd180=False)
+    n_without = len(calls)
+    calls.clear()
+    ims.pseudo_spectral_acceleration(sample_waveforms, periods, dt, full_rotd180=True)
+    n_with = len(calls)
+
+    assert n_without == len(periods)
+    assert n_with == len(periods)
+
+
+def test_lazy_matches_eager_psa_full_rotd180(
+    sample_waveforms: npt.NDArray[np.float64],
+) -> None:
+    periods = np.array([0.1, 0.5, 1.0])
+    lazy_input = _to_dask(sample_waveforms, station_chunk=1)
+    eager = ims.pseudo_spectral_acceleration(
+        sample_waveforms, periods, 0.01, full_rotd180=True
+    )
+    lazy = ims.pseudo_spectral_acceleration(
+        lazy_input, periods, 0.01, full_rotd180=True
+    )
+
+    assert all(v.chunks is not None for v in lazy.data_vars.values())
+    computed = lazy.compute()
+    for component in eager.data_vars:
+        assert_array_equal(eager[component].values, computed[component].values)
+
+
+def test_lazy_matches_eager_fas(
+    sample_waveforms: npt.NDArray[np.float64], ko_matrices: Path
+) -> None:
+    freqs = np.logspace(-1, 1, 16, dtype=np.float64)
+    lazy_input = _to_dask(sample_waveforms, station_chunk=1)
+    eager = ims.fourier_amplitude_spectra(sample_waveforms, 0.01, freqs, ko_matrices)
+    lazy = ims.fourier_amplitude_spectra(lazy_input, 0.01, freqs, ko_matrices)
+
+    assert all(v.chunks is not None for v in lazy.data_vars.values())
+    computed = lazy.compute()
+    # BLAS may re-block the Konno matmul differently per station chunk, so
+    # allow a little slack rather than requiring bit-identical results.
+    for component in eager.data_vars:
+        assert_array_almost_equal(
+            eager[component].values, computed[component].values, decimal=10
+        )
+
+
+def test_lazy_preserves_station_coord_and_extra_coords(
+    sample_waveforms: npt.NDArray[np.float64],
+) -> None:
+    n_stations = sample_waveforms.shape[1]
+    waveform = xr.DataArray(
+        da.from_array(sample_waveforms, chunks=(3, 1, sample_waveforms.shape[2])),
+        dims=("component", "station", "time"),
+        coords={
+            "station": [f"stat_{i}" for i in range(n_stations)],
+            "latitude": ("station", np.arange(n_stations, dtype=np.float64)),
+            "longitude": ("station", -np.arange(n_stations, dtype=np.float64)),
+        },
+    )
+    result = ims.peak_ground_acceleration(waveform)
+    assert_array_equal(result.station.values, waveform.station.values)
+    assert_array_equal(result.latitude.values, waveform.latitude.values)
+    assert_array_equal(result.longitude.values, waveform.longitude.values)
+
+
+def test_rechunks_component_and_time_core_dims(
+    sample_waveforms: npt.NDArray[np.float64],
+) -> None:
+    """A waveform chunked across `component`/`time` (as a real broadband file
+    opened with `chunks={}` might be) must still work: `_as_waveform` forces
+    those two dims back to a single chunk before `apply_ufunc` sees them."""
+    waveform = xr.DataArray(
+        da.from_array(sample_waveforms, chunks=(1, 1, 5)),
+        dims=("component", "station", "time"),
+    )
+    result = ims.peak_ground_acceleration(waveform)
+    computed = result.compute()
+    expected = ims.peak_ground_acceleration(sample_waveforms)
+    for component in expected.data_vars:
+        assert_array_equal(expected[component].values, computed[component].values)
