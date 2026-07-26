@@ -91,7 +91,12 @@ pub fn rotd180_peaks(
     survivors.clear();
     for i in 0..n {
         let p = [x[i], y[i]];
-        let (e0, e1, e2, e3) = (cross(a, b, p), cross(b, c, p), cross(c, d, p), cross(d, a, p));
+        let (e0, e1, e2, e3) = (
+            cross(a, b, p),
+            cross(b, c, p),
+            cross(c, d, p),
+            cross(d, a, p),
+        );
         let inside = (e0 > 0.0 && e1 > 0.0 && e2 > 0.0 && e3 > 0.0)
             || (e0 < 0.0 && e1 < 0.0 && e2 < 0.0 && e3 < 0.0);
         if !inside {
@@ -166,9 +171,9 @@ mod tests {
     fn brute_peaks(x: ArrayView1<f64>, y: ArrayView1<f64>) -> [f64; 180] {
         std::array::from_fn(|theta| {
             let (sin_theta, cos_theta) = (theta as f64 * DEGREES).sin_cos();
-            Zip::from(x)
-                .and(y)
-                .fold(0.0f64, |m: f64, &a, &b| m.max((cos_theta * a + sin_theta * b).abs()))
+            Zip::from(x).and(y).fold(0.0f64, |m: f64, &a, &b| {
+                m.max((cos_theta * a + sin_theta * b).abs())
+            })
         })
     }
 
@@ -354,7 +359,9 @@ mod tests {
         for theta in 0..180 {
             assert!(
                 (got[theta] - want[theta]).abs() <= 1e-9 * want[theta].max(1.0),
-                "angle {theta}: culled {} != brute {}", got[theta], want[theta]
+                "angle {theta}: culled {} != brute {}",
+                got[theta],
+                want[theta]
             );
         }
 
@@ -377,7 +384,10 @@ mod tests {
         let got = peaks(comp_0.view(), comp_90.view());
         let want = brute_peaks(comp_0.view(), comp_90.view());
         for theta in 0..180 {
-            assert!((got[theta] - want[theta]).abs() <= 1e-9, "circular angle {theta}");
+            assert!(
+                (got[theta] - want[theta]).abs() <= 1e-9,
+                "circular angle {theta}"
+            );
         }
     }
 
@@ -399,7 +409,10 @@ mod tests {
         let got = peaks(line_0.view(), line_90.view());
         let want = brute_peaks(line_0.view(), line_90.view());
         for theta in 0..180 {
-            assert!((got[theta] - want[theta]).abs() < 1e-9, "collinear angle {theta}");
+            assert!(
+                (got[theta] - want[theta]).abs() < 1e-9,
+                "collinear angle {theta}"
+            );
         }
     }
 
@@ -413,7 +426,10 @@ mod tests {
         let records = [
             (array![1.0, -2.0, 3.0], array![0.5, 0.5, -1.0]),
             (Array1::zeros(5), Array1::zeros(5)),
-            (array![9.81, -3.0, 2.0, 7.0, -8.0, 1.0], array![1.0, 4.0, -4.0, 0.0, 2.0, -2.0]),
+            (
+                array![9.81, -3.0, 2.0, 7.0, -8.0, 1.0],
+                array![1.0, 4.0, -4.0, 0.0, 2.0, -2.0],
+            ),
             (array![2.5], array![-1.5]),
         ];
         for (comp_0, comp_90) in &records {
