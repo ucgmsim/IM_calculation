@@ -1,4 +1,3 @@
-use ndarray::parallel::prelude::*;
 use ndarray::prelude::*;
 use ndarray::{Array1, Ix1, Ix2};
 
@@ -95,16 +94,14 @@ pub fn newmark_beta_method(
     newmark_beta_solver(waveform, dt, w, xi, gamma, beta, u0, dudt0)
 }
 
-/// Solve the SDOF oscillator equation for an array of observations, in parallel, *in-place*.
+/// Solve the SDOF oscillator equation for every row of `waveforms`, serially.
 ///
-/// The `waveforms` array must have shape `(ns, nt)`, where `ns` is the number of stations and `nt` is the number of timesteps.
-/// The solver uses the Newmark-Beta method to solve the SDOF oscillator equation for an oscillator
-/// with an *angular frequency* of `w` Hz, damping coefficient of `xi`, and mass parameter `m`.
-/// The `gamma` and `beta` parameters determine if the constant or linear acceleration method is implemented.
-///
-///
-/// Solving is done in parallel for all `ns` stations, and in-place on the waveforms array.
-pub fn newmark_beta_method_parallel(
+/// The `waveforms` array has shape `(ns, nt)`, where `ns` is the number of
+/// stations and `nt` the number of timesteps. Each row is solved with the
+/// Newmark-Beta method for an oscillator of angular frequency `w` and damping
+/// coefficient `xi`, and the resulting displacement response is written to the
+/// matching row of the `(ns, nt)` output.
+pub fn newmark_beta_method_batch(
     waveforms: &ArrayView2<f64>,
     dt: f64,
     w: f64,
@@ -112,12 +109,61 @@ pub fn newmark_beta_method_parallel(
 ) -> Array<f64, Ix2> {
     let mut out = Array::<f64, Ix2>::zeros(waveforms.dim());
     out.axis_iter_mut(Axis(0))
-        .into_par_iter()
-        .zip(waveforms.axis_iter(Axis(0)).into_par_iter())
+        .zip(waveforms.axis_iter(Axis(0)))
         .for_each(|(mut out_row, in_row)| {
-            let r = newmark_beta_method(in_row, dt, w, xi, 0.0, 0.0);
-            out_row.assign(&r);
+            out_row.assign(&newmark_beta_method(in_row, dt, w, xi, 0.0, 0.0));
         });
+    out
+}
+
+/// Pseudo-spectral acceleration at every integer rotation angle 0..=179
+/// degrees, for a single oscillator period, computed **serially**.
+///
+/// For each station the two horizontal components are pushed through the
+/// Newmark-beta SDOF solver (kept in f64 for accuracy over long records) and
+/// the displacement responses are reduced to their peak rotated amplitude at
+/// every angle by [`crate::rotd::rotd180_peaks`]. Multiplying by `w^2`
+/// converts the peak relative displacement of the unit-mass oscillator to a
+/// pseudo-spectral acceleration.
+///
+/// The loop over stations is deliberately serial: this runs one period per
+/// call inside a Dask worker that already owns a core, so spawning a Rayon
+/// pool here would oversubscribe the machine and fight the outer scheduler.
+/// The two RotD work buffers are allocated once and reused for every station.
+///
+/// `comp_0` and `comp_90` are the 000 and 090 acceleration waveforms with
+/// shape `(ns, nt)`. The result has shape `(ns, 180)`.
+pub fn psa_rotd180(
+    comp_0: &ArrayView2<f64>,
+    comp_90: &ArrayView2<f64>,
+    dt: f64,
+    w: f64,
+    xi: f64,
+) -> Array2<f64> {
+    assert_eq!(
+        comp_0.dim(),
+        comp_90.dim(),
+        "components must have matching shapes"
+    );
+    let ns = comp_0.nrows();
+    let conversion_factor = w * w;
+    let mut out = Array2::<f64>::zeros((ns, 180));
+    let mut survivors: Vec<[f64; 2]> = Vec::with_capacity(comp_0.ncols());
+    let mut hull: Vec<[f64; 2]> = Vec::with_capacity(256);
+    for s in 0..ns {
+        let response_0 = newmark_beta_method(comp_0.row(s), dt, w, xi, 0.0, 0.0);
+        let response_90 = newmark_beta_method(comp_90.row(s), dt, w, xi, 0.0, 0.0);
+        let peaks = crate::rotd::rotd180_peaks(
+            response_0.view(),
+            response_90.view(),
+            &mut survivors,
+            &mut hull,
+        );
+        let mut row = out.row_mut(s);
+        for (angle, &peak) in peaks.iter().enumerate() {
+            row[angle] = conversion_factor * peak;
+        }
+    }
     out
 }
 

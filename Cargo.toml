@@ -10,12 +10,12 @@ crate-type = ["cdylib", "lib"]
 path = "src-rust/lib.rs"
 
 [dependencies]
-ndarray = { version = "0.17.2", features = ["rayon"] }
+ndarray = "0.17.2"
 numpy = "0.29"
 pyo3 = "0.29"
 
 [dev-dependencies]
-ndarray = { version = "0.17.2", features = ["rayon", "approx"] }
+ndarray = { version = "0.17.2", features = ["approx"] }
 approx = "0.5.1"
 criterion = { version = "0.8.2", features = ["html_reports"] }
 proptest = "1.11.0"

@@ -2,10 +2,7 @@
 
 import itertools
 import multiprocessing
-import os
 import warnings
-from collections.abc import Generator, MutableMapping
-from contextlib import contextmanager
 from enum import IntEnum, StrEnum
 from pathlib import Path
 
@@ -28,38 +25,6 @@ ChunkedWaveformArray = np.ndarray[tuple[int, int, int], np.dtype[np.float64]]
 SingleWaveformArray = np.ndarray[tuple[int, int], np.dtype[np.float64]]
 WaveformArray = ChunkedWaveformArray | SingleWaveformArray
 Array1D = np.ndarray[tuple[int], np.dtype[np.float64]]
-
-
-@contextmanager
-def environment(
-    **variables: str,
-    # NOTE: the type here could be the os._Environ type defined in the
-    # os module, but this means we don't rely on any specific
-    # behaviour of that object which might change later down the line
-    # (or indeed, they may remove the os._Environ object at any time
-    # because it is an internal class).
-) -> Generator[MutableMapping[str, str]]:
-    """Update an environment and revert after exit
-
-    Parameters
-    ----------
-    **variables : str or bytes
-        Environment values to update inside the context manager.
-
-    Yields
-    ------
-    MutableMapping
-        The mapping object representing `os.environ`.
-    """
-    # Code to acquire resource, e.g.:
-    old_environment: dict[str, str] = os.environ.copy()
-    try:
-        os.environ.update(variables)
-        yield os.environ
-    finally:
-        for key in set(os.environ) - set(old_environment):
-            del os.environ[key]
-        os.environ.update(old_environment)
 
 
 class Component(IntEnum):
@@ -110,7 +75,8 @@ def pseudo_spectral_acceleration(
     dt : np.float64
         Timestep resolution of the waveforms (s).
     cores : int, optional
-        Number of CPU cores for parallel processing via Rayon.
+        Retained for API compatibility; only sets the default station chunk
+        size. The solve itself is single-threaded.
     step : int, optional
         Station chunk size for processing. Defaults to `cores` if None.
     use_tqdm : bool, optional
@@ -125,10 +91,8 @@ def pseudo_spectral_acceleration(
     waveforms = np.ascontiguousarray(waveforms)
     angular_frequencies = 2 * np.pi / periods
 
-    # Step size *used* to be based on the cores available but that no
-    # longer holds because Rayon, the rust parallel work scheduler,
-    # manages this on its own. So the real bound on step size is now
-    # how much memory we have available.
+    # Step size bounds how many stations are solved per Rust call; the real
+    # limit is now how much memory we have available for a chunk.
     step = step or cores
     n_stations = waveforms.shape[1]
     n_frequencies = len(angular_frequencies)
@@ -138,51 +102,50 @@ def pseudo_spectral_acceleration(
     comp_90_psa = np.zeros((n_frequencies, n_stations), dtype=np.float64)
     comp_ver_psa = np.zeros((n_frequencies, n_stations), dtype=np.float64)
     xi = 0.05
-    with environment(RAYON_NUM_THREADS=str(cores)):
-        station_iter = range(0, n_stations, step)
-        n_steps = len(station_iter) * len(angular_frequencies)
-        station_period_iterator = itertools.product(
-            range(len(angular_frequencies)), station_iter
+    station_iter = range(0, n_stations, step)
+    n_steps = len(station_iter) * len(angular_frequencies)
+    station_period_iterator = itertools.product(
+        range(len(angular_frequencies)), station_iter
+    )
+    # Coverage tests don't cover this interactive usage (because
+    # it doesn't change the calculations).
+    if use_tqdm:  # pragma no cover
+        station_period_iterator = tqdm.tqdm(station_period_iterator, total=n_steps)
+    j_last: int | None = None
+    for j, i in station_period_iterator:
+        w = angular_frequencies[j]
+        if use_tqdm and j_last != j:  # pragma: no cover
+            assert isinstance(station_period_iterator, tqdm.tqdm)
+            j_last = j
+            t0 = periods[j]
+            station_period_iterator.set_description(f"Period {t0:g}")
+
+        comp_0_chunk = waveforms[Component.COMP_0.value, i : i + step].astype(
+            np.float64
         )
-        # Coverage tests don't cover this interactive usage (because
-        # it doesn't change the calculations).
-        if use_tqdm:  # pragma no cover
-            station_period_iterator = tqdm.tqdm(station_period_iterator, total=n_steps)
-        j_last: int | None = None
-        for j, i in station_period_iterator:
-            w = angular_frequencies[j]
-            if use_tqdm and j_last != j:  # pragma: no cover
-                assert isinstance(station_period_iterator, tqdm.tqdm)
-                j_last = j
-                t0 = periods[j]
-                station_period_iterator.set_description(f"Period {t0:g}")
+        comp_90_chunk = waveforms[Component.COMP_90.value, i : i + step].astype(
+            np.float64
+        )
+        comp_0_response = _core._newmark_beta_method(comp_0_chunk, dt, w, xi)
+        comp_90_response = _core._newmark_beta_method(comp_90_chunk, dt, w, xi)
+        conversion_factor = w * w
 
-            comp_0_chunk = waveforms[Component.COMP_0.value, i : i + step].astype(
-                np.float64
-            )
-            comp_90_chunk = waveforms[Component.COMP_90.value, i : i + step].astype(
-                np.float64
-            )
-            comp_0_response = _core._newmark_beta_method(comp_0_chunk, dt, w, xi)
-            comp_90_response = _core._newmark_beta_method(comp_90_chunk, dt, w, xi)
-            conversion_factor = w * w
+        rotd_psa[j, i : i + step] = conversion_factor * _core._rotd(
+            comp_0_response, comp_90_response
+        )
 
-            rotd_psa[j, i : i + step] = conversion_factor * _core._rotd_parallel(
-                comp_0_response, comp_90_response
-            )
+        comp_0_psa[j, i : i + step] = conversion_factor * np.abs(comp_0_response).max(
+            axis=1
+        )
+        comp_90_psa[j, i : i + step] = conversion_factor * np.abs(comp_90_response).max(
+            axis=1
+        )
 
-            comp_0_psa[j, i : i + step] = conversion_factor * np.abs(
-                comp_0_response
-            ).max(axis=1)
-            comp_90_psa[j, i : i + step] = conversion_factor * np.abs(
-                comp_90_response
-            ).max(axis=1)
-
-            z = waveforms[Component.COMP_VER.value, i : i + step].astype(np.float64)
-            z_response = _core._newmark_beta_method(z, dt, w, xi)
-            comp_ver_psa[j, i : i + step] = conversion_factor * np.abs(z_response).max(
-                axis=1
-            )
+        z = waveforms[Component.COMP_VER.value, i : i + step].astype(np.float64)
+        z_response = _core._newmark_beta_method(z, dt, w, xi)
+        comp_ver_psa[j, i : i + step] = conversion_factor * np.abs(z_response).max(
+            axis=1
+        )
 
     geom_psa = np.sqrt(comp_0_psa * comp_90_psa)
 
@@ -247,30 +210,15 @@ def significant_duration(
     quant_low = percent_low / 100
     quant_high = percent_high / 100
 
-    if (
-        cores == 1 or n_stations < 1000
-    ):  # from benchmarks: for < 1000 stations the parallel overhead is not worth it.
-        significant_duration_0 = _core._significant_duration(
-            comp_0, dt, quant_low, quant_high
-        )
-        significant_duration_90 = _core._significant_duration(
-            comp_90, dt, quant_low, quant_high
-        )
-        significant_duration_ver = _core._significant_duration(
-            comp_ver, dt, quant_low, quant_high
-        )
-    else:
-        # Testing is not big enough for multi-core execution so this codepath is not covered.
-        with environment(RAYON_NUM_THREADS=str(cores)):  # pragma: no cover
-            significant_duration_0 = _core._parallel_significant_duration(
-                comp_0, dt, quant_low, quant_high
-            )
-            significant_duration_90 = _core._parallel_significant_duration(
-                comp_90, dt, quant_low, quant_high
-            )
-            significant_duration_ver = _core._parallel_significant_duration(
-                comp_ver, dt, quant_low, quant_high
-            )
+    significant_duration_0 = _core._significant_duration(
+        comp_0, dt, quant_low, quant_high
+    )
+    significant_duration_90 = _core._significant_duration(
+        comp_90, dt, quant_low, quant_high
+    )
+    significant_duration_ver = _core._significant_duration(
+        comp_ver, dt, quant_low, quant_high
+    )
 
     return pd.DataFrame(
         {
@@ -436,11 +384,7 @@ def compute_intensity_measure_rotd(
     comp_0 = waveforms[Component.COMP_0]
     comp_90 = waveforms[Component.COMP_90]
     comp_ver = waveforms[Component.COMP_VER]
-    if cores == 1:
-        rotd_stats = _core._rotd(comp_0, comp_90)
-    else:
-        with environment(RAYON_NUM_THREADS=str(cores)):
-            rotd_stats = _core._rotd_parallel(comp_0, comp_90)
+    rotd_stats = _core._rotd(comp_0, comp_90)
     pga_comp_0 = np.abs(comp_0).max(axis=1)
     pga_comp_90 = np.abs(comp_90).max(axis=1)
     pga_ver = np.abs(comp_ver).max(axis=1)
@@ -577,15 +521,9 @@ def cumulative_absolute_velocity(
         comp_90 = np.where(np.abs(comp_90) < threshold / g, np.float64(0), comp_90)
         comp_ver = np.where(np.abs(comp_ver) < threshold / g, np.float64(0), comp_ver)
 
-    if cores == 1:
-        comp_0_cav = _core._cav(comp_0, dt)
-        comp_90_cav = _core._cav(comp_90, dt)
-        comp_ver_cav = _core._cav(comp_ver, dt)
-    else:
-        with environment(RAYON_NUM_THREADS=str(cores)):
-            comp_0_cav = _core._parallel_cav(comp_0, dt)
-            comp_90_cav = _core._parallel_cav(comp_90, dt)
-            comp_ver_cav = _core._parallel_cav(comp_ver, dt)
+    comp_0_cav = _core._cav(comp_0, dt)
+    comp_90_cav = _core._cav(comp_90, dt)
+    comp_ver_cav = _core._cav(comp_ver, dt)
 
     return pd.DataFrame(
         {
@@ -620,15 +558,9 @@ def arias_intensity(
     comp_90 = waveform[Component.COMP_90]
     comp_ver = waveform[Component.COMP_VER]
 
-    if cores == 1:
-        comp_0_ai = _core._arias_intensity(comp_0, dt)
-        comp_90_ai = _core._arias_intensity(comp_90, dt)
-        comp_ver_ai = _core._arias_intensity(comp_ver, dt)
-    else:
-        with environment(RAYON_NUM_THREADS=str(cores)):
-            comp_0_ai = _core._parallel_arias_intensity(comp_0, dt)
-            comp_90_ai = _core._parallel_arias_intensity(comp_90, dt)
-            comp_ver_ai = _core._parallel_arias_intensity(comp_ver, dt)
+    comp_0_ai = _core._arias_intensity(comp_0, dt)
+    comp_90_ai = _core._arias_intensity(comp_90, dt)
+    comp_ver_ai = _core._arias_intensity(comp_ver, dt)
 
     return pd.DataFrame(
         {

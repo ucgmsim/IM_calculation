@@ -1,4 +1,3 @@
-use crate::utils::parallel_reduce_rows;
 use ndarray::prelude::*;
 
 fn threshold_search(normalised_intensities: ArrayView1<f64>, dt: f64, low: f64, high: f64) -> f64 {
@@ -27,20 +26,6 @@ pub fn significant_duration(
 ) -> Array1<f64> {
     // Binary search for values above threshold
     arias_intensity.map_axis(Axis(1), |normalised_intensity| {
-        threshold_search(normalised_intensity, dt, low, high)
-    })
-}
-
-pub fn parallel_significant_duration(
-    arias_intensity: ArrayView2<f64>,
-    dt: f64,
-    low: f64,
-    high: f64,
-) -> Array1<f64> {
-    // Normalise arias intensity
-    // NOTE: this is subtly different to parallel_map because it does
-    // not create a copy of the array for output. It simply updates in-place.
-    parallel_reduce_rows(arias_intensity.view(), |normalised_intensity| {
         threshold_search(normalised_intensity, dt, low, high)
     })
 }
@@ -74,19 +59,6 @@ mod tests {
         let result = significant_duration(arias.view(), dt, 0.5, 0.5);
 
         assert_eq!(result[0], 0.0);
-    }
-
-    #[test]
-    fn test_parallel_matches_sequential() {
-        let arias = array![[0.0, 0.1, 0.5, 0.8, 1.0], [0.0, 0.4, 0.7, 0.9, 1.0]];
-        let dt = 0.01;
-        let low = 0.05;
-        let high = 0.95;
-
-        let seq = significant_duration(arias.view(), dt, low, high);
-        let par = parallel_significant_duration(arias.view(), dt, low, high);
-
-        assert_abs_diff_eq!(seq, par, epsilon = 1e-10);
     }
 
     #[test]

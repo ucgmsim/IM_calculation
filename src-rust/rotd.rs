@@ -26,36 +26,121 @@ fn rotd_calculation(comp_0: ArrayView1<f64>, comp_90: ArrayView1<f64>) -> [f64; 
     ]
 }
 
-/// Fill an (ns, 3) array with the RotD statistics of each waveform pair,
-/// optionally distributing the rows across rayon's thread pool.
-fn rotd_rows(comp_0: ArrayView2<f64>, comp_90: ArrayView2<f64>, parallel: bool) -> Array2<f64> {
+/// Fill an (ns, 3) array with the RotD statistics of each waveform pair.
+pub fn rotd(comp_0: ArrayView2<f64>, comp_90: ArrayView2<f64>) -> Array2<f64> {
     assert_eq!(
         comp_0.nrows(),
         comp_90.nrows(),
         "Components must have the same number of waveforms"
     );
     let mut out = Array2::zeros((comp_0.nrows(), 3));
-
-    let zip = Zip::from(out.rows_mut())
+    Zip::from(out.rows_mut())
         .and(comp_0.rows())
-        .and(comp_90.rows());
-    let stats = |mut out: ArrayViewMut1<f64>, comp_0, comp_90| {
-        out.assign(&ArrayView1::from(&rotd_calculation(comp_0, comp_90)));
-    };
-    if parallel {
-        zip.par_for_each(stats);
-    } else {
-        zip.for_each(stats);
-    }
+        .and(comp_90.rows())
+        .for_each(|mut out, comp_0, comp_90| {
+            out.assign(&ArrayView1::from(&rotd_calculation(comp_0, comp_90)));
+        });
     out
 }
 
-pub fn rotd_parallel(comp_0: ArrayView2<f64>, comp_90: ArrayView2<f64>) -> Array2<f64> {
-    rotd_rows(comp_0, comp_90, true)
+const fn cross(o: [f64; 2], u: [f64; 2], v: [f64; 2]) -> f64 {
+    (u[0] - o[0]) * (v[1] - o[1]) - (u[1] - o[1]) * (v[0] - o[0])
 }
 
-pub fn rotd(comp_0: ArrayView2<f64>, comp_90: ArrayView2<f64>) -> Array2<f64> {
-    rotd_rows(comp_0, comp_90, false)
+/// Peak rotated amplitude at every integer angle 0..=179 degrees for one pair
+/// of components, writing its work into caller-provided buffers so nothing is
+/// allocated per station.
+///
+/// The peak at angle theta is the support function of the response trajectory
+/// `(comp_0, comp_90)` along the rotated axis, which is maximised at a vertex
+/// of the trajectory's convex hull. The hull is found with Akl-Toussaint
+/// culling followed by a monotone chain: a first O(n) pass takes the four
+/// axis-extreme points, and any point strictly inside the quadrilateral they
+/// span cannot be a hull vertex and is dropped, so the sort that follows sees
+/// only a few hundred of the tens of thousands of timesteps. The 180
+/// evaluations over the resulting handful of hull vertices are then exact and
+/// cheap; `rotd180_matches_brute` pins the result against the direct scan.
+pub fn rotd180_peaks(
+    x: ArrayView1<f64>,
+    y: ArrayView1<f64>,
+    survivors: &mut Vec<[f64; 2]>,
+    hull: &mut Vec<[f64; 2]>,
+) -> [f64; 180] {
+    let n = x.len();
+    // Axis extremes: a = min x, c = max x, b = max y, d = min y.
+    let p0 = [x[0], y[0]];
+    let (mut a, mut b, mut c, mut d) = (p0, p0, p0, p0);
+    for i in 1..n {
+        let p = [x[i], y[i]];
+        if p[0] < a[0] {
+            a = p;
+        }
+        if p[0] > c[0] {
+            c = p;
+        }
+        if p[1] > b[1] {
+            b = p;
+        }
+        if p[1] < d[1] {
+            d = p;
+        }
+    }
+    // Keep points that are not strictly inside quad a-b-c-d. Sign-agnostic so
+    // it holds whatever the quad's winding, and a degenerate (collinear)
+    // extreme set simply keeps everything.
+    survivors.clear();
+    for i in 0..n {
+        let p = [x[i], y[i]];
+        let (e0, e1, e2, e3) = (cross(a, b, p), cross(b, c, p), cross(c, d, p), cross(d, a, p));
+        let inside = (e0 > 0.0 && e1 > 0.0 && e2 > 0.0 && e3 > 0.0)
+            || (e0 < 0.0 && e1 < 0.0 && e2 < 0.0 && e3 < 0.0);
+        if !inside {
+            survivors.push(p);
+        }
+    }
+    survivors.sort_unstable_by(|p, q| p[0].total_cmp(&q[0]).then(p[1].total_cmp(&q[1])));
+    survivors.dedup();
+
+    hull.clear();
+    if survivors.len() < 3 {
+        hull.extend_from_slice(survivors);
+    } else {
+        for &p in survivors.iter() {
+            while hull.len() >= 2 && cross(hull[hull.len() - 2], hull[hull.len() - 1], p) <= 0.0 {
+                hull.pop();
+            }
+            hull.push(p);
+        }
+        let lower = hull.len() + 1;
+        for &p in survivors.iter().rev() {
+            while hull.len() >= lower && cross(hull[hull.len() - 2], hull[hull.len() - 1], p) <= 0.0
+            {
+                hull.pop();
+            }
+            hull.push(p);
+        }
+        hull.pop();
+    }
+    std::array::from_fn(|theta| {
+        let (sin_theta, cos_theta) = (theta as f64 * DEGREES).sin_cos();
+        hull.iter().fold(0.0f64, |peak, &[hx, hy]| {
+            peak.max((cos_theta * hx + sin_theta * hy).abs())
+        })
+    })
+}
+
+/// Fill an `(ns, 180)` array with the per-angle peaks of each response pair,
+/// serially, allocating the two [`rotd180_peaks`] work buffers once.
+pub fn rotd180_rows(comp_0: ArrayView2<f64>, comp_90: ArrayView2<f64>) -> Array2<f64> {
+    let ns = comp_0.nrows();
+    let mut out = Array2::zeros((ns, 180));
+    let mut survivors: Vec<[f64; 2]> = Vec::with_capacity(comp_0.ncols());
+    let mut hull: Vec<[f64; 2]> = Vec::with_capacity(256);
+    for s in 0..ns {
+        let peaks = rotd180_peaks(comp_0.row(s), comp_90.row(s), &mut survivors, &mut hull);
+        out.row_mut(s).assign(&ArrayView1::from(&peaks));
+    }
+    out
 }
 
 #[cfg(test)]
@@ -63,9 +148,10 @@ mod tests {
     use std::f64::consts::{SQRT_2, TAU};
 
     use ndarray::prelude::*;
+    use ndarray::Zip;
     use proptest::prelude::*;
 
-    use crate::rotd::{rotd, rotd_calculation, rotd_parallel};
+    use crate::rotd::{rotd, rotd180_peaks, rotd180_rows, rotd_calculation, DEGREES};
 
     /// Slack allowed on the sqrt(2) bound. The bound is attained exactly by
     /// linearly polarised records, so only floating point error is tolerated.
@@ -74,6 +160,25 @@ mod tests {
     /// Longest generated waveform. RotD is O(180 * nt), so this keeps a full
     /// proptest run to well under a second.
     const MAX_NT: usize = 128;
+
+    /// The direct scan the culled `rotd180_peaks` must reproduce: every angle
+    /// against every timestep, no hull reduction.
+    fn brute_peaks(x: ArrayView1<f64>, y: ArrayView1<f64>) -> [f64; 180] {
+        std::array::from_fn(|theta| {
+            let (sin_theta, cos_theta) = (theta as f64 * DEGREES).sin_cos();
+            Zip::from(x)
+                .and(y)
+                .fold(0.0f64, |m: f64, &a, &b| m.max((cos_theta * a + sin_theta * b).abs()))
+        })
+    }
+
+    /// `rotd180_peaks` with freshly allocated buffers, for tests that do not
+    /// exercise buffer reuse themselves.
+    fn peaks(x: ArrayView1<f64>, y: ArrayView1<f64>) -> [f64; 180] {
+        let mut survivors = Vec::new();
+        let mut hull = Vec::new();
+        rotd180_peaks(x, y, &mut survivors, &mut hull)
+    }
 
     /// Assert RotD100 <= sqrt(2) * RotD50 for one pair of components, returning
     /// the ratio.
@@ -191,18 +296,134 @@ mod tests {
 
         #[test]
         fn prop_batch_api_agrees_and_is_bounded((comp_0, comp_90) in arb_batch()) {
-            let serial = rotd(comp_0.view(), comp_90.view());
-            let parallel = rotd_parallel(comp_0.view(), comp_90.view());
-            prop_assert_eq!(&serial, &parallel, "rotd and rotd_parallel disagree");
+            let stats = rotd(comp_0.view(), comp_90.view());
+            let peaks = rotd180_rows(comp_0.view(), comp_90.view());
 
-            for (i, stats) in serial.rows().into_iter().enumerate() {
+            for (i, row) in stats.rows().into_iter().enumerate() {
                 let expected = rotd_calculation(comp_0.row(i), comp_90.row(i));
                 prop_assert_eq!(
-                    stats,
+                    row,
                     ArrayView1::from(&expected),
                     "row {} disagrees with rotd_calculation", i
                 );
+                // The RotD180 batch's min/median/max must match the 3-stat
+                // reducer, tying the two public entry points together.
+                let mut sorted: Vec<f64> = peaks.row(i).to_vec();
+                sorted.sort_unstable_by(f64::total_cmp);
+                prop_assert!((sorted[0] - expected[0]).abs() <= 1e-9 * expected[0].max(1.0));
+                prop_assert!(
+                    ((sorted[89] + sorted[90]) / 2.0 - expected[1]).abs()
+                        <= 1e-9 * expected[1].max(1.0)
+                );
+                prop_assert!((sorted[179] - expected[2]).abs() <= 1e-9 * expected[2].max(1.0));
                 assert_ratio_bounded(comp_0.row(i), comp_90.row(i), &format!("row {i}"));
+            }
+        }
+
+        #[test]
+        fn prop_culled_matches_brute((comp_0, comp_90) in arb_record()) {
+            // The interior culling must never change a single per-angle peak,
+            // across the full spread from polarised to near-circular records.
+            let got = peaks(comp_0.view(), comp_90.view());
+            let want = brute_peaks(comp_0.view(), comp_90.view());
+            for theta in 0..180 {
+                prop_assert!(
+                    (got[theta] - want[theta]).abs() <= 1e-9 * want[theta].max(1.0),
+                    "angle {}: culled {} != brute {}", theta, got[theta], want[theta]
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn rotd180_matches_brute() {
+        // The per-angle peaks must match a direct scan at every angle, and once
+        // sorted must reproduce the RotD00/50/100 statistics of the reference.
+        let nt = 733;
+        let comp_0 = Array1::from_shape_fn(nt, |i| {
+            let t = i as f64;
+            (0.31 * t).sin() * (0.007 * t).cos() - 0.4 * (0.13 * t).sin()
+        });
+        let comp_90 = Array1::from_shape_fn(nt, |i| {
+            let t = i as f64;
+            (0.17 * t).cos() + 0.6 * (0.05 * t).sin() * (0.002 * t).cos()
+        });
+
+        let got = peaks(comp_0.view(), comp_90.view());
+        let want = brute_peaks(comp_0.view(), comp_90.view());
+        for theta in 0..180 {
+            assert!(
+                (got[theta] - want[theta]).abs() <= 1e-9 * want[theta].max(1.0),
+                "angle {theta}: culled {} != brute {}", got[theta], want[theta]
+            );
+        }
+
+        let mut sorted = got;
+        sorted.sort_unstable_by(f64::total_cmp);
+        let [min, median, max] = rotd_calculation(comp_0.view(), comp_90.view());
+        assert!((sorted[0] - min).abs() <= 1e-9 * min.max(1.0));
+        assert!(((sorted[89] + sorted[90]) / 2.0 - median).abs() <= 1e-9 * median.max(1.0));
+        assert!((sorted[179] - max).abs() <= 1e-9 * max.max(1.0));
+    }
+
+    #[test]
+    fn rotd180_matches_brute_on_circular_record() {
+        // A near-circular trajectory is the culling's worst case: almost every
+        // point sits near the hull, so few are dropped. The result must still
+        // be exact.
+        let nt = 2000;
+        let comp_0 = Array1::from_shape_fn(nt, |i| (TAU * i as f64 / nt as f64).cos());
+        let comp_90 = Array1::from_shape_fn(nt, |i| (TAU * i as f64 / nt as f64).sin());
+        let got = peaks(comp_0.view(), comp_90.view());
+        let want = brute_peaks(comp_0.view(), comp_90.view());
+        for theta in 0..180 {
+            assert!((got[theta] - want[theta]).abs() <= 1e-9, "circular angle {theta}");
+        }
+    }
+
+    #[test]
+    fn rotd180_handles_degenerate_records() {
+        // Zero, single-sample and collinear records must not panic and must
+        // agree with the reference peaks (all zero, or |projection|).
+        let zeros = Array1::<f64>::zeros(16);
+        assert_eq!(peaks(zeros.view(), zeros.view()), [0.0; 180]);
+
+        let single = array![3.5];
+        let single_peaks = peaks(single.view(), array![0.0].view());
+        assert!((single_peaks[0] - 3.5).abs() < 1e-12);
+        assert!(single_peaks[90].abs() < 1e-12);
+
+        // A linearly polarised (collinear) record: peaks trace |cos(theta)|.
+        let line_0 = array![1.0, -2.0, 3.0, -4.0];
+        let line_90 = &line_0 * 2.0;
+        let got = peaks(line_0.view(), line_90.view());
+        let want = brute_peaks(line_0.view(), line_90.view());
+        for theta in 0..180 {
+            assert!((got[theta] - want[theta]).abs() < 1e-9, "collinear angle {theta}");
+        }
+    }
+
+    #[test]
+    fn rotd180_buffers_reset_between_records() {
+        // Reusing the same buffers across records of different lengths and
+        // shapes must give exactly the same answer as fresh buffers each call:
+        // a guard against a missing clear() leaking state between stations.
+        let mut survivors = Vec::new();
+        let mut hull = Vec::new();
+        let records = [
+            (array![1.0, -2.0, 3.0], array![0.5, 0.5, -1.0]),
+            (Array1::zeros(5), Array1::zeros(5)),
+            (array![9.81, -3.0, 2.0, 7.0, -8.0, 1.0], array![1.0, 4.0, -4.0, 0.0, 2.0, -2.0]),
+            (array![2.5], array![-1.5]),
+        ];
+        for (comp_0, comp_90) in &records {
+            let reused = rotd180_peaks(comp_0.view(), comp_90.view(), &mut survivors, &mut hull);
+            let want = brute_peaks(comp_0.view(), comp_90.view());
+            for theta in 0..180 {
+                assert!(
+                    (reused[theta] - want[theta]).abs() <= 1e-9 * want[theta].max(1.0),
+                    "reused buffers diverged at angle {theta}"
+                );
             }
         }
     }

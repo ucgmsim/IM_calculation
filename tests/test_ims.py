@@ -17,13 +17,13 @@ from numpy.testing import assert_array_almost_equal
 from pytest import Metafunc, TempPathFactory
 
 from IM import im_calculation, ims, snr_calculation, waveform_reading
-from IM.scripts import gen_ko_matrix
 
 
-@pytest.fixture(scope="session", autouse=True)
+@pytest.fixture(scope="session")
 def ko_matrices(
     request: pytest.FixtureRequest, tmp_path_factory: TempPathFactory
 ) -> Path:
+    from IM.scripts import gen_ko_matrix
     ko_matrix_directory = tmp_path_factory.mktemp("ko_matrices")
     gen_ko_matrix.main(ko_matrix_directory, num_to_gen=12)
     return ko_matrix_directory
