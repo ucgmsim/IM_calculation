@@ -313,9 +313,7 @@ def fourier_amplitude_spectra(
     n_components = waveform_shape[0]
     fa_spectrum = np.empty(waveform_shape, dtype=waveforms.dtype)
     for i in range(n_components):
-        fa_spectrum[i] = np.abs(
-            fft.rfft(waveforms[i], n=n_fft, axis=-1, threads=cores) * dt
-        )
+        fa_spectrum[i] = np.abs(fft.rfft(waveforms[i], n=n_fft, axis=-1) * dt)
 
     # Get appropriate konno ohmachi matrix
     konno = ko_matrices.get_konno_matrix(fa_spectrum.shape[-1], ko_directory)
