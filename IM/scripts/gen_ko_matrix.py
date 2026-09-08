@@ -22,7 +22,7 @@ def main(
         ),
     ],
     num_to_gen: Annotated[int, typer.Option()] = 14,
-    bandwidth: Annotated[int, typer.Option()] = 40,
+    bandwidth: Annotated[float, typer.Option()] = 188.5,
 ):
     """Generate the Konno matrices for different window sizes.
 
