@@ -26,7 +26,18 @@ ChunkedWaveformArray = np.ndarray[tuple[int, int, int], np.dtype[np.float64]]
 Waveform = xr.DataArray | np.ndarray
 
 WAVEFORM_DIMS = ("component", "station", "time")
-ROTD_COMPONENTS = ("000", "090", "ver", "geom", "rotd0", "rotd50", "rotd100")
+ROTD_COMPONENTS = (
+    "000",
+    "090",
+    "ver",
+    "geom",
+    "rotd0",
+    "rotd50",
+    "rotd100",
+    "rotd0_orientation",
+    "rotd50_orientation",
+    "rotd100_orientation",
+)
 GEOM_COMPONENTS = ("000", "090", "ver", "geom")
 FAS_COMPONENTS = ("000", "090", "ver", "geom", "eas")
 
@@ -236,19 +247,10 @@ def _rotd_kernel(
     peak_0 = np.abs(comp_0).max(axis=-1)
     peak_90 = np.abs(comp_90).max(axis=-1)
     peak_ver = np.abs(comp_ver).max(axis=-1)
-    stats = _core._rotd(comp_0, comp_90)  # (rows, 3) = rotd0, rotd50, rotd100
-    out = np.stack(
-        [
-            peak_0,
-            peak_90,
-            peak_ver,
-            np.sqrt(peak_0 * peak_90),
-            stats[:, 0],
-            stats[:, 1],
-            stats[:, 2],
-        ],
-        axis=-1,
-    )
+    # (rows, 6) = rotd0, rotd50, rotd100 then their three orientations.
+    stats = _core._rotd(comp_0, comp_90)
+    peaks = np.stack([peak_0, peak_90, peak_ver, np.sqrt(peak_0 * peak_90)], axis=-1)
+    out = np.concatenate([peaks, stats], axis=-1)
     return out.reshape(lead + (len(ROTD_COMPONENTS),))
 
 
@@ -273,8 +275,10 @@ def compute_intensity_measure_rotd(
     Returns
     -------
     xr.Dataset
-        One data variable per component in
-        `['000', '090', 'ver', 'geom', 'rotd0', 'rotd50', 'rotd100']`.
+        One data variable per component in `ROTD_COMPONENTS`: peak values for
+        `['000', '090', 'ver', 'geom', 'rotd0', 'rotd50', 'rotd100']`, then
+        `rotd0_orientation`, `rotd50_orientation` and `rotd100_orientation`
+        holding the angle (degrees) at which each RotD statistic occurs.
     """
     return _im_dataset(
         functools.partial(_rotd_kernel, transform=transform),
@@ -566,23 +570,17 @@ def _psa_kernel(
         w = 2 * np.pi / period
         # (rows, 182): 180 rotated peaks, then the exact 000 and 090 peaks.
         psa = _core._psa_rotd180(comp_0, comp_90, dt, w, DAMPING)
-        rotated = np.sort(psa[:, :180], axis=1)
+        # Reduced in rust, by the same code the peak ground motion RotD uses,
+        # so the statistics and their orientations are defined in one place.
+        stats = _core._rotd180_stats(psa[:, :N_ROTD180_ANGLES])
         peak_0, peak_90 = psa[:, 180], psa[:, 181]
         peak_ver = _core._psa_peak(comp_ver, dt, w, DAMPING)
-        out[:, index] = np.stack(
-            [
-                peak_0,
-                peak_90,
-                peak_ver,
-                np.sqrt(peak_0 * peak_90),
-                rotated[:, 0],
-                (rotated[:, 89] + rotated[:, 90]) / 2,
-                rotated[:, 179],
-            ],
-            axis=-1,
+        peaks = np.stack(
+            [peak_0, peak_90, peak_ver, np.sqrt(peak_0 * peak_90)], axis=-1
         )
+        out[:, index] = np.concatenate([peaks, stats], axis=-1)
         if rotd180 is not None:
-            rotd180[:, index] = psa[:, :180]
+            rotd180[:, index] = psa[:, :N_ROTD180_ANGLES]
 
     out = out.reshape(lead + (len(periods), len(ROTD_COMPONENTS)))
     if rotd180 is None:
@@ -618,9 +616,11 @@ def pseudo_spectral_acceleration(
     Returns
     -------
     xr.Dataset
-        One data variable per component, each with a `period` dimension,
-        containing PSA for
-        ['000', '090', 'ver', 'geom', 'rotd0', 'rotd50', 'rotd100']. If
+        One data variable per component, each with a `period` dimension:
+        PSA for
+        ['000', '090', 'ver', 'geom', 'rotd0', 'rotd50', 'rotd100'], then
+        `rotd0_orientation`, `rotd50_orientation` and `rotd100_orientation`
+        holding the angle (degrees) at which each RotD statistic occurs. If
         `full_rotd180` is set, also a `rotd180` variable with dims
         (..., period, angle).
     """

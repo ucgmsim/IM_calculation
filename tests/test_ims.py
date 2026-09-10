@@ -267,9 +267,13 @@ def test_all_ims_benchmark(ko_matrices: Path) -> None:
         ko_directory=ko_matrices,
     )
 
+    # The benchmark predates the RotD orientation components and has no
+    # reference angles to compare against; those are covered by
+    # test_rotd_orientations_match_a_direct_angle_sweep instead.
+    components = [component for component in result.index if component in data.index]
     for im in result.columns:
-        assert result[im].values == pytest.approx(
-            data.loc[result.index, im].values, abs=5e-4, rel=0.01, nan_ok=True
+        assert result.loc[components, im].values == pytest.approx(
+            data.loc[components, im].values, abs=5e-4, rel=0.01, nan_ok=True
         ), (
             f"Results for {im} do not match!\n{result}"
         )  # 5e-6 implies rounding to five decimal places
@@ -431,8 +435,11 @@ def test_all_ims_benchmark_edge_cases(resource_dir: Path, ko_matrices: Path) -> 
         waveform, dt, ims_list=im_list, ko_directory=ko_matrices
     )
 
-    # Align columns and indices for comparison
-    expected = data.loc[result.index, result.columns]
+    # Align columns and indices for comparison, dropping the components the
+    # benchmark does not carry (the RotD orientations, which postdate it).
+    components = [component for component in result.index if component in data.index]
+    result = result.loc[components]
+    expected = data.loc[components, result.columns]
 
     # Check for failure
     if not np.allclose(
@@ -455,7 +462,7 @@ def test_all_ims_benchmark_edge_cases(resource_dir: Path, ko_matrices: Path) -> 
     # Perform standard assertions
     for im in result.columns:
         assert result[im].values == pytest.approx(
-            data.loc[result.index, im].values, abs=5e-4, rel=0.01, nan_ok=True
+            expected[im].values, abs=5e-4, rel=0.01, nan_ok=True
         ), f"Results for {im} do not match!\n{result}"
 
 
@@ -766,13 +773,89 @@ def test_psa_full_rotd180(sample_waveforms: npt.NDArray[np.float64]) -> None:
         assert_array_equal(without[component].values, with_curve[component].values)
 
     # rotd0/50/100 must be exactly the min/median/max over the angle axis.
-    sorted_curve = np.sort(with_curve["rotd180"].values, axis=-1)
+    curve = with_curve["rotd180"].values
+    sorted_curve = np.sort(curve, axis=-1)
     assert_array_equal(sorted_curve[..., 0], with_curve["rotd0"].values)
     assert_array_equal(
         (sorted_curve[..., 89] + sorted_curve[..., 90]) / 2,
         with_curve["rotd50"].values,
     )
     assert_array_equal(sorted_curve[..., 179], with_curve["rotd100"].values)
+
+    # And each orientation must be the angle of its own statistic in that same
+    # curve: the argmin and argmax for rotd0/rotd100, and the lower of the two
+    # central angles for rotd50, whose peak sits just below the reported
+    # median.
+    assert_array_equal(curve.argmin(axis=-1), with_curve["rotd0_orientation"].values)
+    assert_array_equal(curve.argmax(axis=-1), with_curve["rotd100_orientation"].values)
+    at_median = np.take_along_axis(
+        curve,
+        with_curve["rotd50_orientation"].values.astype(int)[..., np.newaxis],
+        axis=-1,
+    ).squeeze(-1)
+    assert_array_equal(at_median, sorted_curve[..., 89])
+
+
+def test_rotd_orientations_match_a_direct_angle_sweep(
+    sample_waveforms: npt.NDArray[np.float64],
+) -> None:
+    """Each orientation must name the angle its statistic came from, against a
+    plain numpy sweep of the two horizontal components."""
+    result = ims.peak_ground_acceleration(sample_waveforms)
+    comp_0 = sample_waveforms[ims.Component.COMP_0]
+    comp_90 = sample_waveforms[ims.Component.COMP_90]
+
+    angles = np.deg2rad(np.arange(180))
+    # (n_stations, 180): the peak rotated amplitude at every integer angle.
+    sweep = np.abs(
+        np.cos(angles)[np.newaxis, :, np.newaxis] * comp_0[:, np.newaxis, :]
+        + np.sin(angles)[np.newaxis, :, np.newaxis] * comp_90[:, np.newaxis, :]
+    ).max(axis=-1)
+
+    assert_array_equal(sweep.argmin(axis=-1), result["rotd0_orientation"].values)
+    assert_array_equal(sweep.argmax(axis=-1), result["rotd100_orientation"].values)
+    assert_array_equal(sweep.min(axis=-1), result["rotd0"].values)
+    assert_array_equal(sweep.max(axis=-1), result["rotd100"].values)
+
+    sorted_sweep = np.sort(sweep, axis=-1)
+    at_median = np.take_along_axis(
+        sweep,
+        result["rotd50_orientation"].values.astype(int)[..., np.newaxis],
+        axis=-1,
+    ).squeeze(-1)
+    assert_array_equal(at_median, sorted_sweep[..., 89])
+    assert_array_equal(
+        (sorted_sweep[..., 89] + sorted_sweep[..., 90]) / 2, result["rotd50"].values
+    )
+
+
+@pytest.mark.parametrize("polarisation", [0, 30, 45, 100, 179])
+def test_rotd_orientation_of_a_polarised_record(polarisation: int) -> None:
+    """A linearly polarised record fixes the orientations exactly: it peaks
+    along its own direction and vanishes across it, which pins the angle
+    convention (degrees, anticlockwise from the 000 component)."""
+    time = np.arange(0, 1, 0.005)
+    motion = np.sin(2 * np.pi * 5 * time) * np.exp(-2 * time)
+    direction = np.deg2rad(polarisation)
+    waveform = np.stack(
+        [
+            (motion * np.cos(direction))[np.newaxis],
+            (motion * np.sin(direction))[np.newaxis],
+            np.zeros((1, len(time))),
+        ]
+    )
+
+    result = ims.peak_ground_acceleration(waveform)
+    assert result["rotd100_orientation"].values == pytest.approx(polarisation)
+    assert result["rotd0_orientation"].values == pytest.approx(
+        (polarisation + 90) % 180
+    )
+    # Across the direction of motion there is nothing to see, and the sqrt(2)
+    # bound on RotD100 / RotD50 is attained.
+    assert result["rotd0"].values == pytest.approx(0, abs=1e-12)
+    assert result["rotd100"].values / result["rotd50"].values == pytest.approx(
+        np.sqrt(2), rel=1e-9
+    )
 
 
 def test_psa_full_rotd180_does_not_duplicate_the_solve(

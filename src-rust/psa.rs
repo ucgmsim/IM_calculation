@@ -122,14 +122,15 @@ pub fn newmark_beta_method_batch(
 /// For each station the two horizontal components are pushed through the
 /// Newmark-beta SDOF solver (kept in f64 for accuracy over long records) and
 /// the displacement responses are reduced to their peak rotated amplitude at
-/// every angle by [`crate::rotd::rotd180_peaks`]. Multiplying by `w^2`
+/// every angle by [`crate::rotd::Hull::peaks`]. Multiplying by `w^2`
 /// converts the peak relative displacement of the unit-mass oscillator to a
 /// pseudo-spectral acceleration.
 ///
 /// The loop over stations is deliberately serial: this runs one period per
 /// call inside a Dask worker that already owns a core, so spawning a Rayon
 /// pool here would oversubscribe the machine and fight the outer scheduler.
-/// The two RotD work buffers are allocated once and reused for every station.
+/// The RotD hull's work buffers are allocated once and reused for every
+/// station.
 ///
 /// `comp_0` and `comp_90` are the 000 and 090 acceleration waveforms with
 /// shape `(ns, nt)`. The result has shape `(ns, 182)`: columns 0..=179 are
@@ -153,17 +154,11 @@ pub fn psa_rotd180(
     let ns = comp_0.nrows();
     let conversion_factor = w * w;
     let mut out = Array2::<f64>::zeros((ns, 182));
-    let mut survivors: Vec<[f64; 2]> = Vec::with_capacity(comp_0.ncols());
-    let mut hull: Vec<[f64; 2]> = Vec::with_capacity(256);
+    let mut hull = crate::rotd::Hull::with_capacity(comp_0.ncols());
     for s in 0..ns {
         let response_0 = newmark_beta_method(comp_0.row(s), dt, w, xi, 0.0, 0.0);
         let response_90 = newmark_beta_method(comp_90.row(s), dt, w, xi, 0.0, 0.0);
-        let peaks = crate::rotd::rotd180_peaks(
-            response_0.view(),
-            response_90.view(),
-            &mut survivors,
-            &mut hull,
-        );
+        let peaks = hull.peaks(response_0.view(), response_90.view());
         let mut row = out.row_mut(s);
         for (angle, &peak) in peaks.iter().enumerate() {
             row[angle] = conversion_factor * peak;
