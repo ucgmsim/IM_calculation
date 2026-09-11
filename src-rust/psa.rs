@@ -114,6 +114,10 @@ pub fn newmark_beta_method_batch(
     out
 }
 
+/// Columns in a [`psa_rotd180`] row. 180 rotated peaks, two unrotated peaks,
+/// one RotD statistics row.
+pub const PSA_ROTD180_COLUMNS: usize = crate::rotd::N_ANGLES + 2 + crate::rotd::N_ROTD_STATS;
+
 /// Pseudo-spectral acceleration at every integer rotation angle 0..=179
 /// degrees, for one oscillator period, computed **serially**.
 ///
@@ -131,12 +135,18 @@ pub fn newmark_beta_method_batch(
 /// for every station.
 ///
 /// `comp_0` and `comp_90` are the 000 and 090 acceleration waveforms with
-/// shape `(ns, nt)`. The result has shape `(ns, 182)`: columns 0..=179 are
-/// the rotated peaks at each integer angle, and columns 180 and 181 are the
-/// exact peaks of the unrotated 000 and 090 responses (`w^2 * max|response|`),
-/// so a caller who only needs those two components doesn't have to re-derive
-/// them from angle 0 / angle 90, which are off by `cos(90 deg) ~= 6.12e-17`
-/// rather than being exactly zero.
+/// shape `(ns, nt)`. The result has shape `(ns, 188)`:
+///
+/// - columns 0..=179, the rotated peaks at each integer angle;
+/// - columns 180 and 181, the exact peaks of the unrotated 000 and 090
+///   responses (`w^2 * max|response|`), so a caller who only needs those two
+///   components doesn't have to re-derive them from angle 0 / angle 90, which
+///   are off by `cos(90 deg) ~= 6.12e-17` rather than being exactly zero;
+/// - columns 182..=187, the [`crate::rotd::N_ROTD_STATS`] statistics row.
+///
+/// The statistics come from here rather than from a second pass over the
+/// curve because RotD00 and RotD100 come off the hull geometry rather than
+/// the sweep, and this is the only place that hull exists.
 pub fn psa_rotd180(
     comp_0: &ArrayView2<f64>,
     comp_90: &ArrayView2<f64>,
@@ -151,18 +161,31 @@ pub fn psa_rotd180(
     );
     let ns = comp_0.nrows();
     let conversion_factor = w * w;
-    let mut out = Array2::<f64>::zeros((ns, 182));
+    let mut out = Array2::<f64>::zeros((ns, PSA_ROTD180_COLUMNS));
     let mut hull = crate::rotd::Hull::with_capacity(comp_0.ncols());
     for s in 0..ns {
         let response_0 = newmark_beta_method(comp_0.row(s), dt, w, xi, 0.0, 0.0);
         let response_90 = newmark_beta_method(comp_90.row(s), dt, w, xi, 0.0, 0.0);
-        let peaks = hull.peaks(response_0.view(), response_90.view());
+        let (mut peaks, mut extremes) = hull.analyse(response_0.view(), response_90.view());
+        // Scale the displacement response to a pseudo-spectral acceleration
+        // before the reduction, so the statistics come out in the same units
+        // as the curve. The orientations are angles, so they go through
+        // unscaled.
+        for peak in &mut peaks {
+            *peak *= conversion_factor;
+        }
+        extremes.rotd00 *= conversion_factor;
+        extremes.rotd100 *= conversion_factor;
+        let stats = crate::rotd::rotd_stats(peaks, extremes);
         let mut row = out.row_mut(s);
         for (angle, &peak) in peaks.iter().enumerate() {
-            row[angle] = conversion_factor * peak;
+            row[angle] = peak;
         }
         row[180] = conversion_factor * response_0.iter().fold(0.0f64, |m, &u| m.max(u.abs()));
         row[181] = conversion_factor * response_90.iter().fold(0.0f64, |m, &u| m.max(u.abs()));
+        for (column, &stat) in stats.iter().enumerate() {
+            row[182 + column] = stat;
+        }
     }
     out
 }
@@ -344,6 +367,58 @@ mod tests {
 
         assert_abs_diff_eq!(combined[[0, 180]], peak_0[0], epsilon = 1e-12);
         assert_abs_diff_eq!(combined[[0, 181]], peak_90[0], epsilon = 1e-12);
+    }
+
+    #[test]
+    fn test_psa_rotd180_statistics_columns_reduce_its_own_curve() {
+        // Columns 182..=187 replace the second pass the Python side used to
+        // make over the curve, so they must be what that pass would have
+        // produced. Same reduction, same curve, extremes off the same hull.
+        // The scaling to a pseudo-spectral acceleration happens before the
+        // reduction, which puts the statistics in the units the curve is in.
+        let t = Array1::<f64>::linspace(0.0, 4.0, 700);
+        let dt = t[1] - t[0];
+        let comp_0 = Array2::from_shape_fn((2, t.len()), |(s, i)| {
+            (3.0 * t[i] + s as f64).sin() * (1.0 + s as f64)
+        });
+        let comp_90 = Array2::from_shape_fn((2, t.len()), |(s, i)| {
+            0.7 * (5.0 * t[i]).cos() - 0.2 * (1.3 * t[i] + s as f64).sin()
+        });
+        let w = 2.0 * PI;
+
+        let combined = psa_rotd180(&comp_0.view(), &comp_90.view(), dt, w, XI);
+        assert_eq!(combined.ncols(), PSA_ROTD180_COLUMNS);
+
+        for s in 0..comp_0.nrows() {
+            let row = combined.row(s);
+            let curve: [f64; crate::rotd::N_ANGLES] = std::array::from_fn(|theta| row[theta]);
+            let response_0 = newmark_beta_method(comp_0.row(s), dt, w, XI, 0.0, 0.0);
+            let response_90 = newmark_beta_method(comp_90.row(s), dt, w, XI, 0.0, 0.0);
+            let mut extremes = crate::rotd::Hull::default()
+                .analyse(response_0.view(), response_90.view())
+                .1;
+            extremes.rotd00 *= w * w;
+            extremes.rotd100 *= w * w;
+            let expected = crate::rotd::rotd_stats(curve, extremes);
+            for (column, &want) in expected.iter().enumerate() {
+                assert_eq!(
+                    row[182 + column],
+                    want,
+                    "row {s} statistic {column}: {} != {want}",
+                    row[182 + column]
+                );
+            }
+            // The curve is a sample of the same function the extremes are the
+            // exact bounds of, so it has to sit between them.
+            let grid_min = curve.iter().copied().fold(f64::INFINITY, f64::min);
+            let grid_max = curve.iter().copied().fold(0.0f64, f64::max);
+            assert!(
+                row[182] <= grid_min && grid_max <= row[184],
+                "row {s}: RotD00 {} and RotD100 {} do not bracket the curve {grid_min} to {grid_max}",
+                row[182],
+                row[184]
+            );
+        }
     }
 
     #[test]

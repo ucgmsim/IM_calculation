@@ -66,7 +66,8 @@ mod _core {
     /// Rust, one station after another, so a Dask worker limited to one core
     /// doesn't contend with Rayon threads. Returns an `(ns, 182)` array: columns
     /// 0..=179 are the rotated peaks, and columns 180/181 are the exact 000
-    /// and 090 peaks (see [`psa::psa_rotd180`]).
+    /// and 090 peaks, and columns 182..=187 the RotD statistics row (see
+    /// [`psa::psa_rotd180`]).
     #[pyfunction]
     fn _psa_rotd180<'py>(
         py: Python<'py>,
@@ -115,22 +116,6 @@ mod _core {
         let comp_0 = comp_0_py.as_array();
         let comp_90 = comp_90_py.as_array();
         let rotd_stats = py.detach(|| rotd::rotd(comp_0, comp_90));
-        rotd_stats.into_pyarray(py)
-    }
-
-    /// The same RotD statistics, reduced from an already computed angle sweep.
-    ///
-    /// `curve_py` is an `(ns, 180)` array of peaks at every integer angle, as
-    /// the first 180 columns of [`_psa_rotd180`]. Returns the `(ns, 6)` array
-    /// [`_rotd`] returns, so the pSA path shares one reduction with the peak
-    /// ground motion path instead of repeating it in numpy.
-    #[pyfunction]
-    fn _rotd180_stats<'py>(
-        py: Python<'py>,
-        curve_py: PyReadonlyArray2<f64>,
-    ) -> Bound<'py, PyArray2<f64>> {
-        let curve = curve_py.as_array();
-        let rotd_stats = py.detach(|| rotd::rotd180_stats(curve));
         rotd_stats.into_pyarray(py)
     }
 

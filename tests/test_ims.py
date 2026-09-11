@@ -256,6 +256,42 @@ def test_snr_benchmark(ko_matrices: Path) -> None:
     )
 
 
+# The benchmark records RotD0 and RotD100 as the 1 degree grid reported them.
+# Both now come off the hull geometry instead, exactly, and so fall outside
+# what any grid angle could reach. Nothing on the grid is further than half a
+# degree from either extreme, and over that half degree the rotated peak moves
+# by at most RotD100 times its sine. So RotD0 lands up to RotD100 sin(0.5 deg)
+# under the recorded value, and RotD100 up to RotD100 (sec(0.5 deg) - 1) over
+# it.
+GRID_SLACK = {
+    "rotd0": float(np.sin(np.deg2rad(0.5))),
+    "rotd100": float(1 / np.cos(np.deg2rad(0.5)) - 1),
+}
+
+
+def benchmark_close(result: pd.DataFrame, expected: pd.DataFrame) -> np.ndarray:
+    """Compare a result against the benchmark, cell by cell.
+
+    Parameters
+    ----------
+    result : pd.DataFrame
+        IMs as calculated, indexed by component.
+    expected : pd.DataFrame
+        The recorded benchmark, with the same index and columns.
+
+    Returns
+    -------
+    np.ndarray
+        A boolean array, True where the cell matches. NaN matches NaN.
+    """
+    tolerance = np.maximum(5e-4, 0.01 * np.abs(expected.to_numpy()))
+    reference = np.nan_to_num(np.abs(expected.loc["rotd100"].to_numpy()))
+    for component, slack in GRID_SLACK.items():
+        tolerance[expected.index.get_loc(component)] += slack * reference
+    got, want = result.to_numpy(), expected.to_numpy()
+    return (np.abs(got - want) <= tolerance) | (np.isnan(got) & np.isnan(want))
+
+
 def test_all_ims_benchmark(ko_matrices: Path) -> None:
     """Compare the benchmark IM calculation against the code under test."""
     # Load the DataFrame
@@ -282,12 +318,11 @@ def test_all_ims_benchmark(ko_matrices: Path) -> None:
     # reference angles to compare against;
     # test_rotd_orientations_match_a_direct_angle_sweep covers those instead.
     components = [component for component in result.index if component in data.index]
-    for im in result.columns:
-        assert result.loc[components, im].values == pytest.approx(
-            data.loc[components, im].values, abs=5e-4, rel=0.01, nan_ok=True
-        ), (
-            f"Results for {im} do not match!\n{result}"
-        )  # 5e-6 implies rounding to five decimal places
+    result = result.loc[components]
+    expected = data.loc[components, result.columns]
+    close = benchmark_close(result, expected)
+    for index, im in enumerate(result.columns):
+        assert close[:, index].all(), f"Results for {im} do not match!\n{result}"
 
 
 def save_diff_html(
@@ -449,9 +484,8 @@ def test_all_ims_benchmark_edge_cases(resource_dir: Path, ko_matrices: Path) -> 
     expected = data.loc[components, result.columns]
 
     # Check for failure
-    if not np.allclose(
-        result.values, expected.values, atol=5e-4, rtol=0.01, equal_nan=True
-    ):
+    close = benchmark_close(result, expected)
+    if not close.all():
         # Define output filename
         diff_filename = f"diff_fail_{resource_dir.stem}.html"
         diff_path = Path.cwd() / diff_filename  # Or use a specific artifacts dir
@@ -467,10 +501,8 @@ def test_all_ims_benchmark_edge_cases(resource_dir: Path, ko_matrices: Path) -> 
         )
 
     # Perform standard assertions
-    for im in result.columns:
-        assert result[im].values == pytest.approx(
-            expected[im].values, abs=5e-4, rel=0.01, nan_ok=True
-        ), f"Results for {im} do not match!\n{result}"
+    for index, im in enumerate(result.columns):
+        assert close[:, index].all(), f"Results for {im} do not match!\n{result}"
 
 
 # Significant duration calculations combine two independently tested rust
@@ -781,22 +813,36 @@ def test_psa_full_rotd180(sample_waveforms: npt.NDArray[np.float64]) -> None:
     for component in without.data_vars:
         assert_array_equal(without[component].values, with_curve[component].values)
 
-    # rotd0/50/100 must be exactly the min/median/max over the angle axis.
+    # rotd50 must be exactly the median over the angle axis. rotd0 and
+    # rotd100 only bracket the curve, since they come off the hull exactly
+    # and the curve samples whole degrees.
     curve = with_curve["rotd180"].values
     sorted_curve = np.sort(curve, axis=-1)
-    assert_array_equal(sorted_curve[..., 0], with_curve["rotd0"].values)
     assert_array_equal(
         (sorted_curve[..., 89] + sorted_curve[..., 90]) / 2,
         with_curve["rotd50"].values,
     )
-    assert_array_equal(sorted_curve[..., 179], with_curve["rotd100"].values)
+    assert np.all(with_curve["rotd0"].values <= sorted_curve[..., 0])
+    assert np.all(with_curve["rotd100"].values >= sorted_curve[..., 179])
+    # And no further outside it than half a degree of turn.
+    half_step = np.sin(np.deg2rad(0.5)) * with_curve["rotd100"].values
+    assert np.all(sorted_curve[..., 0] - with_curve["rotd0"].values <= half_step)
+    assert np.all(with_curve["rotd100"].values - sorted_curve[..., 179] <= half_step)
 
-    # And each orientation must be the angle of its own statistic in that same
-    # curve. For rotd0 and rotd100 that means the argmin and the argmax. For
-    # rotd50 it means the lower of the two central angles, whose peak sits just
-    # below the reported median.
-    assert_array_equal(curve.argmin(axis=-1), with_curve["rotd0_orientation"].values)
-    assert_array_equal(curve.argmax(axis=-1), with_curve["rotd100_orientation"].values)
+    # And each orientation must be the angle of its own statistic. The two
+    # exact ones point within half a degree of the grid angle they replace;
+    # rotd50 is still a whole degree, the lower of the two central angles,
+    # whose peak sits just below the reported median.
+    for statistic, grid_angle in [
+        ("rotd0", curve.argmin(axis=-1)),
+        ("rotd100", curve.argmax(axis=-1)),
+    ]:
+        offset = (
+            with_curve[f"{statistic}_orientation"].values - grid_angle + 90
+        ) % 180 - 90
+        assert np.all(np.abs(offset) <= 0.5 + 1e-9), (
+            f"{statistic} orientation is more than half a degree off the grid argument"
+        )
     at_median = np.take_along_axis(
         curve,
         with_curve["rotd50_orientation"].values.astype(int)[..., np.newaxis],
@@ -808,23 +854,43 @@ def test_psa_full_rotd180(sample_waveforms: npt.NDArray[np.float64]) -> None:
 def test_rotd_orientations_match_a_direct_angle_sweep(
     sample_waveforms: npt.NDArray[np.float64],
 ) -> None:
-    """Each orientation must equal the angle its statistic came from, against
-    a plain numpy sweep of the two horizontal components."""
+    """Each orientation must be the angle its statistic came from, against a
+    plain numpy sweep of the two horizontal components.
+
+    rotd0 and rotd100 no longer come off that sweep, so what it pins is that
+    each one is the peak at its own reported angle, and that the sweep brackets
+    it. rotd50 is still the sweep's own median.
+    """
     result = ims.peak_ground_acceleration(sample_waveforms)
     comp_0 = sample_waveforms[ims.Component.COMP_0]
     comp_90 = sample_waveforms[ims.Component.COMP_90]
 
-    angles = np.deg2rad(np.arange(180))
-    # (n_stations, 180): the peak rotated amplitude at every integer angle.
-    sweep = np.abs(
-        np.cos(angles)[np.newaxis, :, np.newaxis] * comp_0[:, np.newaxis, :]
-        + np.sin(angles)[np.newaxis, :, np.newaxis] * comp_90[:, np.newaxis, :]
-    ).max(axis=-1)
+    def peaks_at(angles: npt.NDArray[np.float64]) -> npt.NDArray[np.float64]:
+        """Peak rotated amplitude per station at each angle in degrees."""
+        radians = np.deg2rad(angles)
+        return np.abs(
+            np.cos(radians)[..., np.newaxis] * comp_0[:, np.newaxis, :]
+            + np.sin(radians)[..., np.newaxis] * comp_90[:, np.newaxis, :]
+        ).max(axis=-1)
 
-    assert_array_equal(sweep.argmin(axis=-1), result["rotd0_orientation"].values)
-    assert_array_equal(sweep.argmax(axis=-1), result["rotd100_orientation"].values)
-    assert_array_equal(sweep.min(axis=-1), result["rotd0"].values)
-    assert_array_equal(sweep.max(axis=-1), result["rotd100"].values)
+    # (n_stations, 180): the peak rotated amplitude at every integer angle.
+    sweep = peaks_at(np.tile(np.arange(180.0), (len(comp_0), 1)))
+
+    # Each exact statistic is the peak at the angle reported with it.
+    for statistic in ["rotd0", "rotd100"]:
+        at_angle = peaks_at(
+            result[f"{statistic}_orientation"].values[:, np.newaxis]
+        ).squeeze(-1)
+        assert at_angle == pytest.approx(result[statistic].values, rel=1e-12), (
+            f"{statistic} is not the peak at the angle reported with it"
+        )
+
+    # The grid can only bracket them, and only by half a degree of turn.
+    half_step = np.sin(np.deg2rad(0.5)) * result["rotd100"].values
+    assert np.all(result["rotd0"].values <= sweep.min(axis=-1))
+    assert np.all(sweep.min(axis=-1) - result["rotd0"].values <= half_step)
+    assert np.all(result["rotd100"].values >= sweep.max(axis=-1))
+    assert np.all(result["rotd100"].values - sweep.max(axis=-1) <= half_step)
 
     sorted_sweep = np.sort(sweep, axis=-1)
     at_median = np.take_along_axis(
@@ -838,11 +904,16 @@ def test_rotd_orientations_match_a_direct_angle_sweep(
     )
 
 
-@pytest.mark.parametrize("polarisation", [0, 30, 45, 100, 179])
-def test_rotd_orientation_of_a_polarised_record(polarisation: int) -> None:
+@pytest.mark.parametrize("polarisation", [0, 30, 45, 100, 179, 37.3, 100.5, 178.75])
+def test_rotd_orientation_of_a_polarised_record(polarisation: float) -> None:
     """A linearly polarised record fixes the orientations exactly. It peaks
     along its own direction and vanishes across it. That pins the angle
-    convention (degrees, anticlockwise from the 000 component)."""
+    convention (degrees, anticlockwise from the 000 component).
+
+    The off-grid polarisations are the ones the 1 degree sweep couldn't
+    answer. It had to round the orientation to a whole degree and report
+    RotD100 sin(beta) for a RotD0 of exactly zero.
+    """
     time = np.arange(0, 1, 0.005)
     motion = np.sin(2 * np.pi * 5 * time) * np.exp(-2 * time)
     direction = np.deg2rad(polarisation)
@@ -859,11 +930,18 @@ def test_rotd_orientation_of_a_polarised_record(polarisation: int) -> None:
     assert result["rotd0_orientation"].values == pytest.approx(
         (polarisation + 90) % 180
     )
-    # Across the direction of motion the record reads zero, and
-    # RotD100 / RotD50 equals the sqrt(2) bound.
+    # Across the direction of motion the record reads zero.
     assert result["rotd0"].values == pytest.approx(0, abs=1e-12)
+
+    # And the ratio attains its bound. RotD100 is the peak itself, while the
+    # two central grid peaks are cos((45 -+ beta) degrees) of it for a
+    # polarisation beta off the nearest whole degree, so RotD50 is
+    # RotD100 cos(beta) / sqrt(2) and the ratio is sqrt(2) / cos(beta). On the
+    # grid, where beta is 0, that's sqrt(2) exactly.
+    offset = polarisation % 1
+    beta = min(offset, 1 - offset)
     assert result["rotd100"].values / result["rotd50"].values == pytest.approx(
-        np.sqrt(2), rel=1e-9
+        np.sqrt(2) / np.cos(np.deg2rad(beta)), rel=1e-9
     )
 
 

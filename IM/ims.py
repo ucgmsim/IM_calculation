@@ -610,6 +610,11 @@ def ds595(waveform: Waveform, dt: float) -> xr.Dataset:
 N_ROTD180_ANGLES = 180
 ROTD180_ANGLES = np.arange(N_ROTD180_ANGLES)
 
+# Column layout of an `_core._psa_rotd180` row: the 180 rotated peaks, then
+# the exact unrotated 000 and 090 peaks, then the six RotD statistics.
+PSA_PEAK_COLUMNS = slice(N_ROTD180_ANGLES, N_ROTD180_ANGLES + 2)
+PSA_STATS_COLUMNS = slice(N_ROTD180_ANGLES + 2, N_ROTD180_ANGLES + 8)
+
 
 def _psa_kernel(
     block: np.ndarray,
@@ -660,12 +665,13 @@ def _psa_kernel(
     )
     for index, period in enumerate(periods):
         w = 2 * np.pi / period
-        # (rows, 182): 180 rotated peaks, then the exact 000 and 090 peaks.
+        # (rows, 188): 180 rotated peaks, the exact 000 and 090 peaks, then
+        # the RotD statistics row. The statistics come back from rust rather
+        # than off the curve because RotD0 and RotD100 come off the hull
+        # geometry, which only exists inside that call.
         psa = _core._psa_rotd180(comp_0, comp_90, dt, w, DAMPING)
-        # Reduced in rust, by the same code the peak ground motion RotD uses,
-        # so one place defines the statistics and their orientations.
-        stats = _core._rotd180_stats(psa[:, :N_ROTD180_ANGLES])
-        peak_0, peak_90 = psa[:, 180], psa[:, 181]
+        stats = psa[:, PSA_STATS_COLUMNS]
+        peak_0, peak_90 = psa[:, PSA_PEAK_COLUMNS].T
         peak_ver = _core._psa_peak(comp_ver, dt, w, DAMPING)
         peaks = np.stack(
             [peak_0, peak_90, peak_ver, np.sqrt(peak_0 * peak_90)], axis=-1
