@@ -136,6 +136,12 @@ checks = [
 [tool.deptry]
 optional_dependencies_dev_groups = ["test", "dev", "types"]
 
+[tool.deptry.per_rule_ignores]
+# dask is never imported here. It is reached through xarray, which dispatches
+# to it when `xr.apply_ufunc(..., dask="parallelized")` is handed a
+# dask-backed array — the `lazy` extra exists to make that path installable.
+DEP002 = ["dask"]
+
 [tool.uv]
 cache-keys = [
   { file = "pyproject.toml" },
