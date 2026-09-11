@@ -77,7 +77,7 @@ def test_write_intensity_measures(tmp_path: Path, sample_dataset: xr.Dataset):
         if im_name in result:
             assert result[im_name].attrs["description"] == description
 
-    # Ensure units were applied and then dequantified
+    # Ensure the writer applied units and then dequantified them
     for im_name in IM_METADATA:
         if im_name in result:
             assert "units" in result[im_name].attrs
@@ -95,7 +95,7 @@ def test_write_intensity_measures_missing_metadata(
 
     result = xr.open_dataset(file_path, engine="h5netcdf")
 
-    # Ensure that missing metadata does not cause an error
+    # Ensure that missing metadata doesn't cause an error
     assert "station" in result.coords
     assert "description" in result.coords["station"].attrs
 

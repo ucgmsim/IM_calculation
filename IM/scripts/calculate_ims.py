@@ -45,7 +45,7 @@ def calculate_ims_ascii(
     ko_directory: Annotated[Path | None, typer.Option()] = None,
 ) -> None:
     """
-    Calculate intensity measures for a single ASCII waveform fileset (000, 090, vertical).
+    Calculate intensity measures for one ASCII waveform fileset (000, 090, vertical).
 
     Parameters
     ----------
@@ -58,7 +58,7 @@ def calculate_ims_ascii(
     output_file : Path
         Output file for the calculated IMs.
     ims_list : list of IM
-        List of intensity measures (IMs) to calculate, e.g., ['PGA', 'pSA', 'CAV'].
+        List of intensity measures (IMs) to calculate, such as ['PGA', 'pSA', 'CAV'].
     periods : list of float, optional
         List of periods required for calculating the pseudo-spectral acceleration (pSA).
     frequencies : list of float, optional

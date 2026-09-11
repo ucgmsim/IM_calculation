@@ -74,10 +74,11 @@ def calculate_snr(
     Raises
     ------
     ValueError
-        If the noise duration is less than 1s and so SNR can't be computed.
+        If the noise duration falls below 1 s, so the SNR calculation
+        doesn't have a window to work over.
     """
-    # This extra time is to ensure that when a taper is applied, the signal part of the waveform
-    # is not affected by the tapering. The tapering is applied to the signal and noise separately.
+    # The extra time moves the taper off the signal part of the waveform.
+    # Tapering runs over the signal and the noise separately.
     (_, _, nt) = waveform.shape
     tp_extra = (nt - tp) / 19
     # Round up the tp_extra to the nearest highest integer
@@ -91,7 +92,7 @@ def calculate_snr(
         waveform[:, :, :noise_duration],
     )
 
-    # Ensure the noise is not shorter than 1s, if not then skip the calculation
+    # Skip the calculation unless the noise runs for at least 1 s
     if noise_duration < 1:
         raise ValueError("Noise duration is less than 1s")
 

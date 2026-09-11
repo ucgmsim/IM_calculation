@@ -2,9 +2,9 @@
 
 from pathlib import Path
 
-# Importing pint_xarray registers pint units with xarray, allowing for
-# unit-aware operations. It is not explicitly used, so we ignore the flake8
-# F401 error.
+# Importing pint_xarray registers pint units with xarray, which is what makes
+# unit-aware operations work. The `noqa` marks it as an import kept for that
+# side effect alone, which flake8 would otherwise report as F401.
 import pint_xarray  # noqa: F401
 import xarray as xr
 
@@ -20,7 +20,7 @@ def read_intensity_measures(
     Parameters
     ----------
     intensity_measure_file : str or Path
-        The file path or filename of the intensity measures dataset to be read.
+        Path or filename of the intensity measure dataset to open.
 
     Returns
     -------
@@ -59,9 +59,8 @@ IM_METADATA = {
 }
 
 
-# The 'g0' unit is used for acceleration and is equivalent to 9.81 m/s^2. The
-# reason for this is that 'g' is reserved for 'grams'. This is a decision
-# made by the `pint` library, which is used to handle the units.
+# Accelerations carry the 'g0' unit, which equals 9.81 m/s^2. `pint`, the
+# library behind these units, keeps plain 'g' for grams.
 IM_UNITS = {
     IM.PGA: "g0",
     IM.PGV: "cm/s",
@@ -83,9 +82,9 @@ def write_intensity_measures(dataset: xr.Dataset, output_ffp: str | Path) -> Non
     Parameters
     ----------
     dataset : xr.Dataset
-        The xarray dataset containing intensity measures to be written.
+        The xarray dataset of intensity measures to write.
     output_ffp : str or Path
-        The file path where the output dataset should be saved.
+        Destination path for the output dataset.
     """
     for name, description in COORDINATE_METADATA.items():
         if name not in dataset.coords:

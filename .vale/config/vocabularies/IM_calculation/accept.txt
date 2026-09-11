@@ -1,0 +1,82 @@
+# Project vocabulary for Vale. One term per line, treated as a regex, so
+# alternations spell out every capitalisation the prose actually uses.
+#
+# Vale applies this list to every rule, not only the spell checker: a term
+# here also suppresses a Google or ai-tells match that lands on it. That is
+# what the first section is for.
+
+# Domain terms that the general-prose rules read as ordinary English.
+# "significant duration" is the name of the Ds575/Ds595 measure, and
+# "significant figures" is the rounding in FAS column labels; ai-tells reads
+# both as the vague intensifier "significant".
+[Ss]ignificant [Dd]uration
+[Ss]ignificant [Ff]igures
+
+# Intensity measures and the seismology around them
+[Ii]ntensity [Mm]easures?
+IMs?
+PGA
+PGV
+PGD
+CAV5?
+AI
+Ds575
+Ds595
+pSA
+FAS
+EAS
+SNR
+[Rr]ot[Dd][0-9]*
+[Kk]onno
+[Oo]hmachi
+[Nn]ewmark
+[Aa]rias
+[Nn]yquist
+[Aa]ccelerograms?
+[Ww]aveforms?
+[Bb]roadband
+[Tt]apering
+[Aa]nticlockwise
+
+# Formats, libraries and tools
+[Nn]um[Pp]y
+[Ss]ci[Pp]y
+[Xx]array
+[Dd]ask
+[Pp]andas
+[Pp]int
+[Pp]y[Ff]FTW
+[Oo]bs[Pp]y
+[Nn]umpydoc
+[Rr]uff
+[Dd]eptry
+[Ll]efthook
+[Yy]amllint
+[Mm]aturin
+PyO3
+ASCII
+HDF5
+[Nn]et[Cc]DF4?
+TOML
+YAML
+[Nn]darray
+[Dd]type
+[Mm]emmap(?:ped|s)?
+
+# Ordinary technical English that Vale's dictionary lacks
+[Ff]ilesets?
+[Uu]nsmoothed
+[Rr]echunk(?:ed|s|ing)?
+[Cc]onfigs?
+[Ss]ubpackages?
+[Tt]oolchain
+[Rr]epo
+[Ii]terable
+[Bb]roadcastable
+[Pp]arallelise[ds]?
+[Pp]arallelisation
+[Ss]erialise[ds]?
+[Ss]erialisation
+[Nn]ormalise[ds]?
+[Pp]olarise[ds]?
+[Pp]olarisation

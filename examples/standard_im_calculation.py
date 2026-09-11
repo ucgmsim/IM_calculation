@@ -17,8 +17,7 @@ dt, waveform = waveform_reading.read_ascii(comp_000_ffp, comp_090_ffp, comp_ver_
 # Calculate the intensity measures using defaults
 im_results = im_calculation.calculate_ims(waveform, dt)
 
-# Sanity check that the IMs that are calculated are the ones we expect
-# By comparing against the benchmark set
+# Sanity check: compare the calculated IMs against the benchmark set
 benchmark_dir = Path(__file__).parent.parent / "tests" / "resources"
 benchmark_im_results = pd.read_csv(benchmark_dir / "im_benchmark.csv", index_col=0)
 
