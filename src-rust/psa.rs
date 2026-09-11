@@ -32,8 +32,8 @@ fn newmark_beta_solver(
     let a2 = one_over_beta_dt_sq; // u_n+1 - u_n
     let b2 = -one_over_beta_dt; // udot_n
     let c2 = -c1; // uddot_n
-    // Constants to solve for udot_n+1
-    // a'3 = 1 for uddot_n
+                  // Constants to solve for udot_n+1
+                  // a'3 = 1 for uddot_n
     let a3 = 1.0 - gamma; // uddot_n
     let b3 = gamma; // uddot_n+1
 
@@ -44,7 +44,7 @@ fn newmark_beta_solver(
     // ENCI335 notes solve for u''_n+1, but for numerical stability reasons we really want to solve for displacement directly and then derive velocity and acceleration from that.
     // Basically the formulations in the ENCI notes solve for acceleration and then integrate to get displacement, but this involves the calculation of
     // d_pti = waveform[i + 1] - waveform[i]
-    // which is a noisy floating-point operation. We then numerically integrate that noise twice which amplifies the noise carried into the rest of the calculations.
+    // which is a noisy floating-point operation. We then numerically integrate that noise twice which amplifies the noise fed into the rest of the calculations.
     // Instead: implicitly solve for displacement and differentiate. The u at each time step is the smoothed response, so it is more robust to signal noise from the waveform.
     // See https://collab.dvb.bayern/spaces/TUMmodsim/pages/71122788/Newmark-%CE%B2+method for the derivation when beta = 1/4, gamma = 1/2.
     for i in 0..(nt - 1) {

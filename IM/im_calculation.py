@@ -156,8 +156,8 @@ def _dataset_to_frame(dataset: xr.Dataset, index: list[str]) -> pd.DataFrame:
 
     Each component (`000`, `090`, ..., `rotd100`) is already a data variable,
     so the dataset's own columns are the frame's columns. This drops any
-    non-dimension coordinates, such as the `latitude` and `longitude` a real
-    DataArray carries, and replaces the row index with `index`.
+    non-dimension coordinates, such as the `latitude` and `longitude` on a
+    real DataArray, and replaces the row index with `index`.
 
     Parameters
     ----------

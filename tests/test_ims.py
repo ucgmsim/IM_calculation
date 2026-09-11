@@ -443,7 +443,7 @@ def test_all_ims_benchmark_edge_cases(resource_dir: Path, ko_matrices: Path) -> 
     )
 
     # Align columns and indices for comparison, dropping the components the
-    # benchmark doesn't carry (the RotD orientations, which postdate it).
+    # benchmark lacks (the RotD orientations, which postdate it).
     components = [component for component in result.index if component in data.index]
     result = result.loc[components]
     expected = data.loc[components, result.columns]
