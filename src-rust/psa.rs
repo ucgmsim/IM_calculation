@@ -42,7 +42,7 @@ fn newmark_beta_solver(
     // ENCI335 notes solve for u''_n+1, but for numerical stability reasons we really want to solve for displacement directly and then derive velocity and acceleration from that.
     // Basically the formulations in the ENCI notes solve for acceleration and then integrate to get displacement, but this involves the calculation of
     // d_pti = waveform[i + 1] - waveform[i]
-    // which is a noisy floating-point operation. We then numerically integrate that noise twice which amplifies the noise carried into the rest of the calculations.
+    // which is a noisy floating-point operation. We then numerically integrate that noise twice which amplifies the noise fed into the rest of the calculations.
     // Instead: implicitly solve for displacement and differentiate. The u at each time step is the smoothed response, so it is more robust to signal noise from the waveform.
     // See https://collab.dvb.bayern/spaces/TUMmodsim/pages/71122788/Newmark-%CE%B2+method for the derivation when beta = 1/4, gamma = 1/2.
     for i in 0..(nt - 1) {
@@ -173,7 +173,7 @@ pub fn psa_rotd180(
 ///
 /// `waveforms` has shape `(ns, nt)`. Only the peak response is returned
 /// (shape `(ns,)`), so a caller that needs just one component -- e.g. the
-/// vertical, which never participates in RotD -- does not have to carry a
+/// vertical, which never participates in RotD -- does not have to move a
 /// full `(ns, nt)` displacement response back into Python.
 pub fn psa_peak(waveforms: &ArrayView2<f64>, dt: f64, w: f64, xi: f64) -> Array1<f64> {
     let conversion_factor = w * w;

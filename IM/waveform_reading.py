@@ -22,8 +22,8 @@ def strip_trailing_nans(arr: np.ndarray) -> np.ndarray:
         2D numpy array with trailing NaNs removed.
     """
     # Find last non-NaN index in each column, by taking the maximum of an
-    # array of the same shape as `arr` that holds column indices and carries
-    # zeros wherever `arr` has a NaN.
+    # array of the same shape as `arr` that holds column indices, with zeros
+    # wherever `arr` has a NaN.
     # Given:
     #
     # 1     2    3.5

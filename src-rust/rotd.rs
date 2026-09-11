@@ -191,7 +191,7 @@ fn rotd_stats(peaks: [f64; N_ANGLES]) -> [f64; N_ROTD_STATS] {
             max_angle = theta;
         }
     }
-    // The two central peaks, carrying their angles through the sort so the
+    // The two central peaks, with their angles paired through the sort so the
     // median has an orientation. The angle breaks ties, so equal peaks are
     // ranked in ascending angle whatever the sort's internal order.
     let mut ranked: [(f64, u8); N_ANGLES] =

@@ -59,7 +59,7 @@ IM_METADATA = {
 }
 
 
-# Accelerations carry the 'g0' unit, which equals 9.81 m/s^2. `pint`, the
+# Accelerations use the 'g0' unit, which equals 9.81 m/s^2. `pint`, the
 # library behind these units, keeps plain 'g' for grams.
 IM_UNITS = {
     IM.PGA: "g0",
