@@ -25,7 +25,7 @@ pub fn cav(waveforms: ArrayView2<f64>, dt: f64) -> Array1<f64> {
 mod tests {
     use super::*;
     use approx::assert_abs_diff_eq;
-    use ndarray::{array, Array};
+    use ndarray::{Array, array};
     use std::f64::consts::PI;
 
     #[test]

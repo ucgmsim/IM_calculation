@@ -289,12 +289,38 @@ def compute_intensity_measure_rotd(
 
 
 def _velocity(components: ChunkedWaveformArray, dt: float) -> ChunkedWaveformArray:
-    """Integrate acceleration (g) to velocity (cm/s)."""
+    """Integrate acceleration (g) to velocity (cm/s).
+
+    Parameters
+    ----------
+    components : ChunkedWaveformArray
+        Per-component acceleration matrices, shape `(3, n_rows, nt)`.
+    dt : float
+        Timestep resolution (s).
+
+    Returns
+    -------
+    ChunkedWaveformArray
+        Velocity matrices (cm/s), shape `(3, n_rows, nt - 1)`.
+    """
     return G * sp.integrate.cumulative_trapezoid(components, dx=dt, axis=-1)
 
 
 def _displacement(components: ChunkedWaveformArray, dt: float) -> ChunkedWaveformArray:
-    """Integrate acceleration (g) to displacement (cm)."""
+    """Integrate acceleration (g) to displacement (cm).
+
+    Parameters
+    ----------
+    components : ChunkedWaveformArray
+        Per-component acceleration matrices, shape `(3, n_rows, nt)`.
+    dt : float
+        Timestep resolution (s).
+
+    Returns
+    -------
+    ChunkedWaveformArray
+        Displacement matrices (cm), shape `(3, n_rows, nt)`.
+    """
     velocity = sp.integrate.cumulative_trapezoid(components, dx=dt, axis=-1, initial=0)
     # In-place multiplication to avoid yet another allocation
     np.multiply(G, velocity, out=velocity)
@@ -360,10 +386,24 @@ def peak_ground_displacement(waveform: Waveform, dt: float) -> xr.Dataset:
     )
 
 
-def _cav_kernel(
-    block: np.ndarray, *, dt: float, threshold: float | None
-) -> np.ndarray:
-    """Kernel for `cumulative_absolute_velocity`."""
+def _cav_kernel(block: np.ndarray, *, dt: float, threshold: float | None) -> np.ndarray:
+    """Kernel for `cumulative_absolute_velocity`.
+
+    Parameters
+    ----------
+    block : ndarray
+        A `(*lead, n_components, nt)` acceleration block (g).
+    dt : float
+        Timestep resolution (s).
+    threshold : float or None
+        Acceleration threshold ($cm/s^2$). Samples below it are zeroed
+        before integrating. `None` or zero integrates the record as-is.
+
+    Returns
+    -------
+    ndarray
+        A `(*lead, len(GEOM_COMPONENTS))` array of CAV values (m/s).
+    """
     components, lead = _components(block)
     if threshold:
         components = np.where(np.abs(components) < threshold / G, 0.0, components)
@@ -409,7 +449,20 @@ def cumulative_absolute_velocity(
 
 
 def _arias_kernel(block: np.ndarray, *, dt: float) -> np.ndarray:
-    """Kernel for `arias_intensity`."""
+    """Kernel for `arias_intensity`.
+
+    Parameters
+    ----------
+    block : ndarray
+        A `(*lead, n_components, nt)` acceleration block (g).
+    dt : float
+        Timestep resolution (s).
+
+    Returns
+    -------
+    ndarray
+        A `(*lead, len(GEOM_COMPONENTS))` array of Arias intensities (m/s).
+    """
     components, lead = _components(block)
     comp_0, comp_90, comp_ver = components
     ai_0 = _core._arias_intensity(comp_0, dt)
@@ -443,7 +496,25 @@ def arias_intensity(waveform: Waveform, dt: float) -> xr.Dataset:
 def _duration_kernel(
     block: np.ndarray, *, dt: float, quantile_low: float, quantile_high: float
 ) -> np.ndarray:
-    """Kernel for `significant_duration`."""
+    """Kernel for `significant_duration`.
+
+    Parameters
+    ----------
+    block : ndarray
+        A `(*lead, n_components, nt)` acceleration block (g).
+    dt : float
+        Timestep resolution (s).
+    quantile_low : float
+        Lower bound of the Arias intensity accumulation window, as a
+        fraction of the total (e.g. 0.05 for Ds595).
+    quantile_high : float
+        Upper bound of that window (e.g. 0.95 for Ds595).
+
+    Returns
+    -------
+    ndarray
+        A `(*lead, len(GEOM_COMPONENTS))` array of durations (s).
+    """
     components, lead = _components(block)
     comp_0, comp_90, comp_ver = components
     duration_0 = _core._significant_duration(comp_0, dt, quantile_low, quantile_high)
@@ -556,6 +627,26 @@ def _psa_kernel(
     When `full_rotd180` is set, the full 180-angle RotD curve computed for
     the summary statistics is also returned rather than discarded, so the
     Newmark-beta solve never runs twice for the same (period, station chunk).
+
+    Parameters
+    ----------
+    block : ndarray
+        A `(*lead, n_components, nt)` acceleration block (g).
+    periods : ndarray of float
+        Oscillator periods (s) to solve for.
+    dt : float
+        Timestep resolution (s).
+    full_rotd180 : bool
+        Whether to also return the 180-angle RotD curve.
+
+    Returns
+    -------
+    ndarray
+        A `(*lead, len(periods), len(ROTD_COMPONENTS))` array of pseudo
+        spectral accelerations (g).
+    ndarray
+        Only when `full_rotd180` is set: the `(*lead, len(periods),
+        N_ROTD180_ANGLES)` rotated-peak curve those statistics came from.
     """
     components, lead = _components(block)
     comp_0, comp_90, comp_ver = components
@@ -652,9 +743,7 @@ def pseudo_spectral_acceleration(
     dataset = summary.to_dataset("im_component")
     dataset.attrs = {"name": IM.pSA.value}
     if rotd180 is not None:
-        dataset["rotd180"] = rotd180.assign_coords(
-            period=periods, angle=ROTD180_ANGLES
-        )
+        dataset["rotd180"] = rotd180.assign_coords(period=periods, angle=ROTD180_ANGLES)
     return dataset
 
 
@@ -686,7 +775,9 @@ def _konno_smooth(spectrum_data: np.ndarray, konno: np.ndarray) -> np.ndarray:
     smoothed = np.empty(spectrum_data.shape[:-1] + (n_output,), dtype=np.float64)
     for start in range(0, n_output, columns):
         block = slice(start, start + columns)
-        smoothed[..., block] = spectrum_data @ np.asarray(konno[:, block], dtype=np.float64)
+        smoothed[..., block] = spectrum_data @ np.asarray(
+            konno[:, block], dtype=np.float64
+        )
     return smoothed
 
 
@@ -731,7 +822,29 @@ def _fas_kernel(
     fa_frequencies: npt.NDArray[np.float64],
     ko_directory: Path,
 ) -> np.ndarray:
-    """Kernel for `fourier_amplitude_spectra`."""
+    """Kernel for `fourier_amplitude_spectra`.
+
+    Parameters
+    ----------
+    block : ndarray
+        A `(*lead, n_components, nt)` acceleration block (g).
+    dt : float
+        Timestep resolution (s).
+    n_fft : int
+        Length the record is zero-padded to before the real FFT.
+    freqs : ndarray of float
+        Output frequencies (Hz) the smoothed spectrum is interpolated onto.
+    fa_frequencies : ndarray of float
+        The `rfft` bin frequencies (Hz) the Konno-Ohmachi matrix is sized for.
+    ko_directory : Path
+        Directory the cached Konno-Ohmachi matrices are read from.
+
+    Returns
+    -------
+    ndarray
+        A `(*lead, len(freqs), len(FAS_COMPONENTS))` array of Fourier
+        amplitudes, the last component being EAS.
+    """
     components, lead = _components(block)
     n_components, rows, _ = components.shape
     n_fa = len(fa_frequencies)
@@ -745,10 +858,7 @@ def _fas_kernel(
     # single pass over the (potentially huge) Konno matrix.
     eas_unsmoothed = np.sqrt(
         0.5
-        * (
-            np.square(spectra[Component.COMP_0])
-            + np.square(spectra[Component.COMP_90])
-        )
+        * (np.square(spectra[Component.COMP_0]) + np.square(spectra[Component.COMP_90]))
     )
     spectra_and_eas = np.concatenate([spectra, eas_unsmoothed[np.newaxis]], axis=0)
 
@@ -756,9 +866,7 @@ def _fas_kernel(
     smoothed = smooth_and_interpolate(spectra_and_eas, konno, freqs, fa_frequencies)
 
     geom = np.sqrt(smoothed[Component.COMP_0] * smoothed[Component.COMP_90])
-    out = np.stack(
-        [smoothed[0], smoothed[1], smoothed[2], geom, smoothed[3]], axis=-1
-    )
+    out = np.stack([smoothed[0], smoothed[1], smoothed[2], geom, smoothed[3]], axis=-1)
     return out.reshape(lead + (len(freqs), len(FAS_COMPONENTS)))
 
 

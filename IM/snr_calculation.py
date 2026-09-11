@@ -133,5 +133,15 @@ def calculate_snr(
 def _component_frame(dataset: xr.Dataset) -> pd.DataFrame:
     """Take the 000/090/ver components of a single-station FAS dataset as a
     frequency-indexed DataFrame.
+
+    Parameters
+    ----------
+    dataset : xr.Dataset
+        A FAS dataset with a length-one `station` dimension.
+
+    Returns
+    -------
+    pd.DataFrame
+        The 000, 090 and ver components, indexed by frequency.
     """
     return dataset[["000", "090", "ver"]].isel(station=0, drop=True).to_dataframe()

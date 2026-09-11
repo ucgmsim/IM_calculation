@@ -23,3 +23,20 @@ runs/
 # special cases to unignore
 !periods.out
 .venv/
+
+# Rust build output
+target/
+
+# Editable/`uv sync` build metadata
+*.egg-info/
+
+# Coverage artefacts produced by the pytest job's local equivalent
+.coverage
+.coverage.*
+htmlcov/
+
+# Tool caches
+__pycache__/
+.pytest_cache/
+.ruff_cache/
+.hypothesis/

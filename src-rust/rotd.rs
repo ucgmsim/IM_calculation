@@ -264,12 +264,12 @@ pub fn rotd180_rows(comp_0: ArrayView2<f64>, comp_90: ArrayView2<f64>) -> Array2
 mod tests {
     use std::f64::consts::{SQRT_2, TAU};
 
-    use ndarray::prelude::*;
     use ndarray::Zip;
+    use ndarray::prelude::*;
     use proptest::prelude::*;
 
     use crate::rotd::{
-        rotd, rotd180_rows, rotd180_stats, rotd_stats, Hull, DEGREES, N_ANGLES, N_ROTD_STATS,
+        DEGREES, Hull, N_ANGLES, N_ROTD_STATS, rotd, rotd_stats, rotd180_rows, rotd180_stats,
     };
 
     /// Slack allowed on the sqrt(2) bound. The bound is attained exactly by
@@ -673,9 +673,9 @@ mod tests {
         let expected_min = 2.0f64.sqrt() / 2.0; // e.g. at pi / 4 degrees
         let expected_max = 1.0; // e.g. at 0 degrees
         let expected_median = 0.9238443540096138; // derived independently with numpy
-                                                  // The sweep is max(|cos theta|, |sin theta|): least at 45 degrees, and
-                                                  // 1 at both 0 and 90 degrees, of which the lower is reported. The
-                                                  // median falls between the peaks at 157 and 158 degrees.
+        // The sweep is max(|cos theta|, |sin theta|): least at 45 degrees, and
+        // 1 at both 0 and 90 degrees, of which the lower is reported. The
+        // median falls between the peaks at 157 and 158 degrees.
         assert_eq!(
             [at_min, at_median, at_max],
             [45.0, 157.0, 0.0],

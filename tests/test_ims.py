@@ -24,6 +24,7 @@ def ko_matrices(
     request: pytest.FixtureRequest, tmp_path_factory: TempPathFactory
 ) -> Path:
     from IM.scripts import gen_ko_matrix
+
     ko_matrix_directory = tmp_path_factory.mktemp("ko_matrices")
     gen_ko_matrix.main(ko_matrix_directory, num_to_gen=12)
     return ko_matrix_directory
@@ -65,7 +66,9 @@ def _to_dask(waveform: npt.NDArray[np.float64], station_chunk: int) -> xr.DataAr
     names, chunked over `station` only (component/time as single chunks)."""
     n_stations = waveform.shape[1]
     return xr.DataArray(
-        da.from_array(waveform, chunks=(waveform.shape[0], station_chunk, waveform.shape[2])),
+        da.from_array(
+            waveform, chunks=(waveform.shape[0], station_chunk, waveform.shape[2])
+        ),
         dims=("component", "station", "time"),
         coords={"station": [f"stat_{i}" for i in range(n_stations)]},
         attrs={"units": "g"},
@@ -139,15 +142,23 @@ def test_cav5(
     assert np.isclose(result["000"].item(), expected_cav5, atol=0.1)
 
 
-def test_cav_name_depends_on_threshold(sample_waveforms: npt.NDArray[np.float64]) -> None:
+def test_cav_name_depends_on_threshold(
+    sample_waveforms: npt.NDArray[np.float64],
+) -> None:
     """threshold=0 is falsy, so it must name the result CAV, not CAV5."""
-    assert ims.cumulative_absolute_velocity(sample_waveforms, 0.01).attrs["name"] == "CAV"
     assert (
-        ims.cumulative_absolute_velocity(sample_waveforms, 0.01, threshold=0).attrs["name"]
+        ims.cumulative_absolute_velocity(sample_waveforms, 0.01).attrs["name"] == "CAV"
+    )
+    assert (
+        ims.cumulative_absolute_velocity(sample_waveforms, 0.01, threshold=0).attrs[
+            "name"
+        ]
         == "CAV"
     )
     assert (
-        ims.cumulative_absolute_velocity(sample_waveforms, 0.01, threshold=5).attrs["name"]
+        ims.cumulative_absolute_velocity(sample_waveforms, 0.01, threshold=5).attrs[
+            "name"
+        ]
         == "CAV5"
     )
 
@@ -595,7 +606,7 @@ def test_invalid_waveform_shapes(invalid_shape: tuple[int, ...]) -> None:
     waveforms = np.zeros(invalid_shape, dtype=np.float64)
 
     with pytest.raises(TypeError):
-        ims.peak_ground_acceleration(waveforms)  # ty: ignore[invalid-argument-type]
+        ims.peak_ground_acceleration(waveforms)
 
 
 @pytest.mark.slow
@@ -766,7 +777,9 @@ def test_psa_full_rotd180(sample_waveforms: npt.NDArray[np.float64]) -> None:
     assert_array_equal(with_curve.angle.values, np.arange(180))
 
     # Angle 0 is exact (cos(0) == 1.0 exactly), so it must equal 000 exactly.
-    assert_array_equal(with_curve["rotd180"].isel(angle=0).values, with_curve["000"].values)
+    assert_array_equal(
+        with_curve["rotd180"].isel(angle=0).values, with_curve["000"].values
+    )
 
     # The other summary components must be unaffected by asking for the curve.
     for component in without.data_vars:

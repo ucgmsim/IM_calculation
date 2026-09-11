@@ -1,5 +1,5 @@
 use _core::{arias_intensity, cav, psa, significant_duration};
-use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
+use criterion::{BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
 use ndarray::Array2;
 use std::hint::black_box;
 
