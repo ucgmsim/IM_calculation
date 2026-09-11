@@ -8,8 +8,8 @@ mod trapz;
 use pyo3::prelude::*;
 
 /// A Python module implemented in Rust. The name of this function must match
-/// the `lib.name` setting in the `Cargo.toml`, else Python will not be able to
-/// import the module.
+/// the `lib.name` setting in the `Cargo.toml`, else Python fails to import the
+/// module.
 #[pymodule]
 mod _core {
     use numpy::{IntoPyArray, PyArray1, PyArray2, PyReadonlyArray2};
@@ -31,9 +31,9 @@ mod _core {
         xi: f64,
     ) -> Bound<'py, PyArray2<f64>> {
         let waveforms = waveforms_py.as_array();
-        // Touches no Python objects, so drop the GIL for the whole solve: a
-        // threaded caller (e.g. Dask's threaded scheduler) can then run one
-        // of these per core in parallel within a single process.
+        // Rust-only from here, so drop the GIL for the whole solve. A threaded
+        // caller, such as Dask's threaded scheduler, then runs one of these per
+        // core inside one process.
         let waveform_psa = py.detach(|| psa::newmark_beta_method_batch(&waveforms, dt, w, xi));
         waveform_psa.into_pyarray(py)
     }
@@ -63,8 +63,8 @@ mod _core {
     /// Serial pSA at all 180 rotation angles for one period.
     ///
     /// Runs the Newmark-beta solver (f64) and the RotD reduction entirely in
-    /// Rust, one station after another, so a Dask worker holding a single core
-    /// gets no competing Rayon threads. Returns an `(ns, 182)` array: columns
+    /// Rust, one station after another, so a Dask worker limited to one core
+    /// doesn't contend with Rayon threads. Returns an `(ns, 182)` array: columns
     /// 0..=179 are the rotated peaks, and columns 180/181 are the exact 000
     /// and 090 peaks (see [`psa::psa_rotd180`]).
     #[pyfunction]
@@ -78,17 +78,17 @@ mod _core {
     ) -> Bound<'py, PyArray2<f64>> {
         let comp_0 = comp_0_py.as_array();
         let comp_90 = comp_90_py.as_array();
-        // The solve touches no Python objects, so drop the GIL for its whole
-        // duration: a threaded caller (e.g. Dask's threaded scheduler) can then
-        // run one of these per core in parallel within a single process.
+        // The solve is Rust-only, so drop the GIL for its whole duration. A
+        // threaded caller, such as Dask's threaded scheduler, then runs one of
+        // these per core inside one process.
         let psa_rotd = py.detach(|| psa::psa_rotd180(&comp_0, &comp_90, dt, w, xi));
         psa_rotd.into_pyarray(py)
     }
 
-    /// Pseudo-spectral acceleration peak for a single component, one period.
+    /// Pseudo-spectral acceleration peak for one component, one period.
     ///
     /// Used for the vertical component, which never participates in RotD, so
-    /// only its peak response (shape `(ns,)`) is needed.
+    /// its peak response (shape `(ns,)`) suffices.
     #[pyfunction]
     fn _psa_peak<'py>(
         py: Python<'py>,

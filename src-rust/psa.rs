@@ -39,11 +39,11 @@ fn newmark_beta_solver(
     let mut udot = dudt0;
     let mut uddot = -waveform[0] - (c * udot + k * u[0]); // negated because ground motion
 
-    // ENCI335 notes solve for u''_n+1, but for numerical stability reasons we really want to solve for displacement directly and then derive velocity and acceleration from that.
+    // ENCI335 notes solve for u''_n+1, but numerical stability argues for solving for displacement directly and then deriving velocity and acceleration from that.
     // Basically the formulations in the ENCI notes solve for acceleration and then integrate to get displacement, but this involves the calculation of
     // d_pti = waveform[i + 1] - waveform[i]
-    // which is a noisy floating-point operation. We then numerically integrate that noise twice which amplifies the noise fed into the rest of the calculations.
-    // Instead: implicitly solve for displacement and differentiate. The u at each time step is the smoothed response, so it is more robust to signal noise from the waveform.
+    // a floating-point operation that introduces noise. Integrating that noise twice amplifies it into the rest of the calculations.
+    // Instead: implicitly solve for displacement and differentiate. The u at each time step is the smoothed response, so it's less sensitive to signal noise from the waveform.
     // See https://collab.dvb.bayern/spaces/TUMmodsim/pages/71122788/Newmark-%CE%B2+method for the derivation when beta = 1/4, gamma = 1/2.
     for i in 0..(nt - 1) {
         let u_n = u[i];
@@ -64,12 +64,10 @@ fn choose_gamma_beta(dt: f64, w: f64) -> (f64, f64) {
 
     let stability_constant = 0.551328895421792;
     // Whilst the linear solver is theoretically stable for ratios
-    // dt/T up to 0.551-ish, we want to be a bit more conservative
-    // about when we choose the linear solver instead of the constant
-    // solver. During testing, we pick a conservative 80%. This means we leave
-    // some result accuracy on the table, but I can live with this
-    // because it only affects very short period pSA with large
-    // timesteps.
+    // dt/T up to 0.551-ish, the switch from the constant solver to the
+    // linear one uses a wider margin than that. Testing settled on 80%.
+    // The cost is a little accuracy, and it falls only on short period
+    // pSA with large timesteps.
     let stability_fraction = 0.8;
     let effective_stability_constant = stability_fraction * stability_constant;
     let pi = std::f64::consts::PI;
@@ -97,9 +95,9 @@ pub fn newmark_beta_method(
 /// Solve the SDOF oscillator equation for every row of `waveforms`, serially.
 ///
 /// The `waveforms` array has shape `(ns, nt)`, where `ns` is the number of
-/// stations and `nt` the number of timesteps. Each row is solved with the
+/// stations and `nt` the number of timesteps. This solves each row with the
 /// Newmark-Beta method for an oscillator of angular frequency `w` and damping
-/// coefficient `xi`, and the resulting displacement response is written to the
+/// coefficient `xi`, and writes the resulting displacement response to the
 /// matching row of the `(ns, nt)` output.
 pub fn newmark_beta_method_batch(
     waveforms: &ArrayView2<f64>,
@@ -117,26 +115,26 @@ pub fn newmark_beta_method_batch(
 }
 
 /// Pseudo-spectral acceleration at every integer rotation angle 0..=179
-/// degrees, for a single oscillator period, computed **serially**.
+/// degrees, for one oscillator period, computed **serially**.
 ///
-/// For each station the two horizontal components are pushed through the
-/// Newmark-beta SDOF solver (kept in f64 for accuracy over long records) and
-/// the displacement responses are reduced to their peak rotated amplitude at
-/// every angle by [`crate::rotd::Hull::peaks`]. Multiplying by `w^2`
+/// For each station this runs the two horizontal components through the
+/// Newmark-beta SDOF solver (f64 throughout, for accuracy over long records),
+/// then [`crate::rotd::Hull::peaks`] reduces the displacement responses to
+/// their peak rotated amplitude at every angle. Multiplying by `w^2`
 /// converts the peak relative displacement of the unit-mass oscillator to a
 /// pseudo-spectral acceleration.
 ///
 /// The loop over stations is deliberately serial: this runs one period per
-/// call inside a Dask worker that already owns a core, so spawning a Rayon
-/// pool here would oversubscribe the machine and fight the outer scheduler.
-/// The RotD hull's work buffers are allocated once and reused for every
-/// station.
+/// call inside a Dask worker that already has a core to itself, so spawning a
+/// Rayon pool here would oversubscribe the machine and fight the outer
+/// scheduler. The RotD hull allocates its work buffers once and reuses them
+/// for every station.
 ///
 /// `comp_0` and `comp_90` are the 000 and 090 acceleration waveforms with
 /// shape `(ns, nt)`. The result has shape `(ns, 182)`: columns 0..=179 are
 /// the rotated peaks at each integer angle, and columns 180 and 181 are the
 /// exact peaks of the unrotated 000 and 090 responses (`w^2 * max|response|`),
-/// so a caller who only needs those two components does not have to re-derive
+/// so a caller who only needs those two components doesn't have to re-derive
 /// them from angle 0 / angle 90, which are off by `cos(90 deg) ~= 6.12e-17`
 /// rather than being exactly zero.
 pub fn psa_rotd180(
@@ -169,11 +167,11 @@ pub fn psa_rotd180(
     out
 }
 
-/// Pseudo-spectral acceleration peak for a single component, one period.
+/// Pseudo-spectral acceleration peak for one component, one period.
 ///
-/// `waveforms` has shape `(ns, nt)`. Only the peak response is returned
-/// (shape `(ns,)`), so a caller that needs just one component -- e.g. the
-/// vertical, which never participates in RotD -- does not have to move a
+/// `waveforms` has shape `(ns, nt)`. This returns only the peak response
+/// (shape `(ns,)`), so a caller that needs just one component -- the
+/// vertical, say, which never participates in RotD -- doesn't have to move a
 /// full `(ns, nt)` displacement response back into Python.
 pub fn psa_peak(waveforms: &ArrayView2<f64>, dt: f64, w: f64, xi: f64) -> Array1<f64> {
     let conversion_factor = w * w;
@@ -256,8 +254,8 @@ mod tests {
 
         let u = newmark_beta_solver(waveform.view(), dt, w, XI, GAMMA, BETA, 0.0, 0.0);
 
-        // Of course we could use the exact solution here. This test is to determine
-        // the long-term behaviour of the solver accumulating floating point error.
+        // The exact solution would serve here too. This test measures the
+        // long-term behaviour of the solver accumulating floating point error.
         let uss = -M / (M * w * w);
         let uss_est = u[waveform.dim() - 1];
         let err = (uss_est - uss).abs();
@@ -276,7 +274,7 @@ mod tests {
         // Test a more complicated sum of frequencies
         let t = Array1::<f64>::linspace(0.0, 10.0, 100_000);
         let dt = t[1] - t[0];
-        // W(t) = sum_i 1/i * sin(pi * i * t)
+        // W(t) = sum_n 1/n * sin(pi * n * t)
         let waveform = t.map(|&t| {
             (1..100)
                 .map(|freq| {

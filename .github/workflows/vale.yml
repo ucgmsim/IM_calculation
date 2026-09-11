@@ -25,14 +25,16 @@ jobs:
         run: vale sync
 
       # `git ls-files` rather than a fixed path list: it picks up new
-      # directories on its own and never walks .venv or target/.
+      # directories on its own and never walks .venv or target/. Rust is in
+      # scope alongside Python: the crate under src-rust/ has as much
+      # explanatory prose in it as the Python does.
       #
       # Vale exits 0 when every alert is a warning or a suggestion, so the gate
       # is "Vale printed nothing". Status 2 and above is Vale itself failing.
       - name: Vale
         run: |
           status=0
-          vale --output=line $(git ls-files '*.py' '*.md') > alerts.txt || status=$?
+          vale --output=line $(git ls-files '*.py' '*.md' '*.rs') > alerts.txt || status=$?
           if [ "$status" -gt 1 ]; then
             echo "::error::Vale exited with status $status"
             exit "$status"

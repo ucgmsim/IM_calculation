@@ -24,7 +24,7 @@ pub fn significant_duration(
     low: f64,
     high: f64,
 ) -> Array1<f64> {
-    // Binary search for values above threshold
+    // Binary search for values over the threshold
     arias_intensity.map_axis(Axis(1), |normalised_intensity| {
         threshold_search(normalised_intensity, dt, low, high)
     })
