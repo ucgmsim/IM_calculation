@@ -1,0 +1,18 @@
+name: CI
+
+on: [pull_request]
+
+jobs:
+  ci:
+    # @main rather than @v1: the v1 tag predates the Cargo.toml-gated Rust
+    # jobs, and this repo ships the IM._core crate under src-rust/.
+    uses: ucgmsim/meta-ci-action/.github/workflows/ci.yml@main
+    with:
+      package-dir: IM
+      # `dev`, `test` and `types` are optional-dependency extras rather than a
+      # [dependency-groups] table, so --all-extras is what pulls them in;
+      # --dev would be a no-op here.
+      uv-extra-args: "--all-extras"
+      enable-coverage: true
+      cov-package: IM
+      cov-fail-under: 95
