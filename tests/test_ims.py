@@ -706,8 +706,8 @@ def test_component_orientation_with_named_components(
 
 
 # Lazy (dask-backed) input must produce a lazy Dataset whose computed values
-# are bit-identical to the eager result -- station chunking never mixes rows,
-# so nothing about laziness should change the numbers.
+# are bit-identical to the eager result. Station chunking never mixes rows, so
+# nothing about laziness should change the numbers.
 LAZY_CASES = [
     pytest.param(ims.peak_ground_acceleration, {}, id="pga"),
     pytest.param(ims.peak_ground_velocity, {"dt": 0.01}, id="pgv"),

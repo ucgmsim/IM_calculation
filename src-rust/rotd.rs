@@ -286,8 +286,8 @@ mod tests {
     /// The bound holds because the rotated traces at angles theta and
     /// theta + 90 degrees, sampled at the time of the RotD100 peak, have squared
     /// amplitudes summing to RotD100^2 at least. So one angle of every such
-    /// pair at minimum -- 90 of the 180 angles -- peaks at RotD100 / sqrt(2)
-    /// or higher, which puts the median there too.
+    /// pair at minimum (90 of the 180 angles) peaks at RotD100 / sqrt(2) or
+    /// higher, which puts the median there too.
     fn assert_ratio_bounded(comp_0: ArrayView1<f64>, comp_90: ArrayView1<f64>, case: &str) -> f64 {
         let [rotd00, rotd50, rotd100, ..] = brute_stats(comp_0, comp_90);
         assert!(
@@ -319,7 +319,7 @@ mod tests {
     }
 
     /// A non-zero waveform, sampled in [-1, 1). RotD ratios are scale
-    /// invariant, so amplitude isn't worth exploring here -- the fixed tests
+    /// invariant, so amplitude isn't worth exploring here. The fixed tests
     /// cover the extremes of the floating point range instead. This strategy
     /// leaves out the all-zero record, which has no polarisation direction;
     /// `test_ratio_bound_degenerate_records` covers that one.
@@ -539,7 +539,7 @@ mod tests {
         // the extreme quadrilateral onto a triangle. The cull must still drop
         // the interior. With a zero-length quad edge every cross product comes
         // out zero, which puts every point outside the box, and the sort then
-        // handles the whole record -- which is how 3497857_PARS_HN_20 lost 7x
+        // handles the whole record, which is how 3497857_PARS_HN_20 lost 7x
         // of its speedup.
         let interior = 1000;
         let mut comp_0 = Array1::zeros(interior + 3);
