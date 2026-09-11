@@ -170,9 +170,9 @@ pub fn psa_rotd180(
 /// Pseudo-spectral acceleration peak for one component, one period.
 ///
 /// `waveforms` has shape `(ns, nt)`. This returns only the peak response
-/// (shape `(ns,)`), so a caller that needs just one component -- the
-/// vertical, say, which never participates in RotD -- doesn't have to move a
-/// full `(ns, nt)` displacement response back into Python.
+/// (shape `(ns,)`), so a caller that needs just one component (the vertical,
+/// say, which never participates in RotD) doesn't have to move a full
+/// `(ns, nt)` displacement response back into Python.
 pub fn psa_peak(waveforms: &ArrayView2<f64>, dt: f64, w: f64, xi: f64) -> Array1<f64> {
     let conversion_factor = w * w;
     Array1::from_shape_fn(waveforms.nrows(), |s| {

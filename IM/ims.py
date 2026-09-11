@@ -79,9 +79,9 @@ def _as_waveform(waveform: Waveform) -> xr.DataArray:
 
     A bare `(n_components, n_stations, nt)` ndarray becomes an eager
     DataArray with dims `("component", "station", "time")`. For a dask-backed
-    DataArray this rechunks `component` and `time` -- the core dimensions
-    every kernel operates on -- into one chunk each, and preserves whatever
-    `station` chunking the input had.
+    DataArray this rechunks `component` and `time` (the core dimensions every
+    kernel operates on) into one chunk each, and preserves whatever `station`
+    chunking the input had.
 
     Parameters
     ----------
@@ -130,7 +130,8 @@ def _components(block: np.ndarray) -> tuple[ChunkedWaveformArray, tuple[int, ...
     input had (normally just `station`, but there may be none or several).
     Moving the component axis to the front and forcing a contiguous float64
     copy collapses `lead` into one row axis, so `components[i]` is a
-    contiguous `(n_rows, nt)` matrix -- what every `_core` kernel expects.
+    contiguous `(n_rows, nt)` matrix, which is what every `_core` kernel
+    expects.
     Callers restore the original leading shape with `out.reshape(lead + (...))`.
 
     Parameters
@@ -167,7 +168,7 @@ def _im_dataset(
     The kernel receives a `(*lead, n_components, nt)` block (see
     `_components`) and must return a `(*lead, *extra_sizes, len(components))`
     array. Unstacking the trailing component axis gives a `Dataset` with one
-    variable per component -- lazy if the waveform was lazy.
+    variable per component, lazy if the waveform was lazy.
 
     Parameters
     ----------
@@ -755,7 +756,7 @@ def _konno_smooth(spectrum_data: np.ndarray, konno: np.ndarray) -> np.ndarray:
     to float64 before the product. Taking a block of output columns at a
     time bounds the promoted array to `KONNO_BLOCK_BYTES` while leaving each
     output element one full-length float64 accumulation, so the result is
-    the same product, not an approximation of it -- the blocking divides the
+    the same product, not an approximation of it. The blocking divides the
     output columns only, never the contraction axis (the matrix's rows).
 
     Parameters

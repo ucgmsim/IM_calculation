@@ -167,12 +167,12 @@ impl Hull {
 }
 
 /// Reduce the 180 per-angle peaks to the (min, median, max) rotated
-/// amplitude -- RotD00, RotD50 and RotD100 -- and the orientation in degrees
-/// at which each of the three occurs.
+/// amplitude (RotD00, RotD50 and RotD100) and the orientation in degrees at
+/// which each of the three occurs.
 ///
-/// RotD00 and RotD100 each belong to one angle -- the argmin and argmax of
-/// the sweep -- and where several angles reach the same peak, this reports the
-/// lowest of them. RotD50 belongs to no one angle. The median of an even
+/// RotD00 and RotD100 each belong to one angle, the argmin and argmax of the
+/// sweep. Where several angles reach the same peak, this reports the lowest
+/// of them. RotD50 belongs to no one angle. The median of an even
 /// number of samples falls between the two central ones, so its value remains
 /// the average of that pair, and the orientation alongside it takes the lower
 /// of the two.
@@ -351,8 +351,8 @@ mod tests {
     /// The bound holds because the rotated traces at angles theta and
     /// theta + 90 degrees, sampled at the time of the RotD100 peak, have squared
     /// amplitudes summing to RotD100^2 at least. So one angle of every such
-    /// pair at minimum -- 90 of the 180 angles -- peaks at RotD100 / sqrt(2)
-    /// or higher, which puts the median there too.
+    /// pair at minimum (90 of the 180 angles) peaks at RotD100 / sqrt(2) or
+    /// higher, which puts the median there too.
     fn assert_ratio_bounded(comp_0: ArrayView1<f64>, comp_90: ArrayView1<f64>, case: &str) -> f64 {
         let [rotd00, rotd50, rotd100, ..] = brute_stats(comp_0, comp_90);
         assert!(
@@ -384,7 +384,7 @@ mod tests {
     }
 
     /// A non-zero waveform, sampled in [-1, 1). RotD ratios are scale
-    /// invariant, so amplitude isn't worth exploring here -- the fixed tests
+    /// invariant, so amplitude isn't worth exploring here. The fixed tests
     /// cover the extremes of the floating point range instead. This strategy
     /// leaves out the all-zero record, which has no polarisation direction;
     /// `test_ratio_bound_degenerate_records` covers that one.
@@ -468,7 +468,7 @@ mod tests {
             for (i, row) in stats.rows().into_iter().enumerate() {
                 // Both entry points reduce the same hull, so the (ns, 3)
                 // statistics must be exactly the reduction of the (ns, 180)
-                // curve -- no tolerance needed to tie them together.
+                // curve, with no tolerance needed to tie them together.
                 let row_peaks: [f64; 180] = std::array::from_fn(|theta| peaks[(i, theta)]);
                 let curve_stats = rotd_stats(row_peaks);
                 prop_assert_eq!(
@@ -604,7 +604,7 @@ mod tests {
         // the extreme quadrilateral onto a triangle. The cull must still drop
         // the interior. With a zero-length quad edge every cross product comes
         // out zero, which puts every point outside the box, and the sort then
-        // handles the whole record -- which is how 3497857_PARS_HN_20 lost 7x
+        // handles the whole record, which is how 3497857_PARS_HN_20 lost 7x
         // of its speedup.
         let interior = 1000;
         let mut comp_0 = Array1::zeros(interior + 3);
