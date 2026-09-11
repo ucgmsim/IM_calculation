@@ -1,0 +1,52 @@
+name: Vale
+
+on: [pull_request]
+
+jobs:
+  vale:
+    name: Prose lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Vale
+        env:
+          VALE_VERSION: "3.19.0"
+        run: |
+          curl -sSfL \
+            "https://github.com/errata-ai/vale/releases/download/v${VALE_VERSION}/vale_${VALE_VERSION}_Linux_64-bit.tar.gz" \
+            | sudo tar -xz -C /usr/local/bin vale
+          vale --version
+
+      # Fetches the styles named by `Packages` in .vale.ini into StylesPath.
+      # The project vocabulary under .vale/config is committed and survives the
+      # sync.
+      - name: Sync Vale styles
+        run: vale sync
+
+      # `git ls-files` rather than a fixed path list: it picks up new
+      # directories on its own and never walks .venv or target/.
+      #
+      # Vale exits 0 when every alert is a warning or a suggestion, so the gate
+      # is "Vale printed nothing". Status 2 and above is Vale itself failing.
+      - name: Vale
+        run: |
+          status=0
+          vale --output=line $(git ls-files '*.py' '*.md') > alerts.txt || status=$?
+          if [ "$status" -gt 1 ]; then
+            echo "::error::Vale exited with status $status"
+            exit "$status"
+          fi
+          cat alerts.txt
+          count=$(wc -l < alerts.txt)
+          if [ "$count" -gt 0 ]; then
+            {
+              echo "### Vale: $count alert(s)"
+              echo '```'
+              cat alerts.txt
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+            echo "::error::Vale reported $count alert(s)"
+            exit 1
+          fi
+          echo "Vale is clean."

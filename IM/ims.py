@@ -21,8 +21,8 @@ from IM import (
 # `_components` has flattened any leading (broadcast) axes into `n_stations`.
 ChunkedWaveformArray = np.ndarray[tuple[int, int, int], np.dtype[np.float64]]
 
-# A (component, station, time) waveform. A bare ndarray is wrapped eagerly by
-# `_as_waveform`; a dask-backed DataArray stays lazy end to end.
+# A (component, station, time) waveform. `_as_waveform` wraps a bare ndarray
+# eagerly, and returns a dask-backed DataArray still unevaluated.
 Waveform = xr.DataArray | np.ndarray
 
 WAVEFORM_DIMS = ("component", "station", "time")
@@ -77,11 +77,11 @@ class IM(StrEnum):
 def _as_waveform(waveform: Waveform) -> xr.DataArray:
     """Normalise a waveform into a DataArray with `component` and `time` dims.
 
-    A bare `(n_components, n_stations, nt)` ndarray is wrapped as an eager
-    DataArray with dims `("component", "station", "time")`. A dask-backed
-    DataArray is rechunked so that `component` and `time` -- the core
-    dimensions every kernel operates on -- are each a single chunk; any
-    `station` chunking is left untouched.
+    A bare `(n_components, n_stations, nt)` ndarray becomes an eager
+    DataArray with dims `("component", "station", "time")`. For a dask-backed
+    DataArray this rechunks `component` and `time` -- the core dimensions
+    every kernel operates on -- into one chunk each, and preserves whatever
+    `station` chunking the input had.
 
     Parameters
     ----------
@@ -97,8 +97,8 @@ def _as_waveform(waveform: Waveform) -> xr.DataArray:
     Raises
     ------
     TypeError
-        If the waveform has the wrong number of dimensions, is missing the
-        `component`/`time` dimensions, or does not have 3 components.
+        If the waveform has the wrong number of dimensions, or lacks either
+        the `component` and `time` dimensions or a count of 3 components.
     """
     if not isinstance(waveform, xr.DataArray):
         array = np.asarray(waveform)
@@ -129,7 +129,7 @@ def _components(block: np.ndarray) -> tuple[ChunkedWaveformArray, tuple[int, ...
     `(*lead, n_components, nt)`, where `lead` is whatever loop dimensions the
     input had (normally just `station`, but there may be none or several).
     Moving the component axis to the front and forcing a contiguous float64
-    copy collapses `lead` into a single row axis, so `components[i]` is a
+    copy collapses `lead` into one row axis, so `components[i]` is a
     contiguous `(n_rows, nt)` matrix -- what every `_core` kernel expects.
     Callers restore the original leading shape with `out.reshape(lead + (...))`.
 
@@ -166,9 +166,8 @@ def _im_dataset(
 
     The kernel receives a `(*lead, n_components, nt)` block (see
     `_components`) and must return a `(*lead, *extra_sizes, len(components))`
-    array. The trailing component axis is unstacked into data variables, so
-    the result is a `Dataset` with one variable per component -- lazy if the
-    waveform was lazy.
+    array. Unstacking the trailing component axis gives a `Dataset` with one
+    variable per component -- lazy if the waveform was lazy.
 
     Parameters
     ----------
@@ -180,10 +179,10 @@ def _im_dataset(
         Names of the components the kernel produces, in output order.
     name : str
         Name recorded in `dataset.attrs["name"]`, identifying the IM. This is
-        the only place the IM name is carried, since `components` become
+        the only place that records the IM name, since `components` become
         data variables rather than a `component` dimension.
     extra_dims : mapping of str to ndarray, optional
-        Extra output dimensions the kernel introduces (e.g. `period` for pSA,
+        Extra output dimensions the kernel introduces (`period` for pSA,
         `frequency` for FAS), mapping dimension name to coordinate values.
     kwargs : mapping, optional
         Extra keyword arguments passed through to `kernel`.
@@ -192,8 +191,8 @@ def _im_dataset(
     -------
     xr.Dataset
         One data variable per component, sharing the input's `station`
-        dimension and any non-dimension coordinates (e.g. real station
-        names, `latitude`, `longitude`).
+        dimension and any non-dimension coordinates (real station names,
+        `latitude`, `longitude`).
     """
     extra_dims = extra_dims or {}
     kwargs = kwargs or {}
@@ -232,7 +231,7 @@ def _rotd_kernel(
         A `(*lead, n_components, nt)` waveform block.
     transform : callable, optional
         Applied to the `(3, n_rows, nt)` component matrices before taking
-        peaks (e.g. integration for PGV/PGD). Must preserve the leading
+        peaks (integration for PGV/PGD). Must preserve the leading
         `(3, n_rows, ...)` shape.
 
     Returns
@@ -269,8 +268,8 @@ def compute_intensity_measure_rotd(
     name : str
         Name of the resulting dataset (recorded in `dataset.attrs["name"]`).
     transform : callable, optional
-        Applied to the acceleration components before taking peaks (e.g.
-        integration to velocity/displacement for PGV/PGD).
+        Applied to the acceleration components before taking peaks:
+        integration to velocity or displacement for PGV and PGD.
 
     Returns
     -------
@@ -396,8 +395,8 @@ def _cav_kernel(block: np.ndarray, *, dt: float, threshold: float | None) -> np.
     dt : float
         Timestep resolution (s).
     threshold : float or None
-        Acceleration threshold ($cm/s^2$). Samples below it are zeroed
-        before integrating. `None` or zero integrates the record as-is.
+        Acceleration threshold ($cm/s^2$). The kernel zeroes samples below
+        it before integrating. `None` or zero integrates the record as-is.
 
     Returns
     -------
@@ -429,13 +428,14 @@ def cumulative_absolute_velocity(
     dt : float
         Timestep resolution (s).
     threshold : float, optional
-        Acceleration threshold ($cm/s^2$). Values below this are ignored (e.g. 5 for CAV5).
+        Acceleration threshold ($cm/s^2$), 5 for CAV5. The calculation
+        ignores values below it.
 
     Returns
     -------
     xr.Dataset
-        One data variable per component (`attrs["name"]` is `CAV5` if
-        `threshold` is set, else `CAV`) containing CAV values (m/s) for
+        One data variable per component (`attrs["name"]` becomes `CAV5` with
+        a `threshold`, else `CAV`) containing CAV values (m/s) for
         ['000', '090', 'ver', 'geom'].
     """
     name = IM.CAV5.value if threshold else IM.CAV.value
@@ -506,9 +506,9 @@ def _duration_kernel(
         Timestep resolution (s).
     quantile_low : float
         Lower bound of the Arias intensity accumulation window, as a
-        fraction of the total (e.g. 0.05 for Ds595).
+        fraction of the total (0.05 for Ds595).
     quantile_high : float
-        Upper bound of that window (e.g. 0.95 for Ds595).
+        Upper bound of that window (0.95 for Ds595).
 
     Returns
     -------
@@ -543,9 +543,9 @@ def significant_duration(
     dt : float
         Timestep resolution (s).
     percent_low : float
-        Lower bound percentage (e.g., 5.0 for 5%).
+        Lower bound percentage, 5.0 for 5%.
     percent_high : float
-        Upper bound percentage (e.g., 95.0 for 95%).
+        Upper bound percentage, 95.0 for 95%.
     name : str, optional
         Name of the resulting dataset.
 
@@ -622,10 +622,10 @@ def _psa_kernel(
     Loops over periods internally (rather than treating `period` as a
     broadcast input) so every IM kernel shares one contract: `(*lead,
     n_components, nt) -> (*lead, *extra, k)`. Station-chunk parallelism is
-    already ample, so nothing is lost by not also parallelising over period.
+    already ample, so the period loop here runs at no extra cost.
 
-    When `full_rotd180` is set, the full 180-angle RotD curve computed for
-    the summary statistics is also returned rather than discarded, so the
+    With `full_rotd180`, this also returns the full 180-angle RotD curve
+    behind the summary statistics rather than discarding it, so the
     Newmark-beta solve never runs twice for the same (period, station chunk).
 
     Parameters
@@ -645,7 +645,7 @@ def _psa_kernel(
         A `(*lead, len(periods), len(ROTD_COMPONENTS))` array of pseudo
         spectral accelerations (g).
     ndarray
-        Only when `full_rotd180` is set: the `(*lead, len(periods),
+        Only with `full_rotd180`: the `(*lead, len(periods),
         N_ROTD180_ANGLES)` rotated-peak curve those statistics came from.
     """
     components, lead = _components(block)
@@ -662,7 +662,7 @@ def _psa_kernel(
         # (rows, 182): 180 rotated peaks, then the exact 000 and 090 peaks.
         psa = _core._psa_rotd180(comp_0, comp_90, dt, w, DAMPING)
         # Reduced in rust, by the same code the peak ground motion RotD uses,
-        # so the statistics and their orientations are defined in one place.
+        # so one place defines the statistics and their orientations.
         stats = _core._rotd180_stats(psa[:, :N_ROTD180_ANGLES])
         peak_0, peak_90 = psa[:, 180], psa[:, 181]
         peak_ver = _core._psa_peak(comp_ver, dt, w, DAMPING)
@@ -702,7 +702,7 @@ def pseudo_spectral_acceleration(
         If set, also include a `rotd180` data variable with an extra `angle`
         dimension (0..179 degrees), holding pSA (g) at every rotation angle.
         This reuses the same Newmark-beta solve already run for the summary
-        statistics, rather than repeating it.
+        statistics.
 
     Returns
     -------
@@ -712,7 +712,7 @@ def pseudo_spectral_acceleration(
         ['000', '090', 'ver', 'geom', 'rotd0', 'rotd50', 'rotd100'], then
         `rotd0_orientation`, `rotd50_orientation` and `rotd100_orientation`
         holding the angle (degrees) at which each RotD statistic occurs. If
-        `full_rotd180` is set, also a `rotd180` variable with dims
+        you pass `full_rotd180`, also a `rotd180` variable with dims
         (..., period, angle).
     """
     periods = np.asarray(periods, dtype=np.float64)
@@ -750,13 +750,13 @@ def pseudo_spectral_acceleration(
 def _konno_smooth(spectrum_data: np.ndarray, konno: np.ndarray) -> np.ndarray:
     """Multiply a spectrum by a Konno-Ohmachi matrix, a block of columns at a time.
 
-    `konno` is a float32 memmap that can reach tens of gigabytes. Writing
+    `konno` is a float32 memmap of up to tens of gigabytes. Writing
     `spectrum_data @ konno` directly makes numpy promote the *entire* matrix
     to float64 before the product. Taking a block of output columns at a
     time bounds the promoted array to `KONNO_BLOCK_BYTES` while leaving each
-    output element a single full-length float64 accumulation, so the result
-    is the same product, not an approximation of it -- only the contraction
-    axis (the matrix's rows) must never be split, and it isn't here.
+    output element one full-length float64 accumulation, so the result is
+    the same product, not an approximation of it -- the blocking divides the
+    output columns only, never the contraction axis (the matrix's rows).
 
     Parameters
     ----------
@@ -793,7 +793,7 @@ def smooth_and_interpolate(
     Parameters
     ----------
     spectrum_data : ndarray
-        The spectrum data to be smoothed and interpolated.
+        The spectrum data to smooth and interpolate.
     konno : ndarray
         The Konno-Ohmachi smoothing matrix to apply to the spectrum data.
     freqs : ndarray of float64
@@ -833,11 +833,11 @@ def _fas_kernel(
     n_fft : int
         Length the record is zero-padded to before the real FFT.
     freqs : ndarray of float
-        Output frequencies (Hz) the smoothed spectrum is interpolated onto.
+        Output frequencies (Hz) for the interpolated spectrum.
     fa_frequencies : ndarray of float
-        The `rfft` bin frequencies (Hz) the Konno-Ohmachi matrix is sized for.
+        The `rfft` bin frequencies (Hz) that size the Konno-Ohmachi matrix.
     ko_directory : Path
-        Directory the cached Konno-Ohmachi matrices are read from.
+        Directory holding the cached Konno-Ohmachi matrices.
 
     Returns
     -------
@@ -853,9 +853,9 @@ def _fas_kernel(
     for index in range(n_components):
         spectra[index] = np.abs(fft.rfft(components[index], n=n_fft, axis=-1) * dt)
 
-    # EAS is computed from the *unsmoothed* spectrum to avoid distortion of
-    # inter-frequency correlations, then smoothed alongside 000/090/ver in a
-    # single pass over the (potentially huge) Konno matrix.
+    # EAS comes from the *unsmoothed* spectrum, to avoid distorting the
+    # inter-frequency correlations, and then smooths alongside 000/090/ver in
+    # one pass over the (potentially huge) Konno matrix.
     eas_unsmoothed = np.sqrt(
         0.5
         * (np.square(spectra[Component.COMP_0]) + np.square(spectra[Component.COMP_90]))
@@ -878,8 +878,7 @@ def fourier_amplitude_spectra(
 ) -> xr.Dataset:
     """Compute Fourier Amplitude Spectrum (FAS) of seismic waveforms.
 
-    The FAS is computed using FFT and then smoothed using the Konno-Ohmachi
-    smoothing algorithm.
+    An FFT gives the FAS, which the Konno-Ohmachi algorithm then smooths.
 
     Parameters
     ----------

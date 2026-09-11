@@ -9,7 +9,7 @@ import pandas as pd
 def strip_trailing_nans(arr: np.ndarray) -> np.ndarray:
     """Remove trailing NaNs from a 2D numpy array.
 
-    Only removes NaNs if they are at the end of columns.
+    Only removes NaNs if they're at the end of columns.
 
     Parameters
     ----------
@@ -21,10 +21,10 @@ def strip_trailing_nans(arr: np.ndarray) -> np.ndarray:
     np.ndarray
         2D numpy array with trailing NaNs removed.
     """
-    # Find last non-NaN index in each column. This is done by taking the
-    # maximum of an array of the same shape as `arr`, containing column
-    # indices columns and with nan's replaced by zeros.
-    # e.g.
+    # Find last non-NaN index in each column, by taking the maximum of an
+    # array of the same shape as `arr` that holds column indices and carries
+    # zeros wherever `arr` has a NaN.
+    # Given:
     #
     # 1     2    3.5
     # 6     7    8

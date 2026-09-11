@@ -155,9 +155,9 @@ def _dataset_to_frame(dataset: xr.Dataset, index: list[str]) -> pd.DataFrame:
     """Convert a component-per-variable IM dataset into a wide DataFrame.
 
     Each component (`000`, `090`, ..., `rotd100`) is already a data variable,
-    so the dataset's own columns are the frame's columns; this just drops
-    any non-dimension coordinates (e.g. `latitude`/`longitude`, when a real
-    DataArray is passed in) and replaces the row index with `index`.
+    so the dataset's own columns are the frame's columns. This drops any
+    non-dimension coordinates, such as the `latitude` and `longitude` a real
+    DataArray carries, and replaces the row index with `index`.
 
     Parameters
     ----------
@@ -185,7 +185,7 @@ def calculate_ims(
     ko_directory: Path | None = None,
 ):
     """
-    Calculate intensity measures for a single waveform.
+    Calculate intensity measures for one waveform.
 
     Parameters
     ----------
@@ -194,7 +194,8 @@ def calculate_ims(
     dt : float
         Sampling interval (dt) of the waveform.
     ims_list : list of IM, optional
-        List of intensity measures (IMs) to calculate, e.g., [IM.PGA, IM.pSA, IM.CAV].
+        List of intensity measures (IMs) to calculate, such as
+        [IM.PGA, IM.pSA, IM.CAV].
     periods : np.ndarray, optional
         List of periods required for calculating the pseudo-spectral acceleration (pSA).
     frequencies : np.ndarray, optional
@@ -212,7 +213,8 @@ def calculate_ims(
     Raises
     ------
     ValueError
-        If the IM is not recognized or if required environment variables are not set to 1.
+        If the IM isn't recognized, or if the required environment variables
+        aren't set to 1.
     """
     if ims_list is None:
         ims_list = list(IM)
@@ -278,6 +280,6 @@ def calculate_ims(
             )
         results.append(result)
 
-    # Combine all results into a single DataFrame
+    # Combine all results into one DataFrame
     output_ims = pd.concat(results).T
     return output_ims

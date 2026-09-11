@@ -1,1 +1,1 @@
-Welcome to the wiki!
+Welcome to the wiki.
