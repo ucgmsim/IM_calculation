@@ -127,6 +127,12 @@ checks = [
   "YD01",
 ]
 
+[tool.deptry]
+# The retired lint.yml invoked `deptry . -ddg test,dev,types`. The shared
+# workflow calls `deptry .` with no arguments, so the list of extras that are
+# really development-only lives here instead.
+optional_dependencies_dev_groups = ["test", "dev", "types"]
+
 [tool.uv]
 cache-keys = [
   { file = "pyproject.toml" },
