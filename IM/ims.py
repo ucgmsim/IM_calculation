@@ -35,7 +35,6 @@ ROTD_COMPONENTS = (
     "rotd50",
     "rotd100",
     "rotd0_orientation",
-    "rotd50_orientation",
     "rotd100_orientation",
 )
 GEOM_COMPONENTS = ("000", "090", "ver", "geom")
@@ -247,7 +246,7 @@ def _rotd_kernel(
     peak_0 = np.abs(comp_0).max(axis=-1)
     peak_90 = np.abs(comp_90).max(axis=-1)
     peak_ver = np.abs(comp_ver).max(axis=-1)
-    # (rows, 6) = rotd0, rotd50, rotd100 then their three orientations.
+    # (rows, 5) = rotd0, rotd50, rotd100 then the two orientations.
     stats = _core._rotd(comp_0, comp_90)
     peaks = np.stack([peak_0, peak_90, peak_ver, np.sqrt(peak_0 * peak_90)], axis=-1)
     out = np.concatenate([peaks, stats], axis=-1)
@@ -277,8 +276,10 @@ def compute_intensity_measure_rotd(
     xr.Dataset
         One data variable per component in `ROTD_COMPONENTS`: peak values for
         `['000', '090', 'ver', 'geom', 'rotd0', 'rotd50', 'rotd100']`, then
-        `rotd0_orientation`, `rotd50_orientation` and `rotd100_orientation`
-        holding the angle (degrees) at which each RotD statistic occurs.
+        `rotd0_orientation` and `rotd100_orientation` holding the angle
+        (degrees) at which each of those two occurs. RotD50 has no
+        orientation: a continuous function reaches its median at an even
+        number of directions, so naming one would be arbitrary.
     """
     return _im_dataset(
         functools.partial(_rotd_kernel, transform=transform),
@@ -611,9 +612,9 @@ N_ROTD180_ANGLES = 180
 ROTD180_ANGLES = np.arange(N_ROTD180_ANGLES)
 
 # Column layout of an `_core._psa_rotd180` row: the 180 rotated peaks, then
-# the exact unrotated 000 and 090 peaks, then the six RotD statistics.
+# the exact unrotated 000 and 090 peaks, then the five RotD statistics.
 PSA_PEAK_COLUMNS = slice(N_ROTD180_ANGLES, N_ROTD180_ANGLES + 2)
-PSA_STATS_COLUMNS = slice(N_ROTD180_ANGLES + 2, N_ROTD180_ANGLES + 8)
+PSA_STATS_COLUMNS = slice(N_ROTD180_ANGLES + 2, N_ROTD180_ANGLES + 7)
 
 
 def _psa_kernel(
@@ -665,10 +666,10 @@ def _psa_kernel(
     )
     for index, period in enumerate(periods):
         w = 2 * np.pi / period
-        # (rows, 188): 180 rotated peaks, the exact 000 and 090 peaks, then
+        # (rows, 187): 180 rotated peaks, the exact 000 and 090 peaks, then
         # the RotD statistics row. The statistics come back from rust rather
-        # than off the curve because RotD0 and RotD100 come off the hull
-        # geometry, which only exists inside that call.
+        # than off the curve because all three come off the hull geometry,
+        # which only exists inside that call.
         psa = _core._psa_rotd180(comp_0, comp_90, dt, w, DAMPING)
         stats = psa[:, PSA_STATS_COLUMNS]
         peak_0, peak_90 = psa[:, PSA_PEAK_COLUMNS].T
@@ -717,8 +718,8 @@ def pseudo_spectral_acceleration(
         One data variable per component, each with a `period` dimension:
         PSA for
         ['000', '090', 'ver', 'geom', 'rotd0', 'rotd50', 'rotd100'], then
-        `rotd0_orientation`, `rotd50_orientation` and `rotd100_orientation`
-        holding the angle (degrees) at which each RotD statistic occurs. If
+        `rotd0_orientation` and `rotd100_orientation` holding the angle
+        (degrees) at which each of those two occurs. If
         you pass `full_rotd180`, also a `rotd180` variable with dims
         (..., period, angle).
     """

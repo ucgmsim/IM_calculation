@@ -1,4 +1,4 @@
-use std::f64::consts::PI;
+use std::f64::consts::{PI, TAU};
 
 use ndarray::prelude::*;
 
@@ -8,23 +8,169 @@ const DEGREES: f64 = PI / 180.0;
 /// an absolute value, so angles beyond 180 degrees repeat.
 pub const N_ANGLES: usize = 180;
 
-/// Columns in a RotD statistics row. First the RotD00, RotD50 and RotD100
-/// peak amplitudes, then the orientation in degrees of each one.
-pub const N_ROTD_STATS: usize = 6;
+/// Columns in a RotD statistics row. The RotD00, RotD50 and RotD100 peak
+/// amplitudes, then the orientations of the two that have one.
+pub const N_ROTD_STATS: usize = 5;
 
-/// RotD00 and RotD100 read off the hull geometry rather than the 1 degree
-/// grid, with the orientation each one occurs at.
+/// Iteration cap on the median root find. A safeguarded Newton step converges
+/// in well under ten, and the cap stops a pathological record spinning.
+const MEDIAN_ITERATIONS: usize = 128;
+
+/// RotD00, RotD50 and RotD100 off the hull geometry rather than a sampled
+/// sweep, with the orientations of the two that have one.
 ///
-/// Both are exact: the grid can only bracket them, since the true extreme of
-/// the support function rarely falls on a whole degree. That makes `at_00`
-/// and `at_100` real angles in `[0, 180)`, rather than the whole degrees the
-/// RotD50 orientation still reports.
+/// All three are exact. A sampled sweep can only bracket RotD00 and RotD100,
+/// and can only approximate the RotD50 quantile, because the extremes and the
+/// median of the rotated peak rarely fall on whole degrees.
+///
+/// RotD50 has no orientation. A continuous function reaches its median at an
+/// even number of directions, two at the fewest, so picking one of them would
+/// be arbitrary.
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
-pub struct Extremes {
+pub struct Rotd {
     pub rotd00: f64,
-    pub at_00: f64,
+    pub rotd50: f64,
     pub rotd100: f64,
+    pub at_00: f64,
     pub at_100: f64,
+}
+
+impl Rotd {
+    /// The statistics as a row, in the order the Python side reads them.
+    pub fn to_row(self) -> [f64; N_ROTD_STATS] {
+        [
+            self.rotd00,
+            self.rotd50,
+            self.rotd100,
+            self.at_00,
+            self.at_100,
+        ]
+    }
+
+    /// The same statistics with every amplitude multiplied by `factor`. The
+    /// orientations are angles, so they go through unscaled.
+    pub fn scaled(self, factor: f64) -> Self {
+        Self {
+            rotd00: self.rotd00 * factor,
+            rotd50: self.rotd50 * factor,
+            rotd100: self.rotd100 * factor,
+            ..self
+        }
+    }
+}
+
+/// One vertex of the origin-symmetric hull, and the arc of directions over
+/// which that vertex is the furthest point.
+///
+/// The arc is the vertex's normal cone, running between the outward normals
+/// of its two edges. Over it the rotated peak is `radius * cos(x)`, with `x`
+/// measured from the vertex's own direction, which is what makes the level
+/// sets of the peak solvable in closed form arc by arc.
+#[derive(Clone, Copy, Debug)]
+struct Arc {
+    /// Distance from the origin to the vertex.
+    radius: f64,
+    /// Where the arc starts and ends, in radians from the vertex's own
+    /// direction. Both fall inside `[-pi/2, pi/2]`, and `start <= end`. The
+    /// vertex direction itself need not be inside its own cone.
+    start: f64,
+    end: f64,
+    /// The smallest and largest rotated peak over the arc, so a level outside
+    /// this range settles the arc without an `acos`.
+    lowest: f64,
+    highest: f64,
+}
+
+/// Wrap an angle in radians into `(-pi, pi]`.
+fn wrap_radians(radians: f64) -> f64 {
+    let wrapped = (radians + PI).rem_euclid(TAU) - PI;
+    // `rem_euclid` returns the modulus itself for an input a hair below zero.
+    if wrapped <= -PI { PI } else { wrapped }
+}
+
+/// The measure of directions whose rotated peak is at or below `level`, in
+/// radians of turn over the full circle, and its derivative in `level`.
+///
+/// On one arc the peak is `radius * cos(x)`, so `peak <= level` holds exactly
+/// where `|x| >= acos(level / radius)`. That leaves at most two sub-arcs, one
+/// at each end, and clipping them to the arc gives the measure directly. An
+/// arc lying wholly over or wholly under `level` settles without an `acos`.
+fn level_measure(arcs: &[Arc], level: f64) -> (f64, f64) {
+    let mut measure = 0.0;
+    let mut slope = 0.0;
+    for arc in arcs {
+        if level >= arc.highest {
+            measure += arc.end - arc.start;
+            continue;
+        }
+        if level <= arc.lowest {
+            continue;
+        }
+        let ratio = level / arc.radius;
+        let half_width = ratio.clamp(-1.0, 1.0).acos();
+        let below = (-half_width).min(arc.end) - arc.start;
+        let above = arc.end - arc.start.max(half_width);
+        measure += below.max(0.0) + above.max(0.0);
+        // Each end that the level actually cuts moves at `d|x| / dlevel`,
+        // which is `1 / (radius sin(half_width))`. An end the arc's own bounds
+        // clip away has already stopped moving.
+        let mut cuts = 0.0;
+        if -half_width > arc.start && -half_width < arc.end {
+            cuts += 1.0;
+        }
+        if half_width > arc.start && half_width < arc.end {
+            cuts += 1.0;
+        }
+        // `level < highest <= radius` in this branch, so the sine is positive.
+        slope += cuts / (arc.radius * (1.0 - ratio * ratio).sqrt());
+    }
+    (measure, slope)
+}
+
+/// The level the rotated peak is at or below over exactly half the circle:
+/// RotD50, as the median of a continuous function rather than of 180 samples.
+///
+/// `level_measure` is continuous and strictly increasing between RotD00 and
+/// RotD100, because no arc is flat, so the level is unique and a bracketed
+/// root find finds it. The transcendental sum of `acos` terms has no closed
+/// form, so this is exact in the sense any root is: to the last f64 the
+/// bracket can resolve.
+///
+/// The first guess is `RotD100 / sqrt(2)`, which the sqrt(2) bound puts at or
+/// below the answer, so one evaluation usually lifts the bracket most of the
+/// way. Newton steps do the rest, with a bisection whenever one leaves the
+/// bracket or fails to halve it, which caps the work at twice a plain
+/// bisection.
+fn median_level(arcs: &[Arc], rotd00: f64, rotd100: f64) -> f64 {
+    // A record that never moves has no level to find. Spelt out rather than
+    // negated, so a NaN takes this branch too instead of falling into the
+    // loop.
+    if rotd100.is_nan() || rotd100 <= 0.0 {
+        return 0.0;
+    }
+    let (mut low, mut high) = (rotd00, rotd100);
+    let mut level = rotd100 * std::f64::consts::FRAC_1_SQRT_2;
+    let mut previous_width = f64::INFINITY;
+    for _ in 0..MEDIAN_ITERATIONS {
+        let (measure, slope) = level_measure(arcs, level);
+        if measure < PI {
+            low = level;
+        } else {
+            high = level;
+        }
+        let width = high - low;
+        if width <= f64::EPSILON * high {
+            break;
+        }
+        let newton = level - (measure - PI) / slope;
+        level = if slope > 0.0 && newton > low && newton < high && width <= 0.5 * previous_width {
+            newton
+        } else {
+            0.5 * (low + high)
+        };
+        previous_width = width;
+    }
+    0.5 * (low + high)
 }
 
 /// Fold a direction in radians into the `[0, 180)` degrees RotD covers. `u`
@@ -82,6 +228,9 @@ pub struct Hull {
     reflected: Vec<[f64; 2]>,
     /// Vertices of that origin-symmetric hull.
     symmetric: Vec<[f64; 2]>,
+    /// One arc per vertex of the symmetric hull: the directions that vertex
+    /// is the furthest point in, and the cosine the peak follows over them.
+    arcs: Vec<Arc>,
 }
 
 impl Hull {
@@ -92,6 +241,7 @@ impl Hull {
             vertices: Vec::with_capacity(256),
             reflected: Vec::with_capacity(512),
             symmetric: Vec::with_capacity(512),
+            arcs: Vec::with_capacity(512),
         }
     }
 
@@ -202,7 +352,7 @@ impl Hull {
         })
     }
 
-    /// RotD00 and RotD100 off the hull geometry, at their exact angles.
+    /// All three RotD statistics off the hull geometry, exactly.
     ///
     /// **RotD100.** For one point `p` the rotated amplitude `|p . u_theta|` is
     /// largest at `theta = atan2(p_y, p_x)`, where it equals `|p|`. So the
@@ -221,9 +371,16 @@ impl Hull {
     /// polygon, halved. The origin lies inside `S` for any trajectory, which
     /// keeps every one of those distances positive.
     ///
-    /// Both are exact rather than sampled, so each brackets the 1 degree grid:
-    /// `rotd00 <= min(sweep)` and `rotd100 >= max(sweep)`.
-    fn extremes(&mut self) -> Extremes {
+    /// **RotD50.** The same normal cones that bound the minimum decompose the
+    /// whole rotated peak into arcs, one per vertex of `S`, over each of which
+    /// the peak is one cosine. So the measure of directions whose peak is
+    /// at or below a level has a closed form arc by arc, and RotD50 is the
+    /// level where that measure is half the circle. `median_level` finds it.
+    ///
+    /// All three are exact rather than sampled. The extremes bracket the
+    /// 1 degree sweep, `rotd00 <= min(sweep)` and `rotd100 >= max(sweep)`, and
+    /// the median is the quantile of the function the sweep samples.
+    fn statistics(&mut self) -> Rotd {
         // `hypot` rather than the square root of a sum of squares. A record
         // scaled to 1e-300 underflows `px * px` to zero, and one scaled to
         // 1e300 overflows it. Either way RotD100 comes out below a RotD50 that
@@ -262,14 +419,24 @@ impl Hull {
             self.symmetric.pop();
         }
 
-        let (rotd00, at_00) = if self.symmetric.len() < 3 {
+        if self.symmetric.len() < 3 {
             // `S` came out a segment or a point, which is what a trajectory
             // confined to a line through the origin gives, whether that's a
             // linearly polarised record or one that never moves. The peak
             // across the polarisation is exactly zero, at a right angle to
-            // the direction RotD100 came from.
-            (0.0, fold_degrees((at_100 + 90.0).to_radians()))
-        } else {
+            // the direction RotD100 came from, and the peak itself follows
+            // `RotD100 |cos|`, whose median over the circle is
+            // `RotD100 cos(45 deg)` in closed form.
+            return Rotd {
+                rotd00: 0.0,
+                rotd50: rotd100 * std::f64::consts::FRAC_1_SQRT_2,
+                rotd100,
+                at_00: fold_degrees((at_100 + 90.0).to_radians()),
+                at_100,
+            };
+        }
+
+        let (rotd00, at_00) = {
             let mut rotd00 = f64::INFINITY;
             let mut at_00 = 0.0f64;
             for i in 0..self.symmetric.len() {
@@ -299,11 +466,67 @@ impl Hull {
             (rotd00, at_00)
         };
 
-        Extremes {
+        self.build_arcs();
+        Rotd {
             rotd00,
-            at_00,
+            rotd50: median_level(&self.arcs, rotd00, rotd100),
             rotd100,
+            at_00,
             at_100,
+        }
+    }
+
+    /// Decompose the circle into one arc per vertex of the symmetric hull.
+    ///
+    /// A vertex of a convex polygon is the furthest point in exactly the
+    /// directions between the outward normals of its two edges, so those
+    /// normals cut the circle into `S.len()` arcs that tile it. Over the arc
+    /// belonging to vertex `v` the rotated peak is `|v| cos(x)`, `x` measured
+    /// from `v`'s own direction.
+    ///
+    /// `v`'s direction need not lie inside its own cone: a nearer vertex can
+    /// be the furthest point in the direction a further one points along. What
+    /// does hold is that the peak never reaches zero, since the origin is
+    /// interior to `S` whenever `S` has area, which bounds the arc inside
+    /// `[-pi/2, pi/2]` of `v`.
+    fn build_arcs(&mut self) {
+        let count = self.symmetric.len();
+        self.arcs.clear();
+        for index in 0..count {
+            let vertex = self.symmetric[index];
+            let radius = vertex[0].hypot(vertex[1]);
+            if radius == 0.0 {
+                continue;
+            }
+            let direction = vertex[1].atan2(vertex[0]);
+            // The outward normal of the counter-clockwise edge that ends at
+            // this vertex, and of the one that leaves it.
+            let incoming = self.symmetric[(index + count - 1) % count];
+            let outgoing = self.symmetric[(index + 1) % count];
+            // The outward normal of a counter-clockwise edge `a -> b` is
+            // `(dy, -dx)`, whose angle is `atan2(-dx, dy)`.
+            let start =
+                wrap_radians((incoming[0] - vertex[0]).atan2(vertex[1] - incoming[1]) - direction);
+            let end =
+                wrap_radians((vertex[0] - outgoing[0]).atan2(outgoing[1] - vertex[1]) - direction);
+            // Convexity puts `start` below `end` for every vertex of a
+            // polygon with area. Skipping anything else keeps a degenerate
+            // hull from contributing a negative width.
+            if start.is_nan() || end.is_nan() || start > end {
+                continue;
+            }
+            let (near, far) = if start <= 0.0 && end >= 0.0 {
+                (0.0, start.abs().max(end.abs()))
+            } else {
+                (start.abs().min(end.abs()), start.abs().max(end.abs()))
+            };
+            self.arcs.push(Arc {
+                radius,
+                start,
+                end,
+                lowest: radius * far.cos(),
+                highest: radius * near.cos(),
+            });
         }
     }
 
@@ -314,48 +537,34 @@ impl Hull {
         self.sweep()
     }
 
-    /// The 1 degree sweep and the exact extremes, off one hull.
-    pub fn analyse(
-        &mut self,
-        x: ArrayView1<f64>,
-        y: ArrayView1<f64>,
-    ) -> ([f64; N_ANGLES], Extremes) {
+    /// RotD00, RotD50 and RotD100 for one pair of components.
+    ///
+    /// No sweep: every statistic comes off the hull, so a caller that wants
+    /// only the statistics never pays for the 180 angles.
+    pub fn rotd(&mut self, x: ArrayView1<f64>, y: ArrayView1<f64>) -> Rotd {
         self.build(x, y);
-        (self.sweep(), self.extremes())
+        self.statistics()
+    }
+
+    /// The 1 degree sweep and the exact statistics, off one hull.
+    pub fn analyse(&mut self, x: ArrayView1<f64>, y: ArrayView1<f64>) -> ([f64; N_ANGLES], Rotd) {
+        self.build(x, y);
+        (self.sweep(), self.statistics())
     }
 }
 
-/// Assemble a statistics row from the exact extremes and the 1 degree sweep
-/// the median comes off.
-///
-/// RotD00 and RotD100 come from [`Hull::extremes`], which reads them off the
-/// hull geometry instead of the sweep, so both are exact and their
-/// orientations are real angles rather than whole degrees.
-///
-/// RotD50 stays on the grid. The median of an even number of samples falls
-/// between the two central ones, so its value remains the average of that
-/// pair, and the orientation alongside it takes the lower of the two.
-pub(crate) fn rotd_stats(peaks: [f64; N_ANGLES], extremes: Extremes) -> [f64; N_ROTD_STATS] {
-    // Pair each peak with its angle through the sort, so the median has an
-    // orientation. The angle breaks ties, putting equal peaks in ascending
-    // angle whatever the sort's internal order.
-    let mut ranked: [(f64, u8); N_ANGLES] =
-        std::array::from_fn(|theta| (peaks[theta], theta as u8));
-    ranked.sort_unstable_by(|p, q| p.0.total_cmp(&q.0).then(p.1.cmp(&q.1)));
-    let (lower_median, upper_median) = (ranked[89], ranked[90]);
-    [
-        extremes.rotd00,
-        (lower_median.0 + upper_median.0) / 2.0,
-        extremes.rotd100,
-        extremes.at_00,
-        f64::from(lower_median.1),
-        extremes.at_100,
-    ]
+/// The arcs of the origin-symmetric hull of one record, for the tests that
+/// look at the decomposition rather than at what comes out of it.
+#[cfg(test)]
+fn build_arcs_for(x: ArrayView1<f64>, y: ArrayView1<f64>) -> Vec<Arc> {
+    let mut hull = Hull::default();
+    hull.build(x, y);
+    hull.statistics();
+    hull.arcs.clone()
 }
 
-/// Fill an `(ns, 6)` array with the RotD statistics of each waveform pair:
-/// three peak amplitudes then their three orientations, as laid out by
-/// [`rotd_stats`].
+/// Fill an `(ns, 5)` array with the RotD statistics of each waveform pair,
+/// laid out by [`Rotd::to_row`].
 pub fn rotd(comp_0: ArrayView2<f64>, comp_90: ArrayView2<f64>) -> Array2<f64> {
     assert_eq!(
         comp_0.nrows(),
@@ -365,9 +574,8 @@ pub fn rotd(comp_0: ArrayView2<f64>, comp_90: ArrayView2<f64>) -> Array2<f64> {
     let mut out = Array2::zeros((comp_0.nrows(), N_ROTD_STATS));
     let mut hull = Hull::with_capacity(comp_0.ncols());
     for s in 0..comp_0.nrows() {
-        let (peaks, extremes) = hull.analyse(comp_0.row(s), comp_90.row(s));
-        out.row_mut(s)
-            .assign(&ArrayView1::from(&rotd_stats(peaks, extremes)));
+        let row = hull.rotd(comp_0.row(s), comp_90.row(s)).to_row();
+        out.row_mut(s).assign(&ArrayView1::from(&row));
     }
     out
 }
@@ -387,14 +595,15 @@ pub fn rotd180_rows(comp_0: ArrayView2<f64>, comp_90: ArrayView2<f64>) -> Array2
 
 #[cfg(test)]
 mod tests {
-    use std::f64::consts::{SQRT_2, TAU};
+    use std::f64::consts::{FRAC_PI_2, SQRT_2, TAU};
 
     use ndarray::Zip;
     use ndarray::prelude::*;
     use proptest::prelude::*;
 
     use crate::rotd::{
-        DEGREES, Extremes, Hull, N_ANGLES, fold_degrees, rotd, rotd_stats, rotd180_rows,
+        Arc, DEGREES, Hull, N_ANGLES, Rotd, build_arcs_for, fold_degrees, level_measure, rotd,
+        rotd180_rows,
     };
 
     /// Floating point slack, relative to the scale of the record.
@@ -407,24 +616,23 @@ mod tests {
     /// Longest waveform handed to [`brute_extremes`], which is cubic.
     const MAX_BRUTE_NT: usize = 24;
 
-    /// The tightest bound on RotD100 / RotD50, now that RotD100 comes off the
-    /// hull and RotD50 still comes off the 1 degree grid.
+    /// The bound on RotD100 / RotD50, exactly sqrt(2) once both statistics are
+    /// continuous.
     ///
     /// `f(theta) >= RotD100 * |cos(theta - phi)|` for every theta, phi being
     /// the direction RotD100 points along, because the furthest timestep on
-    /// its own already projects that far. Order statistics inherit the
-    /// inequality, so the two central grid peaks are at least
-    /// `RotD100 * cos((45 -+ beta) deg)`, beta being phi's offset from the
-    /// nearest whole degree, which puts RotD50 at `RotD100 * cos(beta) /
-    /// sqrt(2)` or higher.
+    /// its own already projects that far. A pointwise inequality holds for
+    /// quantiles too, and the median of `|cos|` over the circle comes out at
+    /// `cos(45 deg)` exactly, because the directions where `|cos| >= c`
+    /// measure `4 acos(c)`, which is half the circle at `c = cos(45 deg)`. So
+    /// `RotD50 >= RotD100 / sqrt(2)`.
     ///
-    /// Reading RotD100 off the grid as well forced beta to zero and made the
-    /// bound sqrt(2) exactly. Reading it off the hull instead moves the peak
-    /// up to half a degree off-grid, and that half degree is the whole of the
-    /// difference. Polarised records still attain the bound.
-    fn ratio_bound() -> f64 {
-        SQRT_2 / (0.5 * DEGREES).cos()
-    }
+    /// Sampling either statistic loosens this. With both on the 1 degree grid
+    /// the bound was exact but neither value was. With RotD100 exact and
+    /// RotD50 sampled it opened to `sqrt(2) / cos(0.5 deg)`. Exact throughout,
+    /// it closes again, and linearly polarised records attain it at every
+    /// angle.
+    const RATIO_BOUND: f64 = SQRT_2;
 
     /// The rotated peak at an arbitrary angle in degrees, straight off the
     /// timesteps: the function every RotD statistic is an extreme or a
@@ -448,9 +656,14 @@ mod tests {
         Hull::default().peaks(x, y)
     }
 
-    /// The exact extremes for one record, with a fresh hull.
-    fn extremes(x: ArrayView1<f64>, y: ArrayView1<f64>) -> Extremes {
-        Hull::default().analyse(x, y).1
+    /// The exact statistics for one record, with a fresh hull.
+    fn statistics(x: ArrayView1<f64>, y: ArrayView1<f64>) -> Rotd {
+        Hull::default().rotd(x, y)
+    }
+
+    /// The arcs of the origin-symmetric hull for one record.
+    fn arcs_for(x: ArrayView1<f64>, y: ArrayView1<f64>) -> Vec<Arc> {
+        build_arcs_for(x, y)
     }
 
     /// RotD00 and RotD100 found without a hull, for the calipers to answer to.
@@ -467,7 +680,7 @@ mod tests {
     ///
     /// Quadratic in the candidate count and cubic overall, so the callers keep
     /// their records inside [`MAX_BRUTE_NT`].
-    fn brute_extremes(x: ArrayView1<f64>, y: ArrayView1<f64>) -> Extremes {
+    fn brute_extremes(x: ArrayView1<f64>, y: ArrayView1<f64>) -> Rotd {
         let n = x.len();
         let mut rotd100 = 0.0f64;
         let mut at_100 = 0.0f64;
@@ -506,32 +719,59 @@ mod tests {
             at_00 = fold_degrees((at_100 + 90.0).to_radians());
         }
 
-        Extremes {
+        Rotd {
             rotd00,
-            at_00,
+            // Left to the fine-sweep tests, which have their own reference for
+            // it. The candidate search here says nothing about quantiles.
+            rotd50: f64::NAN,
             rotd100,
+            at_00,
             at_100,
         }
     }
 
-    /// Assert that each reported orientation locates its own statistic, and
-    /// that the two exact extremes bracket the grid the median comes off.
+    /// The fraction of a fine angular grid whose rotated peak is at or below
+    /// `level`, over the full circle.
+    ///
+    /// An independent reading of the same quantity `level_measure` computes
+    /// off the arcs: this one knows only the timesteps. The grid count and the
+    /// true measure differ by at most one step per boundary of the level set,
+    /// and the level set has at most two boundaries per arc.
+    fn sampled_fraction_below(
+        x: ArrayView1<f64>,
+        y: ArrayView1<f64>,
+        level: f64,
+        steps: usize,
+    ) -> f64 {
+        let below = (0..steps)
+            .filter(|&step| {
+                let angle = step as f64 * 360.0 / steps as f64;
+                support(x, y, angle) <= level
+            })
+            .count();
+        below as f64 / steps as f64
+    }
+
+    /// Assert that each reported orientation locates its own statistic, that
+    /// the exact extremes bracket the 1 degree sweep, and that the median
+    /// splits the circle in half.
     fn assert_statistics_locate_themselves(x: ArrayView1<f64>, y: ArrayView1<f64>, case: &str) {
         let peaks = brute_peaks(x, y);
-        let found = extremes(x, y);
-        let [rotd00, rotd50, rotd100, at_00, at_50, at_100] = rotd_stats(peaks, found);
+        let Rotd {
+            rotd00,
+            rotd50,
+            rotd100,
+            at_00,
+            at_100,
+        } = statistics(x, y);
         let scale = rotd100.max(1.0);
 
-        for (angle, statistic) in [(at_00, "RotD00"), (at_50, "RotD50"), (at_100, "RotD100")] {
+        for (angle, statistic) in [(at_00, "RotD00"), (at_100, "RotD100")] {
             assert!(
                 (0.0..N_ANGLES as f64).contains(&angle),
                 "{case}: {statistic} orientation {angle} is outside 0..180"
             );
         }
-        assert!(
-            at_50.fract() == 0.0,
-            "{case}: RotD50 orientation {at_50} is not a whole degree"
-        );
 
         // Each exact extreme is the rotated peak at the angle reported with
         // it, which is what makes that angle a certificate rather than a
@@ -569,33 +809,34 @@ mod tests {
             "{case}: exact RotD100 {rotd100} is further than half a degree above the grid maximum {grid_max}"
         );
 
-        // The median falls between the two central peaks, so its angle ranks
-        // ninetieth of 180: fewer than 90 angles peak below it, and at least
-        // 90 peak at or below it.
-        let median_peak = peaks[at_50 as usize];
-        let below = peaks.iter().filter(|&&peak| peak < median_peak).count();
-        let at_or_below = peaks.iter().filter(|&&peak| peak <= median_peak).count();
-        assert!(
-            below <= 89 && at_or_below >= 90,
-            "{case}: RotD50 orientation {at_50} is not the lower median:              {below} angles below it, {at_or_below} at or below"
-        );
         assert!(
             rotd00 <= rotd50 && rotd50 <= rotd100,
             "{case}: RotD00 <= RotD50 <= RotD100 violated: {rotd00}, {rotd50}, {rotd100}"
         );
-        // The lowest angle of a tie, for the one statistic still on the grid.
-        let first = peaks.iter().position(|&peak| peak == median_peak).unwrap();
-        assert_eq!(
-            at_50 as usize, first,
-            "{case}: {median_peak} is first attained at {first} degrees, not {at_50}"
+
+        // The median splits the circle in half, read off a fine grid built
+        // from the timesteps alone rather than from the arcs. The grid
+        // miscounts by at most one step per boundary of the level set, and
+        // each arc puts at most two boundaries in it.
+        let steps = 7200;
+        let fraction = sampled_fraction_below(x, y, rotd50, steps);
+        let slack = 2.0 * arcs_for(x, y).len().max(1) as f64 / steps as f64;
+        assert!(
+            (fraction - 0.5).abs() <= slack,
+            "{case}: RotD50 {rotd50} splits the circle {fraction} to {}, not in half",
+            1.0 - fraction
         );
     }
 
     /// Assert the RotD100 / RotD50 bound for one pair of components, returning
-    /// the ratio. See [`ratio_bound`] for where the bound comes from.
+    /// the ratio. See [`RATIO_BOUND`] for where the bound comes from.
     fn assert_ratio_bounded(comp_0: ArrayView1<f64>, comp_90: ArrayView1<f64>, case: &str) -> f64 {
-        let found = extremes(comp_0, comp_90);
-        let [rotd00, rotd50, rotd100, ..] = rotd_stats(brute_peaks(comp_0, comp_90), found);
+        let Rotd {
+            rotd00,
+            rotd50,
+            rotd100,
+            ..
+        } = statistics(comp_0, comp_90);
         assert!(
             rotd00 <= rotd50 && rotd50 <= rotd100,
             "{case}: RotD00 <= RotD50 <= RotD100 violated: {rotd00}, {rotd50}, {rotd100}"
@@ -610,10 +851,9 @@ mod tests {
             "{case}: RotD50 is zero for a non-zero record (RotD100 = {rotd100})"
         );
         let ratio = rotd100 / rotd50;
-        let bound = ratio_bound();
         assert!(
-            ratio <= bound * (1.0 + TOL),
-            "{case}: RotD100 / RotD50 = {ratio} exceeds {bound}"
+            ratio <= RATIO_BOUND * (1.0 + TOL),
+            "{case}: RotD100 / RotD50 = {ratio} exceeds {RATIO_BOUND}"
         );
         ratio
     }
@@ -703,22 +943,15 @@ mod tests {
         ) {
             // Linearly polarised records don't merely respect the bound, they
             // reach it exactly. Their peak in every direction is
-            // |cos(theta - angle)| of the RotD100 peak, so the ratio depends
-            // on the 1 degree sampling alone. RotD100 is the peak itself and
-            // the two central grid peaks are cos((45 -+ beta) deg) of it, which
-            // puts the ratio at sqrt(2) / cos(beta) whatever the waveform.
-            let offset = angle.to_degrees().rem_euclid(1.0);
-            let beta = offset.min(1.0 - offset);
-            let expected = SQRT_2 / (beta * DEGREES).cos();
+            // |cos(theta - angle)| of the RotD100 peak, so RotD100 is that peak
+            // and RotD50 is cos(45 deg) of it, whatever the waveform and
+            // whatever the angle. The one thing the ratio no longer depends on
+            // is where the record lies relative to a whole degree.
+            let _ = angle;
             let ratio = assert_ratio_bounded(comp_0.view(), comp_90.view(), "polarised record");
             prop_assert!(
-                (ratio - expected).abs() <= TOL * expected,
-                "expected a polarised record {beta} degrees off the grid to attain \
-                 {expected}, found {ratio}"
-            );
-            prop_assert!(
-                ratio >= SQRT_2 * (1.0 - TOL) && ratio <= ratio_bound() * (1.0 + TOL),
-                "ratio {ratio} outside [sqrt(2), sqrt(2) / cos(0.5 deg)]"
+                (ratio - SQRT_2).abs() <= TOL * SQRT_2,
+                "expected a polarised record to attain sqrt(2), found {ratio}"
             );
         }
 
@@ -736,31 +969,23 @@ mod tests {
             let peaks = rotd180_rows(comp_0.view(), comp_90.view());
 
             for (i, row) in stats.rows().into_iter().enumerate() {
-                // Both entry points reduce the same hull, so the (ns, 3)
-                // statistics must be exactly the reduction of the (ns, 180)
-                // curve, with no tolerance needed to tie them together.
-                let row_peaks: [f64; N_ANGLES] = std::array::from_fn(|theta| peaks[(i, theta)]);
-                let curve_stats =
-                    rotd_stats(row_peaks, extremes(comp_0.row(i), comp_90.row(i)));
+                // Both entry points run over the same records, so the
+                // statistics must be the ones the single-record path gives,
+                // with no tolerance needed to tie them together.
+                let single = statistics(comp_0.row(i), comp_90.row(i)).to_row();
                 prop_assert_eq!(
                     row,
-                    ArrayView1::from(&curve_stats),
-                    "row {} disagrees with its own RotD180 curve", i
+                    ArrayView1::from(&single),
+                    "row {} disagrees with its own record", i
                 );
-                // And the hull must reproduce the direct scan's peaks, up
-                // to the floating point slack of evaluating fewer points. The
-                // orientations stay out of this comparison: a near-tie at an
-                // extreme can settle on either of two angles under that slack,
-                // so prop_orientations_locate_their_statistics pins them to
-                // their own sweep instead.
-                let expected = rotd_stats(
-                    brute_peaks(comp_0.row(i), comp_90.row(i)),
-                    extremes(comp_0.row(i), comp_90.row(i)),
-                );
-                for (stat, (&got, &want)) in row.iter().zip(expected.iter()).take(3).enumerate() {
+                // And the curve beside them must be the direct scan's, up to
+                // the floating point slack of evaluating fewer points.
+                let want = brute_peaks(comp_0.row(i), comp_90.row(i));
+                for theta in 0..N_ANGLES {
                     prop_assert!(
-                        (got - want).abs() <= TOL * want.max(1.0),
-                        "row {} stat {}: hull {} != brute {}", i, stat, got, want
+                        (peaks[(i, theta)] - want[theta]).abs() <= TOL * want[theta].max(1.0),
+                        "row {} angle {}: hull {} != brute {}",
+                        i, theta, peaks[(i, theta)], want[theta]
                     );
                 }
                 assert_ratio_bounded(comp_0.row(i), comp_90.row(i), &format!("row {i}"));
@@ -795,7 +1020,7 @@ mod tests {
             // The rotating-calipers minimum, against a search that knows
             // nothing about hulls: every direction where two timesteps could
             // swap the peak between them.
-            let found = extremes(comp_0.view(), comp_90.view());
+            let found = statistics(comp_0.view(), comp_90.view());
             let want = brute_extremes(comp_0.view(), comp_90.view());
             let scale = want.rotd100.max(1.0);
             prop_assert!(
@@ -823,6 +1048,164 @@ mod tests {
     }
 
     #[test]
+    fn arcs_tile_the_circle() {
+        // The normal cones of a convex polygon's vertices partition the
+        // directions, so the arc widths have to add to a full turn. A
+        // mislabelled cone, or an edge normal the wrong way round, breaks the
+        // total.
+        let records: [(Array1<f64>, Array1<f64>); 4] = [
+            (array![1.0, 0.0], array![0.0, 1.0]),
+            (array![1.0, 0.0, -0.5], array![0.0, 2.0, -1.5]),
+            (
+                Array1::from_shape_fn(64, |i| (0.3 * i as f64).sin()),
+                Array1::from_shape_fn(64, |i| (0.17 * i as f64).cos()),
+            ),
+            (
+                Array1::from_shape_fn(360, |i| (TAU * i as f64 / 360.0).cos()),
+                Array1::from_shape_fn(360, |i| (TAU * i as f64 / 360.0).sin()),
+            ),
+        ];
+        for (index, (comp_0, comp_90)) in records.iter().enumerate() {
+            let arcs = arcs_for(comp_0.view(), comp_90.view());
+            let total: f64 = arcs.iter().map(|arc| arc.end - arc.start).sum();
+            assert!(
+                (total - TAU).abs() < 1e-9,
+                "record {index}: {} arcs span {total}, not a full turn",
+                arcs.len()
+            );
+            for arc in &arcs {
+                assert!(
+                    arc.start >= -FRAC_PI_2 - 1e-12 && arc.end <= FRAC_PI_2 + 1e-12,
+                    "record {index}: an arc runs outside a right angle of its own vertex"
+                );
+                assert!(arc.lowest <= arc.highest && arc.highest <= arc.radius);
+            }
+        }
+    }
+
+    #[test]
+    fn arc_integral_matches_the_perimeter() {
+        // Cauchy's formula: integrating a convex body's support function over
+        // the circle gives its perimeter. The arcs put that integral in closed
+        // form, `radius * (sin(end) - sin(start))` each, which a perimeter
+        // measured straight off the vertices then has to match. Only a correct
+        // decomposition passes this.
+        let comp_0 = Array1::from_shape_fn(97, |i| (0.41 * i as f64).sin() + 0.3);
+        let comp_90 = Array1::from_shape_fn(97, |i| (0.13 * i as f64).cos() - 0.2);
+        let arcs = arcs_for(comp_0.view(), comp_90.view());
+        let integral: f64 = arcs
+            .iter()
+            .map(|arc| arc.radius * (arc.end.sin() - arc.start.sin()))
+            .sum();
+
+        let mut hull = Hull::default();
+        hull.rotd(comp_0.view(), comp_90.view());
+        let vertices = &hull.symmetric;
+        let perimeter: f64 = (0..vertices.len())
+            .map(|i| {
+                let a = vertices[i];
+                let b = vertices[(i + 1) % vertices.len()];
+                (b[0] - a[0]).hypot(b[1] - a[1])
+            })
+            .sum();
+        assert!(
+            (integral - perimeter).abs() <= 1e-12 * perimeter,
+            "arc integral {integral} is not the perimeter {perimeter}"
+        );
+    }
+
+    #[test]
+    fn level_measure_matches_a_fine_sweep() {
+        // The closed-form measure of directions below a level, against a
+        // count over a grid fine enough to resolve it.
+        let comp_0 = Array1::from_shape_fn(211, |i| (0.29 * i as f64).sin() * 1.4);
+        let comp_90 = Array1::from_shape_fn(211, |i| (0.07 * i as f64).cos() - 0.4);
+        let arcs = arcs_for(comp_0.view(), comp_90.view());
+        let found = statistics(comp_0.view(), comp_90.view());
+        let steps = 360_000;
+
+        for fraction in [0.0, 0.1, 0.25, 0.5, 0.75, 0.9, 1.0] {
+            let level = found.rotd00 + fraction * (found.rotd100 - found.rotd00);
+            let (measure, _) = level_measure(&arcs, level);
+            let sampled = sampled_fraction_below(comp_0.view(), comp_90.view(), level, steps) * TAU;
+            // One grid step per boundary of the level set, two boundaries per
+            // arc at most.
+            let slack = 2.0 * arcs.len() as f64 * TAU / steps as f64;
+            assert!(
+                (measure - sampled).abs() <= slack,
+                "level {level}: closed form {measure} against sampled {sampled}"
+            );
+        }
+    }
+
+    #[test]
+    fn median_matches_a_fine_sweep() {
+        // RotD50 is the level with half the circle at or below it. A sweep of
+        // 360000 directions has to agree, to within the boundaries it can
+        // miscount.
+        let comp_0 = Array1::from_shape_fn(401, |i| {
+            let t = i as f64;
+            (0.23 * t).sin() + 0.4 * (0.07 * t).cos()
+        });
+        let comp_90 = Array1::from_shape_fn(401, |i| {
+            let t = i as f64;
+            0.6 * (0.19 * t).cos() - 0.25 * (0.03 * t).sin()
+        });
+        let found = statistics(comp_0.view(), comp_90.view());
+        let steps = 360_000;
+        let fraction = sampled_fraction_below(comp_0.view(), comp_90.view(), found.rotd50, steps);
+        let arcs = arcs_for(comp_0.view(), comp_90.view());
+        let slack = 2.0 * arcs.len() as f64 / steps as f64;
+        assert!(
+            (fraction - 0.5).abs() <= slack,
+            "RotD50 {} splits the circle {fraction} to {}",
+            found.rotd50,
+            1.0 - fraction
+        );
+
+        // And the same statement the other way round: the sweep's own median
+        // has to agree, to the resolution of the sweep.
+        let mut sweep: Vec<f64> = (0..steps)
+            .map(|step| {
+                support(
+                    comp_0.view(),
+                    comp_90.view(),
+                    step as f64 * 360.0 / steps as f64,
+                )
+            })
+            .collect();
+        sweep.sort_unstable_by(f64::total_cmp);
+        let sampled_median = (sweep[steps / 2 - 1] + sweep[steps / 2]) / 2.0;
+        assert!(
+            (found.rotd50 - sampled_median).abs() <= 1e-6 * found.rotd100,
+            "RotD50 {} against the sweep's own median {sampled_median}",
+            found.rotd50
+        );
+    }
+
+    #[test]
+    fn median_of_a_polarised_record_is_the_peak_over_root_two() {
+        // A record on a line through the origin has peak RotD100 |cos|, whose
+        // median over the circle is cos(45 degrees) of the peak exactly, at
+        // every polarisation. The 1 degree sweep could only manage
+        // cos(45 deg) cos(beta) for a record beta off the nearest whole
+        // degree, which is where the old sqrt(2) / cos(0.5 deg) slack came
+        // from.
+        for polarisation in [0.0f64, 30.0, 45.0, 100.5, 137.219, 179.0] {
+            let motion = Array1::from_shape_fn(128, |i| (0.3 * i as f64).sin());
+            let (comp_0, comp_90) = polarised(&motion, polarisation.to_radians());
+            let found = statistics(comp_0.view(), comp_90.view());
+            let peak = motion.iter().fold(0.0f64, |m, &u| m.max(u.abs()));
+            let expected = peak * std::f64::consts::FRAC_1_SQRT_2;
+            assert!(
+                (found.rotd50 - expected).abs() <= 1e-12 * peak,
+                "polarisation {polarisation}: RotD50 {} is not {expected}",
+                found.rotd50
+            );
+        }
+    }
+
+    #[test]
     fn calipers_match_an_analytic_minimum() {
         // Two timesteps, at (1, 0) and (0, 2). The rotated peak is
         // max(|cos theta|, 2 |sin theta|), least where the two are equal, at
@@ -832,7 +1215,7 @@ mod tests {
         // (0, 2), (-1, 0), (0, -2), whose edges all lie 2 / sqrt(5) from the
         // origin, so the calipers have to find the same number off the
         // geometry that calculus finds off the function.
-        let found = extremes(array![1.0, 0.0].view(), array![0.0, 2.0].view());
+        let found = statistics(array![1.0, 0.0].view(), array![0.0, 2.0].view());
         let expected_rotd00 = 2.0 / 5.0f64.sqrt();
         let expected_at_00 = 0.5f64.atan().to_degrees();
         assert!(
@@ -864,7 +1247,7 @@ mod tests {
             let t = i as f64;
             0.6 * (0.19 * t).cos() - 0.25 * (0.03 * t).sin()
         });
-        let found = extremes(comp_0.view(), comp_90.view());
+        let found = statistics(comp_0.view(), comp_90.view());
 
         let steps = 180_000;
         let mut fine_min = f64::INFINITY;
@@ -895,7 +1278,7 @@ mod tests {
         for polarisation in [0.0f64, 30.0, 45.0, 100.5, 179.0] {
             let motion = Array1::from_shape_fn(64, |i| (0.3 * i as f64).sin());
             let (comp_0, comp_90) = polarised(&motion, polarisation.to_radians());
-            let found = extremes(comp_0.view(), comp_90.view());
+            let found = statistics(comp_0.view(), comp_90.view());
             let peak = motion.iter().fold(0.0f64, |m, &u| m.max(u.abs()));
 
             // Zero to rounding rather than exactly zero, because the sine and
@@ -940,10 +1323,10 @@ mod tests {
         // A record that never moves, and one with one timestep only. Neither
         // has an origin-symmetric hull with any area to run calipers over.
         let zeros = Array1::<f64>::zeros(16);
-        let still = extremes(zeros.view(), zeros.view());
+        let still = statistics(zeros.view(), zeros.view());
         assert_eq!([still.rotd00, still.rotd100], [0.0, 0.0]);
 
-        let one = extremes(array![3.0].view(), array![4.0].view());
+        let one = statistics(array![3.0].view(), array![4.0].view());
         assert_eq!(one.rotd00, 0.0, "one timestep leaves a direction unmoved");
         assert_eq!(one.rotd100, 5.0);
         assert!((one.at_100 - (4.0f64 / 3.0).atan().to_degrees()).abs() < 1e-12);
@@ -951,7 +1334,7 @@ mod tests {
         // Collinear but off the origin. The symmetric hull is a parallelogram
         // with area, so the calipers run over it, and the minimum comes out as
         // the distance to the line the record follows.
-        let off_origin = extremes(
+        let off_origin = statistics(
             Array1::from_elem(8, 2.0).view(),
             Array1::from_shape_fn(8, |i| i as f64 - 4.0).view(),
         );
@@ -997,7 +1380,7 @@ mod tests {
 
         // The extremes no longer come off this curve, so what the curve pins
         // is that they bracket it.
-        let found = extremes(comp_0.view(), comp_90.view());
+        let found = statistics(comp_0.view(), comp_90.view());
         assert!(
             found.rotd00 <= sorted[0] && sorted[179] <= found.rotd100,
             "exact extremes {} and {} do not bracket the sweep {} to {}",
@@ -1122,18 +1505,23 @@ mod tests {
     fn test_rotd_statistics() {
         let comp_0 = array![1.0f64, 0.0f64];
         let comp_90 = array![0.0f64, 1.0f64];
-        let (sweep, found) = Hull::default().analyse(comp_0.view(), comp_90.view());
-        let [min, median, max, at_min, at_median, at_max] = rotd_stats(sweep, found);
-        let expected_min = 2.0f64.sqrt() / 2.0; // such as at pi / 4 degrees
-        let expected_max = 1.0; // such as at 0 degrees
-        let expected_median = 0.9238443540096138; // derived independently with numpy
-        // The sweep is max(|cos theta|, |sin theta|): least at 45 degrees, and
-        // 1 at both 0 and 90 degrees, of which rotd_stats takes the lower. The
-        // median falls between the peaks at 157 and 158 degrees.
+        let [min, median, max, at_min, at_max] = statistics(comp_0.view(), comp_90.view()).to_row();
+        // Timesteps at (1, 0) and (0, 1) give a square for the symmetric
+        // hull, so the rotated peak is max(|cos theta|, |sin theta|). That's
+        // least at 45 degrees, worth cos(45 deg), and 1 at both 0 and 90
+        // degrees, of which the tie rule takes the lower.
+        let expected_min = 2.0f64.sqrt() / 2.0;
+        let expected_max = 1.0;
+        // Every normal cone of that square spans 90 degrees, so the peak is at
+        // or below a level over 4 * 2 * (45 deg - acos(level)) of the circle.
+        // Half the circle puts acos(level) at 22.5 degrees. The 1 degree sweep
+        // could only get to 0.9238443540096138, which is the median of its two
+        // central samples at 157 and 158 degrees.
+        let expected_median = (std::f64::consts::PI / 8.0).cos();
         assert_eq!(
-            [at_min, at_median, at_max],
-            [45.0, 157.0, 0.0],
-            "Orientations wrong: found {at_min}, {at_median}, {at_max} degrees"
+            [at_min, at_max],
+            [45.0, 0.0],
+            "Orientations wrong: found {at_min} and {at_max} degrees"
         );
         assert!(
             (min - expected_min).abs() < 1e-6,
@@ -1169,12 +1557,17 @@ mod tests {
         let curve = rotd180_rows(comp_0.view(), comp_90.view());
         let stats = rotd(comp_0.view(), comp_90.view());
         for s in 0..3 {
+            let single = statistics(comp_0.row(s), comp_90.row(s)).to_row();
+            assert_eq!(stats.row(s), ArrayView1::from(&single), "row {s}");
+            // The statistics no longer come off this curve, but they still
+            // have to bracket it.
             let row = curve.row(s);
-            let reduced = rotd_stats(
-                std::array::from_fn(|theta| row[theta]),
-                extremes(comp_0.row(s), comp_90.row(s)),
+            let grid_min = row.iter().copied().fold(f64::INFINITY, f64::min);
+            let grid_max = row.iter().copied().fold(0.0f64, f64::max);
+            assert!(
+                single[0] <= grid_min && grid_max <= single[2],
+                "row {s}: statistics do not bracket the curve"
             );
-            assert_eq!(stats.row(s), ArrayView1::from(&reduced), "row {s}");
         }
     }
 

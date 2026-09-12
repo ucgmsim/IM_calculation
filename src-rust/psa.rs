@@ -142,11 +142,11 @@ pub const PSA_ROTD180_COLUMNS: usize = crate::rotd::N_ANGLES + 2 + crate::rotd::
 ///   responses (`w^2 * max|response|`), so a caller who only needs those two
 ///   components doesn't have to re-derive them from angle 0 / angle 90, which
 ///   are off by `cos(90 deg) ~= 6.12e-17` rather than being exactly zero;
-/// - columns 182..=187, the [`crate::rotd::N_ROTD_STATS`] statistics row.
+/// - columns 182..=186, the [`crate::rotd::N_ROTD_STATS`] statistics row.
 ///
 /// The statistics come from here rather than from a second pass over the
-/// curve because RotD00 and RotD100 come off the hull geometry rather than
-/// the sweep, and this is the only place that hull exists.
+/// curve because all three come off the hull geometry rather than the sweep,
+/// and this is the only place that hull exists.
 pub fn psa_rotd180(
     comp_0: &ArrayView2<f64>,
     comp_90: &ArrayView2<f64>,
@@ -166,17 +166,13 @@ pub fn psa_rotd180(
     for s in 0..ns {
         let response_0 = newmark_beta_method(comp_0.row(s), dt, w, xi, 0.0, 0.0);
         let response_90 = newmark_beta_method(comp_90.row(s), dt, w, xi, 0.0, 0.0);
-        let (mut peaks, mut extremes) = hull.analyse(response_0.view(), response_90.view());
-        // Scale the displacement response to a pseudo-spectral acceleration
-        // before the reduction, so the statistics come out in the same units
-        // as the curve. The orientations are angles, so they go through
-        // unscaled.
+        let (mut peaks, statistics) = hull.analyse(response_0.view(), response_90.view());
+        // Scale the displacement response to a pseudo-spectral acceleration,
+        // so the curve and the statistics beside it come out in one unit.
         for peak in &mut peaks {
             *peak *= conversion_factor;
         }
-        extremes.rotd00 *= conversion_factor;
-        extremes.rotd100 *= conversion_factor;
-        let stats = crate::rotd::rotd_stats(peaks, extremes);
+        let stats = statistics.scaled(conversion_factor).to_row();
         let mut row = out.row_mut(s);
         for (angle, &peak) in peaks.iter().enumerate() {
             row[angle] = peak;
@@ -394,12 +390,10 @@ mod tests {
             let curve: [f64; crate::rotd::N_ANGLES] = std::array::from_fn(|theta| row[theta]);
             let response_0 = newmark_beta_method(comp_0.row(s), dt, w, XI, 0.0, 0.0);
             let response_90 = newmark_beta_method(comp_90.row(s), dt, w, XI, 0.0, 0.0);
-            let mut extremes = crate::rotd::Hull::default()
-                .analyse(response_0.view(), response_90.view())
-                .1;
-            extremes.rotd00 *= w * w;
-            extremes.rotd100 *= w * w;
-            let expected = crate::rotd::rotd_stats(curve, extremes);
+            let expected = crate::rotd::Hull::default()
+                .rotd(response_0.view(), response_90.view())
+                .scaled(w * w)
+                .to_row();
             for (column, &want) in expected.iter().enumerate() {
                 assert_eq!(
                     row[182 + column],

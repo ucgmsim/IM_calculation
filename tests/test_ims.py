@@ -813,26 +813,24 @@ def test_psa_full_rotd180(sample_waveforms: npt.NDArray[np.float64]) -> None:
     for component in without.data_vars:
         assert_array_equal(without[component].values, with_curve[component].values)
 
-    # rotd50 must be exactly the median over the angle axis. rotd0 and
-    # rotd100 only bracket the curve, since they come off the hull exactly
-    # and the curve samples whole degrees.
+    # Every statistic now comes off the hull rather than this curve. What the
+    # curve pins is that rotd0 and rotd100 bracket it, and that rotd50 splits
+    # it down the middle.
     curve = with_curve["rotd180"].values
     sorted_curve = np.sort(curve, axis=-1)
-    assert_array_equal(
-        (sorted_curve[..., 89] + sorted_curve[..., 90]) / 2,
-        with_curve["rotd50"].values,
-    )
     assert np.all(with_curve["rotd0"].values <= sorted_curve[..., 0])
     assert np.all(with_curve["rotd100"].values >= sorted_curve[..., 179])
     # And no further outside it than half a degree of turn.
     half_step = np.sin(np.deg2rad(0.5)) * with_curve["rotd100"].values
     assert np.all(sorted_curve[..., 0] - with_curve["rotd0"].values <= half_step)
     assert np.all(with_curve["rotd100"].values - sorted_curve[..., 179] <= half_step)
+    below = (curve <= with_curve["rotd50"].values[..., np.newaxis]).sum(axis=-1)
+    assert np.all(np.abs(below - 90) <= 2), (
+        f"rotd50 splits the 180 sampled angles {below.min()} to {below.max()}, not evenly"
+    )
 
-    # And each orientation must be the angle of its own statistic. The two
-    # exact ones point within half a degree of the grid angle they replace;
-    # rotd50 is still a whole degree, the lower of the two central angles,
-    # whose peak sits just below the reported median.
+    # And each orientation must be the angle of its own statistic, within half
+    # a degree of the grid angle it replaces.
     for statistic, grid_angle in [
         ("rotd0", curve.argmin(axis=-1)),
         ("rotd100", curve.argmax(axis=-1)),
@@ -843,12 +841,6 @@ def test_psa_full_rotd180(sample_waveforms: npt.NDArray[np.float64]) -> None:
         assert np.all(np.abs(offset) <= 0.5 + 1e-9), (
             f"{statistic} orientation is more than half a degree off the grid argument"
         )
-    at_median = np.take_along_axis(
-        curve,
-        with_curve["rotd50_orientation"].values.astype(int)[..., np.newaxis],
-        axis=-1,
-    ).squeeze(-1)
-    assert_array_equal(at_median, sorted_curve[..., 89])
 
 
 def test_rotd_orientations_match_a_direct_angle_sweep(
@@ -859,7 +851,7 @@ def test_rotd_orientations_match_a_direct_angle_sweep(
 
     rotd0 and rotd100 no longer come off that sweep, so what it pins is that
     each one is the peak at its own reported angle, and that the sweep brackets
-    it. rotd50 is still the sweep's own median.
+    it, and that rotd50 splits the directions in half.
     """
     result = ims.peak_ground_acceleration(sample_waveforms)
     comp_0 = sample_waveforms[ims.Component.COMP_0]
@@ -892,15 +884,17 @@ def test_rotd_orientations_match_a_direct_angle_sweep(
     assert np.all(result["rotd100"].values >= sweep.max(axis=-1))
     assert np.all(result["rotd100"].values - sweep.max(axis=-1) <= half_step)
 
-    sorted_sweep = np.sort(sweep, axis=-1)
-    at_median = np.take_along_axis(
-        sweep,
-        result["rotd50_orientation"].values.astype(int)[..., np.newaxis],
-        axis=-1,
-    ).squeeze(-1)
-    assert_array_equal(at_median, sorted_sweep[..., 89])
-    assert_array_equal(
-        (sorted_sweep[..., 89] + sorted_sweep[..., 90]) / 2, result["rotd50"].values
+    # rotd50 is the median of the same function, over the continuum rather
+    # than over 180 samples of it, so what a sweep can say is that half the
+    # directions fall on each side. A fine sweep says it sharply: it miscounts
+    # by at most one step per boundary of the level set, and a hull this small
+    # has only a few of those.
+    fine = peaks_at(
+        np.tile(np.linspace(0.0, 360.0, 36000, endpoint=False), (len(comp_0), 1))
+    )
+    fraction = (fine <= result["rotd50"].values[:, np.newaxis]).mean(axis=-1)
+    assert fraction == pytest.approx(0.5, abs=1e-3), (
+        f"rotd50 splits the circle {fraction}, not in half"
     )
 
 
@@ -933,15 +927,12 @@ def test_rotd_orientation_of_a_polarised_record(polarisation: float) -> None:
     # Across the direction of motion the record reads zero.
     assert result["rotd0"].values == pytest.approx(0, abs=1e-12)
 
-    # And the ratio attains its bound. RotD100 is the peak itself, while the
-    # two central grid peaks are cos((45 -+ beta) degrees) of it for a
-    # polarisation beta off the nearest whole degree, so RotD50 is
-    # RotD100 cos(beta) / sqrt(2) and the ratio is sqrt(2) / cos(beta). On the
-    # grid, where beta is 0, that's sqrt(2) exactly.
-    offset = polarisation % 1
-    beta = min(offset, 1 - offset)
+    # And the ratio attains its bound exactly, at every polarisation. The peak
+    # in every direction is |cos| of RotD100, whose median over the circle is
+    # cos(45 degrees), so the ratio is sqrt(2) however the record lies
+    # relative to a whole degree.
     assert result["rotd100"].values / result["rotd50"].values == pytest.approx(
-        np.sqrt(2) / np.cos(np.deg2rad(beta)), rel=1e-9
+        np.sqrt(2), rel=1e-12
     )
 
 

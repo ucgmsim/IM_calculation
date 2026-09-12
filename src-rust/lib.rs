@@ -66,7 +66,7 @@ mod _core {
     /// Rust, one station after another, so a Dask worker limited to one core
     /// doesn't contend with Rayon threads. Returns an `(ns, 182)` array: columns
     /// 0..=179 are the rotated peaks, and columns 180/181 are the exact 000
-    /// and 090 peaks, and columns 182..=187 the RotD statistics row (see
+    /// and 090 peaks, and columns 182..=186 the RotD statistics row (see
     /// [`psa::psa_rotd180`]).
     #[pyfunction]
     fn _psa_rotd180<'py>(
@@ -105,8 +105,9 @@ mod _core {
 
     /// RotD statistics of every `(comp_0, comp_90)` pair.
     ///
-    /// Returns an `(ns, 6)` array: RotD00, RotD50 and RotD100, then the
-    /// orientation in degrees at which each of the three occurs.
+    /// Returns an `(ns, 5)` array: RotD00, RotD50 and RotD100, then the
+    /// orientation in degrees of RotD00 and of RotD100. RotD50 has no
+    /// orientation to report.
     #[pyfunction]
     fn _rotd<'py>(
         py: Python<'py>,
