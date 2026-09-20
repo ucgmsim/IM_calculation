@@ -17,12 +17,8 @@ from IM import (
     ko_matrices,
 )
 
-# Concrete (n_components, n_stations, nt) block, as seen inside a kernel once
-# `_components` has flattened any leading (broadcast) axes into `n_stations`.
 ChunkedWaveformArray = np.ndarray[tuple[int, int, int], np.dtype[np.float64]]
 
-# A (component, station, time) waveform. A bare ndarray is wrapped eagerly by
-# `_as_waveform`; a dask-backed DataArray stays lazy end to end.
 Waveform = xr.DataArray | np.ndarray
 
 WAVEFORM_DIMS = ("component", "station", "time")
@@ -43,8 +39,6 @@ FAS_COMPONENTS = ("000", "090", "ver", "geom", "eas")
 
 DAMPING = 0.05
 G = 981
-# Bounds how much of a (possibly multi-gigabyte, float32, memmapped) Konno
-# matrix gets promoted to float64 at once by `_konno_smooth`.
 KONNO_BLOCK_BYTES = 64 * 2**20
 
 
@@ -76,12 +70,6 @@ class IM(StrEnum):
 
 def _as_waveform(waveform: Waveform) -> xr.DataArray:
     """Normalise a waveform into a DataArray with `component` and `time` dims.
-
-    A bare `(n_components, n_stations, nt)` ndarray is wrapped as an eager
-    DataArray with dims `("component", "station", "time")`. A dask-backed
-    DataArray is rechunked so that `component` and `time` -- the core
-    dimensions every kernel operates on -- are each a single chunk; any
-    `station` chunking is left untouched.
 
     Parameters
     ----------
@@ -125,14 +113,6 @@ def _as_waveform(waveform: Waveform) -> xr.DataArray:
 def _components(block: np.ndarray) -> tuple[ChunkedWaveformArray, tuple[int, ...]]:
     """Split an `apply_ufunc` block into contiguous per-component matrices.
 
-    `apply_ufunc` moves core dimensions to the end, so `block` arrives as
-    `(*lead, n_components, nt)`, where `lead` is whatever loop dimensions the
-    input had (normally just `station`, but there may be none or several).
-    Moving the component axis to the front and forcing a contiguous float64
-    copy collapses `lead` into a single row axis, so `components[i]` is a
-    contiguous `(n_rows, nt)` matrix -- what every `_core` kernel expects.
-    Callers restore the original leading shape with `out.reshape(lead + (...))`.
-
     Parameters
     ----------
     block : ndarray
@@ -163,12 +143,6 @@ def _im_dataset(
     kwargs: Mapping[str, object] | None = None,
 ) -> xr.Dataset:
     """Run a per-station kernel over a waveform, one data variable per component.
-
-    The kernel receives a `(*lead, n_components, nt)` block (see
-    `_components`) and must return a `(*lead, *extra_sizes, len(components))`
-    array. The trailing component axis is unstacked into data variables, so
-    the result is a `Dataset` with one variable per component -- lazy if the
-    waveform was lazy.
 
     Parameters
     ----------
@@ -548,14 +522,8 @@ def _psa_kernel(
 ) -> np.ndarray | tuple[np.ndarray, np.ndarray]:
     """Kernel for `pseudo_spectral_acceleration`.
 
-    Loops over periods internally (rather than treating `period` as a
-    broadcast input) so every IM kernel shares one contract: `(*lead,
-    n_components, nt) -> (*lead, *extra, k)`. Station-chunk parallelism is
-    already ample, so nothing is lost by not also parallelising over period.
-
     When `full_rotd180` is set, the full 180-angle RotD curve computed for
-    the summary statistics is also returned rather than discarded, so the
-    Newmark-beta solve never runs twice for the same (period, station chunk).
+    the summary statistics is also returned rather than discarded.
     """
     components, lead = _components(block)
     comp_0, comp_90, comp_ver = components
@@ -570,8 +538,6 @@ def _psa_kernel(
         w = 2 * np.pi / period
         # (rows, 182): 180 rotated peaks, then the exact 000 and 090 peaks.
         psa = _core._psa_rotd180(comp_0, comp_90, dt, w, DAMPING)
-        # Reduced in rust, by the same code the peak ground motion RotD uses,
-        # so the statistics and their orientations are defined in one place.
         stats = _core._rotd180_stats(psa[:, :N_ROTD180_ANGLES])
         peak_0, peak_90 = psa[:, 180], psa[:, 181]
         peak_ver = _core._psa_peak(comp_ver, dt, w, DAMPING)
@@ -659,15 +625,7 @@ def pseudo_spectral_acceleration(
 
 
 def _konno_smooth(spectrum_data: np.ndarray, konno: np.ndarray) -> np.ndarray:
-    """Multiply a spectrum by a Konno-Ohmachi matrix, a block of columns at a time.
-
-    `konno` is a float32 memmap that can reach tens of gigabytes. Writing
-    `spectrum_data @ konno` directly makes numpy promote the *entire* matrix
-    to float64 before the product. Taking a block of output columns at a
-    time bounds the promoted array to `KONNO_BLOCK_BYTES` while leaving each
-    output element a single full-length float64 accumulation, so the result
-    is the same product, not an approximation of it -- only the contraction
-    axis (the matrix's rows) must never be split, and it isn't here.
+    """Multiply a spectrum by a Konno-Ohmachi matrix.
 
     Parameters
     ----------
@@ -683,6 +641,9 @@ def _konno_smooth(spectrum_data: np.ndarray, konno: np.ndarray) -> np.ndarray:
     """
     n_output = konno.shape[1]
     columns = max(1, KONNO_BLOCK_BYTES // (konno.shape[0] * np.float64().itemsize))
+    # KO matrices can be really large, so this applies a block-wise
+    # multiplication. This is done without dask because it would add a new
+    # dependency to the codebase.
     smoothed = np.empty(spectrum_data.shape[:-1] + (n_output,), dtype=np.float64)
     for start in range(0, n_output, columns):
         block = slice(start, start + columns)
@@ -769,9 +730,6 @@ def fourier_amplitude_spectra(
     ko_directory: Path,
 ) -> xr.Dataset:
     """Compute Fourier Amplitude Spectrum (FAS) of seismic waveforms.
-
-    The FAS is computed using FFT and then smoothed using the Konno-Ohmachi
-    smoothing algorithm.
 
     Parameters
     ----------
