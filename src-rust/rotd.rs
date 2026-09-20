@@ -8,8 +8,8 @@ const DEGREES: f64 = PI / 180.0;
 pub const N_ANGLES: usize = 180;
 
 /// Columns in a RotD statistics row: the RotD00, RotD50 and RotD100 peak
-/// amplitudes, then the orientation in degrees at which each occurs.
-pub const N_ROTD_STATS: usize = 6;
+/// amplitudes, then the orientation in degrees of RotD00 and RotD100.
+pub const N_ROTD_STATS: usize = 5;
 
 const fn cross(o: [f64; 2], u: [f64; 2], v: [f64; 2]) -> f64 {
     (u[0] - o[0]) * (v[1] - o[1]) - (u[1] - o[1]) * (v[0] - o[0])
@@ -151,12 +151,9 @@ impl Hull {
 }
 
 /// Reduce the 180 per-angle peaks to the (min, median, max) rotated
-/// amplitude. Orientation is recorded for each peak.
+/// amplitude. Orientation is recorded for the min and the max.
 pub(crate) fn rotd_stats(peaks: [f64; N_ANGLES]) -> [f64; N_ROTD_STATS] {
-    // Strict comparisons, so a tie leaves the lowest angle in place. Taking
-    // the extremes here rather than off the ranking below is what makes that
-    // consistent: the last element of an ascending rank is the *highest*
-    // angle of any tie at the maximum, not the lowest.
+    // Strict comparisons, so a tie leaves the lowest angle in place.
     let (mut min_angle, mut max_angle) = (0usize, 0usize);
     for theta in 1..N_ANGLES {
         if peaks[theta] < peaks[min_angle] {
@@ -166,25 +163,21 @@ pub(crate) fn rotd_stats(peaks: [f64; N_ANGLES]) -> [f64; N_ROTD_STATS] {
             max_angle = theta;
         }
     }
-    // The two central peaks, carrying their angles through the sort so the
-    // median has an orientation. The angle breaks ties, so equal peaks are
-    // ranked in ascending angle whatever the sort's internal order.
-    let mut ranked: [(f64, u8); N_ANGLES] =
-        std::array::from_fn(|theta| (peaks[theta], theta as u8));
-    ranked.sort_unstable_by(|p, q| p.0.total_cmp(&q.0).then(p.1.cmp(&q.1)));
-    let (lower_median, upper_median) = (ranked[89], ranked[90]);
+    // An even number of samples, so the median falls between the two central
+    // peaks and is the average of that pair.
+    let mut ranked = peaks;
+    ranked.sort_unstable_by(f64::total_cmp);
     [
         peaks[min_angle],
-        (lower_median.0 + upper_median.0) / 2.0,
+        (ranked[89] + ranked[90]) / 2.0,
         peaks[max_angle],
         min_angle as f64,
-        f64::from(lower_median.1),
         max_angle as f64,
     ]
 }
 
-/// Fill an `(ns, 6)` array with the RotD statistics of each waveform pair:
-/// three peak amplitudes then their three orientations, as laid out by
+/// Fill an `(ns, 5)` array with the RotD statistics of each waveform pair:
+/// three peak amplitudes then two orientations, as laid out by
 /// [`rotd_stats`].
 pub fn rotd(comp_0: ArrayView2<f64>, comp_90: ArrayView2<f64>) -> Array2<f64> {
     assert_eq!(
@@ -255,11 +248,11 @@ mod tests {
         rotd_stats(brute_peaks(x, y))
     }
 
-    /// Assert that each reported orientation locates its own statistic in the
-    /// sweep it was reduced from.
+    /// Assert that the RotD00 and RotD100 orientations locate their own
+    /// statistic in the sweep they were reduced from.
     fn assert_orientations_locate_statistics(peaks: [f64; N_ANGLES], case: &str) {
-        let [rotd00, rotd50, rotd100, at_00, at_50, at_100] = rotd_stats(peaks);
-        for (angle, statistic) in [(at_00, "RotD00"), (at_50, "RotD50"), (at_100, "RotD100")] {
+        let [rotd00, rotd50, rotd100, at_00, at_100] = rotd_stats(peaks);
+        for (angle, statistic) in [(at_00, "RotD00"), (at_100, "RotD100")] {
             assert!(
                 (0.0..N_ANGLES as f64).contains(&angle) && angle.fract() == 0.0,
                 "{case}: {statistic} orientation {angle} is not an integer angle in 0..180"
@@ -274,22 +267,12 @@ mod tests {
             peaks[at_100 as usize], rotd100,
             "{case}: RotD100 is not the peak at {at_100} degrees"
         );
-        // The median falls between the two central peaks, so its angle is the
-        // one ranked 90th of 180: fewer than 90 angles peak below it, and at
-        // least 90 peak at or below it.
-        let median_peak = peaks[at_50 as usize];
-        let below = peaks.iter().filter(|&&peak| peak < median_peak).count();
-        let at_or_below = peaks.iter().filter(|&&peak| peak <= median_peak).count();
         assert!(
-            below <= 89 && at_or_below >= 90,
-            "{case}: RotD50 orientation {at_50} is not the lower median:              {below} angles below it, {at_or_below} at or below"
+            rotd00 <= rotd50 && rotd50 <= rotd100,
+            "{case}: RotD50 {rotd50} is not between RotD00 {rotd00} and RotD100 {rotd100}"
         );
-        assert!(
-            median_peak <= rotd50 && rotd50 <= rotd100,
-            "{case}: RotD50 {rotd50} is not between its own peak {median_peak} and RotD100"
-        );
-        // The lowest angle of a tie, for every statistic.
-        for (angle, value) in [(at_00, rotd00), (at_100, rotd100), (at_50, median_peak)] {
+        // The lowest angle of a tie, for both extremes.
+        for (angle, value) in [(at_00, rotd00), (at_100, rotd100)] {
             let first = peaks.iter().position(|&peak| peak == value).unwrap();
             assert_eq!(
                 angle as usize, first,
@@ -447,8 +430,8 @@ mod tests {
 
         #[test]
         fn prop_orientations_locate_their_statistics((comp_0, comp_90) in arb_record()) {
-            // Whatever the record, each statistic's orientation must point at
-            // the angle it came from.
+            // Whatever the record, each reported orientation must point at
+            // the angle its statistic came from.
             assert_orientations_locate_statistics(
                 peaks(comp_0.view(), comp_90.view()),
                 "generated record",
@@ -620,18 +603,16 @@ mod tests {
     fn test_rotd_statistics() {
         let comp_0 = array![1.0f64, 0.0f64];
         let comp_90 = array![0.0f64, 1.0f64];
-        let [min, median, max, at_min, at_median, at_max] =
-            rotd_stats(peaks(comp_0.view(), comp_90.view()));
+        let [min, median, max, at_min, at_max] = rotd_stats(peaks(comp_0.view(), comp_90.view()));
         let expected_min = 2.0f64.sqrt() / 2.0; // e.g. at pi / 4 degrees
         let expected_max = 1.0; // e.g. at 0 degrees
         let expected_median = 0.9238443540096138; // derived independently with numpy
-                                                  // The sweep is max(|cos theta|, |sin theta|): least at 45 degrees, and
-                                                  // 1 at both 0 and 90 degrees, of which the lower is reported. The
-                                                  // median falls between the peaks at 157 and 158 degrees.
+        // The sweep is max(|cos theta|, |sin theta|): least at 45 degrees, and
+        // 1 at both 0 and 90 degrees, of which the lower is reported.
         assert_eq!(
-            [at_min, at_median, at_max],
-            [45.0, 157.0, 0.0],
-            "Orientations wrong: found {at_min}, {at_median}, {at_max} degrees"
+            [at_min, at_max],
+            [45.0, 0.0],
+            "Orientations wrong: found {at_min}, {at_max} degrees"
         );
         assert!(
             (min - expected_min).abs() < 1e-6,

@@ -31,7 +31,6 @@ ROTD_COMPONENTS = (
     "rotd50",
     "rotd100",
     "rotd0_orientation",
-    "rotd50_orientation",
     "rotd100_orientation",
 )
 GEOM_COMPONENTS = ("000", "090", "ver", "geom")
@@ -221,7 +220,7 @@ def _rotd_kernel(
     peak_0 = np.abs(comp_0).max(axis=-1)
     peak_90 = np.abs(comp_90).max(axis=-1)
     peak_ver = np.abs(comp_ver).max(axis=-1)
-    # (rows, 6) = rotd0, rotd50, rotd100 then their three orientations.
+    # (rows, 5) = rotd0, rotd50, rotd100 then the RotD0 and RotD100 orientations.
     stats = _core._rotd(comp_0, comp_90)
     peaks = np.stack([peak_0, peak_90, peak_ver, np.sqrt(peak_0 * peak_90)], axis=-1)
     out = np.concatenate([peaks, stats], axis=-1)
@@ -251,8 +250,8 @@ def compute_intensity_measure_rotd(
     xr.Dataset
         One data variable per component in `ROTD_COMPONENTS`: peak values for
         `['000', '090', 'ver', 'geom', 'rotd0', 'rotd50', 'rotd100']`, then
-        `rotd0_orientation`, `rotd50_orientation` and `rotd100_orientation`
-        holding the angle (degrees) at which each RotD statistic occurs.
+        `rotd0_orientation` and `rotd100_orientation` holding the angle
+        (degrees) at which RotD0 and RotD100 occur.
     """
     return _im_dataset(
         functools.partial(_rotd_kernel, transform=transform),
@@ -546,8 +545,8 @@ def pseudo_spectral_acceleration(
         One data variable per component in `ROTD_COMPONENTS`, each with a
         `period` dimension: PSA for
         ['000', '090', 'ver', 'geom', 'rotd0', 'rotd50', 'rotd100'], then
-        `rotd0_orientation`, `rotd50_orientation` and `rotd100_orientation`
-        holding the angle (degrees) at which each RotD statistic occurs.
+        `rotd0_orientation` and `rotd100_orientation` holding the angle
+        (degrees) at which RotD0 and RotD100 occur.
     """
     periods = np.asarray(periods, dtype=np.float64)
     return _im_dataset(

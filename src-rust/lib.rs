@@ -46,9 +46,9 @@ mod _core {
     /// Pseudo-spectral acceleration statistics for every station and period.
     ///
     /// The three components have shape `(ns, nt)`. Returns an `(ns,
-    /// n_periods, 10)` array whose last axis is laid out as
+    /// n_periods, 9)` array whose last axis is laid out as
     /// `ROTD_COMPONENTS`: the 000, 090, vertical and geometric mean peaks,
-    /// then the six columns [`_rotd`] returns.
+    /// then the five columns [`_rotd`] returns.
     #[pyfunction]
     fn _psa<'py>(
         py: Python<'py>,
@@ -69,8 +69,8 @@ mod _core {
 
     /// RotD statistics of every `(comp_0, comp_90)` pair.
     ///
-    /// Returns an `(ns, 6)` array: RotD00, RotD50 and RotD100, then the
-    /// orientation in degrees at which each of the three occurs.
+    /// Returns an `(ns, 5)` array: RotD00, RotD50 and RotD100, then the
+    /// orientation in degrees at which RotD00 and RotD100 occur.
     #[pyfunction]
     fn _rotd<'py>(
         py: Python<'py>,

@@ -747,8 +747,9 @@ def test_lazy_matches_eager_psa(sample_waveforms: npt.NDArray[np.float64]) -> No
 def test_rotd_orientations_match_a_direct_angle_sweep(
     sample_waveforms: npt.NDArray[np.float64],
 ) -> None:
-    """Each orientation must name the angle its statistic came from, against a
-    plain numpy sweep of the two horizontal components."""
+    """Each orientation must name the angle its statistic came from, and
+    RotD50 must be the median, against a plain numpy sweep of the two
+    horizontal components."""
     result = ims.peak_ground_acceleration(sample_waveforms)
     comp_0 = sample_waveforms[ims.Component.COMP_0]
     comp_90 = sample_waveforms[ims.Component.COMP_90]
@@ -766,12 +767,6 @@ def test_rotd_orientations_match_a_direct_angle_sweep(
     assert_array_equal(sweep.max(axis=-1), result["rotd100"].values)
 
     sorted_sweep = np.sort(sweep, axis=-1)
-    at_median = np.take_along_axis(
-        sweep,
-        result["rotd50_orientation"].values.astype(int)[..., np.newaxis],
-        axis=-1,
-    ).squeeze(-1)
-    assert_array_equal(at_median, sorted_sweep[..., 89])
     assert_array_equal(
         (sorted_sweep[..., 89] + sorted_sweep[..., 90]) / 2, result["rotd50"].values
     )

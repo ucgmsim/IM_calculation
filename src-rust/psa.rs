@@ -97,7 +97,7 @@ pub fn newmark_beta_method(
 }
 
 /// Columns of a pSA row: the 000, 090, vertical and geometric mean peaks,
-/// then the six RotD statistics of [`rotd::rotd_stats`].
+/// then the five RotD statistics of [`rotd::rotd_stats`].
 pub const N_PSA_COMPONENTS: usize = 4 + N_ROTD_STATS;
 
 /// Peak pseudo-spectral acceleration of a displacement response.
@@ -109,7 +109,7 @@ fn peak(response: &Array1<f64>, w_squared: f64) -> f64 {
 }
 
 /// Pseudo-spectral acceleration statistics for every station and period.
-/// Output shape: (stations, periods, components = 000, 090, VER, GEOM, rotd0, rotd50, rotd100, theta0, theta50, theta100).
+/// Output shape: (stations, periods, components = 000, 090, VER, GEOM, rotd0, rotd50, rotd100, theta0, theta100).
 pub fn psa(
     comp_0: &ArrayView2<f64>,
     comp_90: &ArrayView2<f64>,
