@@ -8,11 +8,10 @@ import numpy as np
 
 @functools.cache
 def get_konno_matrix(size: int, directory: Path) -> np.memmap:
-    """
-    Retrieves the precomputed Konno matrix from a file.
+    """Retrieves the precomputed Konno matrix from a file.
 
-    Cached per `(size, directory)`: the memmap is opened once per process
-    and reused, since it may be called once per dask task/chunk.
+    Cached per `(size, directory)`. The memmap is opened once per process and
+    reused.
 
     Parameters
     ----------

@@ -31,9 +31,6 @@ mod _core {
         xi: f64,
     ) -> Bound<'py, PyArray2<f64>> {
         let waveforms = waveforms_py.as_array();
-        // Touches no Python objects, so drop the GIL for the whole solve: a
-        // threaded caller (e.g. Dask's threaded scheduler) can then run one
-        // of these per core in parallel within a single process.
         let waveform_psa = py.detach(|| psa::newmark_beta_method_batch(&waveforms, dt, w, xi));
         waveform_psa.into_pyarray(py)
     }
@@ -61,12 +58,6 @@ mod _core {
     }
 
     /// Serial pSA at all 180 rotation angles for one period.
-    ///
-    /// Runs the Newmark-beta solver (f64) and the RotD reduction entirely in
-    /// Rust, one station after another, so a Dask worker holding a single core
-    /// gets no competing Rayon threads. Returns an `(ns, 182)` array: columns
-    /// 0..=179 are the rotated peaks, and columns 180/181 are the exact 000
-    /// and 090 peaks (see [`psa::psa_rotd180`]).
     #[pyfunction]
     fn _psa_rotd180<'py>(
         py: Python<'py>,
@@ -78,17 +69,11 @@ mod _core {
     ) -> Bound<'py, PyArray2<f64>> {
         let comp_0 = comp_0_py.as_array();
         let comp_90 = comp_90_py.as_array();
-        // The solve touches no Python objects, so drop the GIL for its whole
-        // duration: a threaded caller (e.g. Dask's threaded scheduler) can then
-        // run one of these per core in parallel within a single process.
         let psa_rotd = py.detach(|| psa::psa_rotd180(&comp_0, &comp_90, dt, w, xi));
         psa_rotd.into_pyarray(py)
     }
 
     /// Pseudo-spectral acceleration peak for a single component, one period.
-    ///
-    /// Used for the vertical component, which never participates in RotD, so
-    /// only its peak response (shape `(ns,)`) is needed.
     #[pyfunction]
     fn _psa_peak<'py>(
         py: Python<'py>,
