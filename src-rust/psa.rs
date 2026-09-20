@@ -32,8 +32,8 @@ fn newmark_beta_solver(
     let a2 = one_over_beta_dt_sq; // u_n+1 - u_n
     let b2 = -one_over_beta_dt; // udot_n
     let c2 = -c1; // uddot_n
-                  // Constants to solve for udot_n+1
-                  // a'3 = 1 for uddot_n
+    // Constants to solve for udot_n+1
+    // a'3 = 1 for uddot_n
     let a3 = 1.0 - gamma; // uddot_n
     let b3 = gamma; // uddot_n+1
 

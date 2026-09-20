@@ -198,11 +198,11 @@ pub fn rotd(comp_0: ArrayView2<f64>, comp_90: ArrayView2<f64>) -> Array2<f64> {
 mod tests {
     use std::f64::consts::{SQRT_2, TAU};
 
-    use ndarray::prelude::*;
     use ndarray::Zip;
+    use ndarray::prelude::*;
     use proptest::prelude::*;
 
-    use crate::rotd::{rotd, rotd_stats, Hull, DEGREES, N_ANGLES, N_ROTD_STATS};
+    use crate::rotd::{DEGREES, Hull, N_ANGLES, N_ROTD_STATS, rotd, rotd_stats};
 
     /// Fill an `(ns, 180)` array with the per-angle peaks of each response pair,
     /// serially, allocating the [`Hull`] work buffers once.

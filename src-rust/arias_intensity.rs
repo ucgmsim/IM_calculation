@@ -83,5 +83,4 @@ mod tests {
         assert_eq!(total.shape(), &[3]);
         assert_eq!(cumulative.shape(), &[3, 100]);
     }
-
 }
