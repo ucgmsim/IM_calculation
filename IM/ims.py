@@ -510,7 +510,6 @@ def ds595(waveform: Waveform, dt: float) -> xr.Dataset:
 
 
 N_ROTD180_ANGLES = 180
-ROTD180_ANGLES = np.arange(N_ROTD180_ANGLES)
 
 
 def _psa_kernel(
@@ -518,22 +517,12 @@ def _psa_kernel(
     *,
     periods: npt.NDArray[np.float64],
     dt: float,
-    full_rotd180: bool,
-) -> np.ndarray | tuple[np.ndarray, np.ndarray]:
-    """Kernel for `pseudo_spectral_acceleration`.
-
-    When `full_rotd180` is set, the full 180-angle RotD curve computed for
-    the summary statistics is also returned rather than discarded.
-    """
+) -> np.ndarray:
+    """Kernel for `pseudo_spectral_acceleration`."""
     components, lead = _components(block)
     comp_0, comp_90, comp_ver = components
     rows = comp_0.shape[0]
     out = np.empty((rows, len(periods), len(ROTD_COMPONENTS)), dtype=np.float64)
-    rotd180 = (
-        np.empty((rows, len(periods), N_ROTD180_ANGLES), dtype=np.float64)
-        if full_rotd180
-        else None
-    )
     for index, period in enumerate(periods):
         w = 2 * np.pi / period
         # (rows, 182): 180 rotated peaks, then the exact 000 and 090 peaks.
@@ -545,20 +534,14 @@ def _psa_kernel(
             [peak_0, peak_90, peak_ver, np.sqrt(peak_0 * peak_90)], axis=-1
         )
         out[:, index] = np.concatenate([peaks, stats], axis=-1)
-        if rotd180 is not None:
-            rotd180[:, index] = psa[:, :N_ROTD180_ANGLES]
 
-    out = out.reshape(lead + (len(periods), len(ROTD_COMPONENTS)))
-    if rotd180 is None:
-        return out
-    return out, rotd180.reshape(lead + (len(periods), N_ROTD180_ANGLES))
+    return out.reshape(lead + (len(periods), len(ROTD_COMPONENTS)))
 
 
 def pseudo_spectral_acceleration(
     waveforms: Waveform,
     periods: npt.ArrayLike,
     dt: float,
-    full_rotd180: bool = False,
 ) -> xr.Dataset:
     """Compute pseudo-spectral acceleration (PSA) statistics.
 
@@ -573,11 +556,6 @@ def pseudo_spectral_acceleration(
         Natural periods of the oscillators (s).
     dt : float
         Timestep resolution of the waveforms (s).
-    full_rotd180 : bool, optional
-        If set, also include a `rotd180` data variable with an extra `angle`
-        dimension (0..179 degrees), holding pSA (g) at every rotation angle.
-        This reuses the same Newmark-beta solve already run for the summary
-        statistics, rather than repeating it.
 
     Returns
     -------
@@ -586,41 +564,31 @@ def pseudo_spectral_acceleration(
         PSA for
         ['000', '090', 'ver', 'geom', 'rotd0', 'rotd50', 'rotd100'], then
         `rotd0_orientation`, `rotd50_orientation` and `rotd100_orientation`
-        holding the angle (degrees) at which each RotD statistic occurs. If
-        `full_rotd180` is set, also a `rotd180` variable with dims
-        (..., period, angle).
+        holding the angle (degrees) at which each RotD statistic occurs.
     """
     periods = np.asarray(periods, dtype=np.float64)
     waveform = _as_waveform(waveforms)
-    kernel = functools.partial(
-        _psa_kernel, periods=periods, dt=dt, full_rotd180=full_rotd180
-    )
+    kernel = functools.partial(_psa_kernel, periods=periods, dt=dt)
 
-    output_core_dims = [["period", "im_component"]]
-    output_sizes = {"period": len(periods), "im_component": len(ROTD_COMPONENTS)}
-    if full_rotd180:
-        output_core_dims.append(["period", "angle"])
-        output_sizes["angle"] = N_ROTD180_ANGLES
-
-    outputs = xr.apply_ufunc(
+    summary = xr.apply_ufunc(
         kernel,
         waveform,
         input_core_dims=[["component", "time"]],
-        output_core_dims=output_core_dims,
+        output_core_dims=[["period", "im_component"]],
         keep_attrs=False,
         dask="parallelized",
-        output_dtypes=[np.float64] * len(output_core_dims),
-        dask_gufunc_kwargs={"output_sizes": output_sizes},
+        output_dtypes=[np.float64],
+        dask_gufunc_kwargs={
+            "output_sizes": {
+                "period": len(periods),
+                "im_component": len(ROTD_COMPONENTS),
+            }
+        },
     )
-    summary, rotd180 = outputs if full_rotd180 else (outputs, None)
 
     summary = summary.assign_coords(im_component=list(ROTD_COMPONENTS), period=periods)
     dataset = summary.to_dataset("im_component")
     dataset.attrs = {"name": IM.pSA.value}
-    if rotd180 is not None:
-        dataset["rotd180"] = rotd180.assign_coords(
-            period=periods, angle=ROTD180_ANGLES
-        )
     return dataset
 
 

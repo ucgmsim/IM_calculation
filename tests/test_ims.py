@@ -744,58 +744,6 @@ def test_lazy_matches_eager_psa(sample_waveforms: npt.NDArray[np.float64]) -> No
         assert_array_equal(eager[component].values, computed[component].values)
 
 
-def test_psa_full_rotd180(sample_waveforms: npt.NDArray[np.float64]) -> None:
-    """The full 180-angle curve must be internally consistent with the
-    summary statistics computed from the same solve."""
-    periods = np.array([0.1, 0.5, 1.0])
-    dt = 0.01
-
-    without = ims.pseudo_spectral_acceleration(sample_waveforms, periods, dt)
-    with_curve = ims.pseudo_spectral_acceleration(
-        sample_waveforms, periods, dt, full_rotd180=True
-    )
-
-    assert "rotd180" not in without.data_vars
-    assert set(with_curve.data_vars) == set(without.data_vars) | {"rotd180"}
-    assert with_curve["rotd180"].dims == ("station", "period", "angle")
-    assert with_curve["rotd180"].shape == (
-        sample_waveforms.shape[1],
-        len(periods),
-        180,
-    )
-    assert_array_equal(with_curve.angle.values, np.arange(180))
-
-    # Angle 0 is exact (cos(0) == 1.0 exactly), so it must equal 000 exactly.
-    assert_array_equal(with_curve["rotd180"].isel(angle=0).values, with_curve["000"].values)
-
-    # The other summary components must be unaffected by asking for the curve.
-    for component in without.data_vars:
-        assert_array_equal(without[component].values, with_curve[component].values)
-
-    # rotd0/50/100 must be exactly the min/median/max over the angle axis.
-    curve = with_curve["rotd180"].values
-    sorted_curve = np.sort(curve, axis=-1)
-    assert_array_equal(sorted_curve[..., 0], with_curve["rotd0"].values)
-    assert_array_equal(
-        (sorted_curve[..., 89] + sorted_curve[..., 90]) / 2,
-        with_curve["rotd50"].values,
-    )
-    assert_array_equal(sorted_curve[..., 179], with_curve["rotd100"].values)
-
-    # And each orientation must be the angle of its own statistic in that same
-    # curve: the argmin and argmax for rotd0/rotd100, and the lower of the two
-    # central angles for rotd50, whose peak sits just below the reported
-    # median.
-    assert_array_equal(curve.argmin(axis=-1), with_curve["rotd0_orientation"].values)
-    assert_array_equal(curve.argmax(axis=-1), with_curve["rotd100_orientation"].values)
-    at_median = np.take_along_axis(
-        curve,
-        with_curve["rotd50_orientation"].values.astype(int)[..., np.newaxis],
-        axis=-1,
-    ).squeeze(-1)
-    assert_array_equal(at_median, sorted_curve[..., 89])
-
-
 def test_rotd_orientations_match_a_direct_angle_sweep(
     sample_waveforms: npt.NDArray[np.float64],
 ) -> None:
@@ -856,49 +804,6 @@ def test_rotd_orientation_of_a_polarised_record(polarisation: int) -> None:
     assert result["rotd100"].values / result["rotd50"].values == pytest.approx(
         np.sqrt(2), rel=1e-9
     )
-
-
-def test_psa_full_rotd180_does_not_duplicate_the_solve(
-    sample_waveforms: npt.NDArray[np.float64], monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """Requesting the full curve must reuse the same per-period solve as the
-    summary statistics, not run it a second time."""
-    periods = np.array([0.1, 0.5, 1.0])
-    dt = 0.01
-    calls = []
-    original = ims._core._psa_rotd180
-    monkeypatch.setattr(
-        ims._core,
-        "_psa_rotd180",
-        lambda *args, **kwargs: (calls.append(1), original(*args, **kwargs))[1],
-    )
-
-    ims.pseudo_spectral_acceleration(sample_waveforms, periods, dt, full_rotd180=False)
-    n_without = len(calls)
-    calls.clear()
-    ims.pseudo_spectral_acceleration(sample_waveforms, periods, dt, full_rotd180=True)
-    n_with = len(calls)
-
-    assert n_without == len(periods)
-    assert n_with == len(periods)
-
-
-def test_lazy_matches_eager_psa_full_rotd180(
-    sample_waveforms: npt.NDArray[np.float64],
-) -> None:
-    periods = np.array([0.1, 0.5, 1.0])
-    lazy_input = _to_dask(sample_waveforms, station_chunk=1)
-    eager = ims.pseudo_spectral_acceleration(
-        sample_waveforms, periods, 0.01, full_rotd180=True
-    )
-    lazy = ims.pseudo_spectral_acceleration(
-        lazy_input, periods, 0.01, full_rotd180=True
-    )
-
-    assert all(v.chunks is not None for v in lazy.data_vars.values())
-    computed = lazy.compute()
-    for component in eager.data_vars:
-        assert_array_equal(eager[component].values, computed[component].values)
 
 
 def test_lazy_matches_eager_fas(
