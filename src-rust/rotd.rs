@@ -198,11 +198,11 @@ pub fn rotd(comp_0: ArrayView2<f64>, comp_90: ArrayView2<f64>) -> Array2<f64> {
 mod tests {
     use std::f64::consts::{SQRT_2, TAU};
 
-    use ndarray::prelude::*;
     use ndarray::Zip;
+    use ndarray::prelude::*;
     use proptest::prelude::*;
 
-    use crate::rotd::{rotd, rotd_stats, Hull, DEGREES, N_ANGLES, N_ROTD_STATS};
+    use crate::rotd::{DEGREES, Hull, N_ANGLES, N_ROTD_STATS, rotd, rotd_stats};
 
     /// Fill an `(ns, 180)` array with the per-angle peaks of each response pair,
     /// serially, allocating the [`Hull`] work buffers once.
@@ -607,8 +607,8 @@ mod tests {
         let expected_min = 2.0f64.sqrt() / 2.0; // e.g. at pi / 4 degrees
         let expected_max = 1.0; // e.g. at 0 degrees
         let expected_median = 0.9238443540096138; // derived independently with numpy
-                                                  // The sweep is max(|cos theta|, |sin theta|): least at 45 degrees, and
-                                                  // 1 at both 0 and 90 degrees, of which the lower is reported.
+        // The sweep is max(|cos theta|, |sin theta|): least at 45 degrees, and
+        // 1 at both 0 and 90 degrees, of which the lower is reported.
         assert_eq!(
             [at_min, at_max],
             [45.0, 0.0],

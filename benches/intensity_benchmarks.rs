@@ -1,6 +1,6 @@
 use _core::{arias_intensity, cav, psa, significant_duration};
-use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
-use ndarray::{array, Array2};
+use criterion::{BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
+use ndarray::{Array2, array};
 use std::hint::black_box;
 
 // Configuration constants for test scenarios
