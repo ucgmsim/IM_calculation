@@ -595,6 +595,11 @@ def _psa_kernel(
         Periods to solve pSA with.
     dt : float
         Shared station timestep.
+
+    Returns
+    -------
+    np.ndarray
+        A chunk of solved pSA values.
     """
     (comp_0, comp_90, comp_ver), lead = _components(block)
     psa = _core._psa(comp_0, comp_90, comp_ver, periods, dt, DAMPING)
