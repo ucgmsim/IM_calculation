@@ -585,7 +585,17 @@ def _psa_kernel(
     periods: npt.NDArray[np.float64],
     dt: float,
 ) -> np.ndarray:
-    """Kernel for `pseudo_spectral_acceleration`."""
+    """Kernel for `pseudo_spectral_acceleration`.
+
+    Parameters
+    ----------
+    block : np.ndarray
+        A block of stations to solve pSA for.
+    periods : np.ndarray of float64
+        Periods to solve pSA with.
+    dt : float
+        Shared station timestep.
+    """
     (comp_0, comp_90, comp_ver), lead = _components(block)
     psa = _core._psa(comp_0, comp_90, comp_ver, periods, dt, DAMPING)
     return psa.reshape(lead + (len(periods), len(ROTD_COMPONENTS)))
