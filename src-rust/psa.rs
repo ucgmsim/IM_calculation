@@ -1,5 +1,7 @@
 use ndarray::prelude::*;
-use ndarray::{Array1, Ix1, Ix2};
+use ndarray::{Array1, Ix1};
+
+use crate::rotd::{self, Hull, N_ROTD_STATS};
 
 #[allow(clippy::too_many_arguments)]
 fn newmark_beta_solver(
@@ -94,93 +96,56 @@ pub fn newmark_beta_method(
     newmark_beta_solver(waveform, dt, w, xi, gamma, beta, u0, dudt0)
 }
 
-/// Solve the SDOF oscillator equation for every row of `waveforms`, serially.
+/// Columns of a pSA row: the 000, 090, vertical and geometric mean peaks,
+/// then the six RotD statistics of [`rotd::rotd_stats`].
+pub const N_PSA_COMPONENTS: usize = 4 + N_ROTD_STATS;
+
+/// Peak pseudo-spectral acceleration of a displacement response.
 ///
-/// The `waveforms` array has shape `(ns, nt)`, where `ns` is the number of
-/// stations and `nt` the number of timesteps. Each row is solved with the
-/// Newmark-Beta method for an oscillator of angular frequency `w` and damping
-/// coefficient `xi`, and the resulting displacement response is written to the
-/// matching row of the `(ns, nt)` output.
-pub fn newmark_beta_method_batch(
-    waveforms: &ArrayView2<f64>,
-    dt: f64,
-    w: f64,
-    xi: f64,
-) -> Array<f64, Ix2> {
-    let mut out = Array::<f64, Ix2>::zeros(waveforms.dim());
-    out.axis_iter_mut(Axis(0))
-        .zip(waveforms.axis_iter(Axis(0)))
-        .for_each(|(mut out_row, in_row)| {
-            out_row.assign(&newmark_beta_method(in_row, dt, w, xi, 0.0, 0.0));
-        });
-    out
+/// Multiplying by `w_squared` converts the peak relative displacement of the
+/// unit-mass oscillator to a pseudo-spectral acceleration.
+fn peak(response: &Array1<f64>, w_squared: f64) -> f64 {
+    w_squared * response.iter().fold(0.0f64, |m, &u| m.max(u.abs()))
 }
 
-/// Pseudo-spectral acceleration at every integer rotation angle 0..=179
-/// degrees, for a single oscillator period, computed **serially**.
-///
-/// For each station the two horizontal components are pushed through the
-/// Newmark-beta SDOF solver (kept in f64 for accuracy over long records) and
-/// the displacement responses are reduced to their peak rotated amplitude at
-/// every angle by [`crate::rotd::Hull::peaks`]. Multiplying by `w^2`
-/// converts the peak relative displacement of the unit-mass oscillator to a
-/// pseudo-spectral acceleration.
-///
-/// The loop over stations is deliberately serial: this runs one period per
-/// call inside a Dask worker that already owns a core, so spawning a Rayon
-/// pool here would oversubscribe the machine and fight the outer scheduler.
-/// The RotD hull's work buffers are allocated once and reused for every
-/// station.
-///
-/// `comp_0` and `comp_90` are the 000 and 090 acceleration waveforms with
-/// shape `(ns, nt)`. The result has shape `(ns, 182)`: columns 0..=179 are
-/// the rotated peaks at each integer angle, and columns 180 and 181 are the
-/// exact peaks of the unrotated 000 and 090 responses (`w^2 * max|response|`),
-/// so a caller who only needs those two components does not have to re-derive
-/// them from angle 0 / angle 90, which are off by `cos(90 deg) ~= 6.12e-17`
-/// rather than being exactly zero.
-pub fn psa_rotd180(
+/// Pseudo-spectral acceleration statistics for every station and period.
+/// Output shape: (stations, periods, components = 000, 090, VER, GEOM, rotd0, rotd50, rotd100, theta0, theta50, theta100).
+pub fn psa(
     comp_0: &ArrayView2<f64>,
     comp_90: &ArrayView2<f64>,
+    comp_ver: &ArrayView2<f64>,
+    periods: &ArrayView1<f64>,
     dt: f64,
-    w: f64,
     xi: f64,
-) -> Array2<f64> {
-    assert_eq!(
-        comp_0.dim(),
-        comp_90.dim(),
+) -> Array3<f64> {
+    assert!(
+        comp_0.dim() == comp_90.dim() && comp_0.dim() == comp_ver.dim(),
         "components must have matching shapes"
     );
     let ns = comp_0.nrows();
-    let conversion_factor = w * w;
-    let mut out = Array2::<f64>::zeros((ns, 182));
-    let mut hull = crate::rotd::Hull::with_capacity(comp_0.ncols());
-    for s in 0..ns {
-        let response_0 = newmark_beta_method(comp_0.row(s), dt, w, xi, 0.0, 0.0);
-        let response_90 = newmark_beta_method(comp_90.row(s), dt, w, xi, 0.0, 0.0);
-        let peaks = hull.peaks(response_0.view(), response_90.view());
-        let mut row = out.row_mut(s);
-        for (angle, &peak) in peaks.iter().enumerate() {
-            row[angle] = conversion_factor * peak;
+    let mut out = Array3::zeros((ns, periods.len(), N_PSA_COMPONENTS));
+    let mut hull = Hull::with_capacity(comp_0.ncols());
+    for (index, &period) in periods.iter().enumerate() {
+        let w = std::f64::consts::TAU / period;
+        let w_squared = w * w;
+        for s in 0..ns {
+            let response_0 = newmark_beta_method(comp_0.row(s), dt, w, xi, 0.0, 0.0);
+            let response_90 = newmark_beta_method(comp_90.row(s), dt, w, xi, 0.0, 0.0);
+            let response_ver = newmark_beta_method(comp_ver.row(s), dt, w, xi, 0.0, 0.0);
+            let mut sweep = hull.peaks(response_0.view(), response_90.view());
+            sweep.iter_mut().for_each(|peak| *peak *= w_squared);
+            let peak_0 = peak(&response_0, w_squared);
+            let peak_90 = peak(&response_90, w_squared);
+            let mut row = out.slice_mut(s![s, index, ..]);
+            row[0] = peak_0;
+            row[1] = peak_90;
+            row[2] = peak(&response_ver, w_squared);
+            row[3] = (peak_0 * peak_90).sqrt();
+            row.slice_mut(s![4..])
+                .assign(&ArrayView1::from(&rotd::rotd_stats(sweep)));
         }
-        row[180] = conversion_factor * response_0.iter().fold(0.0f64, |m, &u| m.max(u.abs()));
-        row[181] = conversion_factor * response_90.iter().fold(0.0f64, |m, &u| m.max(u.abs()));
     }
     out
-}
-
-/// Pseudo-spectral acceleration peak for a single component, one period.
-///
-/// `waveforms` has shape `(ns, nt)`. Only the peak response is returned
-/// (shape `(ns,)`), so a caller that needs just one component -- e.g. the
-/// vertical, which never participates in RotD -- does not have to carry a
-/// full `(ns, nt)` displacement response back into Python.
-pub fn psa_peak(waveforms: &ArrayView2<f64>, dt: f64, w: f64, xi: f64) -> Array1<f64> {
-    let conversion_factor = w * w;
-    Array1::from_shape_fn(waveforms.nrows(), |s| {
-        let response = newmark_beta_method(waveforms.row(s), dt, w, xi, 0.0, 0.0);
-        conversion_factor * response.iter().fold(0.0f64, |m, &u| m.max(u.abs()))
-    })
 }
 
 #[cfg(test)]
@@ -328,24 +293,59 @@ mod tests {
     }
 
     #[test]
-    fn test_psa_rotd180_columns_180_181_match_component_peaks() {
-        // Columns 180/181 must agree with an independent per-component
-        // psa_peak computation (which is also what column 0 / column 90
-        // approximate, up to cos(90 deg) != 0 exactly in f64).
+    fn test_psa_matches_the_shared_rotd_path() {
+        // pSA is the RotD reduction applied to oscillator responses rather
+        // than to the waveforms themselves, so it must agree exactly with the
+        // peak ground motion path run on those responses.
         let t = Array1::<f64>::linspace(0.0, 2.0, 512);
         let dt = t[1] - t[0];
-        let comp_0 = t.map(|&x| (3.0 * x).sin());
-        let comp_90 = t.map(|&x| 0.7 * (5.0 * x).cos());
-        let comp_0_2d = comp_0.clone().insert_axis(Axis(0));
-        let comp_90_2d = comp_90.clone().insert_axis(Axis(0));
-        let w = 2.0 * PI;
+        let comp_0 = t.map(|&x| (3.0 * x).sin()).insert_axis(Axis(0));
+        let comp_90 = t.map(|&x| 0.7 * (5.0 * x).cos()).insert_axis(Axis(0));
+        let comp_ver = t.map(|&x| 0.2 * (7.0 * x).sin()).insert_axis(Axis(0));
+        let period = 1.0;
+        let w_squared = (std::f64::consts::TAU / period).powi(2);
 
-        let combined = psa_rotd180(&comp_0_2d.view(), &comp_90_2d.view(), dt, w, XI);
-        let peak_0 = psa_peak(&comp_0_2d.view(), dt, w, XI);
-        let peak_90 = psa_peak(&comp_90_2d.view(), dt, w, XI);
+        let result = psa(
+            &comp_0.view(),
+            &comp_90.view(),
+            &comp_ver.view(),
+            &array![period].view(),
+            dt,
+            XI,
+        );
 
-        assert_abs_diff_eq!(combined[[0, 180]], peak_0[0], epsilon = 1e-12);
-        assert_abs_diff_eq!(combined[[0, 181]], peak_90[0], epsilon = 1e-12);
+        let responses: Vec<Array2<f64>> = [&comp_0, &comp_90, &comp_ver]
+            .iter()
+            .map(|comp| {
+                newmark_beta_method(comp.row(0), dt, w_squared.sqrt(), XI, 0.0, 0.0)
+                    .insert_axis(Axis(0))
+            })
+            .collect();
+        let peak = |response: &Array2<f64>| {
+            w_squared * response.iter().fold(0.0f64, |m, &u| m.max(u.abs()))
+        };
+
+        for (column, response) in responses.iter().enumerate() {
+            assert_abs_diff_eq!(result[[0, 0, column]], peak(response), epsilon = 1e-12);
+        }
+        assert_abs_diff_eq!(
+            result[[0, 0, 3]],
+            (peak(&responses[0]) * peak(&responses[1])).sqrt(),
+            epsilon = 1e-12
+        );
+        // The statistics of the scaled responses, straight off the peak
+        // ground motion entry point.
+        let stats = crate::rotd::rotd(
+            (&responses[0] * w_squared).view(),
+            (&responses[1] * w_squared).view(),
+        );
+        for column in 0..N_ROTD_STATS {
+            assert_abs_diff_eq!(
+                result[[0, 0, 4 + column]],
+                stats[[0, column]],
+                epsilon = 1e-12
+            );
+        }
     }
 
     #[test]

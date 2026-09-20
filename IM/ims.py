@@ -509,9 +509,6 @@ def ds595(waveform: Waveform, dt: float) -> xr.Dataset:
     return significant_duration(waveform, dt, 5, 95, IM.Ds595.value)
 
 
-N_ROTD180_ANGLES = 180
-
-
 def _psa_kernel(
     block: np.ndarray,
     *,
@@ -519,23 +516,9 @@ def _psa_kernel(
     dt: float,
 ) -> np.ndarray:
     """Kernel for `pseudo_spectral_acceleration`."""
-    components, lead = _components(block)
-    comp_0, comp_90, comp_ver = components
-    rows = comp_0.shape[0]
-    out = np.empty((rows, len(periods), len(ROTD_COMPONENTS)), dtype=np.float64)
-    for index, period in enumerate(periods):
-        w = 2 * np.pi / period
-        # (rows, 182): 180 rotated peaks, then the exact 000 and 090 peaks.
-        psa = _core._psa_rotd180(comp_0, comp_90, dt, w, DAMPING)
-        stats = _core._rotd180_stats(psa[:, :N_ROTD180_ANGLES])
-        peak_0, peak_90 = psa[:, 180], psa[:, 181]
-        peak_ver = _core._psa_peak(comp_ver, dt, w, DAMPING)
-        peaks = np.stack(
-            [peak_0, peak_90, peak_ver, np.sqrt(peak_0 * peak_90)], axis=-1
-        )
-        out[:, index] = np.concatenate([peaks, stats], axis=-1)
-
-    return out.reshape(lead + (len(periods), len(ROTD_COMPONENTS)))
+    (comp_0, comp_90, comp_ver), lead = _components(block)
+    psa = _core._psa(comp_0, comp_90, comp_ver, periods, dt, DAMPING)
+    return psa.reshape(lead + (len(periods), len(ROTD_COMPONENTS)))
 
 
 def pseudo_spectral_acceleration(
@@ -560,36 +543,21 @@ def pseudo_spectral_acceleration(
     Returns
     -------
     xr.Dataset
-        One data variable per component, each with a `period` dimension:
-        PSA for
+        One data variable per component in `ROTD_COMPONENTS`, each with a
+        `period` dimension: PSA for
         ['000', '090', 'ver', 'geom', 'rotd0', 'rotd50', 'rotd100'], then
         `rotd0_orientation`, `rotd50_orientation` and `rotd100_orientation`
         holding the angle (degrees) at which each RotD statistic occurs.
     """
     periods = np.asarray(periods, dtype=np.float64)
-    waveform = _as_waveform(waveforms)
-    kernel = functools.partial(_psa_kernel, periods=periods, dt=dt)
-
-    summary = xr.apply_ufunc(
-        kernel,
-        waveform,
-        input_core_dims=[["component", "time"]],
-        output_core_dims=[["period", "im_component"]],
-        keep_attrs=False,
-        dask="parallelized",
-        output_dtypes=[np.float64],
-        dask_gufunc_kwargs={
-            "output_sizes": {
-                "period": len(periods),
-                "im_component": len(ROTD_COMPONENTS),
-            }
-        },
+    return _im_dataset(
+        _psa_kernel,
+        waveforms,
+        ROTD_COMPONENTS,
+        name=IM.pSA.value,
+        extra_dims={"period": periods},
+        kwargs={"periods": periods, "dt": dt},
     )
-
-    summary = summary.assign_coords(im_component=list(ROTD_COMPONENTS), period=periods)
-    dataset = summary.to_dataset("im_component")
-    dataset.attrs = {"name": IM.pSA.value}
-    return dataset
 
 
 def _konno_smooth(spectrum_data: np.ndarray, konno: np.ndarray) -> np.ndarray:

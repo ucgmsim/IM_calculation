@@ -4,8 +4,7 @@ use ndarray::prelude::*;
 
 const DEGREES: f64 = PI / 180.0;
 
-/// Integer rotation angles RotD is sampled at: 0..=179 degrees. The peak is
-/// an absolute value, so angles beyond 180 degrees repeat.
+/// Integer rotation angles RotD is sampled at: 0, 1, ..., 179 degrees.
 pub const N_ANGLES: usize = 180;
 
 /// Columns in a RotD statistics row: the RotD00, RotD50 and RotD100 peak
@@ -41,11 +40,6 @@ fn monotone_chain(
 
 /// The convex hull of a response trajectory, and the scratch space used to
 /// find it.
-///
-/// Every RotD figure this module produces is a peak rotated amplitude, and
-/// every one of them comes from [`Hull::peaks`]. The buffers live in the
-/// struct rather than in locals so a batch of stations allocates once and
-/// reuses the same two vectors for every record.
 #[derive(Default)]
 pub struct Hull {
     /// Points that survived the Akl-Toussaint cull, sorted lexicographically.
@@ -65,18 +59,7 @@ impl Hull {
 
     /// Peak rotated amplitude at every integer angle 0..=179 degrees for one
     /// pair of components.
-    ///
-    /// The peak at angle theta is the support function of the response
-    /// trajectory `(x, y)` along the rotated axis, which is maximised at a
-    /// vertex of the trajectory's convex hull. The hull is found with
-    /// Akl-Toussaint culling followed by a monotone chain: a first O(n) pass
-    /// takes the four axis-extreme points, and any point strictly inside the
-    /// polygon they span cannot be a hull vertex and is dropped, so the sort
-    /// that follows sees only a few hundred of the tens of thousands of
-    /// timesteps. The 180 evaluations over the resulting handful of hull
-    /// vertices are then exact and cheap; `rotd180_matches_brute` pins the
-    /// result against the direct scan.
-    pub fn peaks(&mut self, x: ArrayView1<f64>, y: ArrayView1<f64>) -> [f64; 180] {
+    pub fn peaks(&mut self, x: ArrayView1<f64>, y: ArrayView1<f64>) -> [f64; N_ANGLES] {
         let n = x.len();
         // Axis extremes, in order around the trajectory: min x, max y, max x,
         // min y.
@@ -168,16 +151,8 @@ impl Hull {
 }
 
 /// Reduce the 180 per-angle peaks to the (min, median, max) rotated
-/// amplitude -- RotD00, RotD50 and RotD100 -- and the orientation in degrees
-/// at which each of the three occurs.
-///
-/// RotD00 and RotD100 each sit at a single angle -- the argmin and argmax of
-/// the sweep -- and where several angles attain the same peak, the lowest of
-/// them is reported. RotD50 has no single angle at all: the median of an even
-/// number of samples falls between the two central ones, so its value stays
-/// the average of that pair, as it has always been, and the orientation
-/// reported alongside is the lower of the two.
-fn rotd_stats(peaks: [f64; N_ANGLES]) -> [f64; N_ROTD_STATS] {
+/// amplitude. Orientation is recorded for each peak.
+pub(crate) fn rotd_stats(peaks: [f64; N_ANGLES]) -> [f64; N_ROTD_STATS] {
     // Strict comparisons, so a tie leaves the lowest angle in place. Taking
     // the extremes here rather than off the ranking below is what makes that
     // consistent: the last element of an ascending rank is the *highest*
@@ -226,40 +201,6 @@ pub fn rotd(comp_0: ArrayView2<f64>, comp_90: ArrayView2<f64>) -> Array2<f64> {
     out
 }
 
-/// Fill an `(ns, 6)` array with the RotD statistics of an already computed
-/// `(ns, 180)` angle sweep.
-///
-/// The pSA path takes its sweep from [`crate::psa::psa_rotd180`] rather than
-/// from [`rotd`], so this applies the one reduction in [`rotd_stats`] to a
-/// curve that has already been paid for.
-pub fn rotd180_stats(curve: ArrayView2<f64>) -> Array2<f64> {
-    assert_eq!(
-        curve.ncols(),
-        N_ANGLES,
-        "A RotD180 curve needs a peak at every integer angle"
-    );
-    let mut out = Array2::zeros((curve.nrows(), N_ROTD_STATS));
-    for s in 0..curve.nrows() {
-        let row = curve.row(s);
-        let stats = rotd_stats(std::array::from_fn(|theta| row[theta]));
-        out.row_mut(s).assign(&ArrayView1::from(&stats));
-    }
-    out
-}
-
-/// Fill an `(ns, 180)` array with the per-angle peaks of each response pair,
-/// serially, allocating the [`Hull`] work buffers once.
-pub fn rotd180_rows(comp_0: ArrayView2<f64>, comp_90: ArrayView2<f64>) -> Array2<f64> {
-    let ns = comp_0.nrows();
-    let mut out = Array2::zeros((ns, N_ANGLES));
-    let mut hull = Hull::with_capacity(comp_0.ncols());
-    for s in 0..ns {
-        let peaks = hull.peaks(comp_0.row(s), comp_90.row(s));
-        out.row_mut(s).assign(&ArrayView1::from(&peaks));
-    }
-    out
-}
-
 #[cfg(test)]
 mod tests {
     use std::f64::consts::{SQRT_2, TAU};
@@ -268,9 +209,20 @@ mod tests {
     use ndarray::Zip;
     use proptest::prelude::*;
 
-    use crate::rotd::{
-        rotd, rotd180_rows, rotd180_stats, rotd_stats, Hull, DEGREES, N_ANGLES, N_ROTD_STATS,
-    };
+    use crate::rotd::{rotd, rotd_stats, Hull, DEGREES, N_ANGLES, N_ROTD_STATS};
+
+    /// Fill an `(ns, 180)` array with the per-angle peaks of each response pair,
+    /// serially, allocating the [`Hull`] work buffers once.
+    fn rotd180_rows(comp_0: ArrayView2<f64>, comp_90: ArrayView2<f64>) -> Array2<f64> {
+        let ns = comp_0.nrows();
+        let mut out = Array2::zeros((ns, N_ANGLES));
+        let mut hull = Hull::with_capacity(comp_0.ncols());
+        for s in 0..ns {
+            let peaks = hull.peaks(comp_0.row(s), comp_90.row(s));
+            out.row_mut(s).assign(&ArrayView1::from(&peaks));
+        }
+        out
+    }
 
     /// Slack allowed on the sqrt(2) bound. The bound is attained exactly by
     /// linearly polarised records, so only floating point error is tolerated.
@@ -282,7 +234,7 @@ mod tests {
 
     /// The direct scan the culled [`Hull::peaks`] must reproduce: every angle
     /// against every timestep, no hull reduction.
-    fn brute_peaks(x: ArrayView1<f64>, y: ArrayView1<f64>) -> [f64; 180] {
+    fn brute_peaks(x: ArrayView1<f64>, y: ArrayView1<f64>) -> [f64; N_ANGLES] {
         std::array::from_fn(|theta| {
             let (sin_theta, cos_theta) = (theta as f64 * DEGREES).sin_cos();
             Zip::from(x).and(y).fold(0.0f64, |m: f64, &a, &b| {
@@ -293,7 +245,7 @@ mod tests {
 
     /// [`Hull::peaks`] with a fresh hull, for tests that do not exercise
     /// buffer reuse themselves.
-    fn peaks(x: ArrayView1<f64>, y: ArrayView1<f64>) -> [f64; 180] {
+    fn peaks(x: ArrayView1<f64>, y: ArrayView1<f64>) -> [f64; N_ANGLES] {
         Hull::default().peaks(x, y)
     }
 
@@ -469,7 +421,7 @@ mod tests {
                 // Both entry points reduce the same hull, so the (ns, 3)
                 // statistics must be exactly the reduction of the (ns, 180)
                 // curve -- no tolerance needed to tie them together.
-                let row_peaks: [f64; 180] = std::array::from_fn(|theta| peaks[(i, theta)]);
+                let row_peaks: [f64; N_ANGLES] = std::array::from_fn(|theta| peaks[(i, theta)]);
                 let curve_stats = rotd_stats(row_peaks);
                 prop_assert_eq!(
                     row,
@@ -578,7 +530,7 @@ mod tests {
         // Zero, single-sample and collinear records must not panic and must
         // agree with the reference peaks (all zero, or |projection|).
         let zeros = Array1::<f64>::zeros(16);
-        assert_eq!(peaks(zeros.view(), zeros.view()), [0.0; 180]);
+        assert_eq!(peaks(zeros.view(), zeros.view()), [0.0; N_ANGLES]);
 
         let single = array![3.5];
         let single_peaks = peaks(single.view(), array![0.0].view());
@@ -696,32 +648,6 @@ mod tests {
             "Maximum calculation failed: expected 1.0 +/- 1e-6 found: {}",
             max
         );
-    }
-
-    #[test]
-    fn rotd180_stats_reduces_a_curve_like_rotd() {
-        // The pSA path reduces an already computed sweep rather than a pair of
-        // components, and must land on exactly the same statistics.
-        let nt = 512;
-        let comp_0 = Array2::from_shape_fn((3, nt), |(s, i)| {
-            let t = i as f64;
-            (0.03 * t + s as f64).sin() * (1.0 + s as f64)
-        });
-        let comp_90 = Array2::from_shape_fn((3, nt), |(s, i)| {
-            let t = i as f64;
-            (0.05 * t).cos() - 0.3 * (0.11 * t + s as f64).sin()
-        });
-        let curve = rotd180_rows(comp_0.view(), comp_90.view());
-        assert_eq!(
-            rotd180_stats(curve.view()),
-            rotd(comp_0.view(), comp_90.view())
-        );
-    }
-
-    #[test]
-    #[should_panic(expected = "peak at every integer angle")]
-    fn rotd180_stats_rejects_a_short_curve() {
-        rotd180_stats(Array2::zeros((2, 179)).view());
     }
 
     #[test]

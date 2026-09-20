@@ -1,6 +1,6 @@
 use _core::{arias_intensity, cav, psa, significant_duration};
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
-use ndarray::Array2;
+use ndarray::{array, Array2};
 use std::hint::black_box;
 
 // Configuration constants for test scenarios
@@ -134,16 +134,19 @@ fn bench_psa(c: &mut Criterion) {
             for &samples in SAMPLE_LENGTHS {
                 let waveforms = generate_waveforms(stations, samples);
                 let view = waveforms.view();
+                let periods = array![period];
                 let param = format!("T{:.1}s_{}stn_{}smp", period, stations, samples);
 
                 group.throughput(Throughput::Bytes((stations * samples * 8) as u64));
 
                 group.bench_with_input(BenchmarkId::new("Sequential", &param), &view, |b, &v| {
                     b.iter(|| {
-                        psa::newmark_beta_method_batch(
+                        psa::psa(
                             black_box(&v),
+                            black_box(&v),
+                            black_box(&v),
+                            black_box(&periods.view()),
                             black_box(SAMPLING_RATE),
-                            black_box(period),
                             black_box(DAMPING),
                         )
                     })
