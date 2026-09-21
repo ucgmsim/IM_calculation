@@ -1,6 +1,5 @@
 """ASCII IM Calculation script - entrypoint"""
 
-import multiprocessing
 from pathlib import Path
 from typing import Annotated
 
@@ -43,10 +42,6 @@ def calculate_ims_ascii(
     ],
     periods: Annotated[list[float] | None, typer.Option()] = None,
     frequencies: Annotated[list[float] | None, typer.Option()] = None,
-    cores: Annotated[
-        int,
-        typer.Option(),
-    ] = multiprocessing.cpu_count(),
     ko_directory: Annotated[Path | None, typer.Option()] = None,
 ) -> None:
     """
@@ -68,8 +63,6 @@ def calculate_ims_ascii(
         List of periods required for calculating the pseudo-spectral acceleration (pSA).
     frequencies : list of float, optional
         List of frequencies required for calculating the Fourier amplitude spectrum (FAS).
-    cores : int, optional
-        Number of cores to use for parallel processing in pSA and FAS calculations.
     ko_directory : Path, optional
         Path to the directory containing the Konno-Ohmachi matrices.
         Only required if FAS is in the list of IMs.
@@ -89,7 +82,6 @@ def calculate_ims_ascii(
         ims_list,
         np.array(periods),
         np.array(frequencies),
-        cores,
         ko_directory,
     )
 

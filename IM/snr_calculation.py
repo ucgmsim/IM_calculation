@@ -1,12 +1,12 @@
 """Waveform SNR calculation"""
 
-import multiprocessing
 from pathlib import Path
 from typing import NamedTuple
 
 import numpy as np
 import pandas as pd
 import scipy as sp
+import xarray as xr
 
 from IM import im_calculation, ims
 
@@ -47,7 +47,6 @@ def calculate_snr(
     tp: int,
     ko_directory: Path,
     frequencies: np.ndarray = im_calculation.DEFAULT_FREQUENCIES,
-    cores: int = multiprocessing.cpu_count(),
 ) -> SNRResult:
     """
     Calculates the SNR of a waveform given a tp and common frequency vector
@@ -65,8 +64,6 @@ def calculate_snr(
     frequencies : np.ndarray, optional
         The frequency vector to use for the SNR calculation,
         by default takes the frequencies from FAS
-    cores : int, optional
-        Number of cores to use for parallel processing in FAS calculations.
 
     Returns
     -------
@@ -112,37 +109,29 @@ def calculate_snr(
 
     # Generate FFT for the signal and noise
     fas_signal = ims.fourier_amplitude_spectra(
-        taper_signal_acc, dt, frequencies, ko_directory, cores
+        taper_signal_acc, dt, frequencies, ko_directory
     )
     fas_noise = ims.fourier_amplitude_spectra(
-        taper_noise_acc, dt, frequencies, ko_directory, cores
+        taper_noise_acc, dt, frequencies, ko_directory
     )
 
-    # Calculate the SNR
+    # Calculate the SNR. Dataset arithmetic aligns on variable name, so this
+    # produces a 5-variable (000/090/ver/geom/eas) dataset just like fas_signal
+    # and fas_noise.
     with np.errstate(divide="ignore", invalid="ignore"):
         snr = (fas_signal * noise_duration) / (fas_noise * signal_duration)
 
-    # Create SNR DataFrame with 000, 090 and ver
-    snr_df = snr.to_dataframe().unstack(level="component")
-    snr_df.index = snr.coords["frequency"].values
-    snr_df.columns = snr_df.columns.droplevel(0)
-    snr_df = snr_df[["000", "090", "ver"]]
-
-    # Create FAS noise and signal DataFrames with 000, 090 and ver
-    fas_signal_df = fas_signal.to_dataframe().unstack(level="component")
-    fas_signal_df.index = fas_signal.coords["frequency"].values
-    fas_signal_df.columns = fas_signal_df.columns.droplevel(0)  # ty: ignore[invalid-assignment, invalid-argument-type]
-    fas_signal_df = fas_signal_df[["000", "090", "ver"]]
-
-    fas_noise_df = fas_noise.to_dataframe().unstack(level="component")
-    fas_noise_df.index = fas_noise.coords["frequency"].values
-    fas_noise_df.columns = fas_noise_df.columns.droplevel(0)  # ty: ignore[invalid-assignment, invalid-argument-type]
-    fas_noise_df = fas_noise_df[["000", "090", "ver"]]
-
-    assert isinstance(snr_df, pd.DataFrame)
-    assert isinstance(fas_signal_df, pd.DataFrame)
-    assert isinstance(fas_noise_df, pd.DataFrame)
+    snr_df = _component_frame(snr)
+    fas_signal_df = _component_frame(fas_signal)
+    fas_noise_df = _component_frame(fas_noise)
 
     return SNRResult(
         snr_df, fas_signal_df, fas_noise_df, signal_duration, noise_duration
     )
+
+
+def _component_frame(dataset: xr.Dataset) -> pd.DataFrame:
+    """Take the 000/090/ver components of a single-station FAS dataset as a
+    frequency-indexed DataFrame.
+    """
+    return dataset[["000", "090", "ver"]].isel(station=0, drop=True).to_dataframe()

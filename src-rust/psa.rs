@@ -1,6 +1,7 @@
-use ndarray::parallel::prelude::*;
 use ndarray::prelude::*;
-use ndarray::{Array1, Ix1, Ix2};
+use ndarray::{Array1, Ix1};
+
+use crate::rotd::{self, Hull, N_ROTD_STATS};
 
 #[allow(clippy::too_many_arguments)]
 fn newmark_beta_solver(
@@ -31,8 +32,8 @@ fn newmark_beta_solver(
     let a2 = one_over_beta_dt_sq; // u_n+1 - u_n
     let b2 = -one_over_beta_dt; // udot_n
     let c2 = -c1; // uddot_n
-                  // Constants to solve for udot_n+1
-                  // a'3 = 1 for uddot_n
+    // Constants to solve for udot_n+1
+    // a'3 = 1 for uddot_n
     let a3 = 1.0 - gamma; // uddot_n
     let b3 = gamma; // uddot_n+1
 
@@ -95,29 +96,55 @@ pub fn newmark_beta_method(
     newmark_beta_solver(waveform, dt, w, xi, gamma, beta, u0, dudt0)
 }
 
-/// Solve the SDOF oscillator equation for an array of observations, in parallel, *in-place*.
+/// Columns of a pSA row: the 000, 090, vertical and geometric mean peaks,
+/// then the five RotD statistics of [`rotd::rotd_stats`].
+pub const N_PSA_COMPONENTS: usize = 4 + N_ROTD_STATS;
+
+/// Peak pseudo-spectral acceleration of a displacement response.
 ///
-/// The `waveforms` array must have shape `(ns, nt)`, where `ns` is the number of stations and `nt` is the number of timesteps.
-/// The solver uses the Newmark-Beta method to solve the SDOF oscillator equation for an oscillator
-/// with an *angular frequency* of `w` Hz, damping coefficient of `xi`, and mass parameter `m`.
-/// The `gamma` and `beta` parameters determine if the constant or linear acceleration method is implemented.
-///
-///
-/// Solving is done in parallel for all `ns` stations, and in-place on the waveforms array.
-pub fn newmark_beta_method_parallel(
-    waveforms: &ArrayView2<f64>,
+/// Multiplying by `w_squared` converts the peak relative displacement of the
+/// unit-mass oscillator to a pseudo-spectral acceleration.
+fn peak(response: &Array1<f64>, w_squared: f64) -> f64 {
+    w_squared * response.iter().fold(0.0f64, |m, &u| m.max(u.abs()))
+}
+
+/// Pseudo-spectral acceleration statistics for every station and period.
+/// Output shape: (stations, periods, components = 000, 090, VER, GEOM, rotd0, rotd50, rotd100, theta0, theta100).
+pub fn psa(
+    comp_0: &ArrayView2<f64>,
+    comp_90: &ArrayView2<f64>,
+    comp_ver: &ArrayView2<f64>,
+    periods: &ArrayView1<f64>,
     dt: f64,
-    w: f64,
     xi: f64,
-) -> Array<f64, Ix2> {
-    let mut out = Array::<f64, Ix2>::zeros(waveforms.dim());
-    out.axis_iter_mut(Axis(0))
-        .into_par_iter()
-        .zip(waveforms.axis_iter(Axis(0)).into_par_iter())
-        .for_each(|(mut out_row, in_row)| {
-            let r = newmark_beta_method(in_row, dt, w, xi, 0.0, 0.0);
-            out_row.assign(&r);
-        });
+) -> Array3<f64> {
+    assert!(
+        comp_0.dim() == comp_90.dim() && comp_0.dim() == comp_ver.dim(),
+        "components must have matching shapes"
+    );
+    let ns = comp_0.nrows();
+    let mut out = Array3::zeros((ns, periods.len(), N_PSA_COMPONENTS));
+    let mut hull = Hull::with_capacity(comp_0.ncols());
+    for (index, &period) in periods.iter().enumerate() {
+        let w = std::f64::consts::TAU / period;
+        let w_squared = w * w;
+        for s in 0..ns {
+            let response_0 = newmark_beta_method(comp_0.row(s), dt, w, xi, 0.0, 0.0);
+            let response_90 = newmark_beta_method(comp_90.row(s), dt, w, xi, 0.0, 0.0);
+            let response_ver = newmark_beta_method(comp_ver.row(s), dt, w, xi, 0.0, 0.0);
+            let mut sweep = hull.peaks(response_0.view(), response_90.view());
+            sweep.iter_mut().for_each(|peak| *peak *= w_squared);
+            let peak_0 = peak(&response_0, w_squared);
+            let peak_90 = peak(&response_90, w_squared);
+            let mut row = out.slice_mut(s![s, index, ..]);
+            row[0] = peak_0;
+            row[1] = peak_90;
+            row[2] = peak(&response_ver, w_squared);
+            row[3] = (peak_0 * peak_90).sqrt();
+            row.slice_mut(s![4..])
+                .assign(&ArrayView1::from(&rotd::rotd_stats(sweep)));
+        }
+    }
     out
 }
 
@@ -263,6 +290,62 @@ mod tests {
         let u = newmark_beta_solver(waveform.view(), dt, w, xi, GAMMA, BETA, 1.0, 0.0);
         let analytical = t.map(|&x| (-x).exp() * (x + 1.0));
         assert_abs_diff_eq!(u, analytical, epsilon = 5e-4);
+    }
+
+    #[test]
+    fn test_psa_matches_the_shared_rotd_path() {
+        // pSA is the RotD reduction applied to oscillator responses rather
+        // than to the waveforms themselves, so it must agree exactly with the
+        // peak ground motion path run on those responses.
+        let t = Array1::<f64>::linspace(0.0, 2.0, 512);
+        let dt = t[1] - t[0];
+        let comp_0 = t.map(|&x| (3.0 * x).sin()).insert_axis(Axis(0));
+        let comp_90 = t.map(|&x| 0.7 * (5.0 * x).cos()).insert_axis(Axis(0));
+        let comp_ver = t.map(|&x| 0.2 * (7.0 * x).sin()).insert_axis(Axis(0));
+        let period = 1.0;
+        let w_squared = (std::f64::consts::TAU / period).powi(2);
+
+        let result = psa(
+            &comp_0.view(),
+            &comp_90.view(),
+            &comp_ver.view(),
+            &array![period].view(),
+            dt,
+            XI,
+        );
+
+        let responses: Vec<Array2<f64>> = [&comp_0, &comp_90, &comp_ver]
+            .iter()
+            .map(|comp| {
+                newmark_beta_method(comp.row(0), dt, w_squared.sqrt(), XI, 0.0, 0.0)
+                    .insert_axis(Axis(0))
+            })
+            .collect();
+        let peak = |response: &Array2<f64>| {
+            w_squared * response.iter().fold(0.0f64, |m, &u| m.max(u.abs()))
+        };
+
+        for (column, response) in responses.iter().enumerate() {
+            assert_abs_diff_eq!(result[[0, 0, column]], peak(response), epsilon = 1e-12);
+        }
+        assert_abs_diff_eq!(
+            result[[0, 0, 3]],
+            (peak(&responses[0]) * peak(&responses[1])).sqrt(),
+            epsilon = 1e-12
+        );
+        // The statistics of the scaled responses, straight off the peak
+        // ground motion entry point.
+        let stats = crate::rotd::rotd(
+            (&responses[0] * w_squared).view(),
+            (&responses[1] * w_squared).view(),
+        );
+        for column in 0..N_ROTD_STATS {
+            assert_abs_diff_eq!(
+                result[[0, 0, 4 + column]],
+                stats[[0, column]],
+                epsilon = 1e-12
+            );
+        }
     }
 
     #[test]

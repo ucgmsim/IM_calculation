@@ -6,7 +6,6 @@
 //! A key feature of this implementation is the handling of zero-crossings, which ensures that
 //! rectified functions (like $f(x) = |x|$) are integrated with geometric precision.
 
-use crate::utils::{parallel_map_rows, parallel_reduce_rows};
 use ndarray::prelude::*;
 
 /// Calculates the contribution of a single step to the trapezium integral.
@@ -73,22 +72,12 @@ fn cumulative_trapz_one_with_fun<F>(
     out *= 0.5;
 }
 
-/// Computes the total integral for each row of a 2D array in parallel.
+/// Computes the total integral for each row of a 2D array.
 ///
 /// # Arguments
 /// * `waveforms` - 2D array where each row is a separate signal.
 /// * `dt` - The timestep.
 /// * `f` - Function to apply to values (e.g., `|x| x * x` for arias intensity).
-pub fn parallel_trapz_with_fun<F>(waveforms: ArrayView2<f64>, dt: f64, f: F) -> Array1<f64>
-where
-    F: Fn(f64) -> f64 + Send + Sync,
-{
-    parallel_reduce_rows(waveforms, |waveform| trapz_one_with_fun(waveform, dt, &f))
-}
-
-/// Computes the total integral for each row of a 2D array.
-///
-/// This is the sequential version of [`parallel_trapz_with_fun`].
 pub fn trapz_with_fun<F>(waveforms: ArrayView2<f64>, dt: f64, f: F) -> Array1<f64>
 where
     F: Fn(f64) -> f64,
@@ -96,26 +85,7 @@ where
     waveforms.map_axis(Axis(1), |waveform| trapz_one_with_fun(waveform, dt, &f))
 }
 
-/// Computes the cumulative integral for each row of a 2D array in parallel.
-///
-/// # Returns
-/// An `Array2` of the same shape as `waveforms`.
-pub fn parallel_cumulative_trapz_with_fun<F>(
-    waveforms: ArrayView2<f64>,
-    dt: f64,
-    f: F,
-) -> Array2<f64>
-where
-    F: Fn(f64) -> f64 + Send + Sync,
-{
-    parallel_map_rows(waveforms, |waveform, out| {
-        cumulative_trapz_one_with_fun(waveform, out, dt, &f)
-    })
-}
-
 /// Computes the cumulative integral for each row of a 2D array.
-///
-/// This is the sequential version of [`parallel_cumulative_trapz_with_fun`].
 pub fn cumulative_trapz_with_fun<F>(waveforms: ArrayView2<f64>, dt: f64, f: F) -> Array2<f64>
 where
     F: Fn(f64) -> f64,
@@ -207,29 +177,6 @@ mod tests {
         let area_dt2 = trapz_one_with_fun(waveform.view(), 2.0, &identity);
 
         assert_abs_diff_eq!(area_dt2, area_dt1 * 2.0, epsilon = 1e-10);
-    }
-
-    #[test]
-    fn test_parallel_equals_sequential() {
-        // This test prevents "implementation drift" where the parallel version
-        // gets updated but the sequential one is forgotten.
-
-        // Shape (2 rows, 3 cols)
-        let waveforms = array![[0.0, 1.0, 2.0], [2.0, 1.0, 0.0]];
-        let dt = 1.0;
-
-        let seq_res = trapz_with_fun(waveforms.view(), dt, identity);
-        let par_res = parallel_trapz_with_fun(waveforms.view(), dt, identity);
-
-        // Check if shapes match
-        assert_eq!(
-            seq_res.dim(),
-            par_res.dim(),
-            "Sequential and Parallel output shapes mismatch"
-        );
-
-        // Check if values match
-        assert_abs_diff_eq!(seq_res, par_res, epsilon = 1e-10);
     }
 
     #[test]

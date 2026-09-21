@@ -1,6 +1,6 @@
 use _core::{arias_intensity, cav, psa, significant_duration};
-use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
-use ndarray::Array2;
+use criterion::{BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
+use ndarray::{Array2, array};
 use std::hint::black_box;
 
 // Configuration constants for test scenarios
@@ -39,13 +39,6 @@ fn bench_cav(c: &mut Criterion) {
             group.bench_with_input(BenchmarkId::new("Sequential", &param), &view, |b, &v| {
                 b.iter(|| cav::cav(black_box(v), black_box(SAMPLING_RATE)))
             });
-
-            // Only benchmark parallel for multiple stations
-            if stations > 1 {
-                group.bench_with_input(BenchmarkId::new("Parallel", &param), &view, |b, &v| {
-                    b.iter(|| cav::parallel_cav(black_box(v), black_box(SAMPLING_RATE)))
-                });
-            }
         }
     }
 
@@ -67,17 +60,6 @@ fn bench_arias_intensity(c: &mut Criterion) {
             group.bench_with_input(BenchmarkId::new("Sequential", &param), &view, |b, &v| {
                 b.iter(|| arias_intensity::arias_intensity(black_box(v), black_box(SAMPLING_RATE)))
             });
-
-            if stations > 1 {
-                group.bench_with_input(BenchmarkId::new("Parallel", &param), &view, |b, &v| {
-                    b.iter(|| {
-                        arias_intensity::parallel_arias_intensity(
-                            black_box(v),
-                            black_box(SAMPLING_RATE),
-                        )
-                    })
-                });
-            }
         }
     }
 
@@ -105,17 +87,6 @@ fn bench_cumulative_arias(c: &mut Criterion) {
                     )
                 })
             });
-
-            if stations > 1 {
-                group.bench_with_input(BenchmarkId::new("Parallel", &param), &view, |b, &v| {
-                    b.iter(|| {
-                        arias_intensity::parallel_cumulative_arias_intensity(
-                            black_box(v),
-                            black_box(SAMPLING_RATE),
-                        )
-                    })
-                });
-            }
         }
     }
 
@@ -144,19 +115,6 @@ fn bench_significant_duration(c: &mut Criterion) {
                     )
                 })
             });
-
-            if stations > 1 {
-                group.bench_with_input(BenchmarkId::new("Parallel", &param), &view, |b, &v| {
-                    b.iter(|| {
-                        significant_duration::parallel_significant_duration(
-                            black_box(v),
-                            black_box(SAMPLING_RATE),
-                            0.05,
-                            0.95,
-                        )
-                    })
-                });
-            }
         }
     }
 
@@ -176,16 +134,19 @@ fn bench_psa(c: &mut Criterion) {
             for &samples in SAMPLE_LENGTHS {
                 let waveforms = generate_waveforms(stations, samples);
                 let view = waveforms.view();
+                let periods = array![period];
                 let param = format!("T{:.1}s_{}stn_{}smp", period, stations, samples);
 
                 group.throughput(Throughput::Bytes((stations * samples * 8) as u64));
 
-                group.bench_with_input(BenchmarkId::new("Parallel", &param), &view, |b, &v| {
+                group.bench_with_input(BenchmarkId::new("Sequential", &param), &view, |b, &v| {
                     b.iter(|| {
-                        psa::newmark_beta_method_parallel(
+                        psa::psa(
                             black_box(&v),
+                            black_box(&v),
+                            black_box(&v),
+                            black_box(&periods.view()),
                             black_box(SAMPLING_RATE),
-                            black_box(period),
                             black_box(DAMPING),
                         )
                     })

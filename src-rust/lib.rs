@@ -5,7 +5,6 @@ pub mod psa;
 pub mod rotd;
 pub mod significant_duration;
 mod trapz;
-mod utils;
 use pyo3::prelude::*;
 
 /// A Python module implemented in Rust. The name of this function must match
@@ -13,7 +12,7 @@ use pyo3::prelude::*;
 /// import the module.
 #[pymodule]
 mod _core {
-    use numpy::{IntoPyArray, PyArray1, PyArray2, PyReadonlyArray2};
+    use numpy::{IntoPyArray, PyArray1, PyArray2, PyArray3, PyReadonlyArray1, PyReadonlyArray2};
     use pyo3::prelude::*;
 
     use crate::arias_intensity;
@@ -22,20 +21,6 @@ mod _core {
     use crate::rotd;
     use crate::significant_duration;
 
-    /// Newmark-beta method
-    #[pyfunction]
-    fn _newmark_beta_method<'py>(
-        py: Python<'py>,
-        waveforms_py: PyReadonlyArray2<f64>,
-        dt: f64,
-        w: f64,
-        xi: f64,
-    ) -> Bound<'py, PyArray2<f64>> {
-        let waveforms = waveforms_py.as_array();
-        let waveform_psa = psa::newmark_beta_method_parallel(&waveforms, dt, w, xi);
-        waveform_psa.into_pyarray(py)
-    }
-
     #[pyfunction]
     fn _arias_intensity<'py>(
         py: Python<'py>,
@@ -43,40 +28,7 @@ mod _core {
         dt: f64,
     ) -> Bound<'py, PyArray1<f64>> {
         let waveforms = waveforms_py.as_array();
-        let waveform_ai = arias_intensity::arias_intensity(waveforms, dt);
-        waveform_ai.into_pyarray(py)
-    }
-
-    #[pyfunction]
-    fn _parallel_arias_intensity<'py>(
-        py: Python<'py>,
-        waveforms_py: PyReadonlyArray2<f64>,
-        dt: f64,
-    ) -> Bound<'py, PyArray1<f64>> {
-        let waveforms = waveforms_py.as_array();
-        let waveform_ai = arias_intensity::parallel_arias_intensity(waveforms, dt);
-        waveform_ai.into_pyarray(py)
-    }
-
-    #[pyfunction]
-    fn _cumulative_arias_intensity<'py>(
-        py: Python<'py>,
-        waveforms_py: PyReadonlyArray2<f64>,
-        dt: f64,
-    ) -> Bound<'py, PyArray2<f64>> {
-        let waveforms = waveforms_py.as_array();
-        let waveform_ai = arias_intensity::cumulative_arias_intensity(waveforms, dt);
-        waveform_ai.into_pyarray(py)
-    }
-
-    #[pyfunction]
-    fn _parallel_cumulative_arias_intensity<'py>(
-        py: Python<'py>,
-        waveforms_py: PyReadonlyArray2<f64>,
-        dt: f64,
-    ) -> Bound<'py, PyArray2<f64>> {
-        let waveforms = waveforms_py.as_array();
-        let waveform_ai = arias_intensity::parallel_cumulative_arias_intensity(waveforms, dt);
+        let waveform_ai = py.detach(|| arias_intensity::arias_intensity(waveforms, dt));
         waveform_ai.into_pyarray(py)
     }
 
@@ -87,33 +39,38 @@ mod _core {
         dt: f64,
     ) -> Bound<'py, PyArray1<f64>> {
         let waveforms = waveforms_py.as_array();
-        let waveform_cav = cav::cav(waveforms, dt);
+        let waveform_cav = py.detach(|| cav::cav(waveforms, dt));
         waveform_cav.into_pyarray(py)
     }
 
+    /// Pseudo-spectral acceleration statistics for every station and period.
+    ///
+    /// The three components have shape `(ns, nt)`. Returns an `(ns,
+    /// n_periods, 9)` array whose last axis is laid out as
+    /// `ROTD_COMPONENTS`: the 000, 090, vertical and geometric mean peaks,
+    /// then the five columns [`_rotd`] returns.
     #[pyfunction]
-    fn _parallel_cav<'py>(
-        py: Python<'py>,
-        waveforms_py: PyReadonlyArray2<f64>,
-        dt: f64,
-    ) -> Bound<'py, PyArray1<f64>> {
-        let waveforms = waveforms_py.as_array();
-        let waveform_cav = cav::parallel_cav(waveforms, dt);
-        waveform_cav.into_pyarray(py)
-    }
-
-    #[pyfunction]
-    fn _rotd_parallel<'py>(
+    fn _psa<'py>(
         py: Python<'py>,
         comp_0_py: PyReadonlyArray2<f64>,
         comp_90_py: PyReadonlyArray2<f64>,
-    ) -> Bound<'py, PyArray2<f64>> {
+        comp_ver_py: PyReadonlyArray2<f64>,
+        periods_py: PyReadonlyArray1<f64>,
+        dt: f64,
+        xi: f64,
+    ) -> Bound<'py, PyArray3<f64>> {
         let comp_0 = comp_0_py.as_array();
         let comp_90 = comp_90_py.as_array();
-        let rotd_stats = rotd::rotd_parallel(comp_0, comp_90);
-        rotd_stats.into_pyarray(py)
+        let comp_ver = comp_ver_py.as_array();
+        let periods = periods_py.as_array();
+        let psa = py.detach(|| psa::psa(&comp_0, &comp_90, &comp_ver, &periods, dt, xi));
+        psa.into_pyarray(py)
     }
 
+    /// RotD statistics of every `(comp_0, comp_90)` pair.
+    ///
+    /// Returns an `(ns, 5)` array: RotD00, RotD50 and RotD100, then the
+    /// orientation in degrees at which RotD00 and RotD100 occur.
     #[pyfunction]
     fn _rotd<'py>(
         py: Python<'py>,
@@ -122,7 +79,7 @@ mod _core {
     ) -> Bound<'py, PyArray2<f64>> {
         let comp_0 = comp_0_py.as_array();
         let comp_90 = comp_90_py.as_array();
-        let rotd_stats = rotd::rotd(comp_0, comp_90);
+        let rotd_stats = py.detach(|| rotd::rotd(comp_0, comp_90));
         rotd_stats.into_pyarray(py)
     }
 
@@ -135,27 +92,10 @@ mod _core {
         high: f64,
     ) -> Bound<'py, PyArray1<f64>> {
         let waveforms = waveforms_py.as_array();
-        let arias_intensity = arias_intensity::cumulative_arias_intensity(waveforms, dt);
-        let ds = significant_duration::significant_duration(arias_intensity.view(), dt, low, high);
-        ds.into_pyarray(py)
-    }
-
-    #[pyfunction]
-    fn _parallel_significant_duration<'py>(
-        py: Python<'py>,
-        waveforms_py: PyReadonlyArray2<f64>,
-        dt: f64,
-        low: f64,
-        high: f64,
-    ) -> Bound<'py, PyArray1<f64>> {
-        let waveforms = waveforms_py.as_array();
-        let arias_intensity = arias_intensity::parallel_cumulative_arias_intensity(waveforms, dt);
-        let ds = significant_duration::parallel_significant_duration(
-            arias_intensity.view(),
-            dt,
-            low,
-            high,
-        );
+        let ds = py.detach(|| {
+            let arias_intensity = arias_intensity::cumulative_arias_intensity(waveforms, dt);
+            significant_duration::significant_duration(arias_intensity.view(), dt, low, high)
+        });
         ds.into_pyarray(py)
     }
 }
