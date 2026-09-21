@@ -28,7 +28,13 @@ ko_matrix = ["obspy"]
 # and get lazy datasets out; xr.apply_ufunc(..., dask="parallelized") never
 # imports dask for plain numpy/eager xarray input.
 lazy = ["dask[array]"]
-test = ["pytest", "hypothesis[numpy]", "pytest-cov", "rich>=14.2.0", "dask[array]"]
+test = [
+  "pytest",
+  "hypothesis[numpy]",
+  "pytest-cov",
+  "rich>=14.2.0",
+  "dask[array]",
+]
 types = ["pandas-stubs", "scipy-stubs"]
 dev = ["deptry", "ruff", "ty", "numpydoc"]
 
@@ -128,9 +134,6 @@ checks = [
 ]
 
 [tool.deptry]
-# The retired lint.yml invoked `deptry . -ddg test,dev,types`. The shared
-# workflow calls `deptry .` with no arguments, so the list of extras that are
-# really development-only lives here instead.
 optional_dependencies_dev_groups = ["test", "dev", "types"]
 
 [tool.uv]
