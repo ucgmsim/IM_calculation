@@ -34,6 +34,9 @@ target/
 .coverage
 .coverage.*
 htmlcov/
+# The benchmark test writes one of these into the working directory whenever
+# it fails, which is exactly when `git add -A` is most likely to sweep it up.
+diff_fail_*.html
 
 # Tool caches
 __pycache__/
