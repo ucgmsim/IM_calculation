@@ -8,8 +8,8 @@ mod trapz;
 use pyo3::prelude::*;
 
 /// A Python module implemented in Rust. The name of this function must match
-/// the `lib.name` setting in the `Cargo.toml`, else Python will not be able to
-/// import the module.
+/// the `lib.name` setting in the `Cargo.toml`, else Python fails to import the
+/// module.
 #[pymodule]
 mod _core {
     use numpy::{IntoPyArray, PyArray1, PyArray2, PyArray3, PyReadonlyArray1, PyReadonlyArray2};

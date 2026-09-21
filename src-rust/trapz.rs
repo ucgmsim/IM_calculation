@@ -1,17 +1,18 @@
 //! Numerical integration module using the Trapezium Rule with zero-crossing correction.
 //!
-//! This module provides utilities for both total and cumulative integration of 1D and 2D arrays,
-//! with support for mapping a function $f(x)$ over the values before integration.
+//! Total and cumulative integration of 1D and 2D arrays, optionally mapping a
+//! function $f(x)$ over the values first.
 //!
-//! A key feature of this implementation is the handling of zero-crossings, which ensures that
-//! rectified functions (like $f(x) = |x|$) are integrated with geometric precision.
+//! Zero-crossing handling is what integrates rectified functions (like
+//! $f(x) = |x|$) to geometric precision.
 
 use ndarray::prelude::*;
 
-/// Calculates the contribution of a single step to the trapezium integral.
+/// Calculates the contribution of one step to the trapezium integral.
 ///
-/// If a zero-crossing is detected between `v1` and `v2`, the interval is split
-/// at the estimated root to improve precision for non-linear functions like absolute value.
+/// On finding a zero-crossing between `v1` and `v2`, this splits the interval
+/// at the estimated root, for precision on non-linear functions like absolute
+/// value.
 ///
 /// # Arguments
 /// * `v1` - Value at the start of the interval.
@@ -38,7 +39,7 @@ where
 
 /// Integrates a 1D waveform using the trapezium rule.
 ///
-/// The result is calculated as:
+/// The result comes out as:
 /// $$\text{Area} = \frac{1}{2} \sum_{i=0}^{n-1} \text{trapz\_step}(v_i, v_{i+1}, dt, f)$$
 fn trapz_one_with_fun<F>(waveform: ArrayView1<f64>, dt: f64, f: &F) -> f64
 where
@@ -77,7 +78,7 @@ fn cumulative_trapz_one_with_fun<F>(
 /// # Arguments
 /// * `waveforms` - 2D array where each row is a separate signal.
 /// * `dt` - The timestep.
-/// * `f` - Function to apply to values (e.g., `|x| x * x` for arias intensity).
+/// * `f` - Function to apply to values, such as `|x| x * x` for arias intensity.
 pub fn trapz_with_fun<F>(waveforms: ArrayView2<f64>, dt: f64, f: F) -> Array1<f64>
 where
     F: Fn(f64) -> f64,
@@ -118,7 +119,7 @@ mod tests {
         //
         // Scenario: A signal goes from -1.0 to 1.0 over dt=2.0.
         // It crosses zero exactly in the middle.
-        // We integrate |x| (rectified).
+        // The integrand is |x| (rectified).
 
         // STANDARD TRAPEZIUM MATH:
         // Area = 0.5 * dt * (|v1| + |v2|)
@@ -126,7 +127,8 @@ mod tests {
         // This is WRONG for |x|. The actual area of two triangles is 1.0.
 
         // `trapz_step` detects the crossing and splits the interval.
-        // It should return exactly 1.0 * 2 (since the 0.5 factor is applied later).
+        // It should return exactly 1.0 * 2, because trapz_one applies the 0.5
+        // factor later.
 
         let v1 = -1.0;
         let v2 = 1.0;
@@ -135,7 +137,7 @@ mod tests {
         // Note: trapz_step returns 2x the area (the 0.5 is in trapz_one)
         let result_2x = trapz_step(v1, v2, dt, &rectified);
 
-        // We expect the area to be 1.0, so the function returns 2.0
+        // The area should come to 1.0, so the function returns 2.0
         assert_abs_diff_eq!(result_2x, 2.0, epsilon = 1e-10);
     }
 
@@ -155,7 +157,7 @@ mod tests {
 
     #[test]
     fn test_cumulative_matches_total() {
-        // Guarantee: The last point of a cumulative integral MUST
+        // Contract: the last point of a cumulative integral MUST
         // equal the result of the total integral.
         let waveform = array![0.5, -0.5, 1.0, -2.0, 3.0];
         let mut out = Array1::zeros(waveform.dim());
@@ -169,8 +171,8 @@ mod tests {
 
     #[test]
     fn test_linearity_scaling() {
-        // Guarantee: If we double dt, the area should double.
-        // This ensures variables aren't hardcoded.
+        // Contract: doubling dt doubles the area. A hardcoded dt anywhere in
+        // the integration would break this.
         let waveform = array![1.0, 2.0, 3.0];
 
         let area_dt1 = trapz_one_with_fun(waveform.view(), 1.0, &identity);
@@ -190,8 +192,8 @@ mod tests {
 
         let result = trapz_with_fun(waveforms.view(), dt, identity);
 
-        // If the code integrates correctly (Batch, Time), result should have 2 elements.
-        // If it integrates incorrectly (Time, Batch), it will have 3 elements.
+        // Integrating correctly (Batch, Time) gives a 2-element result.
+        // Integrating the wrong way round (Time, Batch) gives 3 elements.
         assert_eq!(
             result.len(),
             2,

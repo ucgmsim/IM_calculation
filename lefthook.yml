@@ -90,4 +90,4 @@ pre-push:
     vale:
       # Needs `vale sync` once, to fetch the styles named in .vale.ini.
       run: vale {push_files}
-      glob: "*.{py,md}"
+      glob: "*.{py,md,rs}"
