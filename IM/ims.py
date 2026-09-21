@@ -664,7 +664,7 @@ def _konno_smooth(spectrum_data: np.ndarray, konno: np.ndarray) -> np.ndarray:
     n_output = konno.shape[1]
     columns = max(1, KONNO_BLOCK_BYTES // (konno.shape[0] * np.float64().itemsize))
     # KO matrices can be really large, so this applies a block-wise
-    # multiplication. This is done without dask because it would add a new
+    # multiplication. Dask would do the same thing, at the cost of a new
     # dependency to the codebase.
     smoothed = np.empty(spectrum_data.shape[:-1] + (n_output,), dtype=np.float64)
     for start in range(0, n_output, columns):

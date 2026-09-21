@@ -45,10 +45,10 @@ mod _core {
 
     /// Pseudo-spectral acceleration statistics for every station and period.
     ///
-    /// The three components have shape `(ns, nt)`. Returns an `(ns,
-    /// n_periods, 9)` array whose last axis is laid out as
-    /// `ROTD_COMPONENTS`: the 000, 090, vertical and geometric mean peaks,
-    /// then the five columns [`_rotd`] returns.
+    /// Each component has shape `(ns, nt)`. Returns an `(ns, n_periods, 9)`
+    /// array whose last axis follows `ROTD_COMPONENTS`: the 000, 090,
+    /// vertical and geometric mean peaks, then the five columns [`_rotd`]
+    /// returns.
     #[pyfunction]
     fn _psa<'py>(
         py: Python<'py>,

@@ -4,11 +4,12 @@ use ndarray::prelude::*;
 
 const DEGREES: f64 = PI / 180.0;
 
-/// Integer rotation angles RotD is sampled at: 0, 1, ..., 179 degrees.
+/// Integer rotation angles RotD samples: 0, 1, ..., 179 degrees.
 pub const N_ANGLES: usize = 180;
 
-/// Columns in a RotD statistics row: the RotD00, RotD50 and RotD100 peak
-/// amplitudes, then the orientation in degrees of RotD00 and RotD100.
+/// Columns in a RotD statistics row. Peak amplitudes for RotD00, RotD50 and
+/// RotD100 come first. The RotD00 and RotD100 orientations, in degrees,
+/// follow them.
 pub const N_ROTD_STATS: usize = 5;
 
 const fn cross(o: [f64; 2], u: [f64; 2], v: [f64; 2]) -> f64 {
@@ -150,9 +151,9 @@ impl Hull {
 }
 
 /// Reduce the 180 per-angle peaks to the (min, median, max) rotated
-/// amplitude. Orientation is recorded for the min and the max.
+/// amplitude. The row also gives the orientation of the min and the max.
 pub(crate) fn rotd_stats(peaks: [f64; N_ANGLES]) -> [f64; N_ROTD_STATS] {
-    // Strict comparisons, so a tie leaves the lowest angle in place.
+    // Strict comparisons keep the lowest angle in place on a tie.
     let (mut min_angle, mut max_angle) = (0usize, 0usize);
     for theta in 1..N_ANGLES {
         if peaks[theta] < peaks[min_angle] {
@@ -162,8 +163,8 @@ pub(crate) fn rotd_stats(peaks: [f64; N_ANGLES]) -> [f64; N_ROTD_STATS] {
             max_angle = theta;
         }
     }
-    // An even number of samples, so the median falls between the two central
-    // peaks and is the average of that pair.
+    // An even number of samples. The median falls between the two central
+    // peaks, and takes the average of that pair.
     let mut ranked = peaks;
     ranked.sort_unstable_by(f64::total_cmp);
     [
@@ -225,7 +226,7 @@ mod tests {
     const MAX_NT: usize = 128;
 
     /// The direct scan the culled [`Hull::peaks`] must reproduce: every angle
-    /// against every timestep, no hull reduction.
+    /// against every timestep, over the full point set.
     fn brute_peaks(x: ArrayView1<f64>, y: ArrayView1<f64>) -> [f64; N_ANGLES] {
         std::array::from_fn(|theta| {
             let (sin_theta, cos_theta) = (theta as f64 * DEGREES).sin_cos();
@@ -248,7 +249,7 @@ mod tests {
     }
 
     /// Assert that the RotD00 and RotD100 orientations locate their own
-    /// statistic in the sweep they were reduced from.
+    /// statistic in the sweep `rotd_stats` reduced.
     fn assert_orientations_locate_statistics(peaks: [f64; N_ANGLES], case: &str) {
         let [rotd00, rotd50, rotd100, at_00, at_100] = rotd_stats(peaks);
         for (angle, statistic) in [(at_00, "RotD00"), (at_100, "RotD100")] {
@@ -319,9 +320,10 @@ mod tests {
     }
 
     /// A non-zero waveform, sampled in [-1, 1). RotD ratios are scale
-    /// invariant, so amplitude isn't worth exploring here. The fixed tests
-    /// cover the extremes of the floating point range instead. This strategy
-    /// leaves out the all-zero record, which has no polarisation direction;
+    /// invariant. Varying the amplitude tests nothing new, and the
+    /// fixed tests cover the extremes of the floating point range instead.
+    /// This strategy leaves out the all-zero record, which has no
+    /// polarisation direction;
     /// `test_ratio_bound_degenerate_records` covers that one.
     fn arb_waveform() -> impl Strategy<Value = Array1<f64>> {
         prop::collection::vec(-1.0f64..1.0, 1..=MAX_NT)
@@ -403,7 +405,7 @@ mod tests {
             for (i, row) in stats.rows().into_iter().enumerate() {
                 // Both entry points reduce the same hull, so the (ns, 3)
                 // statistics must be exactly the reduction of the (ns, 180)
-                // curve -- no tolerance needed to tie them together.
+                // curve (no tolerance needed to tie them together).
                 let row_peaks: [f64; N_ANGLES] = std::array::from_fn(|theta| peaks[(i, theta)]);
                 let curve_stats = rotd_stats(row_peaks);
                 prop_assert_eq!(
@@ -493,8 +495,8 @@ mod tests {
     #[test]
     fn rotd180_matches_brute_on_circular_record() {
         // A near-circular trajectory is the culling's worst case: almost every
-        // point lies near the hull, so the cull removes few of them. The result
-        // must still be exact.
+        // point lies near the hull. The cull removes few of them, and the
+        // result must still be exact.
         let nt = 2000;
         let comp_0 = Array1::from_shape_fn(nt, |i| (TAU * i as f64 / nt as f64).cos());
         let comp_90 = Array1::from_shape_fn(nt, |i| (TAU * i as f64 / nt as f64).sin());
@@ -605,11 +607,11 @@ mod tests {
         let comp_0 = array![1.0f64, 0.0f64];
         let comp_90 = array![0.0f64, 1.0f64];
         let [min, median, max, at_min, at_max] = rotd_stats(peaks(comp_0.view(), comp_90.view()));
-        let expected_min = 2.0f64.sqrt() / 2.0; // e.g. at pi / 4 degrees
-        let expected_max = 1.0; // e.g. at 0 degrees
+        let expected_min = 2.0f64.sqrt() / 2.0; // such as at pi / 4 degrees
+        let expected_max = 1.0; // such as at 0 degrees
         let expected_median = 0.9238443540096138; // derived independently with numpy
         // The sweep is max(|cos theta|, |sin theta|): least at 45 degrees, and
-        // 1 at both 0 and 90 degrees, of which the lower is reported.
+        // 1 at both 0 and 90 degrees, of which `rotd_stats` reports the lower.
         assert_eq!(
             [at_min, at_max],
             [45.0, 0.0],

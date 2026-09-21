@@ -137,7 +137,7 @@ mod tests {
         // Note: trapz_step returns 2x the area (the 0.5 is in trapz_one)
         let result_2x = trapz_step(v1, v2, dt, &rectified);
 
-        // The area should come to 1.0, so the function returns 2.0
+        // The area should come to 1.0. The function returns twice that.
         assert_abs_diff_eq!(result_2x, 2.0, epsilon = 1e-10);
     }
 
