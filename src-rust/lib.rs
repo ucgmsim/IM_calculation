@@ -1,6 +1,7 @@
 pub mod arias_intensity;
 pub mod cav;
 pub mod constants;
+pub mod konno_ohmachi;
 pub mod psa;
 pub mod rotd;
 pub mod significant_duration;
@@ -17,6 +18,7 @@ mod _core {
 
     use crate::arias_intensity;
     use crate::cav;
+    use crate::konno_ohmachi;
     use crate::psa;
     use crate::rotd;
     use crate::significant_duration;
@@ -49,6 +51,39 @@ mod _core {
     /// n_periods, 9)` array whose last axis is laid out as
     /// `ROTD_COMPONENTS`: the 000, 090, vertical and geometric mean peaks,
     /// then the five columns [`_rotd`] returns.
+    /// Rows `start..stop` of the Konno-Ohmachi smoothing matrix.
+    ///
+    /// Returns a `(stop - start, n_bins)` row-major `float32` array whose rows
+    /// each sum to one. Smoothing contracts over the centre index, so a
+    /// spectrum is smoothed with `spectra @ matrix`.
+    #[pyfunction]
+    fn _konno_ohmachi_matrix_rows<'py>(
+        py: Python<'py>,
+        n_bins: usize,
+        bandwidth: f64,
+        start: usize,
+        stop: usize,
+    ) -> Bound<'py, PyArray2<f32>> {
+        let rows = py.detach(|| konno_ohmachi::matrix_rows(n_bins, bandwidth, start, stop));
+        rows.into_pyarray(py)
+    }
+
+    /// Konno-Ohmachi smoothing of `(n_spectra, n_bins)` spectra, matrix-free.
+    ///
+    /// Agrees with `spectra @ _konno_ohmachi_matrix_rows(n_bins, bandwidth, 0,
+    /// n_bins)` up to the `float32` rounding of the matrix. Use it only when the
+    /// matrix will not fit: it re-evaluates every window on every call.
+    #[pyfunction]
+    fn _konno_ohmachi_smooth<'py>(
+        py: Python<'py>,
+        spectra_py: PyReadonlyArray2<f64>,
+        bandwidth: f64,
+    ) -> Bound<'py, PyArray2<f64>> {
+        let spectra = spectra_py.as_array();
+        let smoothed = py.detach(|| konno_ohmachi::smooth(spectra, bandwidth));
+        smoothed.into_pyarray(py)
+    }
+
     #[pyfunction]
     fn _psa<'py>(
         py: Python<'py>,
