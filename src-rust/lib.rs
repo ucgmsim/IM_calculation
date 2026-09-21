@@ -8,8 +8,8 @@ mod trapz;
 use pyo3::prelude::*;
 
 /// A Python module implemented in Rust. The name of this function must match
-/// the `lib.name` setting in the `Cargo.toml`, else Python will not be able to
-/// import the module.
+/// the `lib.name` setting in the `Cargo.toml`, else Python fails to import the
+/// module.
 #[pymodule]
 mod _core {
     use numpy::{IntoPyArray, PyArray1, PyArray2, PyArray3, PyReadonlyArray1, PyReadonlyArray2};
@@ -45,10 +45,10 @@ mod _core {
 
     /// Pseudo-spectral acceleration statistics for every station and period.
     ///
-    /// The three components have shape `(ns, nt)`. Returns an `(ns,
-    /// n_periods, 9)` array whose last axis is laid out as
-    /// `ROTD_COMPONENTS`: the 000, 090, vertical and geometric mean peaks,
-    /// then the five columns [`_rotd`] returns.
+    /// Each component has shape `(ns, nt)`. Returns an `(ns, n_periods, 9)`
+    /// array whose last axis follows `ROTD_COMPONENTS`: the 000, 090,
+    /// vertical and geometric mean peaks, then the five columns [`_rotd`]
+    /// returns.
     #[pyfunction]
     fn _psa<'py>(
         py: Python<'py>,

@@ -84,8 +84,8 @@ def _as_waveform(waveform: Waveform) -> xr.DataArray:
     Raises
     ------
     TypeError
-        If the waveform has the wrong number of dimensions, is missing the
-        `component`/`time` dimensions, or does not have 3 components.
+        If the waveform has the wrong number of dimensions, or lacks either
+        the `component` and `time` dimensions or a count of 3 components.
     """
     if not isinstance(waveform, xr.DataArray):
         array = np.asarray(waveform)
@@ -153,10 +153,10 @@ def _im_dataset(
         Names of the components the kernel produces, in output order.
     name : str
         Name recorded in `dataset.attrs["name"]`, identifying the IM. This is
-        the only place the IM name is carried, since `components` become
+        the only place that records the IM name, since `components` become
         data variables rather than a `component` dimension.
     extra_dims : mapping of str to ndarray, optional
-        Extra output dimensions the kernel introduces (e.g. `period` for pSA,
+        Extra output dimensions the kernel introduces (`period` for pSA,
         `frequency` for FAS), mapping dimension name to coordinate values.
     kwargs : mapping, optional
         Extra keyword arguments passed through to `kernel`.
@@ -165,8 +165,8 @@ def _im_dataset(
     -------
     xr.Dataset
         One data variable per component, sharing the input's `station`
-        dimension and any non-dimension coordinates (e.g. real station
-        names, `latitude`, `longitude`).
+        dimension and any non-dimension coordinates (real station names,
+        `latitude`, `longitude`).
     """
     extra_dims = extra_dims or {}
     kwargs = kwargs or {}
@@ -205,7 +205,7 @@ def _rotd_kernel(
         A `(*lead, n_components, nt)` waveform block.
     transform : callable, optional
         Applied to the `(3, n_rows, nt)` component matrices before taking
-        peaks (e.g. integration for PGV/PGD). Must preserve the leading
+        peaks (integration for PGV/PGD). Must preserve the leading
         `(3, n_rows, ...)` shape.
 
     Returns
@@ -242,8 +242,8 @@ def compute_intensity_measure_rotd(
     name : str
         Name of the resulting dataset (recorded in `dataset.attrs["name"]`).
     transform : callable, optional
-        Applied to the acceleration components before taking peaks (e.g.
-        integration to velocity/displacement for PGV/PGD).
+        Applied to the acceleration components before taking peaks:
+        integration to velocity or displacement for PGV and PGD.
 
     Returns
     -------
@@ -369,8 +369,8 @@ def _cav_kernel(block: np.ndarray, *, dt: float, threshold: float | None) -> np.
     dt : float
         Timestep resolution (s).
     threshold : float or None
-        Acceleration threshold ($cm/s^2$). Samples below it are zeroed
-        before integrating. `None` or zero integrates the record as-is.
+        Acceleration threshold ($cm/s^2$). The kernel zeroes samples below
+        it before integrating. `None` or zero integrates the record as-is.
 
     Returns
     -------
@@ -402,13 +402,14 @@ def cumulative_absolute_velocity(
     dt : float
         Timestep resolution (s).
     threshold : float, optional
-        Acceleration threshold ($cm/s^2$). Values below this are ignored (e.g. 5 for CAV5).
+        Acceleration threshold ($cm/s^2$), 5 for CAV5. The calculation
+        ignores values below it.
 
     Returns
     -------
     xr.Dataset
-        One data variable per component (`attrs["name"]` is `CAV5` if
-        `threshold` is set, else `CAV`) containing CAV values (m/s) for
+        One data variable per component (`attrs["name"]` becomes `CAV5` with
+        a `threshold`, else `CAV`) containing CAV values (m/s) for
         ['000', '090', 'ver', 'geom'].
     """
     name = IM.CAV5.value if threshold else IM.CAV.value
@@ -479,9 +480,9 @@ def _duration_kernel(
         Timestep resolution (s).
     quantile_low : float
         Lower bound of the Arias intensity accumulation window, as a
-        fraction of the total (e.g. 0.05 for Ds595).
+        fraction of the total (0.05 for Ds595).
     quantile_high : float
-        Upper bound of that window (e.g. 0.95 for Ds595).
+        Upper bound of that window (0.95 for Ds595).
 
     Returns
     -------
@@ -516,9 +517,9 @@ def significant_duration(
     dt : float
         Timestep resolution (s).
     percent_low : float
-        Lower bound percentage (e.g., 5.0 for 5%).
+        Lower bound percentage, 5.0 for 5%.
     percent_high : float
-        Upper bound percentage (e.g., 95.0 for 95%).
+        Upper bound percentage, 95.0 for 95%.
     name : str, optional
         Name of the resulting dataset.
 
@@ -663,7 +664,7 @@ def _konno_smooth(spectrum_data: np.ndarray, konno: np.ndarray) -> np.ndarray:
     n_output = konno.shape[1]
     columns = max(1, KONNO_BLOCK_BYTES // (konno.shape[0] * np.float64().itemsize))
     # KO matrices can be really large, so this applies a block-wise
-    # multiplication. This is done without dask because it would add a new
+    # multiplication. Dask would do the same thing, at the cost of a new
     # dependency to the codebase.
     smoothed = np.empty(spectrum_data.shape[:-1] + (n_output,), dtype=np.float64)
     for start in range(0, n_output, columns):
@@ -686,7 +687,7 @@ def smooth_and_interpolate(
     Parameters
     ----------
     spectrum_data : ndarray
-        The spectrum data to be smoothed and interpolated.
+        The spectrum data to smooth and interpolate.
     konno : ndarray
         The Konno-Ohmachi smoothing matrix to apply to the spectrum data.
     freqs : ndarray of float64
@@ -726,11 +727,11 @@ def _fas_kernel(
     n_fft : int
         Length the record is zero-padded to before the real FFT.
     freqs : ndarray of float
-        Output frequencies (Hz) the smoothed spectrum is interpolated onto.
+        Output frequencies (Hz) for the interpolated spectrum.
     fa_frequencies : ndarray of float
-        The `rfft` bin frequencies (Hz) the Konno-Ohmachi matrix is sized for.
+        The `rfft` bin frequencies (Hz) that size the Konno-Ohmachi matrix.
     ko_directory : Path
-        Directory the cached Konno-Ohmachi matrices are read from.
+        Directory holding the cached Konno-Ohmachi matrices.
 
     Returns
     -------
@@ -746,9 +747,9 @@ def _fas_kernel(
     for index in range(n_components):
         spectra[index] = np.abs(fft.rfft(components[index], n=n_fft, axis=-1) * dt)
 
-    # EAS is computed from the *unsmoothed* spectrum to avoid distortion of
-    # inter-frequency correlations, then smoothed alongside 000/090/ver in a
-    # single pass over the (potentially huge) Konno matrix.
+    # EAS comes from the *unsmoothed* spectrum, to avoid distorting the
+    # inter-frequency correlations, and then smooths alongside 000/090/ver in
+    # one pass over the (potentially huge) Konno matrix.
     eas_unsmoothed = np.sqrt(
         0.5
         * (np.square(spectra[Component.COMP_0]) + np.square(spectra[Component.COMP_90]))

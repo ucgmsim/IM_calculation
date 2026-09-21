@@ -1,7 +1,7 @@
 //! Cumulative absolute velocity (CAV) calculation module.
 //!
-//! This module provides functions to calculate the intensity of earthquake ground motion
-//! based on the integral of the absolute value of acceleration.
+//! CAV grades earthquake ground motion by the integral of the absolute value
+//! of acceleration.
 //!
 //! The formula used is:
 //! $$CAV = \int_{0}^{T} |a(t)| \, dt$$
@@ -43,7 +43,7 @@ mod tests {
 
     #[test]
     fn test_cav_negative() {
-        // CAV should not care about negative values
+        // CAV disregards the sign of the acceleration
         let waveforms = array![[-1.0, -1.0]];
         let dt = 1.0;
         let result = cav(waveforms.view(), dt);

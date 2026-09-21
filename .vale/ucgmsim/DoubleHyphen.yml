@@ -1,0 +1,21 @@
+---
+extends: existence
+message: "ASCII em dash: '%s'. Use a comma, a full stop or parentheses."
+level: error
+nonword: true
+# `ai-tells.DoubleHyphen` matches a bare `--` anywhere, which in a numpydoc
+# docstring means every section underline ("Parameters\n----------") and every
+# `# ---` banner comment. That is why .vale.ini switches it off, and switching
+# it off is what let the ASCII em dash back in.
+#
+# The spaced form is the one that is always punctuation, and it is separable:
+# an underline and a banner are an unbroken run of hyphens, so no whitespace
+# ever sits between them. Requiring whitespace on both sides of exactly two
+# hyphens takes the punctuation and leaves the underlines alone. A CLI flag
+# (`--all-extras`) has no trailing space either, so it stays quiet too, which
+# is the other half of what the upstream rule's message asks for.
+#
+# `ai-tells.EmDashUsage` bans the real em dash as well, so the fix here is the
+# comma, the full stop or the parentheses, not a nicer-looking dash.
+tokens:
+  - '\s--\s'

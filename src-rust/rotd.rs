@@ -4,11 +4,12 @@ use ndarray::prelude::*;
 
 const DEGREES: f64 = PI / 180.0;
 
-/// Integer rotation angles RotD is sampled at: 0, 1, ..., 179 degrees.
+/// Integer rotation angles RotD samples: 0, 1, ..., 179 degrees.
 pub const N_ANGLES: usize = 180;
 
-/// Columns in a RotD statistics row: the RotD00, RotD50 and RotD100 peak
-/// amplitudes, then the orientation in degrees of RotD00 and RotD100.
+/// Columns in a RotD statistics row. Peak amplitudes for RotD00, RotD50 and
+/// RotD100 come first. The RotD00 and RotD100 orientations, in degrees,
+/// follow them.
 pub const N_ROTD_STATS: usize = 5;
 
 const fn cross(o: [f64; 2], u: [f64; 2], v: [f64; 2]) -> f64 {
@@ -19,7 +20,7 @@ const fn cross(o: [f64; 2], u: [f64; 2], v: [f64; 2]) -> f64 {
 /// trailing vertex that would make a non-left turn.
 ///
 /// `floor` is the number of vertices already in `vertices` that belong to an
-/// earlier chain and must not be popped: 1 for the lower hull (its own first
+/// earlier chain and survive every pop: 1 for the lower hull (its own first
 /// point), and the whole lower hull for the upper one.
 fn monotone_chain(
     vertices: &mut Vec<[f64; 2]>,
@@ -42,7 +43,7 @@ fn monotone_chain(
 /// find it.
 #[derive(Default)]
 pub struct Hull {
-    /// Points that survived the Akl-Toussaint cull, sorted lexicographically.
+    /// Points left after the Akl-Toussaint cull, sorted lexicographically.
     survivors: Vec<[f64; 2]>,
     /// The hull vertices themselves, the only points [`Hull::peaks`] scans.
     vertices: Vec<[f64; 2]>,
@@ -61,8 +62,8 @@ impl Hull {
     /// pair of components.
     pub fn peaks(&mut self, x: ArrayView1<f64>, y: ArrayView1<f64>) -> [f64; N_ANGLES] {
         let n = x.len();
-        // Axis extremes, in order around the trajectory: min x, max y, max x,
-        // min y.
+        // Axis extremes, in order around the trajectory, starting at min x
+        // and going through max y, max x and min y.
         let p0 = [x[0], y[0]];
         let (mut a, mut b, mut c, mut d) = (p0, p0, p0, p0);
         for i in 1..n {
@@ -95,12 +96,11 @@ impl Hull {
         }
         ring[corners] = ring[0];
 
-        // Now we build the culling box edges. If the box is actually a
-        // triangle an edge is repeated twice. This represents duplicate work in
-        // the culling loop below, but it is more efficient than leaving out the
-        // extra edge because Rust is good at optimising the predictable
-        // cross-products. Making this part dynamic makes calculations slower by
-        // a factor of 10.
+        // Now for the culling box edges. A box that's actually a triangle
+        // repeats an edge twice. That duplicates work in the culling loop
+        // below, but it beats dropping the extra edge, because Rust optimises
+        // the predictable cross-products well. Deciding the edge count at run
+        // time costs 10x in the calculation.
         let [edge_0, edge_1, edge_2, edge_3] = std::array::from_fn(|j| {
             let corner = j.min(corners - 1);
             [ring[corner], ring[corner + 1]]
@@ -151,9 +151,9 @@ impl Hull {
 }
 
 /// Reduce the 180 per-angle peaks to the (min, median, max) rotated
-/// amplitude. Orientation is recorded for the min and the max.
+/// amplitude. The row also gives the orientation of the min and the max.
 pub(crate) fn rotd_stats(peaks: [f64; N_ANGLES]) -> [f64; N_ROTD_STATS] {
-    // Strict comparisons, so a tie leaves the lowest angle in place.
+    // Strict comparisons keep the lowest angle in place on a tie.
     let (mut min_angle, mut max_angle) = (0usize, 0usize);
     for theta in 1..N_ANGLES {
         if peaks[theta] < peaks[min_angle] {
@@ -163,8 +163,8 @@ pub(crate) fn rotd_stats(peaks: [f64; N_ANGLES]) -> [f64; N_ROTD_STATS] {
             max_angle = theta;
         }
     }
-    // An even number of samples, so the median falls between the two central
-    // peaks and is the average of that pair.
+    // An even number of samples. The median falls between the two central
+    // peaks, and takes the average of that pair.
     let mut ranked = peaks;
     ranked.sort_unstable_by(f64::total_cmp);
     [
@@ -217,8 +217,8 @@ mod tests {
         out
     }
 
-    /// Slack allowed on the sqrt(2) bound. The bound is attained exactly by
-    /// linearly polarised records, so only floating point error is tolerated.
+    /// Slack allowed on the sqrt(2) bound. Linearly polarised records reach
+    /// the bound exactly, so this leaves room for floating point error only.
     const RATIO_TOL: f64 = 1e-12;
 
     /// Longest generated waveform. RotD is O(180 * nt), so this keeps a full
@@ -226,7 +226,7 @@ mod tests {
     const MAX_NT: usize = 128;
 
     /// The direct scan the culled [`Hull::peaks`] must reproduce: every angle
-    /// against every timestep, no hull reduction.
+    /// against every timestep, over the full point set.
     fn brute_peaks(x: ArrayView1<f64>, y: ArrayView1<f64>) -> [f64; N_ANGLES] {
         std::array::from_fn(|theta| {
             let (sin_theta, cos_theta) = (theta as f64 * DEGREES).sin_cos();
@@ -236,7 +236,7 @@ mod tests {
         })
     }
 
-    /// [`Hull::peaks`] with a fresh hull, for tests that do not exercise
+    /// [`Hull::peaks`] with a fresh hull, for tests that don't exercise
     /// buffer reuse themselves.
     fn peaks(x: ArrayView1<f64>, y: ArrayView1<f64>) -> [f64; N_ANGLES] {
         Hull::default().peaks(x, y)
@@ -249,7 +249,7 @@ mod tests {
     }
 
     /// Assert that the RotD00 and RotD100 orientations locate their own
-    /// statistic in the sweep they were reduced from.
+    /// statistic in the sweep `rotd_stats` reduced.
     fn assert_orientations_locate_statistics(peaks: [f64; N_ANGLES], case: &str) {
         let [rotd00, rotd50, rotd100, at_00, at_100] = rotd_stats(peaks);
         for (angle, statistic) in [(at_00, "RotD00"), (at_100, "RotD100")] {
@@ -258,7 +258,7 @@ mod tests {
                 "{case}: {statistic} orientation {angle} is not an integer angle in 0..180"
             );
         }
-        // The extremes are attained exactly at their own angle.
+        // The extremes land exactly on their own angle.
         assert_eq!(
             peaks[at_00 as usize], rotd00,
             "{case}: RotD00 is not the peak at {at_00} degrees"
@@ -286,9 +286,9 @@ mod tests {
     ///
     /// The bound holds because the rotated traces at angles theta and
     /// theta + 90 degrees, sampled at the time of the RotD100 peak, have squared
-    /// amplitudes summing to RotD100^2 at least. So at least one angle of every
-    /// such pair -- 90 of the 180 angles -- peaks at or above RotD100 / sqrt(2),
-    /// which puts the median there too.
+    /// amplitudes summing to RotD100^2 at least. So one angle of every such
+    /// pair at minimum (90 of the 180 angles) peaks at RotD100 / sqrt(2) or
+    /// higher, which puts the median there too.
     fn assert_ratio_bounded(comp_0: ArrayView1<f64>, comp_90: ArrayView1<f64>, case: &str) -> f64 {
         let [rotd00, rotd50, rotd100, ..] = brute_stats(comp_0, comp_90);
         assert!(
@@ -320,10 +320,11 @@ mod tests {
     }
 
     /// A non-zero waveform, sampled in [-1, 1). RotD ratios are scale
-    /// invariant, so amplitude is not worth exploring here -- the fixed tests
-    /// cover the extremes of the floating point range instead. The all-zero
-    /// record is excluded because it has no polarisation direction; it is
-    /// covered by `test_ratio_bound_degenerate_records`.
+    /// invariant. Varying the amplitude tests nothing new, and the
+    /// fixed tests cover the extremes of the floating point range instead.
+    /// This strategy leaves out the all-zero record, which has no
+    /// polarisation direction;
+    /// `test_ratio_bound_degenerate_records` covers that one.
     fn arb_waveform() -> impl Strategy<Value = Array1<f64>> {
         prop::collection::vec(-1.0f64..1.0, 1..=MAX_NT)
             .prop_filter("waveform is identically zero", |samples| {
@@ -346,7 +347,7 @@ mod tests {
     ///
     /// Sweeping one parameter rather than picking between separate strategies
     /// keeps shrinking effective: a counterexample reduces along `polarisation`
-    /// and the waveform together instead of stalling on a `prop_oneof` branch.
+    /// and the waveform together instead of stopping at a `prop_oneof` branch.
     fn arb_record() -> impl Strategy<Value = (Array1<f64>, Array1<f64>)> {
         let samples = prop::collection::vec((-1.0f64..1.0, -1.0f64..1.0, -1.0f64..1.0), 1..=MAX_NT);
         (samples, 0.0f64..TAU, 0.0f64..=1.0).prop_map(|(samples, angle, polarisation)| {
@@ -384,10 +385,11 @@ mod tests {
 
         #[test]
         fn prop_polarised_records_attain_the_bound((comp_0, comp_90) in arb_polarised_components()) {
-            // The bound is not merely respected by linearly polarised records,
-            // it is met: their peak in every direction is |cos(theta - angle)|
-            // of the RotD100 peak, so the ratio is a property of the 1 degree
-            // sampling alone and comes out at sqrt(2) whatever the waveform.
+            // Linearly polarised records don't merely respect the bound, they
+            // reach it exactly: their peak in every direction is
+            // |cos(theta - angle)| of the RotD100 peak, so the ratio is a
+            // property of the 1 degree sampling alone and comes out at sqrt(2)
+            // whatever the waveform.
             let ratio = assert_ratio_bounded(comp_0.view(), comp_90.view(), "polarised record");
             prop_assert!(
                 (ratio - SQRT_2).abs() <= RATIO_TOL,
@@ -403,7 +405,7 @@ mod tests {
             for (i, row) in stats.rows().into_iter().enumerate() {
                 // Both entry points reduce the same hull, so the (ns, 3)
                 // statistics must be exactly the reduction of the (ns, 180)
-                // curve -- no tolerance needed to tie them together.
+                // curve (no tolerance needed to tie them together).
                 let row_peaks: [f64; N_ANGLES] = std::array::from_fn(|theta| peaks[(i, theta)]);
                 let curve_stats = rotd_stats(row_peaks);
                 prop_assert_eq!(
@@ -413,10 +415,10 @@ mod tests {
                 );
                 // And the hull must reproduce the direct scan's peaks, up
                 // to the floating point slack of evaluating fewer points. The
-                // orientations are deliberately not compared: a near-tie at
-                // an extreme can land on either of two angles under that
-                // slack, so they are pinned to their own sweep instead, by
-                // prop_orientations_locate_their_statistics.
+                // orientations stay out of this comparison: a near-tie at an
+                // extreme can settle on either of two angles under that slack,
+                // so prop_orientations_locate_their_statistics pins them to
+                // their own sweep instead.
                 let expected = brute_stats(comp_0.row(i), comp_90.row(i));
                 for (stat, (&got, &want)) in row.iter().zip(expected.iter()).take(3).enumerate() {
                     prop_assert!(
@@ -444,7 +446,7 @@ mod tests {
 
         #[test]
         fn prop_culled_matches_brute((comp_0, comp_90) in arb_record()) {
-            // The interior culling must never change a single per-angle peak,
+            // The interior culling must never change one per-angle peak,
             // across the full spread from polarised to near-circular records.
             let got = peaks(comp_0.view(), comp_90.view());
             let want = brute_peaks(comp_0.view(), comp_90.view());
@@ -493,8 +495,8 @@ mod tests {
     #[test]
     fn rotd180_matches_brute_on_circular_record() {
         // A near-circular trajectory is the culling's worst case: almost every
-        // point sits near the hull, so few are dropped. The result must still
-        // be exact.
+        // point lies near the hull. The cull removes few of them, and the
+        // result must still be exact.
         let nt = 2000;
         let comp_0 = Array1::from_shape_fn(nt, |i| (TAU * i as f64 / nt as f64).cos());
         let comp_90 = Array1::from_shape_fn(nt, |i| (TAU * i as f64 / nt as f64).sin());
@@ -535,11 +537,12 @@ mod tests {
 
     #[test]
     fn cull_drops_the_interior_when_a_point_is_extreme_in_two_axes() {
-        // One timestep that is both the max in x and the min in y collapses
+        // One timestep that's both the max in x and the min in y collapses
         // the extreme quadrilateral onto a triangle. The cull must still drop
-        // the interior: with a zero-length quad edge every cross product is
-        // zero, no point counts as inside, and the whole record reaches the
-        // sort -- which is how 3497857_PARS_HN_20 lost 7x of its speedup.
+        // the interior. With a zero-length quad edge every cross product comes
+        // out zero, which puts every point outside the box, and the sort then
+        // handles the whole record, which is how 3497857_PARS_HN_20 lost 7x
+        // of its speedup.
         let interior = 1000;
         let mut comp_0 = Array1::zeros(interior + 3);
         let mut comp_90 = Array1::zeros(interior + 3);
@@ -548,7 +551,7 @@ mod tests {
             comp_0[i] = 0.01 * t.cos();
             comp_90[i] = 0.01 * t.sin();
         }
-        // min x, max y, and one corner that is both max x and min y.
+        // min x, max y, and one corner that's both max x and min y.
         let extremes = [[-1.0, 0.0], [0.0, 1.0], [1.0, -1.0]];
         for (i, [px, py]) in extremes.into_iter().enumerate() {
             comp_0[interior + i] = px;
@@ -604,11 +607,11 @@ mod tests {
         let comp_0 = array![1.0f64, 0.0f64];
         let comp_90 = array![0.0f64, 1.0f64];
         let [min, median, max, at_min, at_max] = rotd_stats(peaks(comp_0.view(), comp_90.view()));
-        let expected_min = 2.0f64.sqrt() / 2.0; // e.g. at pi / 4 degrees
-        let expected_max = 1.0; // e.g. at 0 degrees
+        let expected_min = 2.0f64.sqrt() / 2.0; // such as at pi / 4 degrees
+        let expected_max = 1.0; // such as at 0 degrees
         let expected_median = 0.9238443540096138; // derived independently with numpy
         // The sweep is max(|cos theta|, |sin theta|): least at 45 degrees, and
-        // 1 at both 0 and 90 degrees, of which the lower is reported.
+        // 1 at both 0 and 90 degrees, of which `rotd_stats` reports the lower.
         assert_eq!(
             [at_min, at_max],
             [45.0, 0.0],
@@ -633,8 +636,8 @@ mod tests {
 
     #[test]
     fn test_ratio_bound_degenerate_records() {
-        // Cases proptest will not reach on its own: exact zeros, single
-        // samples, and the ends of the floating point range.
+        // Cases beyond proptest's own reach: exact zeros, single samples, and
+        // the ends of the floating point range.
         let zeros = Array1::zeros(32);
         assert_ratio_bounded(zeros.view(), zeros.view(), "zero record");
 
@@ -665,7 +668,7 @@ mod tests {
     #[test]
     fn test_ratio_bound_circular_records() {
         // A circularly polarised record peaks identically in every direction,
-        // so it sits at the opposite extreme from the bound, with a ratio of 1.
+        // putting it at the opposite extreme from the bound, with a ratio of 1.
         let nt = 3600;
         let comp_0 = Array1::from_shape_fn(nt, |i| (TAU * i as f64 / nt as f64).cos());
         let comp_90 = Array1::from_shape_fn(nt, |i| (TAU * i as f64 / nt as f64).sin());

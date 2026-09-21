@@ -86,3 +86,8 @@ pre-push:
     rustfmt:
       glob: "*.rs"
       run: cargo fmt --all --check
+
+    vale:
+      # Needs `vale sync` once, to fetch the styles named in .vale.ini.
+      run: vale {push_files}
+      glob: "*.{py,md,rs}"

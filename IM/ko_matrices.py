@@ -10,8 +10,8 @@ import numpy as np
 def get_konno_matrix(size: int, directory: Path) -> np.memmap:
     """Retrieves the precomputed Konno matrix from a file.
 
-    Cached per `(size, directory)`. The memmap is opened once per process and
-    reused.
+    Cached per `(size, directory)`. Each process opens the memmap once and
+    reuses it.
 
     Parameters
     ----------
@@ -28,10 +28,10 @@ def get_konno_matrix(size: int, directory: Path) -> np.memmap:
     Raises
     ------
     FileNotFoundError
-        If the required matrix file does not exist.
+        If the required matrix file doesn't exist.
     """
 
-    # File path for the matrix
+    # Path to the matrix
     ko_matrix_file = directory / f"KO_{size - 1}.npy"
 
     if not ko_matrix_file.exists():
