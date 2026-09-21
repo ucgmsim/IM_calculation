@@ -95,7 +95,7 @@ impl Hull {
         }
         ring[corners] = ring[0];
 
-        // Now we build the culling box edges. If the box is a actually a
+        // Now we build the culling box edges. If the box is actually a
         // triangle an edge is repeated twice. This represents duplicate work in
         // the culling loop below, but it is more efficient than leaving out the
         // extra edge because Rust is good at optimising the predictable
