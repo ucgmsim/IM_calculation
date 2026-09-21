@@ -69,7 +69,12 @@ def calculate_ims_ascii(
         amplitude spectrum. Lower values smooth more strongly.
     scratch_directory : Path, optional
         Where to build a Konno-Ohmachi matrix too large to hold in memory.
+        Defaults to `$IM_CALCULATION_SCRATCH_DIR`, else the temporary
+        directory.
     """
+    if scratch_directory is not None:
+        konno_ohmachi.set_scratch_directory(scratch_directory)
+
     if periods is None:
         periods = list(im_calculation.DEFAULT_PERIODS)
     if frequencies is None:
@@ -86,7 +91,6 @@ def calculate_ims_ascii(
         np.array(periods),
         np.array(frequencies),
         bandwidth,
-        scratch_directory,
     )
 
     result.to_csv(output_file)

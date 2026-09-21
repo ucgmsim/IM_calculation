@@ -53,7 +53,7 @@ def isolated_matrices(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> Iterator[None]:
     """Give each test its own scratch directory and an empty matrix store."""
-    monkeypatch.setenv(konno_ohmachi.SCRATCH_DIRECTORY_VARIABLE, str(tmp_path))
+    monkeypatch.setattr(konno_ohmachi.MATRICES, "scratch_directory", tmp_path)
     konno_ohmachi.clear_matrix_cache()
     yield
     konno_ohmachi.clear_matrix_cache()
@@ -169,14 +169,16 @@ def test_spilled_tier_leaves_no_file(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """A spilled matrix is unlinked while still mapped, so nothing is left behind."""
-    monkeypatch.setenv(konno_ohmachi.MEMORY_BUDGET_VARIABLE, "1")
+    monkeypatch.setattr(konno_ohmachi.MATRICES, "memory_budget", 1)
     spilled = konno_ohmachi.smooth(spectra)
 
     assert list(tmp_path.iterdir()) == []
     assert isinstance(konno_ohmachi.MATRICES._spilled[(65, 40.0)], np.memmap)
     # Still usable after the unlink, and identical to the in-memory tier.
     konno_ohmachi.clear_matrix_cache()
-    monkeypatch.delenv(konno_ohmachi.MEMORY_BUDGET_VARIABLE)
+    monkeypatch.setattr(
+        konno_ohmachi.MATRICES, "memory_budget", konno_ohmachi.DEFAULT_MEMORY_BUDGET
+    )
     assert spilled == pytest.approx(konno_ohmachi.smooth(spectra), rel=1e-12)
 
 
@@ -184,14 +186,16 @@ def test_matrix_free_tier_when_nothing_fits(
     spectra: npt.NDArray[np.float64], monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """With no memory budget and no scratch, smoothing still works, with a warning."""
-    monkeypatch.setenv(konno_ohmachi.MEMORY_BUDGET_VARIABLE, "1")
+    monkeypatch.setattr(konno_ohmachi.MATRICES, "memory_budget", 1)
     monkeypatch.setattr(konno_ohmachi.MatrixStore, "_spill", lambda *_: None)
 
     with pytest.warns(RuntimeWarning, match="matrix-free"):
         matrix_free = konno_ohmachi.smooth(spectra)
 
     konno_ohmachi.clear_matrix_cache()
-    monkeypatch.delenv(konno_ohmachi.MEMORY_BUDGET_VARIABLE)
+    monkeypatch.setattr(
+        konno_ohmachi.MATRICES, "memory_budget", konno_ohmachi.DEFAULT_MEMORY_BUDGET
+    )
     assert matrix_free == pytest.approx(konno_ohmachi.smooth(spectra), rel=1e-5)
 
 
@@ -199,10 +203,10 @@ def test_spill_declines_when_scratch_is_unusable(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     """An unwritable or absent scratch directory falls through rather than raising."""
-    monkeypatch.setenv(
-        konno_ohmachi.SCRATCH_DIRECTORY_VARIABLE, str(tmp_path / "file" / "under")
-    )
     (tmp_path / "file").write_text("not a directory")
+    monkeypatch.setattr(
+        konno_ohmachi.MATRICES, "scratch_directory", tmp_path / "file" / "under"
+    )
     assert konno_ohmachi.MATRICES._spill(65, 40.0) is None
 
 
@@ -251,7 +255,7 @@ def test_matrices_are_evicted_to_stay_inside_the_budget(
 ) -> None:
     """Holding two matrices that do not both fit evicts the older one."""
     # One 65-bin matrix is 16.9 kB; allow a little over one.
-    monkeypatch.setenv(konno_ohmachi.MEMORY_BUDGET_VARIABLE, str(65 * 65 * 4 + 1))
+    monkeypatch.setattr(konno_ohmachi.MATRICES, "memory_budget", 65 * 65 * 4 + 1)
     konno_ohmachi.MATRICES.get(65, 40.0)
     konno_ohmachi.MATRICES.get(65, 20.0)
 
@@ -268,7 +272,7 @@ def test_blocked_application_matches_unblocked(
     konno_ohmachi.clear_matrix_cache()
     # One row per block, so every block boundary is exercised.
     monkeypatch.setattr(konno_ohmachi, "KONNO_BLOCK_BYTES", 1)
-    monkeypatch.setenv(konno_ohmachi.MEMORY_BUDGET_VARIABLE, "1")
+    monkeypatch.setattr(konno_ohmachi.MATRICES, "memory_budget", 1)
 
     assert konno_ohmachi.smooth(spectra) == pytest.approx(unblocked, rel=1e-6)
 
@@ -284,42 +288,53 @@ def test_concurrent_smoothing_is_consistent(
         assert result == pytest.approx(results[0], rel=1e-12)
 
 
-def test_memory_budget_and_scratch_directory_defaults(
+def test_settings_are_resolved_when_the_store_is_built(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Both settings read the environment at call time, and have defaults."""
-    monkeypatch.delenv(konno_ohmachi.SCRATCH_DIRECTORY_VARIABLE)
+    """A store reads the environment once, at construction, not on every use."""
+    monkeypatch.delenv(konno_ohmachi.SCRATCH_DIRECTORY_VARIABLE, raising=False)
     monkeypatch.delenv(konno_ohmachi.MEMORY_BUDGET_VARIABLE, raising=False)
-    assert konno_ohmachi.MATRICES.memory_budget == konno_ohmachi.DEFAULT_MEMORY_BUDGET
-    assert konno_ohmachi.MATRICES.scratch_directory.is_dir()
+    default = konno_ohmachi.MatrixStore()
+    assert default.memory_budget == konno_ohmachi.DEFAULT_MEMORY_BUDGET
+    assert default.scratch_directory.is_dir()
 
     monkeypatch.setenv(konno_ohmachi.MEMORY_BUDGET_VARIABLE, "12345")
     monkeypatch.setenv(konno_ohmachi.SCRATCH_DIRECTORY_VARIABLE, "/from-env")
-    assert konno_ohmachi.MATRICES.memory_budget == 12345
-    assert konno_ohmachi.MATRICES.scratch_directory == Path("/from-env")
+    assert konno_ohmachi.MatrixStore().memory_budget == 12345
+    assert konno_ohmachi.MatrixStore().scratch_directory == Path("/from-env")
+    # The store built before the change keeps what it resolved.
+    assert default.memory_budget == konno_ohmachi.DEFAULT_MEMORY_BUDGET
 
-    # A store constructed with explicit settings beats the environment.
-    store = konno_ohmachi.MatrixStore(memory_budget=7, scratch_directory=Path("/x"))
-    assert store.memory_budget == 7
-    assert store.scratch_directory == Path("/x")
+    # Constructor arguments beat the environment.
+    explicit = konno_ohmachi.MatrixStore(memory_budget=7, scratch_directory=Path("/x"))
+    assert explicit.memory_budget == 7
+    assert explicit.scratch_directory == Path("/x")
 
 
-def test_scratch_directory_argument_is_used(
+def test_zero_memory_budget_is_honoured() -> None:
+    """A budget of zero means spill everything, not fall back to the default."""
+    assert konno_ohmachi.MatrixStore(memory_budget=0).memory_budget == 0
+
+
+def test_set_scratch_directory_redirects_the_default_store(
     spectra: npt.NDArray[np.float64],
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """The kwarg overrides the environment for where a spill is built."""
-    monkeypatch.setenv(konno_ohmachi.MEMORY_BUDGET_VARIABLE, "1")
-    monkeypatch.setenv(konno_ohmachi.SCRATCH_DIRECTORY_VARIABLE, str(tmp_path / "env"))
-    chosen = tmp_path / "explicit"
+    """`set_scratch_directory` is the runtime knob for the default store.
 
-    smoothed = konno_ohmachi.smooth(spectra, scratch_directory=chosen)
+    The environment is only read when a store is built, and `MATRICES` is built
+    at import, so setting the variable afterwards would not reach it.
+    """
+    monkeypatch.setattr(konno_ohmachi.MATRICES, "memory_budget", 1)
+    chosen = tmp_path / "chosen"
+    konno_ohmachi.set_scratch_directory(chosen)
 
-    # The chosen directory was created and used; the environment one never was.
+    smoothed = konno_ohmachi.smooth(spectra)
+
+    assert konno_ohmachi.MATRICES.scratch_directory == chosen
     assert chosen.is_dir()
-    assert not (tmp_path / "env").exists()
-    # Unlinked while open, so it is left empty.
+    # The scratch file is unlinked as it is created, so nothing is left behind.
     assert list(chosen.iterdir()) == []
     assert isinstance(konno_ohmachi.MATRICES._spilled[(65, 40.0)], np.memmap)
     assert np.isfinite(smoothed).all()
@@ -335,7 +350,7 @@ def test_failed_spill_leaves_no_partial_file(
 
     monkeypatch.setattr(konno_ohmachi._core, "_konno_ohmachi_matrix_rows", fail)
 
-    assert konno_ohmachi.MATRICES._spill(65, 40.0, tmp_path) is None
+    assert konno_ohmachi.MATRICES._spill(65, 40.0) is None
     assert list(tmp_path.iterdir()) == []
 
 
@@ -380,3 +395,24 @@ def test_store_can_be_isolated_from_the_default() -> None:
     assert len(store) == 1
     assert len(konno_ohmachi.MATRICES) == 0
     assert smoothed == pytest.approx(np.ones((1, 65)), rel=1e-6)
+
+
+def test_race_to_build_is_resolved_under_the_lock(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A thread that loses the race takes the winner's matrix, not a rebuild.
+
+    `get` looks up twice: once lock-free, then again under the lock in case
+    another thread finished while this one waited. Driven deterministically here
+    by making the first lookup miss and the second hit.
+    """
+    store = konno_ohmachi.MatrixStore()
+    winner = konno_ohmachi.smoothing_matrix(65, 40.0)
+    lookups = iter([None, winner])
+    monkeypatch.setattr(store, "_lookup", lambda _key: next(lookups))
+
+    def explode(*_args: object, **_kwargs: object) -> None:
+        raise AssertionError("rebuilt instead of taking the winner's matrix")
+
+    monkeypatch.setattr(konno_ohmachi, "smoothing_matrix", explode)
+    assert store.get(65, 40.0) is winner

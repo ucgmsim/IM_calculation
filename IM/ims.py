@@ -4,7 +4,6 @@ import functools
 import warnings
 from collections.abc import Callable, Mapping, Sequence
 from enum import IntEnum, StrEnum
-from pathlib import Path
 
 import numpy as np
 import numpy.typing as npt
@@ -679,7 +678,6 @@ def _fas_kernel(
     freqs: npt.NDArray[np.float64],
     fa_frequencies: npt.NDArray[np.float64],
     bandwidth: float,
-    scratch_directory: Path | None,
 ) -> np.ndarray:
     """Kernel for `fourier_amplitude_spectra`.
 
@@ -697,8 +695,6 @@ def _fas_kernel(
         The `rfft` bin frequencies (Hz) the smoothed spectrum is defined on.
     bandwidth : float
         Bandwidth of the Konno-Ohmachi smoothing window.
-    scratch_directory : Path or None
-        Where to build a Konno-Ohmachi matrix too large to hold in memory.
 
     Returns
     -------
@@ -724,7 +720,7 @@ def _fas_kernel(
     spectra_and_eas = np.concatenate([spectra, eas_unsmoothed[np.newaxis]], axis=0)
 
     smoothed = _interpolate(
-        konno_ohmachi.smooth(spectra_and_eas, bandwidth, scratch_directory),
+        konno_ohmachi.smooth(spectra_and_eas, bandwidth),
         fa_frequencies,
         freqs,
     )
@@ -739,7 +735,6 @@ def fourier_amplitude_spectra(
     dt: float,
     freqs: npt.NDArray[np.float64],
     bandwidth: float = konno_ohmachi.DEFAULT_BANDWIDTH,
-    scratch_directory: Path | None = None,
 ) -> xr.Dataset:
     """Compute Fourier Amplitude Spectrum (FAS) of seismic waveforms.
 
@@ -754,10 +749,6 @@ def fourier_amplitude_spectra(
     bandwidth : float, optional
         Bandwidth of the Konno-Ohmachi smoothing window. Lower values smooth
         more strongly.
-    scratch_directory : Path, optional
-        Where to build a Konno-Ohmachi matrix too large to hold in memory.
-        Defaults to `$IM_CALCULATION_SCRATCH_DIR`, else the platform temporary
-        directory.
 
     Returns
     -------
@@ -792,6 +783,5 @@ def fourier_amplitude_spectra(
             "freqs": freqs,
             "fa_frequencies": fa_frequencies,
             "bandwidth": bandwidth,
-            "scratch_directory": scratch_directory,
         },
     )

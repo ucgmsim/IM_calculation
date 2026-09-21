@@ -1,26 +1,4 @@
-"""Konno-Ohmachi spectral smoothing.
-
-Smoothing a spectrum of `n` real-FFT bins is a product with an `n x n` matrix.
-That matrix grows quadratically -- a 22 minute record at 100 Hz needs 17 GB --
-so this module decides, per size, where to put it:
-
-- small enough to hold, which is every observed record: build it in memory and
-  keep it for the life of the process;
-- too large for memory: build it into an unnamed scratch file, so it costs
-  address space rather than resident memory and cannot outlive the process;
-- no room even for that: fall back to the matrix-free kernel, which is correct
-  but re-derives every window on every call.
-
-Each output bin is a weighted average of the spectrum whose weights sum to one,
-so a flat spectrum is returned unchanged. This is obspy's direct smoothing path;
-its matrix path contracts over the other index and attenuates a flat spectrum by
-up to 25% near the band edges.
-
-Matrices live in a `MatrixStore`, one per process, and are not cached between
-runs. Under `fork` a child inherits the parent's store and shares it
-copy-on-write, so a pool should warm the store before forking -- see
-`MatrixStore.warm`. Under `spawn` nothing is shared and every worker rebuilds.
-"""
+"""Konno-Ohmachi spectral smoothing."""
 
 import contextlib
 import os
@@ -153,43 +131,25 @@ class MatrixStore:
         scratch_directory : Path, optional
             Which filesystem to spill onto.
         """
-        self._memory_budget = memory_budget
-        self._scratch_directory = scratch_directory
+        # `is None` rather than `or`: a budget of zero is a caller asking to
+        # spill everything, not asking for the default.
+        self.memory_budget = (
+            int(os.environ.get(MEMORY_BUDGET_VARIABLE, DEFAULT_MEMORY_BUDGET))
+            if memory_budget is None
+            else memory_budget
+        )
+        self.scratch_directory = (
+            Path(os.environ.get(SCRATCH_DIRECTORY_VARIABLE, tempfile.gettempdir()))
+            if scratch_directory is None
+            else Path(scratch_directory)
+        )
         self._resident: dict[tuple[int, float], np.ndarray] = {}
         self._spilled: dict[tuple[int, float], np.memmap] = {}
         self._handles = contextlib.ExitStack()
         self._lock = threading.Lock()
 
-    @property
-    def memory_budget(self) -> int:
-        """Largest matrix held in memory rather than spilled.
-
-        Returns
-        -------
-        int
-            The constructor argument if given, else
-            `$IM_CALCULATION_KO_MEMORY_BUDGET`, else `DEFAULT_MEMORY_BUDGET`.
-        """
-        if self._memory_budget is not None:
-            return self._memory_budget
-        return int(os.environ.get(MEMORY_BUDGET_VARIABLE, DEFAULT_MEMORY_BUDGET))
-
-    @property
-    def scratch_directory(self) -> Path:
-        """Directory spilled matrices are built in.
-
-        Returns
-        -------
-        Path
-            The constructor argument if given, else
-            `$IM_CALCULATION_SCRATCH_DIR`, else the platform temporary directory.
-        """
-        if self._scratch_directory is not None:
-            return Path(self._scratch_directory)
-        return Path(os.environ.get(SCRATCH_DIRECTORY_VARIABLE, tempfile.gettempdir()))
-
     def __len__(self) -> int:
-        """Number of matrices currently held, across both tiers.
+        """Number of matrices currently held.
 
         Returns
         -------
@@ -202,7 +162,6 @@ class MatrixStore:
         self,
         n_bins: int,
         bandwidth: float = DEFAULT_BANDWIDTH,
-        scratch_directory: Path | None = None,
     ) -> np.ndarray | None:
         """Return the matrix for this size, building it if the store lacks one.
 
@@ -212,8 +171,6 @@ class MatrixStore:
             Number of real-FFT bins the matrix smooths over.
         bandwidth : float, optional
             Bandwidth of the Konno-Ohmachi window.
-        scratch_directory : Path, optional
-            Overrides `self.scratch_directory` for this call.
 
         Returns
         -------
@@ -222,8 +179,8 @@ class MatrixStore:
             and the caller should smooth matrix-free.
         """
         key = (n_bins, bandwidth)
-        # Hit without taking the lock: a build holds it for the whole of an
-        # O(n^2) matrix, and every other worker thread needs only the lookup.
+
+        # First lookup without taking a lock
         if (matrix := self._lookup(key)) is not None:
             return matrix
 
@@ -235,7 +192,7 @@ class MatrixStore:
             budget = self.memory_budget
             nbytes = n_bins * n_bins * np.float32().itemsize
             if nbytes > budget:
-                spilled = self._spill(n_bins, bandwidth, scratch_directory)
+                spilled = self._spill(n_bins, bandwidth)
                 if spilled is not None:
                     self._spilled[key] = spilled
                 return spilled
@@ -251,13 +208,6 @@ class MatrixStore:
     ) -> None:
         """Build matrices ahead of time.
 
-        The reason to call this is `fork`: a child inherits whatever the parent
-        has already built and shares it copy-on-write, so warming in the parent
-        before starting a pool leaves one physical copy instead of one per
-        worker. Warming after the fork does nothing for the other children.
-
-        Use `bins_for_samples` to turn record lengths into bin counts.
-
         Parameters
         ----------
         n_bins : int or iterable of int
@@ -270,11 +220,7 @@ class MatrixStore:
             self.get(size, bandwidth)
 
     def clear(self) -> None:
-        """Drop every matrix held, and close the scratch files behind them.
-
-        Those files are already unlinked, so their space returns to the
-        filesystem as soon as the handles close.
-        """
+        """Drop every matrix held and close the scratch files."""
         with self._lock:
             self._resident.clear()
             self._spilled.clear()
@@ -308,9 +254,7 @@ class MatrixStore:
         """
         return sum(matrix.nbytes for matrix in self._resident.values())
 
-    def _spill(
-        self, n_bins: int, bandwidth: float, directory: Path | None = None
-    ) -> np.memmap | None:
+    def _spill(self, n_bins: int, bandwidth: float) -> np.memmap | None:
         """Build the matrix into a scratch file and return it memory-mapped.
 
         The file is never given a name: `tempfile.TemporaryFile` hands back a
@@ -325,25 +269,21 @@ class MatrixStore:
             Number of real-FFT bins the matrix smooths over.
         bandwidth : float
             Bandwidth of the Konno-Ohmachi window.
-        directory : Path, optional
-            Overrides `self.scratch_directory`.
 
         Returns
         -------
         np.memmap or None
             The matrix, or None if the scratch directory cannot hold it.
         """
-        directory = Path(directory) if directory is not None else self.scratch_directory
         needed = n_bins * n_bins * np.float32().itemsize
         try:
-            directory.mkdir(parents=True, exist_ok=True)
-            if shutil.disk_usage(directory).free < needed:
+            self.scratch_directory.mkdir(parents=True, exist_ok=True)
+            if shutil.disk_usage(self.scratch_directory).free < needed:
                 return None
-            # The handle outlives this call: the mapping is read until the
-            # matrix is dropped, and on Windows the file lives only as long as
-            # its handles. `self._handles` is the context manager holding them.
-            scratch = tempfile.TemporaryFile(dir=directory)  # noqa: SIM115
+
+            scratch = tempfile.TemporaryFile(dir=self.scratch_directory)  # noqa: SIM115
             handle = self._handles.enter_context(scratch)
+
             matrix = np.memmap(
                 handle, dtype=np.float32, mode="w+", shape=(n_bins, n_bins)
             )
@@ -379,17 +319,10 @@ def _apply(spectra: np.ndarray, matrix: np.ndarray) -> npt.NDArray[np.float64]:
     ndarray of float64
         The smoothed spectra, shape `(n_spectra, n_bins)`.
     """
-    # Single precision throughout: the matrix is stored as float32, so promoting
-    # it to run dgemm would cost a full copy of it (~23 s at 17 GB) to buy
-    # accuracy the smoothing does not have. The weights are positive and sum to
-    # one, so the accumulation cannot cancel; the error is ~1e-6 relative.
     spectra = np.ascontiguousarray(spectra, dtype=np.float32)
 
-    # Block over the output bins. A row block of a row-major matrix is one
-    # contiguous read and carries every weight its output bins need, so each
-    # block of the result is written once rather than accumulated into. Anything
-    # within `KONNO_BLOCK_BYTES` is a single block, which is the plain product --
-    # so there is no separate in-memory path to keep in step.
+    # Block apply the matrix multiplication to avoid materialising the smooth
+    # product in memory.
     smoothed = np.empty(spectra.shape, dtype=np.float32)
     for start, stop in _row_blocks(matrix.shape[0]):
         smoothed[:, start:stop] = spectra @ matrix[start:stop, :].T
@@ -401,10 +334,20 @@ def clear_matrix_cache() -> None:
     MATRICES.clear()
 
 
+def set_scratch_directory(scratch_directory: Path) -> None:
+    """Set the scratch directory for KO matrix calculation.
+
+    Parameters
+    ----------
+    scratch_directory : Path
+        The directory to store spilled KO matrices.
+    """
+    MATRICES.scratch_directory = scratch_directory
+
+
 def smooth(
     spectra: np.ndarray,
     bandwidth: float = DEFAULT_BANDWIDTH,
-    scratch_directory: Path | None = None,
     store: MatrixStore | None = None,
 ) -> npt.NDArray[np.float64]:
     """Apply Konno-Ohmachi smoothing along the last axis.
@@ -417,9 +360,6 @@ def smooth(
     bandwidth : float, optional
         Bandwidth of the Konno-Ohmachi window. Lower values smooth more
         strongly.
-    scratch_directory : Path, optional
-        Where to build a matrix too large to hold in memory. Defaults to
-        `$IM_CALCULATION_SCRATCH_DIR`, else the platform temporary directory.
     store : MatrixStore, optional
         Where matrices are kept. Defaults to the module-level `MATRICES`.
 
@@ -432,7 +372,7 @@ def smooth(
     n_bins = spectra.shape[-1]
     flat = np.asarray(spectra).reshape(-1, n_bins)
 
-    matrix = store.get(n_bins, bandwidth, scratch_directory)
+    matrix = store.get(n_bins, bandwidth)
     if matrix is None:
         warnings.warn(
             RuntimeWarning(

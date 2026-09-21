@@ -1,7 +1,5 @@
 """IM calculation script for ascii waveforms"""
 
-from pathlib import Path
-
 import numpy as np
 import pandas as pd
 import xarray as xr
@@ -183,7 +181,6 @@ def calculate_ims(
     periods: np.ndarray = DEFAULT_PERIODS,
     frequencies: np.ndarray = DEFAULT_FREQUENCIES,
     bandwidth: float = konno_ohmachi.DEFAULT_BANDWIDTH,
-    scratch_directory: Path | None = None,
 ):
     """
     Calculate intensity measures for a single waveform.
@@ -203,8 +200,6 @@ def calculate_ims(
     bandwidth : float, optional
         Bandwidth of the Konno-Ohmachi window used to smooth the Fourier
         amplitude spectrum. Lower values smooth more strongly.
-    scratch_directory : Path, optional
-        Where to build a Konno-Ohmachi matrix too large to hold in memory.
 
     Returns
     -------
@@ -260,7 +255,6 @@ def calculate_ims(
                 dt,
                 frequencies,
                 bandwidth=bandwidth,
-                scratch_directory=scratch_directory,
             )
             result = _dataset_to_frame(
                 dataset,

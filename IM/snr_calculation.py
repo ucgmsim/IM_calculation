@@ -1,6 +1,5 @@
 """Waveform SNR calculation"""
 
-from pathlib import Path
 from typing import NamedTuple
 
 import numpy as np
@@ -47,7 +46,6 @@ def calculate_snr(
     tp: int,
     frequencies: np.ndarray = im_calculation.DEFAULT_FREQUENCIES,
     bandwidth: float = konno_ohmachi.DEFAULT_BANDWIDTH,
-    scratch_directory: Path | None = None,
 ) -> SNRResult:
     """
     Calculates the SNR of a waveform given a tp and common frequency vector
@@ -65,8 +63,6 @@ def calculate_snr(
         by default takes the frequencies from FAS
     bandwidth : float, optional
         Bandwidth of the Konno-Ohmachi window used to smooth each spectrum.
-    scratch_directory : Path, optional
-        Where to build a Konno-Ohmachi matrix too large to hold in memory.
 
     Returns
     -------
@@ -112,10 +108,10 @@ def calculate_snr(
 
     # Generate FFT for the signal and noise
     fas_signal = ims.fourier_amplitude_spectra(
-        taper_signal_acc, dt, frequencies, bandwidth, scratch_directory
+        taper_signal_acc, dt, frequencies, bandwidth
     )
     fas_noise = ims.fourier_amplitude_spectra(
-        taper_noise_acc, dt, frequencies, bandwidth, scratch_directory
+        taper_noise_acc, dt, frequencies, bandwidth
     )
 
     # Calculate the SNR. Dataset arithmetic aligns on variable name, so this
