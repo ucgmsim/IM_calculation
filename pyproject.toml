@@ -28,7 +28,13 @@ ko_matrix = ["obspy"]
 # and get lazy datasets out; xr.apply_ufunc(..., dask="parallelized") never
 # imports dask for plain numpy/eager xarray input.
 lazy = ["dask[array]"]
-test = ["pytest", "hypothesis[numpy]", "pytest-cov", "rich>=14.2.0", "dask[array]"]
+test = [
+  "pytest",
+  "hypothesis[numpy]",
+  "pytest-cov",
+  "rich>=14.2.0",
+  "dask[array]",
+]
 types = ["pandas-stubs", "scipy-stubs"]
 dev = ["deptry", "ruff", "ty", "numpydoc"]
 
@@ -126,6 +132,9 @@ checks = [
   "RT04",
   "YD01",
 ]
+
+[tool.deptry]
+optional_dependencies_dev_groups = ["test", "dev", "types"]
 
 [tool.uv]
 cache-keys = [
