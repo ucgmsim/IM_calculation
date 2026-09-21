@@ -167,9 +167,7 @@ def test_spilled_tier_leaves_no_file(
     spilled = konno_ohmachi.smooth(spectra)
 
     assert list(tmp_path.iterdir()) == []
-    assert isinstance(
-        konno_ohmachi._matrix(65, konno_ohmachi.DEFAULT_BANDWIDTH), np.memmap
-    )
+    assert isinstance(konno_ohmachi._SPILLED[(65, 40.0)], np.memmap)
     # Still usable after the unlink, and identical to the in-memory tier.
     konno_ohmachi.clear_matrix_cache()
     monkeypatch.delenv(konno_ohmachi.MEMORY_BUDGET_VARIABLE)
@@ -212,7 +210,9 @@ def test_spill_declines_when_disk_is_full(
     assert list(tmp_path.iterdir()) == []
 
 
-def test_matrix_is_reused_within_a_process(spectra: npt.NDArray[np.float64]) -> None:
+def test_matrix_is_reused_within_a_process(
+    spectra: npt.NDArray[np.float64], monkeypatch: pytest.MonkeyPatch
+) -> None:
     """The second call must not rebuild: the builder is made to fail if it does."""
     first = konno_ohmachi.smooth(spectra)
 
@@ -232,11 +232,12 @@ def test_clear_matrix_cache_releases_matrices(
 ) -> None:
     """Clearing genuinely empties the store rather than only resetting a counter."""
     konno_ohmachi.smooth(spectra)
-    assert konno_ohmachi._MATRICES
+    assert konno_ohmachi._RESIDENT
 
     konno_ohmachi.clear_matrix_cache()
-    assert not konno_ohmachi._MATRICES
-    assert konno_ohmachi._RESIDENT_BYTES == 0
+    assert not konno_ohmachi._RESIDENT
+    assert not konno_ohmachi._SPILLED
+    assert konno_ohmachi._resident_bytes() == 0
 
 
 def test_matrices_are_evicted_to_stay_inside_the_budget(
@@ -248,8 +249,8 @@ def test_matrices_are_evicted_to_stay_inside_the_budget(
     konno_ohmachi._matrix(65, 40.0)
     konno_ohmachi._matrix(65, 20.0)
 
-    assert list(konno_ohmachi._MATRICES) == [(65, 20.0)]
-    assert konno_ohmachi._RESIDENT_BYTES == 65 * 65 * 4
+    assert list(konno_ohmachi._RESIDENT) == [(65, 20.0)]
+    assert konno_ohmachi._resident_bytes() == 65 * 65 * 4
 
 
 def test_blocked_application_matches_unblocked(
@@ -314,7 +315,7 @@ def test_scratch_directory_argument_is_used(
     assert not (tmp_path / "env").exists()
     # Unlinked while open, so it is left empty.
     assert list(chosen.iterdir()) == []
-    assert isinstance(konno_ohmachi._MATRICES[(65, 40.0)], np.memmap)
+    assert isinstance(konno_ohmachi._SPILLED[(65, 40.0)], np.memmap)
     assert np.isfinite(smoothed).all()
 
 

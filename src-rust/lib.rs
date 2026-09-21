@@ -45,17 +45,11 @@ mod _core {
         waveform_cav.into_pyarray(py)
     }
 
-    /// Pseudo-spectral acceleration statistics for every station and period.
-    ///
-    /// The three components have shape `(ns, nt)`. Returns an `(ns,
-    /// n_periods, 9)` array whose last axis is laid out as
-    /// `ROTD_COMPONENTS`: the 000, 090, vertical and geometric mean peaks,
-    /// then the five columns [`_rotd`] returns.
     /// Rows `start..stop` of the Konno-Ohmachi smoothing matrix.
     ///
-    /// Returns a `(stop - start, n_bins)` row-major `float32` array whose rows
-    /// each sum to one. Smoothing contracts over the centre index, so a
-    /// spectrum is smoothed with `spectra @ matrix`.
+    /// Returns a `(stop - start, n_bins)` row-major `float32` array. Row `c` is
+    /// the set of weights that produce output bin `c` and sums to one, so a
+    /// spectrum is smoothed with `spectra @ matrix.T`.
     #[pyfunction]
     fn _konno_ohmachi_matrix_rows<'py>(
         py: Python<'py>,
@@ -71,8 +65,8 @@ mod _core {
     /// Konno-Ohmachi smoothing of `(n_spectra, n_bins)` spectra, matrix-free.
     ///
     /// Agrees with `spectra @ _konno_ohmachi_matrix_rows(n_bins, bandwidth, 0,
-    /// n_bins)` up to the `float32` rounding of the matrix. Use it only when the
-    /// matrix will not fit: it re-evaluates every window on every call.
+    /// n_bins).T` up to the `float32` rounding of the matrix. Use it only when
+    /// the matrix will not fit: it re-evaluates every window on every call.
     #[pyfunction]
     fn _konno_ohmachi_smooth<'py>(
         py: Python<'py>,
@@ -84,6 +78,12 @@ mod _core {
         smoothed.into_pyarray(py)
     }
 
+    /// Pseudo-spectral acceleration statistics for every station and period.
+    ///
+    /// The three components have shape `(ns, nt)`. Returns an `(ns,
+    /// n_periods, 9)` array whose last axis is laid out as
+    /// `ROTD_COMPONENTS`: the 000, 090, vertical and geometric mean peaks,
+    /// then the five columns [`_rotd`] returns.
     #[pyfunction]
     fn _psa<'py>(
         py: Python<'py>,

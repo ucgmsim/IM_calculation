@@ -6,9 +6,8 @@ so this module decides, per size, where to put it:
 
 - small enough to hold, which is every observed record: build it in memory and
   keep it for the life of the process;
-- too large for memory: build it into a scratch file that is unlinked while
-  still open, so it costs address space rather than resident memory and cannot
-  outlive the process;
+- too large for memory: build it into an unnamed scratch file, so it costs
+  address space rather than resident memory and cannot outlive the process;
 - no room even for that: fall back to the matrix-free kernel, which is correct
   but re-derives every window on every call.
 
@@ -17,13 +16,15 @@ so a flat spectrum is returned unchanged. This is obspy's direct smoothing path;
 its matrix path contracts over the other index and attenuates a flat spectrum by
 up to 25% near the band edges.
 
-Nothing is cached between runs. Building the matrix costs about a sixth of what
-applying it costs even at the largest sizes, so persisting it would buy under a
-percent in exchange for stale-cache invalidation, bandwidth metadata and a
-cross-process locking protocol.
+Nothing is cached between runs. Once the matrix is reused across enough spectra
+to be worth having at all, building it is a small fraction of applying it -- for
+the largest records, under a minute against hours -- so persisting it would buy
+about a percent in exchange for stale-cache invalidation, bandwidth metadata and
+a cross-process locking protocol.
 """
 
 import atexit
+import contextlib
 import os
 import shutil
 import tempfile
@@ -50,9 +51,17 @@ KONNO_BLOCK_BYTES = 64 * 2**20
 MEMORY_BUDGET_VARIABLE = "IM_CALCULATION_KO_MEMORY_BUDGET"
 SCRATCH_DIRECTORY_VARIABLE = "IM_CALCULATION_SCRATCH_DIR"
 
-_MATRICES: dict[tuple[int, float], np.ndarray] = {}
-_RESIDENT_BYTES = 0
-_LOCK = threading.RLock()
+_CLEANUP = contextlib.ExitStack()
+"""Holds every scratch handle open for the life of the process."""
+atexit.register(_CLEANUP.close)
+
+_RESIDENT: dict[tuple[int, float], np.ndarray] = {}
+"""Matrices held in memory, oldest first. Their total is capped by the budget."""
+
+_SPILLED: dict[tuple[int, float], np.memmap] = {}
+"""Matrices mapped from scratch files. They cost address space, not memory."""
+
+_LOCK = threading.Lock()
 
 
 def memory_budget() -> int:
@@ -103,6 +112,36 @@ def _row_blocks(n_bins: int) -> list[tuple[int, int]]:
     return [(start, min(start + rows, n_bins)) for start in range(0, n_bins, rows)]
 
 
+def _cached(key: tuple[int, float]) -> np.ndarray | None:
+    """Look up a matrix across both tiers.
+
+    Parameters
+    ----------
+    key : tuple of int and float
+        The `(n_bins, bandwidth)` the matrix was built for.
+
+    Returns
+    -------
+    ndarray or None
+        The matrix if this process already holds one, else None. Two lookups
+        rather than `a or b`, because an array has no truth value.
+    """
+    matrix = _RESIDENT.get(key)
+    return matrix if matrix is not None else _SPILLED.get(key)
+
+
+def _resident_bytes() -> int:
+    """Total size of the matrices currently held in memory.
+
+    Returns
+    -------
+    int
+        Bytes across `_RESIDENT`. Spilled matrices are not counted: they are
+        pages of a scratch file, not resident memory.
+    """
+    return sum(matrix.nbytes for matrix in _RESIDENT.values())
+
+
 def smoothing_matrix(
     n_bins: int, bandwidth: float = DEFAULT_BANDWIDTH
 ) -> npt.NDArray[np.float32]:
@@ -132,9 +171,11 @@ def _spilled_matrix(
 ) -> np.memmap | None:
     """Build the matrix into a scratch file and return it memory-mapped.
 
-    The file is unlinked as soon as it is mapped, so the space is reclaimed when
-    the process exits and no run can inherit a half-written matrix from a
-    crashed one.
+    The file is never given a name: `tempfile.TemporaryFile` hands back a handle
+    to an already-unlinked file, so reclaiming the space is the operating
+    system's job. No run can inherit a half-written matrix from a crashed one,
+    and there is nothing to clean up even when the process is killed outright --
+    which an exit hook would not have survived.
 
     Parameters
     ----------
@@ -143,7 +184,7 @@ def _spilled_matrix(
     bandwidth : float
         Bandwidth of the Konno-Ohmachi window.
     directory : Path, optional
-        Where to build the file. Defaults to `resolve_scratch_directory()`.
+        Which filesystem to build on. Defaults to `resolve_scratch_directory()`.
 
     Returns
     -------
@@ -156,30 +197,18 @@ def _spilled_matrix(
         directory.mkdir(parents=True, exist_ok=True)
         if shutil.disk_usage(directory).free < needed:
             return None
-        handle, name = tempfile.mkstemp(dir=directory, prefix="ko_", suffix=".npy")
-        os.close(handle)
-    except OSError:
-        return None
-
-    path = Path(name)
-    try:
-        matrix = np.lib.format.open_memmap(
-            path, mode="w+", dtype=np.float32, shape=(n_bins, n_bins)
-        )
+        # The handle outlives this call: the mapping is read until the matrix is
+        # dropped, and on Windows the file lives only as long as its handles.
+        # `_CLEANUP` is the context manager -- one that closes at process exit.
+        handle = _CLEANUP.enter_context(tempfile.TemporaryFile(dir=directory))  # noqa: SIM115
+        matrix = np.memmap(handle, dtype=np.float32, mode="w+", shape=(n_bins, n_bins))
         for start, stop in _row_blocks(n_bins):
             matrix[start:stop] = _core._konno_ohmachi_matrix_rows(
                 n_bins, bandwidth, start, stop
             )
         matrix.flush()
     except OSError:
-        path.unlink(missing_ok=True)
         return None
-
-    try:
-        # Unlinking an open file is a POSIX guarantee, not a Windows one.
-        path.unlink()
-    except OSError:  # pragma: no cover
-        atexit.register(path.unlink, missing_ok=True)
     return matrix
 
 
@@ -203,32 +232,30 @@ def _matrix(
         The matrix, in memory or memory-mapped, or None if it will not fit
         anywhere and the caller should smooth matrix-free.
     """
-    global _RESIDENT_BYTES
-
     key = (n_bins, bandwidth)
+    # Hit without taking the lock: a build holds it for the whole of an O(n^2)
+    # matrix, and every other worker thread needs only the dict lookup.
+    if (matrix := _cached(key)) is not None:
+        return matrix
+
     with _LOCK:
-        if key in _MATRICES:
-            return _MATRICES[key]
+        # Another thread may have finished the build while we waited for it.
+        if (matrix := _cached(key)) is not None:
+            return matrix
 
         budget = memory_budget()
         nbytes = n_bins * n_bins * np.float32().itemsize
-        if nbytes <= budget:
-            # Evict oldest-first until the new matrix fits alongside what is
-            # already resident. Spilled matrices cost address space, not memory,
-            # so they are not counted and not evicted.
-            while _MATRICES and _RESIDENT_BYTES + nbytes > budget:
-                evicted = _MATRICES.pop(next(iter(_MATRICES)))
-                if not isinstance(evicted, np.memmap):
-                    _RESIDENT_BYTES -= evicted.nbytes
-            matrix = smoothing_matrix(n_bins, bandwidth)
-            _RESIDENT_BYTES += matrix.nbytes
-        else:
-            matrix = _spilled_matrix(n_bins, bandwidth, scratch_directory)
-            if matrix is None:
-                return None
+        if nbytes > budget:
+            spilled = _spilled_matrix(n_bins, bandwidth, scratch_directory)
+            if spilled is not None:
+                _SPILLED[key] = spilled
+            return spilled
 
-        _MATRICES[key] = matrix
-        return matrix
+        # Drop the oldest resident matrices until this one fits beside them.
+        while _RESIDENT and _resident_bytes() + nbytes > budget:
+            del _RESIDENT[next(iter(_RESIDENT))]
+        _RESIDENT[key] = smoothing_matrix(n_bins, bandwidth)
+        return _RESIDENT[key]
 
 
 def clear_matrix_cache() -> None:
@@ -237,11 +264,9 @@ def clear_matrix_cache() -> None:
     Spilled matrices are already unlinked, so their scratch space is returned as
     soon as the mapping is released.
     """
-    global _RESIDENT_BYTES
-
     with _LOCK:
-        _MATRICES.clear()
-        _RESIDENT_BYTES = 0
+        _RESIDENT.clear()
+        _SPILLED.clear()
 
 
 def _apply(spectra: np.ndarray, matrix: np.ndarray) -> npt.NDArray[np.float64]:
@@ -268,12 +293,11 @@ def _apply(spectra: np.ndarray, matrix: np.ndarray) -> npt.NDArray[np.float64]:
     # one, so the accumulation cannot cancel; the error is ~1e-6 relative.
     spectra = np.ascontiguousarray(spectra, dtype=np.float32)
 
-    if not isinstance(matrix, np.memmap):
-        return np.asarray(spectra @ matrix.T, dtype=np.float64)
-
-    # Block over the output bins. Row block `c` of a row-major memmap is one
-    # contiguous read and holds every weight output bins `c` need, so each block
-    # of the result is written once rather than accumulated into.
+    # Block over the output bins. A row block of a row-major matrix is one
+    # contiguous read and carries every weight its output bins need, so each
+    # block of the result is written once rather than accumulated into. Anything
+    # within `KONNO_BLOCK_BYTES` is a single block, which is the plain product --
+    # so there is no separate in-memory path to keep in step.
     smoothed = np.empty(spectra.shape, dtype=np.float32)
     for start, stop in _row_blocks(matrix.shape[0]):
         smoothed[:, start:stop] = spectra @ matrix[start:stop, :].T

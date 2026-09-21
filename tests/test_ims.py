@@ -170,20 +170,43 @@ def test_fas_benchmark() -> None:
     # Input: (n_stations, nt, n_components) as per fourier_amplitude_spectra logic
     fas_result_ims = ims.fourier_amplitude_spectra(waveform, dt, data.frequency.values)
 
-    for component in data.component.values:
-        # Relative, not `decimal=5`: FAS values here peak at 3.3e-5, so an
-        # absolute tolerance of 5e-6 is a ~9% relative one, and it passed
-        # throughout a 34% smoothing-convention regression.
-        #
-        # EAS is the exception. It sits 8.6% off this benchmark while the other
-        # four components agree to ~2e-6, which predates the convention fix and
-        # looks like a change in how EAS is built (it is combined unsmoothed and
-        # then smoothed). Pinned loosely here so the gap is visible rather than
-        # papered over; it needs resolving separately.
-        tolerance = 0.1 if str(component) == "eas" else 1e-4
-        assert fas_result_ims[str(component)].values == pytest.approx(
-            data.sel(component=component).values, rel=tolerance
+    # Relative, not `decimal=5`: FAS values here peak at 3.3e-5, so an absolute
+    # tolerance of 5e-6 is a ~9% relative one, and it passed throughout a 34%
+    # smoothing-convention regression.
+    for component in ("000", "090", "ver", "geom"):
+        assert fas_result_ims[component].values == pytest.approx(
+            data.sel(component=component).values, rel=1e-4
         )
+
+
+@pytest.mark.xfail(
+    strict=True,
+    reason="EAS is 8.6% off the Jan-2025 reference while 000/090/ver/geom agree "
+    "to 2e-6. Predates the smoothing-convention fix and looks like a change in "
+    "how EAS is built (combined unsmoothed, then smoothed). Unresolved.",
+)
+def test_fas_eas_benchmark() -> None:
+    """EAS against the same benchmark, at the same tolerance as every other component.
+
+    Held at `rel=1e-4` deliberately. A loosened tolerance here would pass at any
+    drift under its own bound and quietly retire the only independent EAS
+    reference in the repo; `strict=True` means this flips to a failure the
+    moment the definition is settled.
+    """
+    data_array_ffp = Path(__file__).parent / "resources" / "fas_benchmark.nc"
+    data = xr.open_dataarray(data_array_ffp)
+    data_dir = Path(__file__).parent.parent / "examples" / "resources"
+    dt, waveform = waveform_reading.read_ascii(
+        data_dir / "2024p950420_MWFS_HN_20.000",
+        data_dir / "2024p950420_MWFS_HN_20.090",
+        data_dir / "2024p950420_MWFS_HN_20.ver",
+    )
+    waveform = np.ascontiguousarray(np.moveaxis(waveform, -1, 0))
+    fas = ims.fourier_amplitude_spectra(waveform, dt, data.frequency.values)
+
+    assert fas["eas"].values == pytest.approx(
+        data.sel(component="eas").values, rel=1e-4
+    )
 
 
 def test_fas_multiple_stations_benchmark() -> None:
@@ -413,7 +436,6 @@ def test_all_ims_benchmark_edge_cases(resource_dir: Path) -> None:
 
     # Read the files to a waveform array that's readable by IM Calculation
     dt, waveform = waveform_reading.read_ascii(comp_000_ffp, comp_090_ffp, comp_ver_ffp)
-    nt = waveform.shape[1]
 
     im_list = [
         ims.IM.PGA,
@@ -426,9 +448,10 @@ def test_all_ims_benchmark_edge_cases(resource_dir: Path) -> None:
         ims.IM.pSA,
     ]
 
-    # If the record is too long the test will fail because of missing KO matrices
-    have_ko_matrix = np.ceil(np.log2(nt)) < 15
-    if have_ko_matrix:
+    # Only some of the per-case benchmarks carry FAS columns; ask for FAS when
+    # there is something to compare it against. (This used to key off record
+    # length, back when a matrix had to exist on disk beforehand.)
+    if data.columns.str.startswith("FAS").any():
         im_list.append(ims.IM.FAS)
 
     # Calculate the intensity measures

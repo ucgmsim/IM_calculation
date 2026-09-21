@@ -694,7 +694,7 @@ def _fas_kernel(
     freqs : ndarray of float
         Output frequencies (Hz) the smoothed spectrum is interpolated onto.
     fa_frequencies : ndarray of float
-        The `rfft` bin frequencies (Hz) the Konno-Ohmachi matrix is sized for.
+        The `rfft` bin frequencies (Hz) the smoothed spectrum is defined on.
     bandwidth : float
         Bandwidth of the Konno-Ohmachi smoothing window.
     scratch_directory : Path or None

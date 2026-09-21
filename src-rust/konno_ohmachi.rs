@@ -27,6 +27,7 @@
 //! flat spectrum by up to 25% near the band edges. The two obspy paths disagree
 //! by up to 30%. This module implements the direct one.
 
+use ndarray::azip;
 use ndarray::prelude::*;
 
 /// Base-10 logarithm of every bin index.
@@ -39,12 +40,16 @@ fn log_bins(n_bins: usize) -> Array1<f64> {
 
 /// Writes the normalised window centred on bin `centre` into `out`.
 ///
-/// `out` must have the same length as `logs`. The steps below are ordered to
-/// match obspy exactly, because the fix-ups at bins `centre` and `0` overwrite
-/// the `0/0` and `-inf` the formula produces there.
-fn smoothing_window(centre: usize, logs: ArrayView1<f64>, bandwidth: f64, out: &mut [f64]) {
-    let n_bins = logs.len();
-
+/// `out` must have the same length as `logs`. The formula is evaluated over
+/// every bin, including the two where it is undefined, and those are then
+/// overwritten with their limits before the sum is taken -- the same order
+/// obspy uses, and the reason the sum is clean despite both producing NaN.
+fn smoothing_window(
+    centre: usize,
+    logs: ArrayView1<f64>,
+    bandwidth: f64,
+    mut out: ArrayViewMut1<f64>,
+) {
     // A centre of zero has no ratio to take. obspy returns the unit impulse
     // here *before* normalising; it already sums to one, so the result is the
     // same either way.
@@ -55,30 +60,18 @@ fn smoothing_window(centre: usize, logs: ArrayView1<f64>, bandwidth: f64, out: &
     }
 
     let log_centre = logs[centre];
-    let mut sum = 0.0;
-    for bin in 1..n_bins {
-        // Skipped rather than computed and overwritten: sin(0)/0 is NaN, and a
-        // NaN added to `sum` would poison the whole row.
-        if bin == centre {
-            continue;
-        }
-        let x = bandwidth * (logs[bin] - log_centre);
-        let value = (x.sin() / x).powi(4);
-        out[bin] = value;
-        sum += value;
-    }
+    azip!((value in &mut out, &log_bin in &logs) {
+        let x = bandwidth * (log_bin - log_centre);
+        *value = (x.sin() / x).powi(4);
+    });
 
-    // The limit as f -> f_c is one.
+    // sin(0)/0 at the centre; log10(0) is -inf at bin zero. Both come out NaN
+    // above and are replaced here by the limits of the window.
     out[centre] = 1.0;
-    sum += 1.0;
-    // The limit as f -> 0 is zero, and `logs[0]` is -inf. Bin zero is outside
-    // the loop above, so `out` may still hold the previous call's value here.
     out[0] = 0.0;
 
-    let scale = 1.0 / sum;
-    for value in out.iter_mut() {
-        *value *= scale;
-    }
+    let sum = out.sum();
+    out /= sum;
 }
 
 /// Rows `start..stop` of the Konno-Ohmachi smoothing matrix.
@@ -97,14 +90,11 @@ pub fn matrix_rows(n_bins: usize, bandwidth: f64, start: usize, stop: usize) -> 
 
     let logs = log_bins(n_bins);
     let mut rows = Array2::<f32>::zeros((stop - start, n_bins));
-    let mut window = vec![0.0f64; n_bins];
+    let mut window = Array1::<f64>::zeros(n_bins);
 
     for (row, centre) in (start..stop).enumerate() {
-        smoothing_window(centre, logs.view(), bandwidth, &mut window);
-        let mut out_row = rows.row_mut(row);
-        for (out, &value) in out_row.iter_mut().zip(window.iter()) {
-            *out = value as f32;
-        }
+        smoothing_window(centre, logs.view(), bandwidth, window.view_mut());
+        azip!((row_value in rows.row_mut(row), &value in &window) *row_value = value as f32);
     }
 
     rows
@@ -124,17 +114,13 @@ pub fn smooth(spectra: ArrayView2<f64>, bandwidth: f64) -> Array2<f64> {
     let (n_spectra, n_bins) = spectra.dim();
     let logs = log_bins(n_bins);
     let mut smoothed = Array2::<f64>::zeros((n_spectra, n_bins));
-    let mut window = vec![0.0f64; n_bins];
+    let mut window = Array1::<f64>::zeros(n_bins);
 
     for centre in 0..n_bins {
-        smoothing_window(centre, logs.view(), bandwidth, &mut window);
-        for (mut out_row, spectrum) in smoothed.rows_mut().into_iter().zip(spectra.rows()) {
-            out_row[centre] = spectrum
-                .iter()
-                .zip(window.iter())
-                .map(|(&amplitude, &weight)| amplitude * weight)
-                .sum();
-        }
+        smoothing_window(centre, logs.view(), bandwidth, window.view_mut());
+        // One matrix-vector product per output bin, rather than a hand-rolled
+        // inner product per spectrum.
+        smoothed.column_mut(centre).assign(&spectra.dot(&window));
     }
 
     smoothed
@@ -152,12 +138,8 @@ mod tests {
     fn full_matrix(n_bins: usize, bandwidth: f64) -> Array2<f64> {
         let logs = log_bins(n_bins);
         let mut matrix = Array2::<f64>::zeros((n_bins, n_bins));
-        let mut window = vec![0.0f64; n_bins];
         for centre in 0..n_bins {
-            smoothing_window(centre, logs.view(), bandwidth, &mut window);
-            matrix
-                .row_mut(centre)
-                .assign(&ArrayView1::from(&window[..]));
+            smoothing_window(centre, logs.view(), bandwidth, matrix.row_mut(centre));
         }
         matrix
     }
@@ -250,6 +232,16 @@ mod tests {
             assert_eq!(head.slice(s![.., ..]), whole.slice(s![..split, ..]));
             assert_eq!(tail.slice(s![.., ..]), whole.slice(s![split.., ..]));
         }
+    }
+
+    /// The `f64` helper above must agree with the `f32` matrix that ships, or
+    /// the tests built on it would pass while `matrix_rows` drifted.
+    #[test]
+    fn test_full_matrix_helper_matches_matrix_rows() {
+        let n_bins = 65;
+        let shipped = matrix_rows(n_bins, BANDWIDTH, 0, n_bins);
+        let helper = full_matrix(n_bins, BANDWIDTH).mapv(|value| value as f32);
+        assert_eq!(shipped, helper);
     }
 
     #[test]
