@@ -12,6 +12,11 @@ so this module decides, per size, where to put it:
 - no room even for that: fall back to the matrix-free kernel, which is correct
   but re-derives every window on every call.
 
+Each output bin is a weighted average of the spectrum whose weights sum to one,
+so a flat spectrum is returned unchanged. This is obspy's direct smoothing path;
+its matrix path contracts over the other index and attenuates a flat spectrum by
+up to 25% near the band edges.
+
 Nothing is cached between runs. Building the matrix costs about a sixth of what
 applying it costs even at the largest sizes, so persisting it would buy under a
 percent in exchange for stale-cache invalidation, bandwidth metadata and a
@@ -103,8 +108,9 @@ def smoothing_matrix(
 ) -> npt.NDArray[np.float32]:
     """Build the Konno-Ohmachi smoothing matrix in memory.
 
-    Row `c` holds the window centred on bin `c`, normalised to sum to one, so a
-    spectrum is smoothed with `spectra @ matrix`.
+    Row `c` holds the window centred on bin `c`, normalised to sum to one, so it
+    is the set of weights that produce output bin `c` and a spectrum is smoothed
+    with `spectra @ matrix.T`.
 
     Parameters
     ----------
@@ -239,7 +245,10 @@ def clear_matrix_cache() -> None:
 
 
 def _apply(spectra: np.ndarray, matrix: np.ndarray) -> npt.NDArray[np.float64]:
-    """Multiply a stack of spectra by a smoothing matrix.
+    """Smooth a stack of spectra with a smoothing matrix.
+
+    Row `c` of `matrix` holds the weights for output bin `c`, so this computes
+    `spectra @ matrix.T`.
 
     Parameters
     ----------
@@ -260,14 +269,14 @@ def _apply(spectra: np.ndarray, matrix: np.ndarray) -> npt.NDArray[np.float64]:
     spectra = np.ascontiguousarray(spectra, dtype=np.float32)
 
     if not isinstance(matrix, np.memmap):
-        return np.asarray(spectra @ matrix, dtype=np.float64)
+        return np.asarray(spectra @ matrix.T, dtype=np.float64)
 
-    # Contract over row blocks rather than column blocks: a row block of a
-    # row-major memmap is one contiguous read, and each block is a complete
-    # contribution to every output bin.
-    smoothed = np.zeros(spectra.shape, dtype=np.float32)
+    # Block over the output bins. Row block `c` of a row-major memmap is one
+    # contiguous read and holds every weight output bins `c` need, so each block
+    # of the result is written once rather than accumulated into.
+    smoothed = np.empty(spectra.shape, dtype=np.float32)
     for start, stop in _row_blocks(matrix.shape[0]):
-        smoothed += spectra[:, start:stop] @ matrix[start:stop, :]
+        smoothed[:, start:stop] = spectra @ matrix[start:stop, :].T
     return np.asarray(smoothed, dtype=np.float64)
 
 

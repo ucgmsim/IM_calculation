@@ -14,10 +14,18 @@
 //! frequency values themselves. Everything here is therefore indexed by bin.
 //!
 //! Row $c$ of the matrix holds the window centred on bin $c$, normalised to sum
-//! to one, so a spectrum is smoothed with `spectra.dot(&matrix)` and the
-//! contraction runs over the *centre* index. This matches obspy's
-//! `calculate_smoothing_matrix` / `apply_smoothing_matrix` pair, which is what
-//! this package's Fourier amplitude spectra are defined against.
+//! to one, so it is exactly the weights that produce output bin $c$:
+//! `smoothed[c] = matrix.row(c).dot(&spectrum)`, or `spectra.dot(&matrix.t())`
+//! for a stack of them. The contraction runs over the *evaluation* index, so
+//! the weights behind every output bin sum to one and a flat spectrum is
+//! returned unchanged.
+//!
+//! This is obspy's `konno_ohmachi_smoothing` with `enforce_no_matrix=True`.
+//! Note that obspy's *matrix* path (`apply_smoothing_matrix`) instead computes
+//! `spectra.dot(&matrix)`, contracting over the centre index; its effective
+//! weights are the column sums, which run 0.75 to 1.09 here, so it attenuates a
+//! flat spectrum by up to 25% near the band edges. The two obspy paths disagree
+//! by up to 30%. This module implements the direct one.
 
 use ndarray::prelude::*;
 
@@ -75,9 +83,10 @@ fn smoothing_window(centre: usize, logs: ArrayView1<f64>, bandwidth: f64, out: &
 
 /// Rows `start..stop` of the Konno-Ohmachi smoothing matrix.
 ///
-/// The result has shape `(stop - start, n_bins)` and is row-major, so a caller
-/// building the whole matrix can fill it a block of rows at a time without ever
-/// holding all of it. Each row sums to one.
+/// Row `c` is the set of weights that produce output bin `c`, so the result has
+/// shape `(stop - start, n_bins)`, is row-major, and each row sums to one. A
+/// caller can therefore fill the matrix, and later apply it, a block of output
+/// bins at a time without ever holding all of it.
 ///
 /// # Panics
 ///
@@ -104,13 +113,11 @@ pub fn matrix_rows(n_bins: usize, bandwidth: f64, start: usize, stop: usize) -> 
 /// Konno-Ohmachi smoothing without materialising the matrix.
 ///
 /// `spectra` has shape `(n_spectra, n_bins)` and the result has the same shape.
-/// Equals `spectra.dot(&matrix_rows(n_bins, bandwidth, 0, n_bins))` up to the
-/// `f32` rounding of the matrix.
+/// Equals `spectra.dot(&matrix_rows(n_bins, bandwidth, 0, n_bins).t())` up to
+/// the `f32` rounding of the matrix.
 ///
-/// Because the contraction runs over the centre index, this accumulates one
-/// outer product per centre rather than taking one inner product per output
-/// bin. It allocates a single window buffer and no matrix, which is the only
-/// way to smooth a spectrum whose matrix would not fit on the machine -- but it
+/// Allocates a single window buffer and no matrix, which is the only way to
+/// smooth a spectrum whose matrix would not fit on the machine -- but it
 /// re-evaluates every window on every call, so prefer the matrix whenever one
 /// can be held.
 pub fn smooth(spectra: ArrayView2<f64>, bandwidth: f64) -> Array2<f64> {
@@ -122,13 +129,11 @@ pub fn smooth(spectra: ArrayView2<f64>, bandwidth: f64) -> Array2<f64> {
     for centre in 0..n_bins {
         smoothing_window(centre, logs.view(), bandwidth, &mut window);
         for (mut out_row, spectrum) in smoothed.rows_mut().into_iter().zip(spectra.rows()) {
-            let weight = spectrum[centre];
-            if weight == 0.0 {
-                continue;
-            }
-            for (out, &value) in out_row.iter_mut().zip(window.iter()) {
-                *out += weight * value;
-            }
+            out_row[centre] = spectrum
+                .iter()
+                .zip(window.iter())
+                .map(|(&amplitude, &weight)| amplitude * weight)
+                .sum();
         }
     }
 
@@ -190,8 +195,7 @@ mod tests {
         }
     }
 
-    /// Rows sum to one, not columns. If anyone ever "fixes" the normalisation to
-    /// run over the evaluation index this fails, and every FAS value moves.
+    /// Each row is the weight set behind one output bin, so each sums to one.
     #[test]
     fn test_rows_sum_to_one() {
         for &n_bins in &[65usize, 129, 257] {
@@ -228,7 +232,7 @@ mod tests {
             ((row * 7 + bin) as f64).sin().abs() + 0.5
         });
 
-        let expected = spectra.dot(&full_matrix(n_bins, BANDWIDTH));
+        let expected = spectra.dot(&full_matrix(n_bins, BANDWIDTH).t());
         let actual = smooth(spectra.view(), BANDWIDTH);
 
         assert_abs_diff_eq!(actual, expected, epsilon = 1e-12);
@@ -271,18 +275,17 @@ mod tests {
             prop_assert!(narrow <= wide + 1e-12, "narrow {narrow} exceeded wide {wide}");
         }
 
-        /// Smoothing a flat spectrum gives the column sums. It is *not* the
-        /// constant back: the weights are normalised over the evaluation index
-        /// but contracted over the centre index, so they need not sum to one
-        /// along the contraction. This is the sharpest statement of the
-        /// convention, and the first thing to break if it ever changes.
+        /// Smoothing a flat spectrum returns it unchanged. This is the
+        /// sharpest statement of the convention: it holds only because the
+        /// contraction runs over the same index the weights are normalised
+        /// over. Contracting over the centre index instead attenuates a flat
+        /// spectrum by up to 25% near the band edges.
         #[test]
-        fn prop_flat_spectrum_gives_column_sums(n_bins in 8usize..48) {
+        fn prop_flat_spectrum_is_preserved(n_bins in 8usize..48) {
             let spectra = Array2::<f64>::ones((1, n_bins));
             let smoothed = smooth(spectra.view(), BANDWIDTH);
-            let column_sums = full_matrix(n_bins, BANDWIDTH).sum_axis(Axis(0));
             for bin in 0..n_bins {
-                prop_assert!((smoothed[[0, bin]] - column_sums[bin]).abs() < 1e-12);
+                prop_assert!((smoothed[[0, bin]] - 1.0).abs() < 1e-12);
             }
         }
     }

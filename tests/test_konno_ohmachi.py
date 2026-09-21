@@ -12,6 +12,9 @@ import pytest
 from IM import konno_ohmachi
 
 REFERENCE_MATRIX = Path(__file__).parent / "resources" / "konno_reference_n65_b40.npy"
+REFERENCE_DIRECT = (
+    Path(__file__).parent / "resources" / "konno_reference_direct_n65_b40.npz"
+)
 
 
 def obspy_smoothing_matrix(n_bins: int, bandwidth: float) -> npt.NDArray[np.float64]:
@@ -108,12 +111,35 @@ def test_smooth_preserves_shape_and_dtype(
 def test_smooth_matches_reference_product(
     spectra: npt.NDArray[np.float64],
 ) -> None:
-    """Smoothing is a product with the obspy matrix, contracted over the centre."""
-    reference = (spectra.reshape(-1, 65) @ np.load(REFERENCE_MATRIX)).reshape(
+    """Each output bin is a weighted average over the whole spectrum."""
+    reference = (spectra.reshape(-1, 65) @ np.load(REFERENCE_MATRIX).T).reshape(
         spectra.shape
     )
     # Single precision accumulation over 65 positive weights; ~1e-6 relative.
     assert konno_ohmachi.smooth(spectra) == pytest.approx(reference, rel=1e-5)
+
+
+def test_smooth_matches_obspy_direct_path() -> None:
+    """Smoothing reproduces obspy's own direct (non-matrix) smoothing.
+
+    This is the convention pin. obspy's matrix path contracts over the other
+    index and disagrees with its direct path by up to 30%, so agreeing with the
+    matrix product alone would not distinguish the two.
+    """
+    reference = np.load(REFERENCE_DIRECT)
+    assert konno_ohmachi.smooth(reference["spectra"]) == pytest.approx(
+        reference["smoothed"], rel=1e-5
+    )
+
+
+def test_flat_spectrum_is_returned_unchanged() -> None:
+    """The weights behind every output bin sum to one.
+
+    Contracting over the centre index instead would attenuate the band edges by
+    up to 25%, which is the failure this guards against.
+    """
+    flat = np.ones((1, 65))
+    assert konno_ohmachi.smooth(flat) == pytest.approx(flat, rel=1e-6)
 
 
 def test_bandwidth_changes_the_result(spectra: npt.NDArray[np.float64]) -> None:

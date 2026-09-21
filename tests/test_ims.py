@@ -171,10 +171,18 @@ def test_fas_benchmark() -> None:
     fas_result_ims = ims.fourier_amplitude_spectra(waveform, dt, data.frequency.values)
 
     for component in data.component.values:
-        assert_array_almost_equal(
-            data.sel(component=component).values,
-            fas_result_ims[str(component)].values,
-            decimal=5,
+        # Relative, not `decimal=5`: FAS values here peak at 3.3e-5, so an
+        # absolute tolerance of 5e-6 is a ~9% relative one, and it passed
+        # throughout a 34% smoothing-convention regression.
+        #
+        # EAS is the exception. It sits 8.6% off this benchmark while the other
+        # four components agree to ~2e-6, which predates the convention fix and
+        # looks like a change in how EAS is built (it is combined unsmoothed and
+        # then smoothed). Pinned loosely here so the gap is visible rather than
+        # papered over; it needs resolving separately.
+        tolerance = 0.1 if str(component) == "eas" else 1e-4
+        assert fas_result_ims[str(component)].values == pytest.approx(
+            data.sel(component=component).values, rel=tolerance
         )
 
 
