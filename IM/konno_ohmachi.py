@@ -345,6 +345,21 @@ def set_scratch_directory(scratch_directory: Path) -> None:
     MATRICES.scratch_directory = scratch_directory
 
 
+def set_memory_budget(memory_budget: int) -> None:
+    """Set the largest KO matrix the default store holds in memory.
+
+    Anything larger is spilled to the scratch directory instead. Matrices
+    already held are unaffected; call `clear_matrix_cache` to rebuild them
+    against the new budget.
+
+    Parameters
+    ----------
+    memory_budget : int
+        Size in bytes. Zero spills every matrix.
+    """
+    MATRICES.memory_budget = memory_budget
+
+
 def smooth(
     spectra: np.ndarray,
     bandwidth: float = DEFAULT_BANDWIDTH,

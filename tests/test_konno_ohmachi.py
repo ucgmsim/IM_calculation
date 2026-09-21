@@ -52,8 +52,16 @@ def _store_contents(_: int) -> list[tuple[int, float]]:
 def isolated_matrices(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> Iterator[None]:
-    """Give each test its own scratch directory and an empty matrix store."""
+    """Give each test its own scratch directory and an empty matrix store.
+
+    Both settings are pinned through `monkeypatch`, so a test that changes them
+    -- including via `set_scratch_directory` / `set_memory_budget` -- cannot leak
+    them into the next one, even if it fails partway.
+    """
     monkeypatch.setattr(konno_ohmachi.MATRICES, "scratch_directory", tmp_path)
+    monkeypatch.setattr(
+        konno_ohmachi.MATRICES, "memory_budget", konno_ohmachi.DEFAULT_MEMORY_BUDGET
+    )
     konno_ohmachi.clear_matrix_cache()
     yield
     konno_ohmachi.clear_matrix_cache()
@@ -314,6 +322,25 @@ def test_settings_are_resolved_when_the_store_is_built(
 def test_zero_memory_budget_is_honoured() -> None:
     """A budget of zero means spill everything, not fall back to the default."""
     assert konno_ohmachi.MatrixStore(memory_budget=0).memory_budget == 0
+
+
+def test_set_memory_budget_redirects_the_default_store(
+    spectra: npt.NDArray[np.float64], tmp_path: Path
+) -> None:
+    """`set_memory_budget` is the runtime knob for the tier boundary."""
+    konno_ohmachi.set_memory_budget(1)
+    assert konno_ohmachi.MATRICES.memory_budget == 1
+
+    # Everything now spills rather than being held in memory.
+    konno_ohmachi.smooth(spectra)
+    assert not konno_ohmachi.MATRICES._resident
+    assert isinstance(konno_ohmachi.MATRICES._spilled[(65, 40.0)], np.memmap)
+
+    konno_ohmachi.set_memory_budget(konno_ohmachi.DEFAULT_MEMORY_BUDGET)
+    konno_ohmachi.clear_matrix_cache()
+    konno_ohmachi.smooth(spectra)
+    assert konno_ohmachi.MATRICES._resident
+    assert not konno_ohmachi.MATRICES._spilled
 
 
 def test_set_scratch_directory_redirects_the_default_store(
