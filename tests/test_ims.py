@@ -14,20 +14,9 @@ from hypothesis import given, settings
 from hypothesis import strategies as st
 from hypothesis.extra import numpy as nst
 from numpy.testing import assert_array_almost_equal, assert_array_equal
-from pytest import Metafunc, TempPathFactory
+from pytest import Metafunc
 
 from IM import im_calculation, ims, snr_calculation, waveform_reading
-
-
-@pytest.fixture(scope="session")
-def ko_matrices(
-    request: pytest.FixtureRequest, tmp_path_factory: TempPathFactory
-) -> Path:
-    from IM.scripts import gen_ko_matrix
-
-    ko_matrix_directory = tmp_path_factory.mktemp("ko_matrices")
-    gen_ko_matrix.main(ko_matrix_directory, num_to_gen=12)
-    return ko_matrix_directory
 
 
 @pytest.fixture
@@ -164,7 +153,7 @@ def test_cav_name_depends_on_threshold(
 
 
 @pytest.mark.slow
-def test_fas_benchmark(ko_matrices: Path) -> None:
+def test_fas_benchmark() -> None:
     data_array_ffp = Path(__file__).parent / "resources" / "fas_benchmark.nc"
     if not data_array_ffp.exists():
         pytest.skip("Benchmark file missing")
@@ -179,9 +168,7 @@ def test_fas_benchmark(ko_matrices: Path) -> None:
     )
     waveform = np.ascontiguousarray(np.moveaxis(waveform, -1, 0))
     # Input: (n_stations, nt, n_components) as per fourier_amplitude_spectra logic
-    fas_result_ims = ims.fourier_amplitude_spectra(
-        waveform, dt, data.frequency.values, ko_matrices
-    )
+    fas_result_ims = ims.fourier_amplitude_spectra(waveform, dt, data.frequency.values)
 
     for component in data.component.values:
         assert_array_almost_equal(
@@ -191,7 +178,7 @@ def test_fas_benchmark(ko_matrices: Path) -> None:
         )
 
 
-def test_fas_multiple_stations_benchmark(ko_matrices: Path) -> None:
+def test_fas_multiple_stations_benchmark() -> None:
     """Compare benchmark FAS calculation with multiple stations against current implementation."""
     # Load the data array
     data_array_ffp = Path(__file__).parent / "resources" / "fas_benchmark.nc"
@@ -210,9 +197,7 @@ def test_fas_multiple_stations_benchmark(ko_matrices: Path) -> None:
     duplicated_array = np.tile(waveform, (1, 2, 1))
 
     # Compute the Fourier Amplitude Spectra
-    fas_result_ims = ims.fourier_amplitude_spectra(
-        duplicated_array, dt, data.frequency, ko_matrices
-    )
+    fas_result_ims = ims.fourier_amplitude_spectra(duplicated_array, dt, data.frequency)
 
     # Compare the results
     for component in data.component.values:
@@ -226,7 +211,7 @@ def test_fas_multiple_stations_benchmark(ko_matrices: Path) -> None:
 
 
 @pytest.mark.slow
-def test_snr_benchmark(ko_matrices: Path) -> None:
+def test_snr_benchmark() -> None:
     """Compare benchmark SNR calculation against current implementation."""
     # Load the DataFrame
     benchmark_ffp = Path(__file__).parent / "resources" / "snr_benchmark.csv"
@@ -246,9 +231,7 @@ def test_snr_benchmark(ko_matrices: Path) -> None:
     tp = 3170
 
     # Compute the SNR
-    snr_result_ims, _, _, _, _ = snr_calculation.calculate_snr(
-        waveform, dt, tp, ko_matrices
-    )
+    snr_result_ims, _, _, _, _ = snr_calculation.calculate_snr(waveform, dt, tp)
 
     # Compare the results
     assert_array_almost_equal(
@@ -256,7 +239,7 @@ def test_snr_benchmark(ko_matrices: Path) -> None:
     )
 
 
-def test_all_ims_benchmark(ko_matrices: Path) -> None:
+def test_all_ims_benchmark() -> None:
     """Compare benchmark IM calculation against current implementation."""
     # Load the DataFrame
     benchmark_ffp = Path(__file__).parent / "resources" / "im_benchmark.csv"
@@ -275,7 +258,6 @@ def test_all_ims_benchmark(ko_matrices: Path) -> None:
     result = im_calculation.calculate_ims(
         waveform,
         dt,
-        ko_directory=ko_matrices,
     )
 
     # The benchmark predates the RotD orientation components and has no
@@ -410,7 +392,7 @@ def pytest_generate_tests(metafunc: Metafunc) -> None:
 
 
 @pytest.mark.slow
-def test_all_ims_benchmark_edge_cases(resource_dir: Path, ko_matrices: Path) -> None:
+def test_all_ims_benchmark_edge_cases(resource_dir: Path) -> None:
     """Compare benchmark IM calculation against current implementation for each directory in resources for edge cases."""
     # Load the benchmark DataFrame
     benchmark_ffp = resource_dir / "im_benchmark.csv"
@@ -442,9 +424,7 @@ def test_all_ims_benchmark_edge_cases(resource_dir: Path, ko_matrices: Path) -> 
         im_list.append(ims.IM.FAS)
 
     # Calculate the intensity measures
-    result = im_calculation.calculate_ims(
-        waveform, dt, ims_list=im_list, ko_directory=ko_matrices
-    )
+    result = im_calculation.calculate_ims(waveform, dt, ims_list=im_list)
 
     # Align columns and indices for comparison, dropping the components the
     # benchmark does not carry (the RotD orientations, which postdate it).
@@ -548,13 +528,12 @@ def test_peak_ground_parameters(
 def test_fourier_amplitude_spectra(
     sample_waveforms: npt.NDArray[np.float64],
     sample_time: npt.NDArray[np.float64],
-    ko_matrices: Path,
     n_freqs: int,
 ) -> None:
     """Test Fourier Amplitude Spectra calculation."""
     dt = sample_time[1] - sample_time[0]
     freqs = np.logspace(-1, 1, n_freqs, dtype=np.float64)
-    result = ims.fourier_amplitude_spectra(sample_waveforms, dt, freqs, ko_matrices)
+    result = ims.fourier_amplitude_spectra(sample_waveforms, dt, freqs)
 
     # Check Dataset structure
     assert isinstance(result, xr.Dataset)
@@ -564,7 +543,7 @@ def test_fourier_amplitude_spectra(
     assert all((variable.values >= 0).all() for variable in result.data_vars.values())
 
 
-def test_nyquist_frequency(ko_matrices: Path) -> None:
+def test_nyquist_frequency() -> None:
     # Define test parameters
     n_stations = 2
     n_timesteps = 1024
@@ -580,7 +559,7 @@ def test_nyquist_frequency(ko_matrices: Path) -> None:
         [1.0, 10.0, 20.0, 60.0], dtype=np.float64
     )  # 60 Hz > Nyquist (50 Hz)
     with pytest.warns(RuntimeWarning):
-        fas = ims.fourier_amplitude_spectra(waveforms, dt, freqs, ko_matrices)
+        fas = ims.fourier_amplitude_spectra(waveforms, dt, freqs)
 
     # Verify that frequencies above Nyquist are filtered out
     expected_freqs = freqs[freqs <= nyquist_frequency]
@@ -610,13 +589,13 @@ def test_invalid_waveform_shapes(invalid_shape: tuple[int, ...]) -> None:
 
 
 @pytest.mark.slow
-def test_fourier_amplitude_spectra_shape(ko_matrices: Path) -> None:
+def test_fourier_amplitude_spectra_shape() -> None:
     n_stations, n_timesteps, n_components = 2, 1024, 3
     dt = 0.01
     waveforms = np.random.rand(n_components, n_stations, n_timesteps).astype(np.float64)
     freqs = np.array([1.0, 10.0, 20.0], dtype=np.float64)
 
-    fas = ims.fourier_amplitude_spectra(waveforms, dt, freqs, ko_matrices)
+    fas = ims.fourier_amplitude_spectra(waveforms, dt, freqs)
     assert len(fas.data_vars) == 5  # 5 components: 0, 90, ver, geom, eas
     for component in ims.FAS_COMPONENTS:
         assert fas[component].shape == (n_stations, len(freqs))
@@ -812,13 +791,11 @@ def test_rotd_orientation_of_a_polarised_record(polarisation: int) -> None:
     )
 
 
-def test_lazy_matches_eager_fas(
-    sample_waveforms: npt.NDArray[np.float64], ko_matrices: Path
-) -> None:
+def test_lazy_matches_eager_fas(sample_waveforms: npt.NDArray[np.float64]) -> None:
     freqs = np.logspace(-1, 1, 16, dtype=np.float64)
     lazy_input = _to_dask(sample_waveforms, station_chunk=1)
-    eager = ims.fourier_amplitude_spectra(sample_waveforms, 0.01, freqs, ko_matrices)
-    lazy = ims.fourier_amplitude_spectra(lazy_input, 0.01, freqs, ko_matrices)
+    eager = ims.fourier_amplitude_spectra(sample_waveforms, 0.01, freqs)
+    lazy = ims.fourier_amplitude_spectra(lazy_input, 0.01, freqs)
 
     assert all(v.chunks is not None for v in lazy.data_vars.values())
     computed = lazy.compute()

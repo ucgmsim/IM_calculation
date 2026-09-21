@@ -23,7 +23,6 @@ dependencies = [
 [tool.setuptools_scm]
 
 [project.optional-dependencies]
-ko_matrix = ["obspy"]
 # Only needed by callers that want to pass dask-backed (lazy) waveforms in
 # and get lazy datasets out; xr.apply_ufunc(..., dask="parallelized") never
 # imports dask for plain numpy/eager xarray input.
@@ -56,7 +55,6 @@ find = { where = [
 
 [project.scripts]
 calculate-ims-ascii = "IM.scripts.calculate_ims:app"
-gen-ko-matrices = "IM.scripts.gen_ko_matrix:app"
 
 [tool.ruff.lint]
 extend-select = [

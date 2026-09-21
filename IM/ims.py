@@ -14,7 +14,7 @@ from pyfftw.interfaces import numpy_fft as fft
 
 from IM import (
     _core,  # ty: ignore[unresolved-import]
-    ko_matrices,
+    konno_ohmachi,
 )
 
 ChunkedWaveformArray = np.ndarray[tuple[int, int, int], np.dtype[np.float64]]
@@ -38,7 +38,6 @@ FAS_COMPONENTS = ("000", "090", "ver", "geom", "eas")
 
 DAMPING = 0.05
 G = 981
-KONNO_BLOCK_BYTES = 64 * 2**20
 
 
 class Component(IntEnum):
@@ -645,61 +644,27 @@ def pseudo_spectral_acceleration(
     )
 
 
-def _konno_smooth(spectrum_data: np.ndarray, konno: np.ndarray) -> np.ndarray:
-    """Multiply a spectrum by a Konno-Ohmachi matrix.
-
-    Parameters
-    ----------
-    spectrum_data : ndarray
-        Spectrum values, shape `(..., n_fa)`.
-    konno : ndarray
-        Konno-Ohmachi smoothing matrix, shape `(n_fa, n_fa)`.
-
-    Returns
-    -------
-    ndarray
-        Smoothed spectrum, shape `(..., n_fa)`.
-    """
-    n_output = konno.shape[1]
-    columns = max(1, KONNO_BLOCK_BYTES // (konno.shape[0] * np.float64().itemsize))
-    # KO matrices can be really large, so this applies a block-wise
-    # multiplication. This is done without dask because it would add a new
-    # dependency to the codebase.
-    smoothed = np.empty(spectrum_data.shape[:-1] + (n_output,), dtype=np.float64)
-    for start in range(0, n_output, columns):
-        block = slice(start, start + columns)
-        smoothed[..., block] = spectrum_data @ np.asarray(
-            konno[:, block], dtype=np.float64
-        )
-    return smoothed
-
-
-def smooth_and_interpolate(
-    spectrum_data: np.ndarray,
-    konno: np.ndarray,
+def _interpolate(
+    smoothed: np.ndarray,
+    fa_frequencies: npt.NDArray[np.float64],
     freqs: npt.NDArray[np.float64],
-    fa_frequencies: np.ndarray,
 ) -> np.ndarray:
-    """
-    Smooths and interpolates a spectrum.
+    """Interpolate a smoothed spectrum onto the requested frequencies.
 
     Parameters
     ----------
-    spectrum_data : ndarray
-        The spectrum data to be smoothed and interpolated.
-    konno : ndarray
-        The Konno-Ohmachi smoothing matrix to apply to the spectrum data.
+    smoothed : ndarray
+        Smoothed spectrum values, shape `(..., len(fa_frequencies))`.
+    fa_frequencies : ndarray of float64
+        The `rfft` bin frequencies the spectrum is defined on (Hz).
     freqs : ndarray of float64
-        The frequencies at which to interpolate the smoothed spectrum data.
-    fa_frequencies : ndarray
-        The original frequencies corresponding to the spectrum data before smoothing.
+        Frequencies to interpolate onto (Hz).
 
     Returns
     -------
     ndarray
-        The smoothed and interpolated spectrum data at the specified frequencies.
+        The spectrum at `freqs`, shape `(..., len(freqs))`.
     """
-    smoothed = _konno_smooth(spectrum_data, konno)
     interpolator = sp.interpolate.make_interp_spline(
         fa_frequencies, smoothed, axis=-1, k=1
     )
@@ -713,7 +678,8 @@ def _fas_kernel(
     n_fft: int,
     freqs: npt.NDArray[np.float64],
     fa_frequencies: npt.NDArray[np.float64],
-    ko_directory: Path,
+    bandwidth: float,
+    scratch_directory: Path | None,
 ) -> np.ndarray:
     """Kernel for `fourier_amplitude_spectra`.
 
@@ -729,8 +695,10 @@ def _fas_kernel(
         Output frequencies (Hz) the smoothed spectrum is interpolated onto.
     fa_frequencies : ndarray of float
         The `rfft` bin frequencies (Hz) the Konno-Ohmachi matrix is sized for.
-    ko_directory : Path
-        Directory the cached Konno-Ohmachi matrices are read from.
+    bandwidth : float
+        Bandwidth of the Konno-Ohmachi smoothing window.
+    scratch_directory : Path or None
+        Where to build a Konno-Ohmachi matrix too large to hold in memory.
 
     Returns
     -------
@@ -755,8 +723,11 @@ def _fas_kernel(
     )
     spectra_and_eas = np.concatenate([spectra, eas_unsmoothed[np.newaxis]], axis=0)
 
-    konno = ko_matrices.get_konno_matrix(n_fa, ko_directory)
-    smoothed = smooth_and_interpolate(spectra_and_eas, konno, freqs, fa_frequencies)
+    smoothed = _interpolate(
+        konno_ohmachi.smooth(spectra_and_eas, bandwidth, scratch_directory),
+        fa_frequencies,
+        freqs,
+    )
 
     geom = np.sqrt(smoothed[Component.COMP_0] * smoothed[Component.COMP_90])
     out = np.stack([smoothed[0], smoothed[1], smoothed[2], geom, smoothed[3]], axis=-1)
@@ -767,7 +738,8 @@ def fourier_amplitude_spectra(
     waveforms: Waveform,
     dt: float,
     freqs: npt.NDArray[np.float64],
-    ko_directory: Path,
+    bandwidth: float = konno_ohmachi.DEFAULT_BANDWIDTH,
+    scratch_directory: Path | None = None,
 ) -> xr.Dataset:
     """Compute Fourier Amplitude Spectrum (FAS) of seismic waveforms.
 
@@ -779,8 +751,13 @@ def fourier_amplitude_spectra(
         Timestep resolution of the waveforms (s).
     freqs : ndarray of float64
         Frequencies at which to compute FAS (Hz).
-    ko_directory : Path
-        Directory containing precomputed Konno-Ohmachi matrices.
+    bandwidth : float, optional
+        Bandwidth of the Konno-Ohmachi smoothing window. Lower values smooth
+        more strongly.
+    scratch_directory : Path, optional
+        Where to build a Konno-Ohmachi matrix too large to hold in memory.
+        Defaults to `$IM_CALCULATION_SCRATCH_DIR`, else the platform temporary
+        directory.
 
     Returns
     -------
@@ -814,6 +791,7 @@ def fourier_amplitude_spectra(
             "n_fft": n_fft,
             "freqs": freqs,
             "fa_frequencies": fa_frequencies,
-            "ko_directory": ko_directory,
+            "bandwidth": bandwidth,
+            "scratch_directory": scratch_directory,
         },
     )
