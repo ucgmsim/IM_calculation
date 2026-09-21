@@ -1,5 +1,6 @@
 """Tests for Konno-Ohmachi smoothing and the matrix tiers behind it."""
 
+import multiprocessing
 import shutil
 from collections.abc import Iterator
 from concurrent.futures import ThreadPoolExecutor
@@ -40,6 +41,11 @@ def obspy_smoothing_matrix(n_bins: int, bandwidth: float) -> npt.NDArray[np.floa
         window[freqs == 0.0] = 0.0
         matrix[centre] = window / window.sum()
     return matrix
+
+
+def _store_contents(_: int) -> list[tuple[int, float]]:
+    """Report the default store's keys. Module level, so `fork` children see it."""
+    return list(konno_ohmachi.MATRICES._resident)
 
 
 @pytest.fixture(autouse=True)
@@ -167,7 +173,7 @@ def test_spilled_tier_leaves_no_file(
     spilled = konno_ohmachi.smooth(spectra)
 
     assert list(tmp_path.iterdir()) == []
-    assert isinstance(konno_ohmachi._SPILLED[(65, 40.0)], np.memmap)
+    assert isinstance(konno_ohmachi.MATRICES._spilled[(65, 40.0)], np.memmap)
     # Still usable after the unlink, and identical to the in-memory tier.
     konno_ohmachi.clear_matrix_cache()
     monkeypatch.delenv(konno_ohmachi.MEMORY_BUDGET_VARIABLE)
@@ -179,7 +185,7 @@ def test_matrix_free_tier_when_nothing_fits(
 ) -> None:
     """With no memory budget and no scratch, smoothing still works, with a warning."""
     monkeypatch.setenv(konno_ohmachi.MEMORY_BUDGET_VARIABLE, "1")
-    monkeypatch.setattr(konno_ohmachi, "_spilled_matrix", lambda *_: None)
+    monkeypatch.setattr(konno_ohmachi.MatrixStore, "_spill", lambda *_: None)
 
     with pytest.warns(RuntimeWarning, match="matrix-free"):
         matrix_free = konno_ohmachi.smooth(spectra)
@@ -197,7 +203,7 @@ def test_spill_declines_when_scratch_is_unusable(
         konno_ohmachi.SCRATCH_DIRECTORY_VARIABLE, str(tmp_path / "file" / "under")
     )
     (tmp_path / "file").write_text("not a directory")
-    assert konno_ohmachi._spilled_matrix(65, 40.0) is None
+    assert konno_ohmachi.MATRICES._spill(65, 40.0) is None
 
 
 def test_spill_declines_when_disk_is_full(
@@ -206,7 +212,7 @@ def test_spill_declines_when_disk_is_full(
     """A matrix larger than the free space is declined before anything is written."""
     full = shutil._ntuple_diskusage(total=0, used=0, free=0)
     monkeypatch.setattr(konno_ohmachi.shutil, "disk_usage", lambda _: full)
-    assert konno_ohmachi._spilled_matrix(65, 40.0) is None
+    assert konno_ohmachi.MATRICES._spill(65, 40.0) is None
     assert list(tmp_path.iterdir()) == []
 
 
@@ -232,12 +238,12 @@ def test_clear_matrix_cache_releases_matrices(
 ) -> None:
     """Clearing genuinely empties the store rather than only resetting a counter."""
     konno_ohmachi.smooth(spectra)
-    assert konno_ohmachi._RESIDENT
+    assert konno_ohmachi.MATRICES._resident
 
     konno_ohmachi.clear_matrix_cache()
-    assert not konno_ohmachi._RESIDENT
-    assert not konno_ohmachi._SPILLED
-    assert konno_ohmachi._resident_bytes() == 0
+    assert not konno_ohmachi.MATRICES._resident
+    assert not konno_ohmachi.MATRICES._spilled
+    assert konno_ohmachi.MATRICES._resident_bytes() == 0
 
 
 def test_matrices_are_evicted_to_stay_inside_the_budget(
@@ -246,11 +252,11 @@ def test_matrices_are_evicted_to_stay_inside_the_budget(
     """Holding two matrices that do not both fit evicts the older one."""
     # One 65-bin matrix is 16.9 kB; allow a little over one.
     monkeypatch.setenv(konno_ohmachi.MEMORY_BUDGET_VARIABLE, str(65 * 65 * 4 + 1))
-    konno_ohmachi._matrix(65, 40.0)
-    konno_ohmachi._matrix(65, 20.0)
+    konno_ohmachi.MATRICES.get(65, 40.0)
+    konno_ohmachi.MATRICES.get(65, 20.0)
 
-    assert list(konno_ohmachi._RESIDENT) == [(65, 20.0)]
-    assert konno_ohmachi._resident_bytes() == 65 * 65 * 4
+    assert list(konno_ohmachi.MATRICES._resident) == [(65, 20.0)]
+    assert konno_ohmachi.MATRICES._resident_bytes() == 65 * 65 * 4
 
 
 def test_blocked_application_matches_unblocked(
@@ -284,18 +290,18 @@ def test_memory_budget_and_scratch_directory_defaults(
     """Both settings read the environment at call time, and have defaults."""
     monkeypatch.delenv(konno_ohmachi.SCRATCH_DIRECTORY_VARIABLE)
     monkeypatch.delenv(konno_ohmachi.MEMORY_BUDGET_VARIABLE, raising=False)
-    assert konno_ohmachi.memory_budget() == konno_ohmachi.DEFAULT_MEMORY_BUDGET
-    assert konno_ohmachi.resolve_scratch_directory().is_dir()
+    assert konno_ohmachi.MATRICES.memory_budget == konno_ohmachi.DEFAULT_MEMORY_BUDGET
+    assert konno_ohmachi.MATRICES.scratch_directory.is_dir()
 
     monkeypatch.setenv(konno_ohmachi.MEMORY_BUDGET_VARIABLE, "12345")
     monkeypatch.setenv(konno_ohmachi.SCRATCH_DIRECTORY_VARIABLE, "/from-env")
-    assert konno_ohmachi.memory_budget() == 12345
-    assert konno_ohmachi.resolve_scratch_directory() == Path("/from-env")
+    assert konno_ohmachi.MATRICES.memory_budget == 12345
+    assert konno_ohmachi.MATRICES.scratch_directory == Path("/from-env")
 
-    # An explicit directory beats the environment.
-    assert konno_ohmachi.resolve_scratch_directory(Path("/explicit")) == Path(
-        "/explicit"
-    )
+    # A store constructed with explicit settings beats the environment.
+    store = konno_ohmachi.MatrixStore(memory_budget=7, scratch_directory=Path("/x"))
+    assert store.memory_budget == 7
+    assert store.scratch_directory == Path("/x")
 
 
 def test_scratch_directory_argument_is_used(
@@ -315,7 +321,7 @@ def test_scratch_directory_argument_is_used(
     assert not (tmp_path / "env").exists()
     # Unlinked while open, so it is left empty.
     assert list(chosen.iterdir()) == []
-    assert isinstance(konno_ohmachi._SPILLED[(65, 40.0)], np.memmap)
+    assert isinstance(konno_ohmachi.MATRICES._spilled[(65, 40.0)], np.memmap)
     assert np.isfinite(smoothed).all()
 
 
@@ -329,5 +335,48 @@ def test_failed_spill_leaves_no_partial_file(
 
     monkeypatch.setattr(konno_ohmachi._core, "_konno_ohmachi_matrix_rows", fail)
 
-    assert konno_ohmachi._spilled_matrix(65, 40.0, tmp_path) is None
+    assert konno_ohmachi.MATRICES._spill(65, 40.0, tmp_path) is None
     assert list(tmp_path.iterdir()) == []
+
+
+def test_bins_for_samples_matches_the_fas_padding() -> None:
+    """The bin count `warm` takes is the one FAS will actually ask for."""
+    for n_samples, expected in ((7144, 4097), (9271, 8193), (21953, 16385)):
+        assert konno_ohmachi.bins_for_samples(n_samples) == expected
+
+
+def test_warm_populates_the_store() -> None:
+    """Warming builds ahead of time, which is what makes fork sharing work."""
+    assert len(konno_ohmachi.MATRICES) == 0
+
+    konno_ohmachi.MATRICES.warm([65, 129])
+    assert len(konno_ohmachi.MATRICES) == 2
+
+    # A warmed size is a hit, not a rebuild.
+    konno_ohmachi.MATRICES.warm(65)
+    assert len(konno_ohmachi.MATRICES) == 2
+
+
+def test_forked_children_inherit_a_warmed_store() -> None:
+    """A child forked after warming reuses the parent's matrix rather than rebuilding.
+
+    This is the whole reason `warm` exists: a pool forked from a cold parent
+    gives every worker its own private copy of every matrix.
+    """
+    konno_ohmachi.MATRICES.warm(65)
+
+    context = multiprocessing.get_context("fork")
+    with context.Pool(2) as pool:
+        inherited = pool.map(_store_contents, range(2))
+
+    assert all(keys == [(65, konno_ohmachi.DEFAULT_BANDWIDTH)] for keys in inherited)
+
+
+def test_store_can_be_isolated_from_the_default() -> None:
+    """A caller can keep its own store rather than sharing the module-level one."""
+    store = konno_ohmachi.MatrixStore()
+    smoothed = konno_ohmachi.smooth(np.ones((1, 65)), store=store)
+
+    assert len(store) == 1
+    assert len(konno_ohmachi.MATRICES) == 0
+    assert smoothed == pytest.approx(np.ones((1, 65)), rel=1e-6)
