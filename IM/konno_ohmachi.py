@@ -233,8 +233,7 @@ class MatrixStore:
         Returns
         -------
         ndarray or None
-            The matrix if the store holds one. Two lookups rather than `a or b`,
-            because an array has no truth value.
+            The matrix if the store holds one.
         """
         matrix = self._resident.get(key)
         return matrix if matrix is not None else self._spilled.get(key)
@@ -245,19 +244,12 @@ class MatrixStore:
         Returns
         -------
         int
-            Bytes across the resident tier. Spilled matrices are not counted:
-            they are pages of a scratch file, not resident memory.
+            Bytes across the resident tier.
         """
         return sum(matrix.nbytes for matrix in self._resident.values())
 
     def _spill(self, n_bins: int, bandwidth: float) -> np.memmap | None:
         """Build the matrix into a scratch file and return it memory-mapped.
-
-        The file is never given a name: `tempfile.TemporaryFile` hands back a
-        handle to an already-unlinked file, so reclaiming the space is the
-        operating system's job. No run can inherit a half-written matrix from a
-        crashed one, and there is nothing to clean up even when the process is
-        killed outright -- which an exit hook would not have survived.
 
         Parameters
         ----------
@@ -300,9 +292,6 @@ MATRICES = MatrixStore()
 def _apply(spectra: np.ndarray, matrix: np.ndarray) -> npt.NDArray[np.float64]:
     """Smooth a stack of spectra with a smoothing matrix.
 
-    Row `c` of `matrix` holds the weights for output bin `c`, so this computes
-    `spectra @ matrix.T`.
-
     Parameters
     ----------
     spectra : ndarray
@@ -317,7 +306,7 @@ def _apply(spectra: np.ndarray, matrix: np.ndarray) -> npt.NDArray[np.float64]:
     """
     spectra = np.ascontiguousarray(spectra, dtype=np.float32)
 
-    # Block apply the matrix multiplication to avoid materialising the smooth
+    # Block apply the matrix multiplication to avoid materialising the double-precision smoothed
     # product in memory.
     smoothed = np.empty(spectra.shape, dtype=np.float32)
     for start, stop in _row_blocks(matrix.shape[0]):
