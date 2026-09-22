@@ -1,12 +1,10 @@
 """IM calculation script for ascii waveforms"""
 
-from pathlib import Path
-
 import numpy as np
 import pandas as pd
 import xarray as xr
 
-from IM import ims
+from IM import ims, konno_ohmachi
 from IM.ims import IM
 
 DEFAULT_PERIODS = np.asarray(
@@ -182,7 +180,7 @@ def calculate_ims(
     ims_list: list[IM] | None = None,
     periods: np.ndarray = DEFAULT_PERIODS,
     frequencies: np.ndarray = DEFAULT_FREQUENCIES,
-    ko_directory: Path | None = None,
+    bandwidth: float = konno_ohmachi.DEFAULT_BANDWIDTH,
 ):
     """
     Calculate intensity measures for a single waveform.
@@ -199,9 +197,9 @@ def calculate_ims(
         List of periods required for calculating the pseudo-spectral acceleration (pSA).
     frequencies : np.ndarray, optional
         List of frequencies required for calculating the Fourier amplitude spectrum (FAS).
-    ko_directory : Path, optional
-        Path to the directory containing the Konno-Ohmachi matrices.
-        Only required if FAS is in the list of IMs.
+    bandwidth : float, optional
+        Bandwidth of the Konno-Ohmachi window used to smooth the Fourier
+        amplitude spectrum. Lower values smooth more strongly.
 
     Returns
     -------
@@ -216,11 +214,6 @@ def calculate_ims(
     """
     if ims_list is None:
         ims_list = list(IM)
-    if ko_directory is None and IM.FAS in ims_list:
-        raise ValueError(
-            "The Konno-Ohmachi directory must be provided if Fourier amplitude spectrum is in the list of IMs."
-        )
-
     results = []
     waveform = np.atleast_3d(waveform)
     waveform = np.ascontiguousarray(np.moveaxis(waveform, -1, 0))
@@ -257,13 +250,11 @@ def calculate_ims(
             dataset = ims.arias_intensity(waveform, dt)
             result = _dataset_to_frame(dataset, [im.value])
         elif im == IM.FAS:
-            assert ko_directory
             dataset = ims.fourier_amplitude_spectra(
                 waveform,
                 dt,
                 frequencies,
-                # ko_directory must be Path because of the check earlier.
-                ko_directory=ko_directory,
+                bandwidth=bandwidth,
             )
             result = _dataset_to_frame(
                 dataset,

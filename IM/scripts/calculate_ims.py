@@ -6,7 +6,7 @@ from typing import Annotated
 import numpy as np
 import typer
 
-from IM import im_calculation, waveform_reading
+from IM import im_calculation, konno_ohmachi, waveform_reading
 from qcore import cli
 
 app = typer.Typer()
@@ -42,7 +42,8 @@ def calculate_ims_ascii(
     ],
     periods: Annotated[list[float] | None, typer.Option()] = None,
     frequencies: Annotated[list[float] | None, typer.Option()] = None,
-    ko_directory: Annotated[Path | None, typer.Option()] = None,
+    bandwidth: Annotated[float, typer.Option()] = konno_ohmachi.DEFAULT_BANDWIDTH,
+    scratch_directory: Annotated[Path | None, typer.Option()] = None,
 ) -> None:
     """
     Calculate intensity measures for a single ASCII waveform fileset (000, 090, vertical).
@@ -63,10 +64,17 @@ def calculate_ims_ascii(
         List of periods required for calculating the pseudo-spectral acceleration (pSA).
     frequencies : list of float, optional
         List of frequencies required for calculating the Fourier amplitude spectrum (FAS).
-    ko_directory : Path, optional
-        Path to the directory containing the Konno-Ohmachi matrices.
-        Only required if FAS is in the list of IMs.
+    bandwidth : float, optional
+        Bandwidth of the Konno-Ohmachi window used to smooth the Fourier
+        amplitude spectrum. Lower values smooth more strongly.
+    scratch_directory : Path, optional
+        Where to build a Konno-Ohmachi matrix too large to hold in memory.
+        Defaults to `$IM_CALCULATION_SCRATCH_DIR`, else the temporary
+        directory.
     """
+    if scratch_directory is not None:
+        konno_ohmachi.set_scratch_directory(scratch_directory)
+
     if periods is None:
         periods = list(im_calculation.DEFAULT_PERIODS)
     if frequencies is None:
@@ -82,7 +90,7 @@ def calculate_ims_ascii(
         ims_list,
         np.array(periods),
         np.array(frequencies),
-        ko_directory,
+        bandwidth,
     )
 
     result.to_csv(output_file)

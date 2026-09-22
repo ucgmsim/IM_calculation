@@ -17,13 +17,11 @@ dependencies = [
   "pint-xarray",
   "xarray[io]>=2025.1",
   "typer>0.12.3",
-  "qcore-utils>=2025.12.1",
 ]
 
 [tool.setuptools_scm]
 
 [project.optional-dependencies]
-ko_matrix = ["obspy"]
 # Only needed by callers that want to pass dask-backed (lazy) waveforms in
 # and get lazy datasets out; xr.apply_ufunc(..., dask="parallelized") never
 # imports dask for plain numpy/eager xarray input.
@@ -34,7 +32,9 @@ test = [
   "pytest-cov",
   "rich>=14.2.0",
   "dask[array]",
+  "qcore-utils>=2025.12.1",
 ]
+cli = ["qcore-utils>=2025.12.1"]
 types = ["pandas-stubs", "scipy-stubs"]
 dev = ["deptry", "ruff", "ty", "numpydoc"]
 
@@ -56,7 +56,6 @@ find = { where = [
 
 [project.scripts]
 calculate-ims-ascii = "IM.scripts.calculate_ims:app"
-gen-ko-matrices = "IM.scripts.gen_ko_matrix:app"
 
 [tool.ruff.lint]
 extend-select = [

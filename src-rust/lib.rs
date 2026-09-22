@@ -1,6 +1,7 @@
 pub mod arias_intensity;
 pub mod cav;
 pub mod constants;
+pub mod konno_ohmachi;
 pub mod psa;
 pub mod rotd;
 pub mod significant_duration;
@@ -17,6 +18,7 @@ mod _core {
 
     use crate::arias_intensity;
     use crate::cav;
+    use crate::konno_ohmachi;
     use crate::psa;
     use crate::rotd;
     use crate::significant_duration;
@@ -41,6 +43,34 @@ mod _core {
         let waveforms = waveforms_py.as_array();
         let waveform_cav = py.detach(|| cav::cav(waveforms, dt));
         waveform_cav.into_pyarray(py)
+    }
+
+    /// Rows `start..stop` of the Konno-Ohmachi smoothing matrix.
+    ///
+    /// Returns a `(stop - start, n_bins)` row-major `float32` array. Row `c` is
+    /// the set of weights that produce output bin `c` and sums to one.
+    #[pyfunction]
+    fn _konno_ohmachi_matrix_rows<'py>(
+        py: Python<'py>,
+        n_bins: usize,
+        bandwidth: f64,
+        start: usize,
+        stop: usize,
+    ) -> Bound<'py, PyArray2<f32>> {
+        let rows = py.detach(|| konno_ohmachi::matrix_rows(n_bins, bandwidth, start, stop));
+        rows.into_pyarray(py)
+    }
+
+    /// Konno-Ohmachi smoothing of `(n_spectra, n_bins)` spectra, matrix-free.
+    #[pyfunction]
+    fn _konno_ohmachi_smooth<'py>(
+        py: Python<'py>,
+        spectra_py: PyReadonlyArray2<f64>,
+        bandwidth: f64,
+    ) -> Bound<'py, PyArray2<f64>> {
+        let spectra = spectra_py.as_array();
+        let smoothed = py.detach(|| konno_ohmachi::smooth(spectra, bandwidth));
+        smoothed.into_pyarray(py)
     }
 
     /// Pseudo-spectral acceleration statistics for every station and period.
