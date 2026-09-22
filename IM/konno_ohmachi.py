@@ -16,7 +16,7 @@ from IM import (
     _core,  # ty: ignore[unresolved-import]
 )
 
-DEFAULT_BANDWIDTH = 40.0
+DEFAULT_BANDWIDTH = 188.5
 """Bandwidth of the Konno-Ohmachi window. Lower values smooth more strongly."""
 
 DEFAULT_MEMORY_BUDGET = 2 * 2**30
