@@ -294,7 +294,7 @@ class MatrixStore:
 
 
 MATRICES = MatrixStore()
-"""The store `smooth` uses when no other is given."""
+"""Default KO matrix store."""
 
 
 def _apply(spectra: np.ndarray, matrix: np.ndarray) -> npt.NDArray[np.float64]:
