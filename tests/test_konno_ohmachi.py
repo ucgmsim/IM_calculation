@@ -270,7 +270,10 @@ def test_clear_matrix_cache_releases_matrices(
 def test_matrices_are_evicted_to_stay_inside_the_budget(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Holding two matrices that do not both fit evicts the older one."""
+    """The budget caps the resident total, not the size of any one matrix.
+
+    Three matrices that each fit individually still evict down to the total.
+    """
     # One 65-bin matrix is 16.9 kB; allow a little over one.
     monkeypatch.setattr(konno_ohmachi.MATRICES, "memory_budget", 65 * 65 * 4 + 1)
     konno_ohmachi.MATRICES.get(65, 40.0)
@@ -458,3 +461,26 @@ def test_race_to_build_is_resolved_under_the_lock(
 
     monkeypatch.setattr(konno_ohmachi, "smoothing_matrix", explode)
     assert store.get(65, 40.0) is winner
+
+
+def test_memory_budget_caps_the_resident_total() -> None:
+    """The budget is a total across matrices, not a per-matrix ceiling.
+
+    Three matrices that each fit the budget on their own are held two at a
+    time, because what the budget bounds is their sum.
+    """
+    one = 65 * 65 * 4
+    store = konno_ohmachi.MatrixStore(memory_budget=one * 2 + 1)
+    for bandwidth in (10.0, 20.0, 30.0):
+        store.get(65, bandwidth)
+
+    assert list(store._resident) == [(65, 20.0), (65, 30.0)]
+    assert store._resident_bytes() == one * 2
+    assert not store._spilled
+
+
+def test_matrix_over_the_whole_budget_spills() -> None:
+    """A matrix that cannot fit even an empty store goes to scratch."""
+    store = konno_ohmachi.MatrixStore(memory_budget=65 * 65 * 4 - 1)
+    assert isinstance(store.get(65, 40.0), np.memmap)
+    assert not store._resident

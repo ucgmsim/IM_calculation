@@ -20,7 +20,7 @@ DEFAULT_BANDWIDTH = 188.5
 """Bandwidth of the Konno-Ohmachi window. Lower values smooth more strongly."""
 
 DEFAULT_MEMORY_BUDGET = 2 * 2**30
-"""Largest matrix held in memory before spilling to scratch (bytes)."""
+"""Total size of the matrices a store holds in memory at once (bytes)."""
 
 KONNO_BLOCK_BYTES = 64 * 2**20
 """Working-set target when building or applying a spilled matrix (bytes)."""
@@ -90,27 +90,21 @@ def smoothing_matrix(
 
 
 class MatrixStore:
-    """Konno-Ohmachi matrices held for the life of a process.
+    """Konno-Ohmachi matrix spilling cache.
 
-    A matrix is fixed by `(n_bins, bandwidth)` alone, so the store is keyed on
-    that and never needs invalidating. Where each one is kept depends on its
-    size, measured against `memory_budget`:
+    This cache stores Konno-Ohmachi matrices on disk and in memory depending on
+    size. When the KO matrices are too large they are written to a temporary
+    directory and then memmap into memory. Small matrices are stored directly in
+    RAM. Matrices too large for disk space are not persisted and the store
+    returns ``None``.
 
-    - within budget: built in memory and kept, evicting the oldest as needed;
-    - over budget: built into an unnamed scratch file and memory-mapped, so it
-      costs address space instead;
-    - too large for even that: not built at all, and `get` returns None so the
-      caller can fall back to the matrix-free kernel.
-
-    The store is per-process. Under `fork` the children inherit whatever the
-    parent had built, sharing it copy-on-write, so warming before forking is
-    worth doing -- see `warm`. Under `spawn` nothing is inherited and every
-    worker builds its own.
+    The cache is
 
     Parameters
     ----------
     memory_budget : int, optional
-        Largest matrix, in bytes, to hold in memory. Defaults to
+        Total bytes of matrices to hold in memory at once, across every size and
+        bandwidth the store has been asked for. Defaults to
         `$IM_CALCULATION_KO_MEMORY_BUDGET`, else `DEFAULT_MEMORY_BUDGET`.
     scratch_directory : Path, optional
         Which filesystem to spill onto. Defaults to
@@ -127,12 +121,10 @@ class MatrixStore:
         Parameters
         ----------
         memory_budget : int, optional
-            Largest matrix, in bytes, to hold in memory.
+            Total bytes of matrices to hold in memory at once.
         scratch_directory : Path, optional
             Which filesystem to spill onto.
         """
-        # `is None` rather than `or`: a budget of zero is a caller asking to
-        # spill everything, not asking for the default.
         self.memory_budget = (
             int(os.environ.get(MEMORY_BUDGET_VARIABLE, DEFAULT_MEMORY_BUDGET))
             if memory_budget is None
@@ -346,16 +338,17 @@ def set_scratch_directory(scratch_directory: Path) -> None:
 
 
 def set_memory_budget(memory_budget: int) -> None:
-    """Set the largest KO matrix the default store holds in memory.
+    """Set how much memory the default store's matrices may occupy in total.
 
-    Anything larger is spilled to the scratch directory instead. Matrices
-    already held are unaffected; call `clear_matrix_cache` to rebuild them
-    against the new budget.
+    Older matrices are evicted to stay inside the budget; one that exceeds the
+    whole budget by itself is spilled to the scratch directory instead. Nothing
+    already held is dropped until the next matrix needs room for itself -- call
+    `clear_matrix_cache` to apply the new budget immediately.
 
     Parameters
     ----------
     memory_budget : int
-        Size in bytes. Zero spills every matrix.
+        Total size in bytes. Zero spills every matrix.
     """
     MATRICES.memory_budget = memory_budget
 
