@@ -7,25 +7,6 @@
 //! where $b$ is the bandwidth, with the removable singularity $W(f_c; f_c) = 1$
 //! and the limit $W(0; f_c) = 0$. The window is constant-width on a logarithmic
 //! frequency axis, so a small bandwidth smooths strongly.
-//!
-//! Only the ratio $f / f_c$ appears. For the real-FFT bin frequencies
-//! $f_k = k / (2 (n - 1) \Delta t)$ that ratio is exactly $j / k$, so the window
-//! depends on the number of bins alone -- not on $\Delta t$, and not on the
-//! frequency values themselves. Everything here is therefore indexed by bin.
-//!
-//! Row $c$ of the matrix holds the window centred on bin $c$, normalised to sum
-//! to one, so it is exactly the weights that produce output bin $c$:
-//! `smoothed[c] = matrix.row(c).dot(&spectrum)`, or `spectra.dot(&matrix.t())`
-//! for a stack of them. The contraction runs over the *evaluation* index, so
-//! the weights behind every output bin sum to one and a flat spectrum is
-//! returned unchanged.
-//!
-//! This is obspy's `konno_ohmachi_smoothing` with `enforce_no_matrix=True`.
-//! Note that obspy's *matrix* path (`apply_smoothing_matrix`) instead computes
-//! `spectra.dot(&matrix)`, contracting over the centre index; its effective
-//! weights are the column sums, which run 0.75 to 1.09 here, so it attenuates a
-//! flat spectrum by up to 25% near the band edges. The two obspy paths disagree
-//! by up to 30%. This module implements the direct one.
 
 use ndarray::azip;
 use ndarray::prelude::*;
@@ -50,9 +31,6 @@ fn smoothing_window(
     bandwidth: f64,
     mut out: ArrayViewMut1<f64>,
 ) {
-    // A centre of zero has no ratio to take. obspy returns the unit impulse
-    // here *before* normalising; it already sums to one, so the result is the
-    // same either way.
     if centre == 0 {
         out.fill(0.0);
         out[0] = 1.0;
@@ -105,11 +83,6 @@ pub fn matrix_rows(n_bins: usize, bandwidth: f64, start: usize, stop: usize) -> 
 /// `spectra` has shape `(n_spectra, n_bins)` and the result has the same shape.
 /// Equals `spectra.dot(&matrix_rows(n_bins, bandwidth, 0, n_bins).t())` up to
 /// the `f32` rounding of the matrix.
-///
-/// Allocates a single window buffer and no matrix, which is the only way to
-/// smooth a spectrum whose matrix would not fit on the machine -- but it
-/// re-evaluates every window on every call, so prefer the matrix whenever one
-/// can be held.
 pub fn smooth(spectra: ArrayView2<f64>, bandwidth: f64) -> Array2<f64> {
     let (n_spectra, n_bins) = spectra.dim();
     let logs = log_bins(n_bins);
