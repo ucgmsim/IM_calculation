@@ -97,12 +97,7 @@ class MatrixStore:
     size. When the KO matrices are too large they are written to a temporary
     directory and then memmap into memory. Small matrices are stored directly in
     RAM. Matrices too large for disk space are not persisted and the store
-    returns ``None``.
-
-    The cache is split between in memory matrices, "resident" matrices, and
-    memmap'd matrices from disk, "spilled" matrices. Matrices are stored in
-    memory up to the memory budget and then spill to disk for anything larger
-    than the budget.
+    returns ``None``. Cache evictions are on LRU basis.
 
     Parameters
     ----------
@@ -140,8 +135,9 @@ class MatrixStore:
             if scratch_directory is None
             else Path(scratch_directory)
         )
-        self._resident: dict[tuple[int, float], np.ndarray] = {}
-        self._spilled: dict[tuple[int, float], np.memmap] = {}
+        # `np.memmap` subclasses `np.ndarray`; the spilled entries are the ones
+        # for which `isinstance(matrix, np.memmap)` holds.
+        self._cache: dict[tuple[int, float], np.ndarray] = {}
         self._handles = contextlib.ExitStack()
         self._lock = threading.Lock()
 
@@ -151,9 +147,9 @@ class MatrixStore:
         Returns
         -------
         int
-            Count of resident plus spilled matrices.
+            Count across both tiers, resident and spilled.
         """
-        return len(self._resident) + len(self._spilled)
+        return len(self._cache)
 
     def get(
         self,
@@ -177,28 +173,42 @@ class MatrixStore:
         """
         key = (n_bins, bandwidth)
 
-        # First lookup without taking a lock
-        if (matrix := self._lookup(key)) is not None:
-            return matrix
-
         with self._lock:
-            # Another thread may have finished the build while we waited.
-            if (matrix := self._lookup(key)) is not None:
+            if (matrix := self._cache.get(key)) is not None:
+                # NOTE: Python dicts maintain insertion order. Doing a pop and
+                # re-insert shifts the key to the front of the insertion order
+                # which makes the dict a cheap LRU cache. Functools implements a
+                # doubly-linked list which is great but extra bookkeeping.
+                self._cache[key] = self._cache.pop(key)
                 return matrix
 
             budget = self.memory_budget
             nbytes = n_bins * n_bins * np.float32().itemsize
+
             if nbytes > budget:
+                # Too big for memory: spill it, or tell
+                # the caller to smooth matrix-free.
                 spilled = self._spill(n_bins, bandwidth)
                 if spilled is not None:
-                    self._spilled[key] = spilled
+                    self._cache[key] = spilled
                 return spilled
 
-            # Drop the oldest resident matrices until this one fits beside them.
-            while self._resident and self._resident_bytes() + nbytes > budget:
-                del self._resident[next(iter(self._resident))]
-            self._resident[key] = smoothing_matrix(n_bins, bandwidth)
-            return self._resident[key]
+            # Evict least-recently-used first until this one fits beside what is
+            # left. A doubly-linked list would make this O(1), but the cache
+            # holds a handful of entries, so scanning the dict is cheaper (in
+            # code) than the speedup from bookkeeping.
+            resident = [
+                (k, m) for k, m in self._cache.items() if not isinstance(m, np.memmap)
+            ]
+            resident_bytes = sum(m.nbytes for _, m in resident)
+            for evict_key, evicted in resident:
+                if resident_bytes + nbytes <= budget:
+                    break
+                del self._cache[evict_key]
+                resident_bytes -= evicted.nbytes
+
+            self._cache[key] = smoothing_matrix(n_bins, bandwidth)
+            return self._cache[key]
 
     def warm(
         self, n_bins: int | Iterable[int], bandwidth: float = DEFAULT_BANDWIDTH
@@ -219,35 +229,8 @@ class MatrixStore:
     def clear(self) -> None:
         """Drop every matrix held and close the scratch files."""
         with self._lock:
-            self._resident.clear()
-            self._spilled.clear()
+            self._cache.clear()
             self._handles.close()
-
-    def _lookup(self, key: tuple[int, float]) -> np.ndarray | None:
-        """Look up a matrix across both tiers.
-
-        Parameters
-        ----------
-        key : tuple of int and float
-            The `(n_bins, bandwidth)` the matrix was built for.
-
-        Returns
-        -------
-        ndarray or None
-            The matrix if the store holds one.
-        """
-        matrix = self._resident.get(key)
-        return matrix if matrix is not None else self._spilled.get(key)
-
-    def _resident_bytes(self) -> int:
-        """Total size of the matrices currently held in memory.
-
-        Returns
-        -------
-        int
-            Bytes across the resident tier.
-        """
-        return sum(matrix.nbytes for matrix in self._resident.values())
 
     def _spill(self, n_bins: int, bandwidth: float) -> np.memmap | None:
         """Build the matrix into a scratch file and return it memory-mapped.
