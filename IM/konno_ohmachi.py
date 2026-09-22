@@ -17,7 +17,8 @@ from IM import (
 )
 
 DEFAULT_BANDWIDTH = 188.5
-"""Bandwidth of the Konno-Ohmachi window. Lower values smooth more strongly."""
+"""Bandwidth of the Konno-Ohmachi window. Lower values smooth more strongly.
+Default matches Section 3.6.3 of NGA-West3 report."""
 
 DEFAULT_MEMORY_BUDGET = 2 * 2**30
 """Total size of the matrices a store holds in memory at once (bytes)."""

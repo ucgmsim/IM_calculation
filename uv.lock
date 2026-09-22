@@ -799,13 +799,15 @@ dependencies = [
     { name = "pandas", extra = ["hdf5"] },
     { name = "pint-xarray" },
     { name = "pyfftw" },
-    { name = "qcore-utils" },
     { name = "scipy" },
     { name = "typer" },
     { name = "xarray", extra = ["io"] },
 ]
 
 [package.optional-dependencies]
+cli = [
+    { name = "qcore-utils" },
+]
 dev = [
     { name = "deptry" },
     { name = "numpydoc" },
@@ -820,6 +822,7 @@ test = [
     { name = "hypothesis", extra = ["numpy"] },
     { name = "pytest" },
     { name = "pytest-cov" },
+    { name = "qcore-utils" },
     { name = "rich" },
 ]
 types = [
@@ -841,7 +844,8 @@ requires-dist = [
     { name = "pyfftw" },
     { name = "pytest", marker = "extra == 'test'" },
     { name = "pytest-cov", marker = "extra == 'test'" },
-    { name = "qcore-utils", specifier = ">=2025.12.1" },
+    { name = "qcore-utils", marker = "extra == 'cli'", specifier = ">=2025.12.1" },
+    { name = "qcore-utils", marker = "extra == 'test'", specifier = ">=2025.12.1" },
     { name = "rich", marker = "extra == 'test'", specifier = ">=14.2.0" },
     { name = "ruff", marker = "extra == 'dev'" },
     { name = "scipy" },
@@ -850,7 +854,7 @@ requires-dist = [
     { name = "typer", specifier = ">0.12.3" },
     { name = "xarray", extras = ["io"], specifier = ">=2025.1" },
 ]
-provides-extras = ["lazy", "test", "types", "dev"]
+provides-extras = ["lazy", "test", "cli", "types", "dev"]
 
 [[package]]
 name = "imagesize"
