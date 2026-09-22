@@ -5,26 +5,19 @@
 //! $$W(f; f_c) = \left[\frac{\sin(b \log_{10}(f / f_c))}{b \log_{10}(f / f_c)}\right]^4$$
 //!
 //! where $b$ is the bandwidth, with the removable singularity $W(f_c; f_c) = 1$
-//! and the limit $W(0; f_c) = 0$. The window is constant-width on a logarithmic
-//! frequency axis, so a small bandwidth smooths strongly.
+//! and the limit $W(0; f_c) = 0$.
 
 use ndarray::azip;
 use ndarray::prelude::*;
 
 /// Base-10 logarithm of every bin index.
-///
-/// Element zero is `-inf` and is never read: bin zero is special-cased both as a
-/// centre and as an evaluation point.
 fn log_bins(n_bins: usize) -> Array1<f64> {
     Array1::from_iter((0..n_bins).map(|bin| (bin as f64).log10()))
 }
 
 /// Writes the normalised window centred on bin `centre` into `out`.
 ///
-/// `out` must have the same length as `logs`. The formula is evaluated over
-/// every bin, including the two where it is undefined, and those are then
-/// overwritten with their limits before the sum is taken -- the same order
-/// obspy uses, and the reason the sum is clean despite both producing NaN.
+/// `out` must have the same length as `logs`.
 fn smoothing_window(
     centre: usize,
     logs: ArrayView1<f64>,
@@ -55,9 +48,7 @@ fn smoothing_window(
 /// Rows `start..stop` of the Konno-Ohmachi smoothing matrix.
 ///
 /// Row `c` is the set of weights that produce output bin `c`, so the result has
-/// shape `(stop - start, n_bins)`, is row-major, and each row sums to one. A
-/// caller can therefore fill the matrix, and later apply it, a block of output
-/// bins at a time without ever holding all of it.
+/// shape `(stop - start, n_bins)`, is row-major, and each row sums to one.
 ///
 /// # Panics
 ///
@@ -79,10 +70,6 @@ pub fn matrix_rows(n_bins: usize, bandwidth: f64, start: usize, stop: usize) -> 
 }
 
 /// Konno-Ohmachi smoothing without materialising the matrix.
-///
-/// `spectra` has shape `(n_spectra, n_bins)` and the result has the same shape.
-/// Equals `spectra.dot(&matrix_rows(n_bins, bandwidth, 0, n_bins).t())` up to
-/// the `f32` rounding of the matrix.
 pub fn smooth(spectra: ArrayView2<f64>, bandwidth: f64) -> Array2<f64> {
     let (n_spectra, n_bins) = spectra.dim();
     let logs = log_bins(n_bins);
@@ -91,8 +78,6 @@ pub fn smooth(spectra: ArrayView2<f64>, bandwidth: f64) -> Array2<f64> {
 
     for centre in 0..n_bins {
         smoothing_window(centre, logs.view(), bandwidth, window.view_mut());
-        // One matrix-vector product per output bin, rather than a hand-rolled
-        // inner product per spectrum.
         smoothed.column_mut(centre).assign(&spectra.dot(&window));
     }
 

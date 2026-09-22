@@ -48,8 +48,7 @@ mod _core {
     /// Rows `start..stop` of the Konno-Ohmachi smoothing matrix.
     ///
     /// Returns a `(stop - start, n_bins)` row-major `float32` array. Row `c` is
-    /// the set of weights that produce output bin `c` and sums to one, so a
-    /// spectrum is smoothed with `spectra @ matrix.T`.
+    /// the set of weights that produce output bin `c` and sums to one.
     #[pyfunction]
     fn _konno_ohmachi_matrix_rows<'py>(
         py: Python<'py>,
@@ -63,10 +62,6 @@ mod _core {
     }
 
     /// Konno-Ohmachi smoothing of `(n_spectra, n_bins)` spectra, matrix-free.
-    ///
-    /// Agrees with `spectra @ _konno_ohmachi_matrix_rows(n_bins, bandwidth, 0,
-    /// n_bins).T` up to the `float32` rounding of the matrix. Use it only when
-    /// the matrix will not fit: it re-evaluates every window on every call.
     #[pyfunction]
     fn _konno_ohmachi_smooth<'py>(
         py: Python<'py>,
