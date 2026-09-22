@@ -98,7 +98,10 @@ class MatrixStore:
     RAM. Matrices too large for disk space are not persisted and the store
     returns ``None``.
 
-    The cache is
+    The cache is split between in memory matrices, "resident" matrices, and
+    memmap'd matrices from disk, "spilled" matrices. Matrices are stored in
+    memory up to the memory budget and then spill to disk for anything larger
+    than the budget.
 
     Parameters
     ----------
@@ -109,6 +112,7 @@ class MatrixStore:
     scratch_directory : Path, optional
         Which filesystem to spill onto. Defaults to
         `$IM_CALCULATION_SCRATCH_DIR`, else the platform temporary directory.
+
     """
 
     def __init__(
