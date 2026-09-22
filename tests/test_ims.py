@@ -273,9 +273,8 @@ def test_snr_benchmark() -> None:
     # Compute the SNR
     snr_result_ims, _, _, _, _ = snr_calculation.calculate_snr(waveform, dt, tp)
 
-    # Compare the results
-    assert_array_almost_equal(
-        data.values.astype(float), snr_result_ims.values.astype(float), decimal=5
+    assert snr_result_ims.values.astype(float) == pytest.approx(
+        data.values.astype(float), rel=1e-5
     )
 
 
