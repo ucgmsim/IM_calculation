@@ -168,7 +168,12 @@ def test_fas_benchmark() -> None:
     )
     waveform = np.ascontiguousarray(np.moveaxis(waveform, -1, 0))
     # Input: (n_stations, nt, n_components) as per fourier_amplitude_spectra logic
-    fas_result_ims = ims.fourier_amplitude_spectra(waveform, dt, data.frequency.values)
+    # `fas_benchmark.nc` was generated with pykooh at bandwidth 40 in Jan 2025 --
+    # the only FAS reference in the repo not produced by this code. Pinned so a
+    # change of `DEFAULT_BANDWIDTH` cannot cost us it.
+    fas_result_ims = ims.fourier_amplitude_spectra(
+        waveform, dt, data.frequency.values, bandwidth=40.0
+    )
 
     # Relative, not `decimal=5`: FAS values here peak at 3.3e-5, so an absolute
     # tolerance of 5e-6 is a ~9% relative one, and it passed throughout a 34%
@@ -202,7 +207,9 @@ def test_fas_eas_benchmark() -> None:
         data_dir / "2024p950420_MWFS_HN_20.ver",
     )
     waveform = np.ascontiguousarray(np.moveaxis(waveform, -1, 0))
-    fas = ims.fourier_amplitude_spectra(waveform, dt, data.frequency.values)
+    fas = ims.fourier_amplitude_spectra(
+        waveform, dt, data.frequency.values, bandwidth=40.0
+    )
 
     assert fas["eas"].values == pytest.approx(
         data.sel(component="eas").values, rel=1e-4
@@ -228,7 +235,9 @@ def test_fas_multiple_stations_benchmark() -> None:
     duplicated_array = np.tile(waveform, (1, 2, 1))
 
     # Compute the Fourier Amplitude Spectra
-    fas_result_ims = ims.fourier_amplitude_spectra(duplicated_array, dt, data.frequency)
+    fas_result_ims = ims.fourier_amplitude_spectra(
+        duplicated_array, dt, data.frequency, bandwidth=40.0
+    )
 
     # Compare the results
     for component in data.component.values:

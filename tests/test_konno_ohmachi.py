@@ -125,12 +125,18 @@ def test_smooth_preserves_shape_and_dtype(
 def test_smooth_matches_reference_product(
     spectra: npt.NDArray[np.float64],
 ) -> None:
-    """Each output bin is a weighted average over the whole spectrum."""
+    """Each output bin is a weighted average over the whole spectrum.
+
+    Pinned at the bandwidth the reference was generated with, so the obspy
+    anchor survives a change of `DEFAULT_BANDWIDTH`.
+    """
     reference = (spectra.reshape(-1, 65) @ np.load(REFERENCE_MATRIX).T).reshape(
         spectra.shape
     )
     # Single precision accumulation over 65 positive weights; ~1e-6 relative.
-    assert konno_ohmachi.smooth(spectra) == pytest.approx(reference, rel=1e-5)
+    assert konno_ohmachi.smooth(spectra, bandwidth=40.0) == pytest.approx(
+        reference, rel=1e-5
+    )
 
 
 def test_smooth_matches_obspy_direct_path() -> None:
@@ -141,7 +147,7 @@ def test_smooth_matches_obspy_direct_path() -> None:
     matrix product alone would not distinguish the two.
     """
     reference = np.load(REFERENCE_DIRECT)
-    assert konno_ohmachi.smooth(reference["spectra"]) == pytest.approx(
+    assert konno_ohmachi.smooth(reference["spectra"], bandwidth=40.0) == pytest.approx(
         reference["smoothed"], rel=1e-5
     )
 
@@ -181,7 +187,10 @@ def test_spilled_tier_leaves_no_file(
     spilled = konno_ohmachi.smooth(spectra)
 
     assert list(tmp_path.iterdir()) == []
-    assert isinstance(konno_ohmachi.MATRICES._spilled[(65, 40.0)], np.memmap)
+    assert isinstance(
+        konno_ohmachi.MATRICES._spilled[(65, konno_ohmachi.DEFAULT_BANDWIDTH)],
+        np.memmap,
+    )
     # Still usable after the unlink, and identical to the in-memory tier.
     konno_ohmachi.clear_matrix_cache()
     monkeypatch.setattr(
@@ -334,7 +343,10 @@ def test_set_memory_budget_redirects_the_default_store(
     # Everything now spills rather than being held in memory.
     konno_ohmachi.smooth(spectra)
     assert not konno_ohmachi.MATRICES._resident
-    assert isinstance(konno_ohmachi.MATRICES._spilled[(65, 40.0)], np.memmap)
+    assert isinstance(
+        konno_ohmachi.MATRICES._spilled[(65, konno_ohmachi.DEFAULT_BANDWIDTH)],
+        np.memmap,
+    )
 
     konno_ohmachi.set_memory_budget(konno_ohmachi.DEFAULT_MEMORY_BUDGET)
     konno_ohmachi.clear_matrix_cache()
@@ -363,7 +375,10 @@ def test_set_scratch_directory_redirects_the_default_store(
     assert chosen.is_dir()
     # The scratch file is unlinked as it is created, so nothing is left behind.
     assert list(chosen.iterdir()) == []
-    assert isinstance(konno_ohmachi.MATRICES._spilled[(65, 40.0)], np.memmap)
+    assert isinstance(
+        konno_ohmachi.MATRICES._spilled[(65, konno_ohmachi.DEFAULT_BANDWIDTH)],
+        np.memmap,
+    )
     assert np.isfinite(smoothed).all()
 
 
