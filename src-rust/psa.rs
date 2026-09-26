@@ -129,6 +129,17 @@ pub fn psa(
         let w = std::f64::consts::TAU / period;
         let w_squared = w * w;
         for s in 0..ns {
+            let mut row = out.slice_mut(s![s, index, ..]);
+            let row_is_finite = comp_0.row(s).iter().all(|v| v.is_finite())
+                && comp_90.row(s).iter().all(|v| v.is_finite())
+                && comp_ver.row(s).iter().all(|v| v.is_finite());
+            if !row_is_finite {
+                // A non-finite input sample poisons the Newmark recursion
+                // from that point on, but the peak fold below would silently
+                // ignore the resulting NaN tail. Short-circuit instead.
+                row.fill(f64::NAN);
+                continue;
+            }
             let response_0 = newmark_beta_method(comp_0.row(s), dt, w, xi, 0.0, 0.0);
             let response_90 = newmark_beta_method(comp_90.row(s), dt, w, xi, 0.0, 0.0);
             let response_ver = newmark_beta_method(comp_ver.row(s), dt, w, xi, 0.0, 0.0);
@@ -136,7 +147,6 @@ pub fn psa(
             sweep.iter_mut().for_each(|peak| *peak *= w_squared);
             let peak_0 = peak(&response_0, w_squared);
             let peak_90 = peak(&response_90, w_squared);
-            let mut row = out.slice_mut(s![s, index, ..]);
             row[0] = peak_0;
             row[1] = peak_90;
             row[2] = peak(&response_ver, w_squared);
@@ -344,6 +354,37 @@ mod tests {
                 result[[0, 0, 4 + column]],
                 stats[[0, column]],
                 epsilon = 1e-12
+            );
+        }
+    }
+
+    #[test]
+    fn test_psa_is_nan_when_a_sample_is_non_finite() {
+        // A NaN sample poisons the Newmark recursion from that point on, but
+        // the peak fold used to ignore the resulting NaN tail and return the
+        // (finite, wrong) peak of the record up to that point instead.
+        let t = Array1::<f64>::linspace(0.0, 2.0, 512);
+        let dt = t[1] - t[0];
+        let mut comp_0 = t.map(|&x| (3.0 * x).sin());
+        comp_0[100] = f64::NAN;
+        let comp_0 = comp_0.insert_axis(Axis(0));
+        let comp_90 = t.map(|&x| 0.7 * (5.0 * x).cos()).insert_axis(Axis(0));
+        let comp_ver = t.map(|&x| 0.2 * (7.0 * x).sin()).insert_axis(Axis(0));
+
+        let result = psa(
+            &comp_0.view(),
+            &comp_90.view(),
+            &comp_ver.view(),
+            &array![1.0].view(),
+            dt,
+            XI,
+        );
+
+        for column in 0..N_PSA_COMPONENTS {
+            assert!(
+                result[[0, 0, column]].is_nan(),
+                "column {column} should be NaN, found {}",
+                result[[0, 0, column]]
             );
         }
     }

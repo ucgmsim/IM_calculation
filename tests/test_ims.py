@@ -535,6 +535,62 @@ def test_ds5xx() -> None:
     assert ds595["000"].item() == pytest.approx(0.9)
 
 
+def test_nan_sample_propagates_to_every_dependent_im_component(
+    sample_waveforms: npt.NDArray[np.float64],
+) -> None:
+    """A NaN sample in the 000 component must give NaN for every IM
+    component that depends on it, rather than a finite but wrong value
+    (issue #228). `sample_waveforms` has two identical stations, so station 1
+    is an unaffected control."""
+    waveforms = sample_waveforms.copy()
+    waveforms[ims.Component.COMP_0, 0, 15] = np.nan
+    dt = 0.01
+
+    pga = ims.peak_ground_acceleration(waveforms)
+    for component in [
+        "000",
+        "geom",
+        "rotd0",
+        "rotd50",
+        "rotd100",
+        "rotd0_orientation",
+        "rotd100_orientation",
+    ]:
+        assert np.isnan(pga[component].values[0]), (
+            f"PGA {component} should be NaN when 000 has a NaN sample"
+        )
+        assert np.isfinite(pga[component].values[1]), (
+            f"PGA {component} should stay finite for the unaffected station"
+        )
+    for component in ["090", "ver"]:
+        assert np.isfinite(pga[component].values[0]), (
+            f"PGA {component} does not depend on 000 and should stay finite"
+        )
+
+    psa = ims.pseudo_spectral_acceleration(waveforms, [1.0], dt)
+    for component in ims.ROTD_COMPONENTS:
+        assert np.isnan(psa[component].values[0]).all(), (
+            f"pSA {component} should be NaN when 000 has a NaN sample"
+        )
+        assert np.isfinite(psa[component].values[1]).all(), (
+            f"pSA {component} should stay finite for the unaffected station"
+        )
+
+    ds595 = ims.ds595(waveforms, dt)
+    for component in ["000", "geom"]:
+        assert np.isnan(ds595[component].values[0]), (
+            f"Ds595 {component} should be NaN when 000 has a NaN sample"
+        )
+    for component in ["090", "ver"]:
+        assert np.isfinite(ds595[component].values[0]), (
+            f"Ds595 {component} does not depend on 000 and should stay finite"
+        )
+    for component in ims.GEOM_COMPONENTS:
+        assert np.isfinite(ds595[component].values[1]), (
+            f"Ds595 {component} should stay finite for the unaffected station"
+        )
+
+
 # Contract guarantee on output shapes
 @pytest.mark.parametrize(
     "func",

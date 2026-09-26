@@ -60,6 +60,12 @@ impl Hull {
     /// Peak rotated amplitude at every integer angle 0..=179 degrees for one
     /// pair of components.
     pub fn peaks(&mut self, x: ArrayView1<f64>, y: ArrayView1<f64>) -> [f64; N_ANGLES] {
+        if x.iter().any(|v| !v.is_finite()) || y.iter().any(|v| !v.is_finite()) {
+            // A non-finite sample makes every peak in the sweep meaningless:
+            // f64::max below would otherwise silently ignore NaN and the hull
+            // comparisons treat it as neither less nor greater than anything.
+            return [f64::NAN; N_ANGLES];
+        }
         let n = x.len();
         // Axis extremes, in order around the trajectory: min x, max y, max x,
         // min y.
@@ -153,6 +159,12 @@ impl Hull {
 /// Reduce the 180 per-angle peaks to the (min, median, max) rotated
 /// amplitude. Orientation is recorded for the min and the max.
 pub(crate) fn rotd_stats(peaks: [f64; N_ANGLES]) -> [f64; N_ROTD_STATS] {
+    if peaks.iter().any(|peak| peak.is_nan()) {
+        // A NaN sweep (from a non-finite input sample) has no orientation to
+        // report either: every strict comparison below would fail silently
+        // and leave RotD00/RotD100 pinned to angle 0.
+        return [f64::NAN; N_ROTD_STATS];
+    }
     // Strict comparisons, so a tie leaves the lowest angle in place.
     let (mut min_angle, mut max_angle) = (0usize, 0usize);
     for theta in 1..N_ANGLES {
@@ -570,6 +582,27 @@ mod tests {
                 "doubly extreme angle {theta}"
             );
         }
+    }
+
+    #[test]
+    fn peaks_are_nan_when_a_sample_is_non_finite() {
+        // A single NaN sample must make every peak NaN, not just quietly
+        // vanish from the f64::max fold or the hull comparisons.
+        let mut comp_0 = Array1::linspace(0.0, 1.0, 16);
+        comp_0[5] = f64::NAN;
+        let comp_90 = Array1::linspace(1.0, 0.0, 16);
+
+        let got = peaks(comp_0.view(), comp_90.view());
+        assert!(
+            got.iter().all(|peak| peak.is_nan()),
+            "expected every peak to be NaN, found {got:?}"
+        );
+
+        let stats = rotd_stats(got);
+        assert!(
+            stats.iter().all(|stat| stat.is_nan()),
+            "expected every RotD statistic (including orientations) to be NaN, found {stats:?}"
+        );
     }
 
     #[test]
