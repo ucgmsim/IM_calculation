@@ -1,14 +1,14 @@
 name: CI
 
-on: [pull_request]
+on:
+  pull_request:
+  push:
+    branches: [master]
 
 jobs:
   ci:
-    # @main rather than @v1: the v1 tag predates the Cargo.toml-gated Rust
-    # jobs, and this repo ships the IM._core crate under src-rust/.
-    uses: ucgmsim/meta-ci-action/.github/workflows/ci.yml@main
+    uses: ucgmsim/meta-ci-action/.github/workflows/ci.yml@v2
     with:
-      package-dir: IM
       # `dev`, `test` and `types` are optional-dependency extras rather than a
       # [dependency-groups] table, so --all-extras is what pulls them in;
       # --dev would be a no-op here.

@@ -113,6 +113,9 @@ binding = "PyO3"
 debug = false
 
 
+[tool.npdlint]
+include = ["IM"]
+
 [tool.numpydoc_validation]
 checks = [
   "GL05",

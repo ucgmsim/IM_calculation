@@ -1,73 +1,20 @@
 # lefthook.yml
-#
-# A local mirror of .github/workflows/ci.yml, so the shared meta-ci-action
-# workflow is not the thing that tells you about a formatting slip.
-#
+
+# Git hooks that run the same checks as CI, from ucgmsim/meta-ci-action's
+# lefthook/ci.yml (pinned to v2, like the CI workflow). Set up once per clone:
+
+#   uv sync --all-extras --dev
 #   uvx lefthook install
-#
-# Adapted from ucgmsim/nzcvm, with the autofix commands split onto pre-commit
-# and the gates onto pre-push. The nzcvm config runs everything on pre-push
-# against {staged_files}, but nothing is staged at push time: those commands
-# report "no files for inspection" and skip, and the two that do not reference
-# the template (clippy, rustfmt) run over the whole crate on every push.
-# {push_files} is the pre-push equivalent — what this branch adds over the
-# upstream ref.
 
-# Autofix, on what is about to be committed. Kept to the commands that finish
-# in well under a second; the slower checks are on pre-push below.
-pre-commit:
-  parallel: true
-  commands:
-    ruff:
-      # Use uvx here because it is independent of the environment.
-      # can also use uv run it is just more portable.
-      run: uvx ruff check --fix {staged_files}
-      glob: "*.py"
-      # Automatically stage the changes that ruff suggests (e.g.
-      # deleting/rearranging unused imports)
-      stage_fixed: true
-
-    ruff-format:
-      run: uvx ruff format {staged_files}
-      glob: "*.py"
-      stage_fixed: true
-
-    rustfmt:
-      glob: "*.rs"
-      run: cargo fmt --all
-      # Once again, rustfmt will fix the problem outright, so we automatically
-      # stage the changes.
-      stage_fixed: true
-
-# The CI gate, on everything the push is about to add. One command per job in
-# the shared workflow.
+# Turn shared checks off with `exclude_tags`; add repo-specific hooks under new names.
+remotes:
+  - git_url: https://github.com/ucgmsim/meta-ci-action
+    ref: v2
+    configs:
+      - lefthook/ci.yml
 pre-push:
   parallel: true
   commands:
-    ruff:
-      run: uvx ruff check {push_files}
-      glob: "*.py"
-
-    ruff-format:
-      run: uvx ruff format --check {push_files}
-      glob: "*.py"
-
-    ty:
-      # Use uv run when you want a command to run in your environment.
-      # Here we want ty to have access to the stubs packages installed
-      # for type checking.
-      run: uv run ty check {push_files}
-      glob: "*.py"
-
-    numpydoc:
-      # The one CI check with no autofix: docstring sections have to be
-      # written by hand, so catching it before the push is worth the second.
-      run: uv run numpydoc lint {push_files}
-      glob: "IM/**.py"
-      exclude:
-        - "IM/**/__init__.py"
-        - "IM/__init__.py"
-
     yaml:
       # Upstream writes this glob as "*.{yaml, yml}". The space is inside the
       # alternation, so the second branch only matches a file named "* yml"
@@ -75,14 +22,3 @@ pre-push:
       run: uvx yamllint {push_files}
       glob: "*.{yaml,yml}"
 
-    clippy:
-      # Unless you have a rust package in the repo this is skipped. Whole-crate
-      # rather than per-file, which is what clippy takes.
-      glob: "*.rs"
-      env:
-        RUSTFLAGS: "-Dwarnings"
-      run: cargo clippy --all-targets -- -D warnings
-
-    rustfmt:
-      glob: "*.rs"
-      run: cargo fmt --all --check
