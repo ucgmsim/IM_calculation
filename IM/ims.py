@@ -619,7 +619,8 @@ def pseudo_spectral_acceleration(
     waveforms : Waveform
         Acceleration waveforms (g) with shape (n_components, n_stations, nt).
     periods : array_like
-        Natural periods of the oscillators (s).
+        Natural periods of the oscillators (s). Must be strictly positive
+        and finite.
     dt : float
         Timestep resolution of the waveforms (s).
 
@@ -631,8 +632,15 @@ def pseudo_spectral_acceleration(
         ['000', '090', 'ver', 'geom', 'rotd0', 'rotd50', 'rotd100'], then
         `rotd0_orientation` and `rotd100_orientation` holding the angle
         (degrees) at which RotD0 and RotD100 occur.
+
+    Raises
+    ------
+    ValueError
+        If any period is not strictly positive and finite.
     """
     periods = np.asarray(periods, dtype=np.float64)
+    if not np.all(np.isfinite(periods) & (periods > 0)):
+        raise ValueError("periods must be strictly positive and finite.")
     return _im_dataset(
         _psa_kernel,
         waveforms,

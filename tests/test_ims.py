@@ -627,6 +627,18 @@ def test_invalid_waveform_shapes(invalid_shape: tuple[int, ...]) -> None:
         ims.peak_ground_acceleration(waveforms)
 
 
+@pytest.mark.parametrize("period", [0.0, -1.0, np.inf, np.nan])
+def test_pseudo_spectral_acceleration_rejects_non_positive_periods(
+    sample_waveforms: npt.NDArray[np.float64],
+    period: float,
+) -> None:
+    """Periods must be strictly positive and finite (see issue #229): a
+    period of zero corresponds to an infinite angular frequency, which
+    silently produced NaN output rather than raising an error."""
+    with pytest.raises(ValueError):
+        ims.pseudo_spectral_acceleration(sample_waveforms, [period], 0.01)
+
+
 @pytest.mark.slow
 def test_fourier_amplitude_spectra_shape() -> None:
     n_stations, n_timesteps, n_components = 2, 1024, 3
