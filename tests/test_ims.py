@@ -150,6 +150,12 @@ def test_cav_name_depends_on_threshold(
         ]
         == "CAV5"
     )
+    assert (
+        ims.cumulative_absolute_velocity(sample_waveforms, 0.01, threshold=10).attrs[
+            "name"
+        ]
+        == "CAV10"
+    )
 
 
 @pytest.mark.slow

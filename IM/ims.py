@@ -406,10 +406,15 @@ def cumulative_absolute_velocity(
     -------
     xr.Dataset
         One data variable per component (`attrs["name"]` is `CAV5` if
-        `threshold` is set, else `CAV`) containing CAV values (m/s) for
-        ['000', '090', 'ver', 'geom'].
+        `threshold` is 5, `CAV` if unset, else `CAV{threshold}`) containing
+        CAV values (m/s) for ['000', '090', 'ver', 'geom'].
     """
-    name = IM.CAV5.value if threshold else IM.CAV.value
+    if not threshold:
+        name = IM.CAV.value
+    elif threshold == 5:
+        name = IM.CAV5.value
+    else:
+        name = f"CAV{threshold:g}"
     return _im_dataset(
         _cav_kernel,
         waveform,
