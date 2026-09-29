@@ -12,7 +12,6 @@ dynamic = ["version"]
 dependencies = [
   "numpy>=2",
   "pandas[hdf5]",
-  "pyfftw",
   "scipy",
   "pint-xarray",
   "xarray[io]>=2025.1",
