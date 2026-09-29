@@ -188,7 +188,8 @@ def calculate_ims(
     Parameters
     ----------
     waveform : np.ndarray
-        Waveform data as a NumPy array.
+        Waveform data for a single station, with shape `(1, nt, 3)` or
+        `(nt, 3)`, where the components are ordered 000, 090, ver.
     dt : float
         Sampling interval (dt) of the waveform.
     ims_list : list of IM, optional
@@ -210,12 +211,21 @@ def calculate_ims(
     Raises
     ------
     ValueError
-        If the IM is not recognized or if required environment variables are not set to 1.
+        If the IM is not recognized, if required environment variables are
+        not set to 1, or if `waveform` is not a single station's waveform
+        with shape `(1, nt, 3)` or `(nt, 3)`.
     """
     if ims_list is None:
         ims_list = list(IM)
     results = []
-    waveform = np.atleast_3d(waveform)
+    waveform = np.asarray(waveform)
+    if waveform.ndim == 2:
+        waveform = waveform[np.newaxis, :, :]
+    if waveform.ndim != 3 or waveform.shape[0] != 1 or waveform.shape[2] != 3:
+        raise ValueError(
+            "waveform must be a single station's waveform with shape "
+            f"(1, nt, 3) or (nt, 3), but waveform.shape={waveform.shape}"
+        )
     waveform = np.ascontiguousarray(np.moveaxis(waveform, -1, 0))
     # Iterate through IMs and calculate them
     for im in ims_list:
