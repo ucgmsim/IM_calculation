@@ -9,7 +9,6 @@ import numpy as np
 import numpy.typing as npt
 import scipy as sp
 import xarray as xr
-from pyfftw.interfaces import numpy_fft as fft
 
 from IM import (
     _core,  # ty: ignore[unresolved-import]
@@ -713,7 +712,7 @@ def _fas_kernel(
 
     spectra = np.empty((n_components, rows, n_fa), dtype=np.float64)
     for index in range(n_components):
-        spectra[index] = np.abs(fft.rfft(components[index], n=n_fft, axis=-1) * dt)
+        spectra[index] = np.abs(np.fft.rfft(components[index], n=n_fft, axis=-1) * dt)
 
     # EAS is computed from the *unsmoothed* spectrum to avoid distortion of
     # inter-frequency correlations, then smoothed alongside 000/090/ver in a
