@@ -9,7 +9,6 @@ import numpy as np
 import numpy.typing as npt
 import scipy as sp
 import xarray as xr
-from pyfftw.interfaces import numpy_fft as fft
 
 from IM import (
     _core,  # ty: ignore[unresolved-import]
@@ -406,10 +405,15 @@ def cumulative_absolute_velocity(
     -------
     xr.Dataset
         One data variable per component (`attrs["name"]` is `CAV5` if
-        `threshold` is set, else `CAV`) containing CAV values (m/s) for
-        ['000', '090', 'ver', 'geom'].
+        `threshold` is 5, `CAV` if unset, else `CAV{threshold}`) containing
+        CAV values (m/s) for ['000', '090', 'ver', 'geom'].
     """
-    name = IM.CAV5.value if threshold else IM.CAV.value
+    if not threshold:
+        name = IM.CAV.value
+    elif threshold == 5:
+        name = IM.CAV5.value
+    else:
+        name = f"CAV{threshold:g}"
     return _im_dataset(
         _cav_kernel,
         waveform,
@@ -708,7 +712,7 @@ def _fas_kernel(
 
     spectra = np.empty((n_components, rows, n_fa), dtype=np.float64)
     for index in range(n_components):
-        spectra[index] = np.abs(fft.rfft(components[index], n=n_fft, axis=-1) * dt)
+        spectra[index] = np.abs(np.fft.rfft(components[index], n=n_fft, axis=-1) * dt)
 
     # EAS is computed from the *unsmoothed* spectrum to avoid distortion of
     # inter-frequency correlations, then smoothed alongside 000/090/ver in a
