@@ -9,14 +9,7 @@ description = "Intensity Measure Calculation for Ground Motion Waveforms"
 readme = "README.md"
 requires-python = ">=3.12"
 dynamic = ["version"]
-dependencies = [
-  "numpy>=2",
-  "pandas[hdf5]",
-  "scipy",
-  "pint-xarray",
-  "xarray[io]>=2025.1",
-  "typer>0.12.3",
-]
+dependencies = ["numpy>=2", "pandas", "scipy", "xarray>=2025.1"]
 
 [tool.setuptools_scm]
 
@@ -33,7 +26,7 @@ test = [
   "dask[array]",
   "qcore-utils>=2025.12.1",
 ]
-cli = ["qcore-utils>=2025.12.1"]
+cli = ["qcore-utils>=2025.12.1", "typer>0.12.3"]
 types = ["pandas-stubs", "scipy-stubs"]
 dev = ["deptry", "ruff", "ty", "numpydoc"]
 
