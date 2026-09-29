@@ -374,7 +374,7 @@ def test_forked_children_inherit_a_warmed_store() -> None:
 
 
 def test_caller_can_keep_its_own_store(spectra: npt.NDArray[np.float64]) -> None:
-    """A caller can keep its own store rather than sharing the module-level one."""
+    """A caller can pass a private `MatrixStore` instead of the module-level one."""
     store = konno_ohmachi.MatrixStore()
 
     konno_ohmachi.smooth(spectra, store=store)

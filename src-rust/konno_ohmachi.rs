@@ -135,7 +135,7 @@ mod tests {
         }
     }
 
-    /// Each row is the weight set behind one output bin, so each sums to one.
+    /// Each row is the weight set behind one output bin. Every row sums to one.
     #[test]
     fn test_rows_sum_to_one() {
         for &n_bins in &[65usize, 129, 257] {
