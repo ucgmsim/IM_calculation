@@ -4,17 +4,15 @@ import functools
 import warnings
 from collections.abc import Callable, Mapping, Sequence
 from enum import IntEnum, StrEnum
-from pathlib import Path
 
 import numpy as np
 import numpy.typing as npt
 import scipy as sp
 import xarray as xr
-from pyfftw.interfaces import numpy_fft as fft
 
 from IM import (
     _core,  # ty: ignore[unresolved-import]
-    ko_matrices,
+    konno_ohmachi,
 )
 
 ChunkedWaveformArray = np.ndarray[tuple[int, int, int], np.dtype[np.float64]]
@@ -38,7 +36,6 @@ FAS_COMPONENTS = ("000", "090", "ver", "geom", "eas")
 
 DAMPING = 0.05
 G = 981
-KONNO_BLOCK_BYTES = 64 * 2**20
 
 
 class Component(IntEnum):
@@ -408,11 +405,16 @@ def cumulative_absolute_velocity(
     Returns
     -------
     xr.Dataset
-        One data variable per component (`attrs["name"]` becomes `CAV5` with
-        a `threshold`, else `CAV`) containing CAV values (m/s) for
-        ['000', '090', 'ver', 'geom'].
+        One data variable per component (`attrs["name"]` is `CAV5` if
+        `threshold` is 5, `CAV` if unset, else `CAV{threshold}`) containing
+        CAV values (m/s) for ['000', '090', 'ver', 'geom'].
     """
-    name = IM.CAV5.value if threshold else IM.CAV.value
+    if not threshold:
+        name = IM.CAV.value
+    elif threshold == 5:
+        name = IM.CAV5.value
+    else:
+        name = f"CAV{threshold:g}"
     return _im_dataset(
         _cav_kernel,
         waveform,
@@ -622,7 +624,8 @@ def pseudo_spectral_acceleration(
     waveforms : Waveform
         Acceleration waveforms (g) with shape (n_components, n_stations, nt).
     periods : array_like
-        Natural periods of the oscillators (s).
+        Natural periods of the oscillators (s). Must be strictly positive
+        and finite.
     dt : float
         Timestep resolution of the waveforms (s).
 
@@ -634,8 +637,15 @@ def pseudo_spectral_acceleration(
         ['000', '090', 'ver', 'geom', 'rotd0', 'rotd50', 'rotd100'], then
         `rotd0_orientation` and `rotd100_orientation` holding the angle
         (degrees) at which RotD0 and RotD100 occur.
+
+    Raises
+    ------
+    ValueError
+        If any period is not strictly positive and finite.
     """
     periods = np.asarray(periods, dtype=np.float64)
+    if not np.all(np.isfinite(periods) & (periods > 0)):
+        raise ValueError("periods must be strictly positive and finite.")
     return _im_dataset(
         _psa_kernel,
         waveforms,
@@ -646,61 +656,27 @@ def pseudo_spectral_acceleration(
     )
 
 
-def _konno_smooth(spectrum_data: np.ndarray, konno: np.ndarray) -> np.ndarray:
-    """Multiply a spectrum by a Konno-Ohmachi matrix.
-
-    Parameters
-    ----------
-    spectrum_data : ndarray
-        Spectrum values, shape `(..., n_fa)`.
-    konno : ndarray
-        Konno-Ohmachi smoothing matrix, shape `(n_fa, n_fa)`.
-
-    Returns
-    -------
-    ndarray
-        Smoothed spectrum, shape `(..., n_fa)`.
-    """
-    n_output = konno.shape[1]
-    columns = max(1, KONNO_BLOCK_BYTES // (konno.shape[0] * np.float64().itemsize))
-    # KO matrices can be really large, so this applies a block-wise
-    # multiplication. Dask would do the same thing, at the cost of a new
-    # dependency to the codebase.
-    smoothed = np.empty(spectrum_data.shape[:-1] + (n_output,), dtype=np.float64)
-    for start in range(0, n_output, columns):
-        block = slice(start, start + columns)
-        smoothed[..., block] = spectrum_data @ np.asarray(
-            konno[:, block], dtype=np.float64
-        )
-    return smoothed
-
-
-def smooth_and_interpolate(
-    spectrum_data: np.ndarray,
-    konno: np.ndarray,
+def _interpolate(
+    smoothed: np.ndarray,
+    fa_frequencies: npt.NDArray[np.float64],
     freqs: npt.NDArray[np.float64],
-    fa_frequencies: np.ndarray,
 ) -> np.ndarray:
-    """
-    Smooths and interpolates a spectrum.
+    """Interpolate a smoothed spectrum onto the requested frequencies.
 
     Parameters
     ----------
-    spectrum_data : ndarray
-        The spectrum data to smooth and interpolate.
-    konno : ndarray
-        The Konno-Ohmachi smoothing matrix to apply to the spectrum data.
+    smoothed : ndarray
+        Smoothed spectrum values, shape `(..., len(fa_frequencies))`.
+    fa_frequencies : ndarray of float64
+        The `rfft` bin frequencies the spectrum is defined on (Hz).
     freqs : ndarray of float64
-        The frequencies at which to interpolate the smoothed spectrum data.
-    fa_frequencies : ndarray
-        The original frequencies corresponding to the spectrum data before smoothing.
+        Frequencies to interpolate onto (Hz).
 
     Returns
     -------
     ndarray
-        The smoothed and interpolated spectrum data at the specified frequencies.
+        The spectrum at `freqs`, shape `(..., len(freqs))`.
     """
-    smoothed = _konno_smooth(spectrum_data, konno)
     interpolator = sp.interpolate.make_interp_spline(
         fa_frequencies, smoothed, axis=-1, k=1
     )
@@ -714,7 +690,7 @@ def _fas_kernel(
     n_fft: int,
     freqs: npt.NDArray[np.float64],
     fa_frequencies: npt.NDArray[np.float64],
-    ko_directory: Path,
+    bandwidth: float,
 ) -> np.ndarray:
     """Kernel for `fourier_amplitude_spectra`.
 
@@ -729,9 +705,9 @@ def _fas_kernel(
     freqs : ndarray of float
         Output frequencies (Hz) for the interpolated spectrum.
     fa_frequencies : ndarray of float
-        The `rfft` bin frequencies (Hz) that size the Konno-Ohmachi matrix.
-    ko_directory : Path
-        Directory holding the cached Konno-Ohmachi matrices.
+        The `rfft` bin frequencies (Hz) the smoothed spectrum is defined on.
+    bandwidth : float
+        Bandwidth of the Konno-Ohmachi smoothing window.
 
     Returns
     -------
@@ -745,7 +721,7 @@ def _fas_kernel(
 
     spectra = np.empty((n_components, rows, n_fa), dtype=np.float64)
     for index in range(n_components):
-        spectra[index] = np.abs(fft.rfft(components[index], n=n_fft, axis=-1) * dt)
+        spectra[index] = np.abs(np.fft.rfft(components[index], n=n_fft, axis=-1) * dt)
 
     # EAS comes from the *unsmoothed* spectrum, to avoid distorting the
     # inter-frequency correlations, and then smooths alongside 000/090/ver in
@@ -756,8 +732,11 @@ def _fas_kernel(
     )
     spectra_and_eas = np.concatenate([spectra, eas_unsmoothed[np.newaxis]], axis=0)
 
-    konno = ko_matrices.get_konno_matrix(n_fa, ko_directory)
-    smoothed = smooth_and_interpolate(spectra_and_eas, konno, freqs, fa_frequencies)
+    smoothed = _interpolate(
+        konno_ohmachi.smooth(spectra_and_eas, bandwidth),
+        fa_frequencies,
+        freqs,
+    )
 
     geom = np.sqrt(smoothed[Component.COMP_0] * smoothed[Component.COMP_90])
     out = np.stack([smoothed[0], smoothed[1], smoothed[2], geom, smoothed[3]], axis=-1)
@@ -768,7 +747,7 @@ def fourier_amplitude_spectra(
     waveforms: Waveform,
     dt: float,
     freqs: npt.NDArray[np.float64],
-    ko_directory: Path,
+    bandwidth: float = konno_ohmachi.DEFAULT_BANDWIDTH,
 ) -> xr.Dataset:
     """Compute Fourier Amplitude Spectrum (FAS) of seismic waveforms.
 
@@ -780,8 +759,9 @@ def fourier_amplitude_spectra(
         Timestep resolution of the waveforms (s).
     freqs : ndarray of float64
         Frequencies at which to compute FAS (Hz).
-    ko_directory : Path
-        Directory containing precomputed Konno-Ohmachi matrices.
+    bandwidth : float, optional
+        Bandwidth of the Konno-Ohmachi smoothing window. Lower values smooth
+        more strongly.
 
     Returns
     -------
@@ -815,6 +795,6 @@ def fourier_amplitude_spectra(
             "n_fft": n_fft,
             "freqs": freqs,
             "fa_frequencies": fa_frequencies,
-            "ko_directory": ko_directory,
+            "bandwidth": bandwidth,
         },
     )

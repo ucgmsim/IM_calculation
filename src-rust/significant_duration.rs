@@ -2,6 +2,11 @@ use ndarray::prelude::*;
 
 fn threshold_search(normalised_intensities: ArrayView1<f64>, dt: f64, low: f64, high: f64) -> f64 {
     if let Some(&max) = normalised_intensities.last()
+        && max.is_nan()
+    {
+        return f64::NAN;
+    }
+    if let Some(&max) = normalised_intensities.last()
         && max >= 1e-10
     {
         let intensities = normalised_intensities.as_slice().unwrap();
@@ -67,5 +72,21 @@ mod tests {
         let result = significant_duration(arias.view(), 0.01, 0.05, 0.95);
 
         assert_eq!(result.len(), 5);
+    }
+
+    #[test]
+    fn test_nan_arias_intensity_gives_nan_duration() {
+        // A NaN sample poisons the cumulative Arias intensity from that point
+        // on, so the final (normalising) value is NaN. That must not be
+        // mistaken for "below threshold" and reported as a duration of 0.0.
+        let arias = array![[0.0, 1.0, 2.0, f64::NAN, f64::NAN]];
+        let dt = 1.0;
+        let result = significant_duration(arias.view(), dt, 0.2, 0.8);
+
+        assert!(
+            result[0].is_nan(),
+            "expected NaN duration, found {}",
+            result[0]
+        );
     }
 }
