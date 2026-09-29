@@ -9,7 +9,7 @@ description = "Intensity Measure Calculation for Ground Motion Waveforms"
 readme = "README.md"
 requires-python = ">=3.12"
 dynamic = ["version"]
-dependencies = ["numpy>=2", "pandas[hdf5]", "pyfftw", "scipy", "xarray>=2025.1"]
+dependencies = ["numpy>=2", "pandas", "pyfftw", "scipy", "xarray>=2025.1"]
 
 [tool.setuptools_scm]
 
