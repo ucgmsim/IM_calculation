@@ -589,7 +589,7 @@ mod tests {
 
     #[test]
     fn peaks_are_nan_when_a_sample_is_non_finite() {
-        // A single NaN sample must make every peak NaN, not just quietly
+        // One NaN sample must make every peak NaN, not just quietly
         // vanish from the f64::max fold or the hull comparisons.
         let mut comp_0 = Array1::linspace(0.0, 1.0, 16);
         comp_0[5] = f64::NAN;

@@ -174,8 +174,8 @@ def test_fas_benchmark() -> None:
     )
     waveform = np.ascontiguousarray(np.moveaxis(waveform, -1, 0))
     # Input: (n_stations, nt, n_components) as per fourier_amplitude_spectra logic
-    # `fas_benchmark.nc` was generated with pykooh at bandwidth 40 in Jan 2025 --
-    # the only FAS reference in the repo not produced by this code. Pinned so a
+    # `fas_benchmark.nc` was generated with pykooh at bandwidth 40 in Jan 2025,
+    # and is the only FAS reference in the repo not produced by this code. Pinned so a
     # change of `DEFAULT_BANDWIDTH` cannot cost us it.
     fas_result_ims = ims.fourier_amplitude_spectra(
         waveform, dt, data.frequency.values, bandwidth=40.0
@@ -458,7 +458,7 @@ def test_all_ims_benchmark_edge_cases(resource_dir: Path) -> None:
         ims.IM.pSA,
     ]
 
-    # Only some of the per-case benchmarks carry FAS columns; ask for FAS when
+    # Only some of the per-case benchmarks have FAS columns; ask for FAS when
     # there is something to compare it against. (This used to key off record
     # length, back when a matrix had to exist on disk beforehand.)
     if data.columns.str.startswith("FAS").any():

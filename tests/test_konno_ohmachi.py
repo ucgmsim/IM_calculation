@@ -1,8 +1,8 @@
 """Tests for Konno-Ohmachi smoothing and the matrix store behind it.
 
-These exercise the module through its public surface -- `smooth`,
-`smoothing_matrix`, `MatrixStore` and the two runtime knobs -- so that how the
-store tiers, keys, evicts or spills its matrices stays free to change.
+These exercise the module through its public surface (`smooth`,
+`smoothing_matrix`, `MatrixStore` and the two runtime knobs), so that how the
+store tiers, keys, evicts or spills its matrices can change without breaking them.
 """
 
 import multiprocessing
@@ -61,7 +61,7 @@ def scratch(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[Path]:
     """Give each test an empty matrix store spilling to its own directory.
 
     Both settings are pinned through `monkeypatch`, so a test that changes them
-    -- including via `set_scratch_directory` / `set_memory_budget` -- cannot leak
+    (including via `set_scratch_directory` / `set_memory_budget`) cannot leak
     them into the next one, even if it fails partway. Spilled matrices are
     unlinked as they are created, so the directory being empty afterwards is a
     file-wide invariant rather than a per-test assertion.
@@ -157,10 +157,10 @@ def test_smooth_matches_reference_product(
     """Each output bin is a weighted average over the whole spectrum.
 
     Pinned at the bandwidth the reference was generated with, so the obspy
-    anchor survives a change of `DEFAULT_BANDWIDTH`.
+    anchor still applies after a change of `DEFAULT_BANDWIDTH`.
     """
     reference = (spectra.reshape(-1, 65) @ reference_matrix.T).reshape(spectra.shape)
-    # Single precision accumulation over 65 positive weights; ~1e-6 relative.
+    # Single precision accumulation over 65 positive weights gives ~1e-6 relative.
     assert konno_ohmachi.smooth(spectra, bandwidth=40.0) == pytest.approx(
         reference, rel=1e-5
     )
@@ -188,7 +188,7 @@ def test_smooth_matches_obspy_direct_path(
     matrix product alone would not distinguish the two.
 
     Repeated across the tiers, and at one row per block so that every block
-    boundary is exercised, because where the matrix lives and how it is chunked
+    boundary is exercised, because where the matrix is stored and how it is chunked
     must not change the numbers. A budget of zero also means zero, rather than
     falling back to the default.
     """
@@ -210,11 +210,11 @@ def test_smooth_falls_back_when_the_matrix_fits_nowhere(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """With no memory budget and no usable scratch, smoothing still works.
+    """Smoothing still works with a zero memory budget and an unusable scratch.
 
-    Every way the scratch directory can refuse a matrix is a warning and a
-    slower answer, never an exception and never a partial file left behind --
-    the `scratch` fixture asserts the latter for us.
+    Every way the scratch directory can refuse a matrix gives a warning and a
+    slower answer. It doesn't raise an exception or leave a partial file behind
+    (the `scratch` fixture checks the latter).
     """
     spectra, smoothed = reference_direct
     konno_ohmachi.set_memory_budget(0)
@@ -281,7 +281,7 @@ def test_matrix_is_built_once_per_size_and_bandwidth(
 def test_clear_matrix_cache_empties_the_store(
     spectra: npt.NDArray[np.float64],
 ) -> None:
-    """Clearing genuinely releases the matrices the store was holding."""
+    """Clearing releases the matrices the store was keeping in memory."""
     konno_ohmachi.smooth(spectra)
     assert len(konno_ohmachi.MATRICES) == 1
 
@@ -290,10 +290,10 @@ def test_clear_matrix_cache_empties_the_store(
 
 
 def test_memory_budget_bounds_what_the_store_holds() -> None:
-    """The budget caps the total held, not the size of any one matrix.
+    """The budget caps the total size of the matrices in memory.
 
-    Three matrices that each fit the budget on their own are held two at a
-    time, because what the budget bounds is their sum.
+    Matrices that each fit the budget on their own stay in memory two at a
+    time, because the budget bounds their sum.
     """
     one = konno_ohmachi.smoothing_matrix(65, 40.0).nbytes
     store = konno_ohmachi.MatrixStore(memory_budget=2 * one + 1)
@@ -342,7 +342,7 @@ def test_concurrent_smoothing_is_consistent(
 def test_warm_builds_ahead_of_use(
     spectra: npt.NDArray[np.float64], monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Warming builds up front so that later smoothing is a hit, not a rebuild."""
+    """Warming builds up front so that later smoothing reuses the cached matrix."""
     konno_ohmachi.MATRICES.warm([65, 129])
     assert len(konno_ohmachi.MATRICES) == 2
 
@@ -363,8 +363,8 @@ def test_warm_builds_ahead_of_use(
 def test_forked_children_inherit_a_warmed_store() -> None:
     """A child forked after warming reuses the parent's matrix rather than rebuilding.
 
-    This is the whole reason `warm` exists: a pool forked from a cold parent
-    gives every worker its own private copy of every matrix.
+    `warm` exists for this case. A pool forked from a cold parent gives every
+    worker its own private copy of every matrix.
     """
     konno_ohmachi.MATRICES.warm(65)
 
@@ -384,6 +384,6 @@ def test_caller_can_keep_its_own_store(spectra: npt.NDArray[np.float64]) -> None
 
 
 def test_bins_for_samples_matches_the_fas_padding() -> None:
-    """The bin count `warm` takes is the one FAS will actually ask for."""
+    """The bin count `warm` takes matches the one FAS uses."""
     for n_samples, expected in ((7144, 4097), (9271, 8193), (21953, 16385)):
         assert konno_ohmachi.bins_for_samples(n_samples) == expected

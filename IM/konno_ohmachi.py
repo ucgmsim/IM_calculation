@@ -177,8 +177,8 @@ class MatrixStore:
             if (matrix := self._cache.get(key)) is not None:
                 # NOTE: Python dicts maintain insertion order. Doing a pop and
                 # re-insert shifts the key to the front of the insertion order
-                # which makes the dict a cheap LRU cache. Functools implements a
-                # doubly-linked list which is great but extra bookkeeping.
+                # which makes the dict a cheap LRU cache. Functools uses a
+                # doubly linked list, which is great but extra bookkeeping.
                 self._cache[key] = self._cache.pop(key)
                 return matrix
 
@@ -193,10 +193,10 @@ class MatrixStore:
                     self._cache[key] = spilled
                 return spilled
 
-            # Evict least-recently-used first until this one fits beside what is
-            # left. A doubly-linked list would make this O(1), but the cache
-            # holds a handful of entries, so scanning the dict is cheaper (in
-            # code) than the speedup from bookkeeping.
+            # Evict the least recently used first until this one fits beside
+            # what is left. A doubly linked list gives O(1) eviction. The cache
+            # stores only a few entries, though, and scanning the dict costs
+            # less code than that bookkeeping.
             resident = [
                 (k, m) for k, m in self._cache.items() if not isinstance(m, np.memmap)
             ]
@@ -319,8 +319,8 @@ def set_memory_budget(memory_budget: int) -> None:
 
     Older matrices are evicted to stay inside the budget; one that exceeds the
     whole budget by itself is spilled to the scratch directory instead. Nothing
-    already held is dropped until the next matrix needs room for itself -- call
-    `clear_matrix_cache` to apply the new budget immediately.
+    already in memory is dropped until the next matrix needs room for itself.
+    Call `clear_matrix_cache` to apply the new budget immediately.
 
     Parameters
     ----------

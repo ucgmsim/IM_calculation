@@ -4,8 +4,8 @@
 //!
 //! $$W(f; f_c) = \left[\frac{\sin(b \log_{10}(f / f_c))}{b \log_{10}(f / f_c)}\right]^4$$
 //!
-//! where $b$ is the bandwidth, with the removable singularity $W(f_c; f_c) = 1$
-//! and the limit $W(0; f_c) = 0$.
+//! where $b$ is the bandwidth. The removable singularity at $f = f_c$ takes
+//! the value 1, and the window is 0 in the limit $f \to 0$.
 
 use ndarray::azip;
 use ndarray::prelude::*;
@@ -36,7 +36,7 @@ fn smoothing_window(
         *value = (x.sin() / x).powi(4);
     });
 
-    // sin(0)/0 at the centre; log10(0) is -inf at bin zero. Both come out NaN
+    // sin(0)/0 at the centre, and log10(0) is -inf at bin zero. Both come out NaN
     // above and are replaced here by the limits of the window.
     out[centre] = 1.0;
     out[0] = 0.0;
@@ -192,7 +192,7 @@ mod tests {
         }
     }
 
-    /// The `f64` helper above must agree with the `f32` matrix that ships, or
+    /// The `f64` helper above must agree with the `f32` production matrix, or
     /// the tests built on it would pass while `matrix_rows` drifted.
     #[test]
     fn test_full_matrix_helper_matches_matrix_rows() {
@@ -226,7 +226,7 @@ mod tests {
         }
 
         /// Smoothing a flat spectrum returns it unchanged. This is the
-        /// sharpest statement of the convention: it holds only because the
+        /// sharpest statement of the convention: it is true only because the
         /// contraction runs over the same index the weights are normalised
         /// over. Contracting over the centre index instead attenuates a flat
         /// spectrum by up to 25% near the band edges.

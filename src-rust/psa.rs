@@ -360,7 +360,7 @@ mod tests {
     fn test_psa_is_nan_when_a_sample_is_non_finite() {
         // A NaN sample poisons the Newmark recursion from that point on, but
         // the peak fold used to ignore the resulting NaN tail and return the
-        // (finite, wrong) peak of the record up to that point instead.
+        // (finite, wrong) peak of the record before the NaN instead.
         let t = Array1::<f64>::linspace(0.0, 2.0, 512);
         let dt = t[1] - t[0];
         let mut comp_0 = t.map(|&x| (3.0 * x).sin());
