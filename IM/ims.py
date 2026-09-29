@@ -641,7 +641,7 @@ def pseudo_spectral_acceleration(
     Raises
     ------
     ValueError
-        If any period is not strictly positive and finite.
+        If any period isn't strictly positive and finite.
     """
     periods = np.asarray(periods, dtype=np.float64)
     if not np.all(np.isfinite(periods) & (periods > 0)):
@@ -668,7 +668,7 @@ def _interpolate(
     smoothed : ndarray
         Smoothed spectrum values, shape `(..., len(fa_frequencies))`.
     fa_frequencies : ndarray of float64
-        The `rfft` bin frequencies the spectrum is defined on (Hz).
+        The `rfft` bin frequencies of the spectrum (Hz).
     freqs : ndarray of float64
         Frequencies to interpolate onto (Hz).
 
@@ -705,7 +705,7 @@ def _fas_kernel(
     freqs : ndarray of float
         Output frequencies (Hz) for the interpolated spectrum.
     fa_frequencies : ndarray of float
-        The `rfft` bin frequencies (Hz) the smoothed spectrum is defined on.
+        The `rfft` bin frequencies (Hz) of the smoothed spectrum.
     bandwidth : float
         Bandwidth of the Konno-Ohmachi smoothing window.
 

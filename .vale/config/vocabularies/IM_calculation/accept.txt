@@ -80,3 +80,4 @@ YAML
 [Nn]ormalise[ds]?
 [Pp]olarise[ds]?
 [Pp]olarisation
+[Cc]entre[ds]?

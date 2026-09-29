@@ -77,8 +77,9 @@ mod tests {
     #[test]
     fn test_nan_arias_intensity_gives_nan_duration() {
         // A NaN sample poisons the cumulative Arias intensity from that point
-        // on, so the final (normalising) value is NaN. That must not be
-        // mistaken for "below threshold" and reported as a duration of 0.0.
+        // on, so the final (normalising) value is NaN. Every threshold
+        // comparison against NaN is false, so without a check the duration
+        // would come out as 0.0. It must be NaN.
         let arias = array![[0.0, 1.0, 2.0, f64::NAN, f64::NAN]];
         let dt = 1.0;
         let result = significant_duration(arias.view(), dt, 0.2, 0.8);

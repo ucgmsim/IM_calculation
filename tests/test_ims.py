@@ -174,9 +174,9 @@ def test_fas_benchmark() -> None:
     )
     waveform = np.ascontiguousarray(np.moveaxis(waveform, -1, 0))
     # Input: (n_stations, nt, n_components) as per fourier_amplitude_spectra logic
-    # `fas_benchmark.nc` was generated with pykooh at bandwidth 40 in Jan 2025,
-    # and is the only FAS reference in the repo not produced by this code. Pinned so a
-    # change of `DEFAULT_BANDWIDTH` cannot cost us it.
+    # pykooh generated `fas_benchmark.nc` at bandwidth 40 in Jan 2025, and it's
+    # the only FAS reference in the repo that this code didn't produce. Pinning
+    # the bandwidth keeps it valid after a change of `DEFAULT_BANDWIDTH`.
     fas_result_ims = ims.fourier_amplitude_spectra(
         waveform, dt, data.frequency.values, bandwidth=40.0
     )
@@ -202,7 +202,7 @@ def test_fas_eas_benchmark() -> None:
     Held at `rel=1e-4` deliberately. A loosened tolerance here would pass at any
     drift under its own bound and quietly retire the only independent EAS
     reference in the repo; `strict=True` means this flips to a failure the
-    moment the definition is settled.
+    moment someone settles the definition.
     """
     data_array_ffp = Path(__file__).parent / "resources" / "fas_benchmark.nc"
     data = xr.open_dataarray(data_array_ffp)

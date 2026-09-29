@@ -27,9 +27,9 @@ def obspy_smoothing_matrix(n_bins: int, bandwidth: float) -> npt.NDArray[np.floa
     """Transcription of obspy's `calculate_smoothing_matrix(..., normalize=True)`.
 
     obspy is no longer a dependency, so this stands in as an independent oracle
-    for sizes and bandwidths the committed reference matrix does not cover. It
-    is checked against that reference by `test_oracle_matches_reference`, so a
-    transcription slip cannot quietly pass as agreement.
+    for sizes and bandwidths the committed reference matrix doesn't cover.
+    `test_oracle_matches_reference` checks it against that reference, so a
+    transcription slip can't quietly pass as agreement.
 
     Derived from `obspy.signal.konnoohmachismoothing` (LGPL-3.0).
     """
@@ -60,11 +60,11 @@ def _store_size(_: int) -> int:
 def scratch(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[Path]:
     """Give each test an empty matrix store spilling to its own directory.
 
-    Both settings are pinned through `monkeypatch`, so a test that changes them
-    (including via `set_scratch_directory` / `set_memory_budget`) cannot leak
-    them into the next one, even if it fails partway. Spilled matrices are
-    unlinked as they are created, so the directory being empty afterwards is a
-    file-wide invariant rather than a per-test assertion.
+    `monkeypatch` pins both settings, so a test that changes them (including
+    via `set_scratch_directory` / `set_memory_budget`) can't leak them into the
+    next one, even if it fails partway. The store unlinks each spilled matrix
+    on creation, so the directory being empty afterwards is a file-wide
+    invariant rather than a per-test assertion.
     """
     scratch_directory = tmp_path / "scratch"
     scratch_directory.mkdir()
@@ -156,7 +156,7 @@ def test_smooth_matches_reference_product(
 ) -> None:
     """Each output bin is a weighted average over the whole spectrum.
 
-    Pinned at the bandwidth the reference was generated with, so the obspy
+    Pinned at the bandwidth obspy generated the reference with, so the obspy
     anchor still applies after a change of `DEFAULT_BANDWIDTH`.
     """
     reference = (spectra.reshape(-1, 65) @ reference_matrix.T).reshape(spectra.shape)
@@ -187,8 +187,8 @@ def test_smooth_matches_obspy_direct_path(
     index and disagrees with its direct path by up to 30%, so agreeing with the
     matrix product alone would not distinguish the two.
 
-    Repeated across the tiers, and at one row per block so that every block
-    boundary is exercised, because where the matrix is stored and how it is chunked
+    Repeated across the tiers, and at one row per block so that the test
+    crosses every block boundary, because the storage tier and the chunking
     must not change the numbers. A budget of zero also means zero, rather than
     falling back to the default.
     """
@@ -309,8 +309,8 @@ def test_set_scratch_directory_chooses_where_matrices_spill(
 ) -> None:
     """`set_scratch_directory` is the runtime knob `calculate_ims` drives.
 
-    The environment is only read when a store is built, and `MATRICES` is built
-    at import, so setting the variable afterwards would not reach it.
+    A store reads the environment only on construction, and the module builds
+    `MATRICES` at import, so setting the variable afterwards would not reach it.
     """
     chosen = tmp_path / "chosen"
     konno_ohmachi.set_scratch_directory(chosen)
@@ -320,7 +320,7 @@ def test_set_scratch_directory_chooses_where_matrices_spill(
 
     # Only spilling creates the directory, so its existence is the evidence.
     assert chosen.is_dir()
-    # The scratch file is unlinked as it is created, so nothing is left behind.
+    # The store unlinks the scratch file on creation, so nothing remains in it.
     assert list(chosen.iterdir()) == []
 
 

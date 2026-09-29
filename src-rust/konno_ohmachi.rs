@@ -37,7 +37,7 @@ fn smoothing_window(
     });
 
     // sin(0)/0 at the centre, and log10(0) is -inf at bin zero. Both come out NaN
-    // above and are replaced here by the limits of the window.
+    // from the loop, so set them to the limits of the window here.
     out[centre] = 1.0;
     out[0] = 0.0;
 
@@ -192,7 +192,7 @@ mod tests {
         }
     }
 
-    /// The `f64` helper above must agree with the `f32` production matrix, or
+    /// The `f64` helper `full_matrix` must agree with the `f32` production matrix, or
     /// the tests built on it would pass while `matrix_rows` drifted.
     #[test]
     fn test_full_matrix_helper_matches_matrix_rows() {
@@ -226,7 +226,7 @@ mod tests {
         }
 
         /// Smoothing a flat spectrum returns it unchanged. This is the
-        /// sharpest statement of the convention: it is true only because the
+        /// sharpest statement of the convention: it's true only because the
         /// contraction runs over the same index the weights are normalised
         /// over. Contracting over the centre index instead attenuates a flat
         /// spectrum by up to 25% near the band edges.
