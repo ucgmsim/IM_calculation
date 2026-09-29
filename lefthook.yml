@@ -22,3 +22,7 @@ pre-push:
       run: uvx yamllint {push_files}
       glob: "*.{yaml,yml}"
 
+    vale:
+      # Needs `vale sync` once, to fetch the styles named in .vale.ini.
+      run: vale {push_files}
+      glob: "*.{py,md,rs}"

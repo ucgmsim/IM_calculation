@@ -64,7 +64,7 @@ def _to_dask(waveform: npt.NDArray[np.float64], station_chunk: int) -> xr.DataAr
     )
 
 
-# NOTE: The following unit tests PGA and PGV exist because there is no direct implementation of PGA/PGV in the rust code.
+# NOTE: The PGA and PGV unit tests below exist because the rust code has no direct PGA/PGV kernel.
 
 
 @pytest.mark.parametrize(
@@ -107,7 +107,7 @@ def test_pgv(
     assert np.isclose(result["000"].item(), expected_pgv, atol=0.1)
 
 
-# CAV5 is partly a python function, so we test expected CAV5 results. CAV tests are in rust.
+# CAV5 is partly a python function, so this file covers the expected CAV5 results. CAV has its tests in rust.
 @pytest.mark.parametrize(
     "comp_0,t_max,expected_cav5",
     [
@@ -134,7 +134,7 @@ def test_cav5(
 def test_cav_name_depends_on_threshold(
     sample_waveforms: npt.NDArray[np.float64],
 ) -> None:
-    """threshold=0 is falsy, so it must name the result CAV, not CAV5."""
+    """threshold=0 is falsy, so the result's name is CAV, not CAV5."""
     assert (
         ims.cumulative_absolute_velocity(sample_waveforms, 0.01).attrs["name"] == "CAV"
     )
@@ -174,9 +174,9 @@ def test_fas_benchmark() -> None:
     )
     waveform = np.ascontiguousarray(np.moveaxis(waveform, -1, 0))
     # Input: (n_stations, nt, n_components) as per fourier_amplitude_spectra logic
-    # `fas_benchmark.nc` was generated with pykooh at bandwidth 40 in Jan 2025 --
-    # the only FAS reference in the repo not produced by this code. Pinned so a
-    # change of `DEFAULT_BANDWIDTH` cannot cost us it.
+    # pykooh generated `fas_benchmark.nc` at bandwidth 40 in Jan 2025, and it's
+    # the only FAS reference in the repo that this code didn't produce. Pinning
+    # the bandwidth keeps it valid after a change of `DEFAULT_BANDWIDTH`.
     fas_result_ims = ims.fourier_amplitude_spectra(
         waveform, dt, data.frequency.values, bandwidth=40.0
     )
@@ -202,7 +202,7 @@ def test_fas_eas_benchmark() -> None:
     Held at `rel=1e-4` deliberately. A loosened tolerance here would pass at any
     drift under its own bound and quietly retire the only independent EAS
     reference in the repo; `strict=True` means this flips to a failure the
-    moment the definition is settled.
+    moment someone settles the definition.
     """
     data_array_ffp = Path(__file__).parent / "resources" / "fas_benchmark.nc"
     data = xr.open_dataarray(data_array_ffp)
@@ -223,7 +223,7 @@ def test_fas_eas_benchmark() -> None:
 
 
 def test_fas_multiple_stations_benchmark() -> None:
-    """Compare benchmark FAS calculation with multiple stations against current implementation."""
+    """Compare the benchmark FAS calculation for multiple stations against the code under test."""
     # Load the data array
     data_array_ffp = Path(__file__).parent / "resources" / "fas_benchmark.nc"
     data = xr.open_dataarray(data_array_ffp)
@@ -258,7 +258,7 @@ def test_fas_multiple_stations_benchmark() -> None:
 
 @pytest.mark.slow
 def test_snr_benchmark() -> None:
-    """Compare benchmark SNR calculation against current implementation."""
+    """Compare the benchmark SNR calculation against the code under test."""
     # Load the DataFrame
     benchmark_ffp = Path(__file__).parent / "resources" / "snr_benchmark.csv"
     data = pd.read_csv(benchmark_ffp, index_col=0)
@@ -285,7 +285,7 @@ def test_snr_benchmark() -> None:
 
 
 def test_all_ims_benchmark() -> None:
-    """Compare benchmark IM calculation against current implementation."""
+    """Compare the benchmark IM calculation against the code under test."""
     # Load the DataFrame
     benchmark_ffp = Path(__file__).parent / "resources" / "im_benchmark.csv"
     data = pd.read_csv(benchmark_ffp, index_col=0)
@@ -306,8 +306,8 @@ def test_all_ims_benchmark() -> None:
     )
 
     # The benchmark predates the RotD orientation components and has no
-    # reference angles to compare against; those are covered by
-    # test_rotd_orientations_match_a_direct_angle_sweep instead.
+    # reference angles to compare against;
+    # test_rotd_orientations_match_a_direct_angle_sweep covers those instead.
     components = [component for component in result.index if component in data.index]
     for im in result.columns:
         assert result.loc[components, im].values == pytest.approx(
@@ -315,10 +315,6 @@ def test_all_ims_benchmark() -> None:
         ), (
             f"Results for {im} do not match!\n{result}"
         )  # 5e-6 implies rounding to five decimal places
-
-
-# Assuming these are imported from your project context
-# from your_module import waveform_reading, ims, im_calculation, BENCHMARK_CASES
 
 
 def save_diff_html(
@@ -330,7 +326,7 @@ def save_diff_html(
     """
     Generates an HTML file highlighting differences between two dataframes.
 
-    Cells are colored based on the relative difference:
+    Colors each cell by the relative difference:
     - >= 20%: Bold White on Red
     - > 0%: Black on Salmon
     - <= -20%: Bold White on Blue
@@ -355,7 +351,7 @@ def save_diff_html(
         # Create a DataFrame of empty strings with same shape as data
         styles = pd.DataFrame("", index=data.index, columns=data.columns)
 
-        # Ensure diff_rel aligns with the subset currently being styled
+        # Ensure diff_rel aligns with the subset the styler passed in
         # (Though with axis=None, 'data' is the full dataframe)
         rel_aligned = diff_rel.loc[data.index, data.columns]
 
@@ -373,7 +369,7 @@ def save_diff_html(
         # --- Apply Logic ---
 
         # 1. Dim (Small changes or NaNs in relative diff)
-        # Note: We use .fillna(False) to handle NaNs in the boolean mask creation
+        # Note: .fillna(False) handles NaNs in the boolean mask creation
         is_small_change = (rel_aligned.abs() < 0.05) | (data.abs() < 1e-6)
         mask_dim = is_small_change | rel_aligned.isna()
         styles[mask_dim] = style_dim
@@ -397,7 +393,7 @@ def save_diff_html(
         return styles
 
     # Create the Styler object
-    # We display diff_abs, but color it based on relative diff logic
+    # Display diff_abs, but color it by the relative diff logic
     styler = (
         diff_abs.style.apply(style_diff, axis=None)
         .format("{:+.3g}", na_rep="-")
@@ -438,7 +434,7 @@ def pytest_generate_tests(metafunc: Metafunc) -> None:
 
 @pytest.mark.slow
 def test_all_ims_benchmark_edge_cases(resource_dir: Path) -> None:
-    """Compare benchmark IM calculation against current implementation for each directory in resources for edge cases."""
+    """Compare the benchmark IM calculation against the code under test, for each edge-case directory in resources."""
     # Load the benchmark DataFrame
     benchmark_ffp = resource_dir / "im_benchmark.csv"
     data = pd.read_csv(benchmark_ffp, index_col=0)
@@ -462,7 +458,7 @@ def test_all_ims_benchmark_edge_cases(resource_dir: Path) -> None:
         ims.IM.pSA,
     ]
 
-    # Only some of the per-case benchmarks carry FAS columns; ask for FAS when
+    # Only some of the per-case benchmarks have FAS columns; ask for FAS when
     # there is something to compare it against. (This used to key off record
     # length, back when a matrix had to exist on disk beforehand.)
     if data.columns.str.startswith("FAS").any():
@@ -472,7 +468,7 @@ def test_all_ims_benchmark_edge_cases(resource_dir: Path) -> None:
     result = im_calculation.calculate_ims(waveform, dt, ims_list=im_list)
 
     # Align columns and indices for comparison, dropping the components the
-    # benchmark does not carry (the RotD orientations, which postdate it).
+    # benchmark lacks (the RotD orientations, which postdate it).
     components = [component for component in result.index if component in data.index]
     result = result.loc[components]
     expected = data.loc[components, result.columns]
@@ -502,9 +498,9 @@ def test_all_ims_benchmark_edge_cases(resource_dir: Path) -> None:
         ), f"Results for {im} do not match!\n{result}"
 
 
-# Significant duration calculations are a combination of two
-# independently tested rust functions, this integration test checks
-# they are called correctly through the python interface
+# Significant duration calculations combine two independently tested rust
+# functions. This integration test checks that the python interface calls
+# them correctly.
 
 
 @pytest.mark.parametrize("percent_low,percent_high", [(5, 75), (5, 95), (20, 80)])
@@ -597,7 +593,7 @@ def test_nan_sample_propagates_to_every_dependent_im_component(
         )
 
 
-# Contract guarantee on output shapes
+# Contract on output shapes
 @pytest.mark.parametrize(
     "func",
     [
@@ -655,14 +651,14 @@ def test_nyquist_frequency() -> None:
     # Generate test waveforms (random data for simplicity)
     waveforms = np.random.rand(n_components, n_stations, n_timesteps).astype(np.float64)
 
-    # Define frequencies, including some above the Nyquist frequency
+    # Define frequencies, including some beyond the Nyquist frequency
     freqs = np.array(
         [1.0, 10.0, 20.0, 60.0], dtype=np.float64
     )  # 60 Hz > Nyquist (50 Hz)
     with pytest.warns(RuntimeWarning):
         fas = ims.fourier_amplitude_spectra(waveforms, dt, freqs)
 
-    # Verify that frequencies above Nyquist are filtered out
+    # Verify that the calculation drops frequencies beyond Nyquist
     expected_freqs = freqs[freqs <= nyquist_frequency]
     np.testing.assert_array_equal(fas.coords["frequency"].values, expected_freqs)
 
@@ -753,7 +749,7 @@ def test_rotational_invariance(
         assert value == pytest.approx(value_t)
 
 
-# Asserts that 090, 000, and ver components are computed for the corresponding COMP_* enum values.
+# Asserts that the calculation maps 090, 000, and ver components onto the corresponding COMP_* enum values.
 @given(
     waveform=nst.arrays(
         np.float64,
@@ -782,8 +778,8 @@ def test_component_orientation(waveform: npt.NDArray[np.float64]) -> None:
 def test_component_orientation_with_named_components(
     sample_waveforms: npt.NDArray[np.float64],
 ) -> None:
-    """Component mapping is positional: index 0/1/2 -> 000/090/ver, regardless
-    of how the input DataArray's `component` coordinate is labelled."""
+    """Component mapping is positional: index 0/1/2 -> 000/090/ver, whatever
+    the input DataArray's `component` coordinate labels say."""
     waveform = xr.DataArray(
         sample_waveforms,
         dims=("component", "station", "time"),
@@ -802,8 +798,8 @@ def test_component_orientation_with_named_components(
 
 
 # Lazy (dask-backed) input must produce a lazy Dataset whose computed values
-# are bit-identical to the eager result -- station chunking never mixes rows,
-# so nothing about laziness should change the numbers.
+# are bit-identical to the eager result. Station chunking never mixes rows, so
+# nothing about laziness should change the numbers.
 LAZY_CASES = [
     pytest.param(ims.peak_ground_acceleration, {}, id="pga"),
     pytest.param(ims.peak_ground_velocity, {"dt": 0.01}, id="pgv"),
@@ -850,7 +846,7 @@ def test_lazy_matches_eager_psa(sample_waveforms: npt.NDArray[np.float64]) -> No
 def test_rotd_orientations_match_a_direct_angle_sweep(
     sample_waveforms: npt.NDArray[np.float64],
 ) -> None:
-    """Each orientation must name the angle its statistic came from, and
+    """Each orientation must give the angle its statistic came from, and
     RotD50 must be the median, against a plain numpy sweep of the two
     horizontal components."""
     result = ims.peak_ground_acceleration(sample_waveforms)
@@ -877,8 +873,8 @@ def test_rotd_orientations_match_a_direct_angle_sweep(
 
 @pytest.mark.parametrize("polarisation", [0, 30, 45, 100, 179])
 def test_rotd_orientation_of_a_polarised_record(polarisation: int) -> None:
-    """A linearly polarised record fixes the orientations exactly: it peaks
-    along its own direction and vanishes across it, which pins the angle
+    """A linearly polarised record fixes the orientations exactly. It peaks
+    along its own direction and vanishes across it. That pins the angle
     convention (degrees, anticlockwise from the 000 component)."""
     time = np.arange(0, 1, 0.005)
     motion = np.sin(2 * np.pi * 5 * time) * np.exp(-2 * time)
@@ -896,8 +892,8 @@ def test_rotd_orientation_of_a_polarised_record(polarisation: int) -> None:
     assert result["rotd0_orientation"].values == pytest.approx(
         (polarisation + 90) % 180
     )
-    # Across the direction of motion there is nothing to see, and the sqrt(2)
-    # bound on RotD100 / RotD50 is attained.
+    # Across the direction of motion the record reads zero, and
+    # RotD100 / RotD50 equals the sqrt(2) bound.
     assert result["rotd0"].values == pytest.approx(0, abs=1e-12)
     assert result["rotd100"].values / result["rotd50"].values == pytest.approx(
         np.sqrt(2), rel=1e-9
@@ -944,7 +940,7 @@ def test_rechunks_component_and_time_core_dims(
 ) -> None:
     """A waveform chunked across `component`/`time` (as a real broadband file
     opened with `chunks={}` might be) must still work: `_as_waveform` forces
-    those two dims back to a single chunk before `apply_ufunc` sees them."""
+    those two dims back to one chunk before `apply_ufunc` receives them."""
     waveform = xr.DataArray(
         da.from_array(sample_waveforms, chunks=(1, 1, 5)),
         dims=("component", "station", "time"),

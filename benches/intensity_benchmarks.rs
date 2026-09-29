@@ -125,7 +125,7 @@ fn bench_significant_duration(c: &mut Criterion) {
 /// This is typically the most expensive calculation
 fn bench_psa(c: &mut Criterion) {
     let mut group = c.benchmark_group("PSA");
-    // PSA is expensive, so we might want to use a smaller sample size
+    // PSA is expensive, so this group uses a small sample size
     group.sample_size(10);
 
     for &period in PSA_PERIODS {

@@ -31,10 +31,9 @@ SCRATCH_DIRECTORY_VARIABLE = "IM_CALCULATION_SCRATCH_DIR"
 
 
 def bins_for_samples(n_samples: int) -> int:
-    """Number of real-FFT bins a record of `n_samples` is smoothed over.
+    """Number of real-FFT bins that smoothing covers for `n_samples` samples.
 
-    The matrix a record needs is fixed by this, so it is what `MatrixStore.warm`
-    takes. Mirrors the zero-padding `fourier_amplitude_spectra` applies.
+    This count sets the matrix a record needs, so `MatrixStore.warm` takes it. Mirrors the zero-padding `fourier_amplitude_spectra` applies.
 
     Parameters
     ----------
@@ -72,8 +71,8 @@ def smoothing_matrix(
     """Build the Konno-Ohmachi smoothing matrix in memory.
 
     Row `c` holds the window centred on bin `c`, normalised to sum to one, so it
-    is the set of weights that produce output bin `c` and a spectrum is smoothed
-    with `spectra @ matrix.T`.
+    is the set of weights that produce output bin `c`, and `spectra @ matrix.T`
+    smooths a spectrum.
 
     Parameters
     ----------
@@ -94,16 +93,16 @@ class MatrixStore:
     """Konno-Ohmachi matrix spilling cache.
 
     This cache stores Konno-Ohmachi matrices on disk and in memory depending on
-    size. When the KO matrices are too large they are written to a temporary
-    directory and then memmap into memory. Small matrices are stored directly in
-    RAM. Matrices too large for disk space are not persisted and the store
-    returns ``None``. Cache evictions are on LRU basis.
+    size. The store writes KO matrices that are too large for memory to a
+    temporary directory and memmaps them back. Small matrices stay in RAM.
+    The store doesn't persist matrices too large for the disk, and returns
+    ``None`` for them. Cache evictions are on LRU basis.
 
     Parameters
     ----------
     memory_budget : int, optional
         Total bytes of matrices to hold in memory at once, across every size and
-        bandwidth the store has been asked for. Defaults to
+        bandwidth the store has built. Defaults to
         `$IM_CALCULATION_KO_MEMORY_BUDGET`, else `DEFAULT_MEMORY_BUDGET`.
     scratch_directory : Path, optional
         Which filesystem to spill onto. Defaults to
@@ -142,7 +141,7 @@ class MatrixStore:
         self._lock = threading.Lock()
 
     def __len__(self) -> int:
-        """Number of matrices currently held.
+        """Number of matrices in memory or spilled to scratch.
 
         Returns
         -------
@@ -177,8 +176,8 @@ class MatrixStore:
             if (matrix := self._cache.get(key)) is not None:
                 # NOTE: Python dicts maintain insertion order. Doing a pop and
                 # re-insert shifts the key to the front of the insertion order
-                # which makes the dict a cheap LRU cache. Functools implements a
-                # doubly-linked list which is great but extra bookkeeping.
+                # which makes the dict a cheap LRU cache. Functools uses a
+                # doubly linked list, which is great but extra bookkeeping.
                 self._cache[key] = self._cache.pop(key)
                 return matrix
 
@@ -193,10 +192,10 @@ class MatrixStore:
                     self._cache[key] = spilled
                 return spilled
 
-            # Evict least-recently-used first until this one fits beside what is
-            # left. A doubly-linked list would make this O(1), but the cache
-            # holds a handful of entries, so scanning the dict is cheaper (in
-            # code) than the speedup from bookkeeping.
+            # Evict the least recently used first until this one fits beside
+            # the remaining matrices. A doubly linked list gives O(1) eviction. The cache
+            # stores only a few entries, though, and scanning the dict costs
+            # less code than that bookkeeping.
             resident = [
                 (k, m) for k, m in self._cache.items() if not isinstance(m, np.memmap)
             ]
@@ -245,7 +244,7 @@ class MatrixStore:
         Returns
         -------
         np.memmap or None
-            The matrix, or None if the scratch directory cannot hold it.
+            The matrix, or None if the scratch directory has no room for it.
         """
         needed = n_bins * n_bins * np.float32().itemsize
         try:
@@ -317,10 +316,10 @@ def set_scratch_directory(scratch_directory: Path) -> None:
 def set_memory_budget(memory_budget: int) -> None:
     """Set how much memory the default store's matrices may occupy in total.
 
-    Older matrices are evicted to stay inside the budget; one that exceeds the
-    whole budget by itself is spilled to the scratch directory instead. Nothing
-    already held is dropped until the next matrix needs room for itself -- call
-    `clear_matrix_cache` to apply the new budget immediately.
+    The store evicts older matrices to stay inside the budget, and spills one
+    that exceeds the whole budget by itself to the scratch directory instead.
+    The store doesn't drop a matrix already in memory until the next one needs room.
+    Call `clear_matrix_cache` to apply the new budget immediately.
 
     Parameters
     ----------
@@ -346,7 +345,7 @@ def smooth(
         Bandwidth of the Konno-Ohmachi window. Lower values smooth more
         strongly.
     store : MatrixStore, optional
-        Where matrices are kept. Defaults to the module-level `MATRICES`.
+        The store that caches matrices. Defaults to the module-level `MATRICES`.
 
     Returns
     -------

@@ -1,7 +1,7 @@
 //! Arias Intensity ($I_A$) calculation module.
 //!
-//! This module provides functions to calculate the intensity of earthquake ground motion
-//! based on the integral of the square of acceleration.
+//! Arias intensity grades earthquake ground motion by the integral of the
+//! square of acceleration.
 //!
 //! The formula used is:
 //! $$I_A = \frac{\pi}{2g} \int_{0}^{T} a(t)^2 \, dt$$
