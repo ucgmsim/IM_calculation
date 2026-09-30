@@ -3,10 +3,12 @@
 //! This module provides functions to calculate the intensity of earthquake ground motion
 //! based on the integral of the square of acceleration.
 //!
-//! The formula used is:
-//! $$I_A = \frac{\pi}{2g} \int_{0}^{T} a(t)^2 \, dt$$
+//! The formula used, for acceleration $a$ expressed in units of $g$, is:
+//! $$I_A = \frac{\pi g}{2} \int_{0}^{T} a(t)^2 \, dt$$
 //!
-//! Where $g$ is the acceleration due to gravity (set here to $9.81 \text{ m/s}^2$).
+//! This is equivalent to the standard $I_A = \frac{\pi}{2g} \int_{0}^{T} a(t)^2 \, dt$
+//! with $a(t)$ in physical units. Here $g$ is the acceleration due to gravity
+//! (set here to $9.81 \text{ m/s}^2$).
 
 use crate::trapz::{cumulative_trapz_with_fun, trapz_with_fun};
 
@@ -14,7 +16,7 @@ use crate::constants::G;
 use ndarray::prelude::*;
 use std::f64::consts::PI;
 
-/// Precomputed scaling factor: $\frac{\pi}{2g}$
+/// Precomputed scaling factor: $\frac{\pi g}{2}$
 const ARIAS_CONSTANT: f64 = G * PI / 2.0;
 
 /// Computes the total Arias Intensity ($I_A$) for each row.
@@ -45,14 +47,14 @@ mod tests {
 
     #[test]
     fn test_arias_physical_constant() {
-        // If a = 1.0 cm/s^2 (constant) for 1 second with dt=1
+        // If a = 1.0 g (constant) for 1 second with dt=1
         // Integral of a^2 dt from 0 to 1 is 1.0.
-        // Result should be PI / (2.0 * 981.0)
+        // Result should be 9.81 * PI / 2.0
         let waveforms = array![[1.0, 1.0]];
         let dt = 1.0;
         let result = arias_intensity(waveforms.view(), dt);
 
-        let expected = ARIAS_CONSTANT;
+        let expected = 9.81 * PI / 2.0;
         assert_abs_diff_eq!(result[0], expected, epsilon = 1e-10);
     }
 
