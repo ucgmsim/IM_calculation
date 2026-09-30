@@ -3,8 +3,8 @@
 //! This module provides functions to calculate the intensity of earthquake ground motion
 //! based on the integral of the absolute value of acceleration.
 //!
-//! The formula used is:
-//! $$CAV = \int_{0}^{T} |a(t)| \, dt$$
+//! The formula used, for acceleration $a$ expressed in units of $g$, is:
+//! $$CAV = g \int_{0}^{T} |a(t)| \, dt$$
 //!
 
 use crate::constants::G;
@@ -30,9 +30,9 @@ mod tests {
 
     #[test]
     fn test_cav_constant() {
-        // If a = 1.0 cm/s^2 (constant) for 1 second with dt = 1
+        // If a = 1.0 g (constant) for 1 second with dt = 1
         // Integral of |a| dt from 0 to 1 is 1.0.
-        // Result should be G (9.81 cm/s)
+        // Result should be G (9.81 m/s)
         let waveforms = array![[1.0, 1.0]];
         let dt = 1.0;
         let result = cav(waveforms.view(), dt);

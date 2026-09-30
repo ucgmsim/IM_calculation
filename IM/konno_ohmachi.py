@@ -176,9 +176,10 @@ class MatrixStore:
         with self._lock:
             if (matrix := self._cache.get(key)) is not None:
                 # NOTE: Python dicts maintain insertion order. Doing a pop and
-                # re-insert shifts the key to the front of the insertion order
-                # which makes the dict a cheap LRU cache. Functools implements a
-                # doubly-linked list which is great but extra bookkeeping.
+                # re-insert moves the key to the end of the insertion order
+                # (most recently used), which makes the dict a cheap LRU cache.
+                # Functools implements a doubly-linked list which is great but
+                # extra bookkeeping.
                 self._cache[key] = self._cache.pop(key)
                 return matrix
 
