@@ -317,6 +317,24 @@ def test_all_ims_benchmark() -> None:
         )  # 5e-6 implies rounding to five decimal places
 
 
+def test_calculate_ims_accepts_2d_waveform() -> None:
+    """A (nt, 3) waveform should give the same result as (1, nt, 3)."""
+    waveform = np.random.default_rng(0).normal(size=(1, 2000, 3)) * 0.1
+
+    result_3d = im_calculation.calculate_ims(waveform, 0.01, [ims.IM.PGA])
+    result_2d = im_calculation.calculate_ims(waveform[0], 0.01, [ims.IM.PGA])
+
+    pd.testing.assert_frame_equal(result_3d, result_2d)
+
+
+def test_calculate_ims_rejects_multiple_stations() -> None:
+    """calculate_ims only supports a single station's waveform."""
+    waveform = np.random.default_rng(0).normal(size=(2, 2000, 3)) * 0.1
+
+    with pytest.raises(ValueError, match="single station"):
+        im_calculation.calculate_ims(waveform, 0.01, [ims.IM.PGA])
+
+
 # Assuming these are imported from your project context
 # from your_module import waveform_reading, ims, im_calculation, BENCHMARK_CASES
 
