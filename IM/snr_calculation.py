@@ -31,13 +31,13 @@ class SNRResult(NamedTuple):
     for each component (000, 090, ver). The index represents frequencies and
     columns represent the different components."""
 
-    signal_duration: float
-    """Duration of the signal portion in seconds, calculated as the number of
-    samples in the signal multiplied by the sampling interval (dt)."""
+    signal_duration: int
+    """Duration of the signal portion in samples (i.e. the number of samples
+    in the signal portion of the waveform)."""
 
-    noise_duration: float
-    """Duration of the noise portion in seconds, calculated as the number of
-    samples in the noise multiplied by the sampling interval (dt)."""
+    noise_duration: int
+    """Duration of the noise portion in samples (i.e. the number of samples
+    in the noise portion of the waveform)."""
 
 
 def calculate_snr(
@@ -56,7 +56,7 @@ def calculate_snr(
         Waveform data as a NumPy array.
     dt : float
         The sampling rate of the waveform
-    tp : float
+    tp : int
         The index of the p-arrival
     frequencies : np.ndarray, optional
         The frequency vector to use for the SNR calculation,
@@ -73,11 +73,15 @@ def calculate_snr(
     Raises
     ------
     ValueError
-        If the noise duration is less than 1s and so SNR can't be computed.
+        If `tp` is not a valid index into the waveform, or if the noise
+        duration is less than 1s and so SNR can't be computed.
     """
+    (_, _, nt) = waveform.shape
+    if not (0 < tp < nt):
+        raise ValueError(f"tp ({tp}) must be between 0 and nt ({nt}), exclusive")
+
     # This extra time is to ensure that when a taper is applied, the signal part of the waveform
     # is not affected by the tapering. The tapering is applied to the signal and noise separately.
-    (_, _, nt) = waveform.shape
     tp_extra = (nt - tp) / 19
     # Round up the tp_extra to the nearest highest integer
     tp_extra = int(np.ceil(tp_extra))
@@ -91,7 +95,7 @@ def calculate_snr(
     )
 
     # Ensure the noise is not shorter than 1s, if not then skip the calculation
-    if noise_duration < 1:
+    if noise_duration * dt < 1.0:
         raise ValueError("Noise duration is less than 1s")
 
     # Apply Taper
