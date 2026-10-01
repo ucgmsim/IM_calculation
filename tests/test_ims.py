@@ -284,6 +284,28 @@ def test_snr_benchmark() -> None:
     )
 
 
+def test_snr_noise_duration_in_seconds() -> None:
+    """A noise window under 1s (in seconds, not samples) must raise."""
+    rng = np.random.default_rng(0)
+    waveform = rng.normal(size=(3, 1, 1000))
+    dt = 0.01
+
+    # tp = 50 samples * dt = 0.01s is only 0.5s of noise, well under 1s.
+    with pytest.raises(ValueError):
+        snr_calculation.calculate_snr(waveform, dt, tp=50)
+
+
+@pytest.mark.parametrize("tp", [0, -1, 1000, 1200])
+def test_snr_tp_validated_against_record_length(tp: int) -> None:
+    """tp must be validated against the number of samples in the waveform."""
+    rng = np.random.default_rng(0)
+    waveform = rng.normal(size=(3, 1, 1000))
+    dt = 0.01
+
+    with pytest.raises(ValueError):
+        snr_calculation.calculate_snr(waveform, dt, tp=tp)
+
+
 def test_all_ims_benchmark() -> None:
     """Compare benchmark IM calculation against current implementation."""
     # Load the DataFrame
