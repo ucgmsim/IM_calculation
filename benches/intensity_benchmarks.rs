@@ -1,7 +1,11 @@
-use _core::{arias_intensity, cav, psa, significant_duration};
+use _core::{arias_intensity, cav, psa};
 use criterion::{BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
-use ndarray::{Array2, array};
+use ndarray::array;
 use std::hint::black_box;
+
+#[path = "common.rs"]
+mod common;
+use common::generate_waveforms;
 
 // Configuration constants for test scenarios
 const SAMPLING_RATE: f64 = 0.005; // 200 Hz
@@ -15,14 +19,6 @@ const SAMPLE_LENGTHS: &[usize] = &[
 ];
 const PSA_PERIODS: &[f64] = &[1.0]; // Should be independent of pSA period, but added here for safety in the future
 const DAMPING: f64 = 0.05;
-
-/// Generate synthetic waveform data for benchmarking
-fn generate_waveforms(stations: usize, samples: usize) -> Array2<f64> {
-    // Using a simple sine wave with some noise for realistic computation
-    Array2::from_shape_fn((stations, samples), |(i, j)| {
-        0.5 * ((j as f64 * 0.01 + i as f64).sin() + 0.1 * (j as f64 * 0.1).cos())
-    })
-}
 
 /// Benchmark CAV (Cumulative Absolute Velocity) calculations
 fn bench_cav(c: &mut Criterion) {
@@ -93,9 +89,16 @@ fn bench_cumulative_arias(c: &mut Criterion) {
     group.finish();
 }
 
-/// Benchmark Significant Duration calculations
+/// Benchmark Significant Duration calculations.
+///
+/// This measures the full Ds pipeline as the Python binding
+/// (`_significant_duration` in `src-rust/lib.rs`) uses it: integrating raw
+/// waveforms to cumulative Arias intensity, then binary-searching that for
+/// the threshold crossings. `significant_duration` itself requires a
+/// non-decreasing cumulative intensity array, so the integration step can't
+/// be skipped without benchmarking an unrepresentative, degenerate input.
 fn bench_significant_duration(c: &mut Criterion) {
-    let mut group = c.benchmark_group("Significant_Duration");
+    let mut group = c.benchmark_group("Significant_Duration_Full_Pipeline");
 
     for &stations in STATION_COUNTS {
         for &samples in SAMPLE_LENGTHS {
@@ -107,7 +110,7 @@ fn bench_significant_duration(c: &mut Criterion) {
 
             group.bench_with_input(BenchmarkId::new("Sequential", &param), &view, |b, &v| {
                 b.iter(|| {
-                    significant_duration::significant_duration(
+                    common::significant_duration_from_waveforms(
                         black_box(v),
                         black_box(SAMPLING_RATE),
                         0.05,
