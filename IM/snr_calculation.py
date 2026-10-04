@@ -31,13 +31,13 @@ class SNRResult(NamedTuple):
     for each component (000, 090, ver). The index represents frequencies and
     columns represent the different components."""
 
-    signal_duration: int
-    """Duration of the signal portion in samples (i.e. the number of samples
-    in the signal portion of the waveform)."""
+    signal_duration: float
+    """Duration of the signal portion in seconds, calculated as the number of
+    samples in the signal multiplied by the sampling interval (dt)."""
 
-    noise_duration: int
-    """Duration of the noise portion in samples (i.e. the number of samples
-    in the noise portion of the waveform)."""
+    noise_duration: float
+    """Duration of the noise portion in seconds, calculated as the number of
+    samples in the noise multiplied by the sampling interval (dt)."""
 
 
 def calculate_snr(
@@ -87,15 +87,16 @@ def calculate_snr(
     tp_extra = int(np.ceil(tp_extra))
 
     # Calculate signal and noise areas
-    signal_duration, noise_duration = (nt - max(tp - tp_extra, 0), tp)
+    signal_npts, noise_npts = (nt - max(tp - tp_extra, 0), tp)
+    signal_duration, noise_duration = (signal_npts * dt, noise_npts * dt)
 
     signal_acc, noise_acc = (
-        waveform[:, :, nt - signal_duration :],
-        waveform[:, :, :noise_duration],
+        waveform[:, :, nt - signal_npts :],
+        waveform[:, :, :noise_npts],
     )
 
     # Ensure the noise is not shorter than 1s, if not then skip the calculation
-    if noise_duration * dt < 1.0:
+    if noise_duration < 1.0:
         raise ValueError("Noise duration is less than 1s")
 
     # Apply Taper
