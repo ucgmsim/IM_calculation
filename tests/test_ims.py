@@ -9,6 +9,7 @@ import numpy as np
 import numpy.typing as npt
 import pandas as pd
 import pytest
+import scipy as sp
 import xarray as xr
 from hypothesis import given, settings
 from hypothesis import strategies as st
@@ -994,3 +995,100 @@ def test_rechunks_component_and_time_core_dims(
     expected = ims.peak_ground_acceleration(sample_waveforms)
     for component in expected.data_vars:
         assert_array_equal(expected[component].values, computed[component].values)
+
+
+@pytest.mark.parametrize("dt", [0.0005, 0.005, 0.02])
+def test_nigam_jennings_coefficients_match_scipy_foh(dt: float) -> None:
+    periods = np.array([0.01, 0.05, 0.1, 0.5, 1.0, 10.0])
+    coefficients = ims._nigam_jennings_coefficients(periods, dt, 0.05)
+    for period, row in zip(periods, coefficients):
+        w = 2 * np.pi / period
+        state = np.array([[0, 1], [-(w**2), -2 * 0.05 * w]])
+        # Outputs [u, v] and load -a_g, so the feedthrough is the a_g[n+1] term.
+        a, b, _, d, _ = sp.signal.cont2discrete(
+            (state, np.array([[0.0], [-1.0]]), np.eye(2), np.zeros((2, 1))),
+            dt,
+            method="foh",
+        )
+        b_n = b[:, 0] - a @ d[:, 0]
+        # Rescale the state [u, v] to [w^2 u, v].
+        scale = np.array([w**2, 1.0])
+        a = a * scale[:, np.newaxis] / scale
+        expected = np.concatenate([a.ravel(), b_n * scale, d[:, 0] * scale])
+        np.testing.assert_allclose(row, expected, rtol=1e-12, atol=0)
+
+
+@pytest.mark.parametrize(
+    "period,factor", [(1.0, 1), (0.05, 1), (0.049, 2), (0.025, 2), (0.02, 4), (0.01, 8)]
+)
+def test_upsampling_factors(period: float, factor: int) -> None:
+    assert ims._upsampling_factors(np.array([period]), 0.005)[0] == factor
+
+
+def test_sinc_upsample_interpolates_band_limited_signals() -> None:
+    dt = 0.01
+    t = np.arange(1000) * dt
+    # A pulse well below Nyquist, decayed to zero at both ends of the record.
+    envelope = np.exp(-(((t - 5) / 1.0) ** 2))
+    signal = envelope * np.sin(2 * np.pi * 7.3 * t)
+    upsampled = ims._upsample_record(signal[np.newaxis], 8)[0]
+
+    assert upsampled.shape == ((len(t) - 1) * 8 + 1,)
+    np.testing.assert_allclose(upsampled[::8], signal, atol=1e-12)
+    fine_t = np.arange(len(upsampled)) * dt / 8
+    expected = np.exp(-(((fine_t - 5) / 1.0) ** 2)) * np.sin(2 * np.pi * 7.3 * fine_t)
+    np.testing.assert_allclose(upsampled, expected, atol=1e-8)
+
+
+def test_psa_matches_an_independent_oscillator_solution() -> None:
+    """pSA at periods solved without upsampling must equal the peak response of
+    scipy's own linear-interpolation simulation of the oscillator."""
+    dt = 0.005
+    rng = np.random.default_rng(0)
+    t = np.arange(4000) * dt
+    ag = rng.normal(size=t.size) * np.sin(np.pi * t / t[-1]) ** 2
+    waveforms = np.broadcast_to(ag, (3, 1, t.size))
+    periods = np.array([0.05, 0.1, 0.3, 1.0, 3.0])
+
+    result = ims.pseudo_spectral_acceleration(waveforms, periods, dt)
+
+    for period, value in zip(periods, result["000"].values[0]):
+        w = 2 * np.pi / period
+        system = (
+            np.array([[0.0, 1.0], [-(w**2), -2 * ims.DAMPING * w]]),
+            np.array([[0.0], [-1.0]]),
+            np.array([[1.0, 0.0]]),
+            np.array([[0.0]]),
+        )
+        _, u, _ = sp.signal.lsim(system, ag, t, interp=True)
+        assert value == pytest.approx(w**2 * np.abs(u).max(), rel=1e-8)
+
+
+def test_short_period_psa_tends_to_pga() -> None:
+    """A stiff oscillator moves with the ground, so pSA must approach the peak
+    of the continuous acceleration, including any peak between samples."""
+    dt = 0.02
+
+    def acceleration(t: npt.NDArray[np.float64]) -> npt.NDArray[np.float64]:
+        envelope = np.exp(-(((t - 10) / 3) ** 2))
+        return envelope * (
+            np.sin(2 * np.pi * 1.1 * t) + 0.5 * np.sin(2 * np.pi * 2.3 * t)
+        )
+
+    ag = acceleration(np.arange(1000, dtype=np.float64) * dt)
+    waveforms = np.broadcast_to(ag, (3, 1, ag.size))
+    peak = np.abs(acceleration(np.arange(1000 * 64, dtype=np.float64) * dt / 64)).max()
+
+    psa = ims.pseudo_spectral_acceleration(waveforms, np.array([0.01]), dt)
+    assert psa["000"].item() == pytest.approx(peak, rel=1e-3)
+
+
+def test_upsampled_psa_is_nan_only_for_the_non_finite_station(
+    sample_waveforms: npt.NDArray[np.float64],
+) -> None:
+    waveforms = sample_waveforms.copy()
+    waveforms[ims.Component.COMP_0, 0, 10] = np.nan
+    psa = ims.pseudo_spectral_acceleration(waveforms, [0.02, 1.0], 0.01)
+    for component in ims.ROTD_COMPONENTS:
+        assert np.isnan(psa[component].values[0]).all()
+        assert np.isfinite(psa[component].values[1]).all()

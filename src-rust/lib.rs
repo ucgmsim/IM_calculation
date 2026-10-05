@@ -13,7 +13,7 @@ use pyo3::prelude::*;
 /// import the module.
 #[pymodule]
 mod _core {
-    use numpy::{IntoPyArray, PyArray1, PyArray2, PyArray3, PyReadonlyArray1, PyReadonlyArray2};
+    use numpy::{IntoPyArray, PyArray1, PyArray2, PyArray3, PyReadonlyArray2};
     use pyo3::prelude::*;
 
     use crate::arias_intensity;
@@ -75,8 +75,9 @@ mod _core {
 
     /// Pseudo-spectral acceleration statistics for every station and period.
     ///
-    /// The three components have shape `(ns, nt)`. Returns an `(ns,
-    /// n_periods, 9)` array whose last axis is laid out as
+    /// The three components have shape `(ns, nt)` and `coefficients` has
+    /// shape `(n_periods, 8)`, one oscillator per row as documented on
+    /// [`psa::N_COEFFICIENTS`]. Returns an `(ns, n_periods, 9)` array whose last axis is laid out as
     /// `ROTD_COMPONENTS`: the 000, 090, vertical and geometric mean peaks,
     /// then the five columns [`_rotd`] returns.
     #[pyfunction]
@@ -85,15 +86,13 @@ mod _core {
         comp_0_py: PyReadonlyArray2<f64>,
         comp_90_py: PyReadonlyArray2<f64>,
         comp_ver_py: PyReadonlyArray2<f64>,
-        periods_py: PyReadonlyArray1<f64>,
-        dt: f64,
-        xi: f64,
+        coefficients_py: PyReadonlyArray2<f64>,
     ) -> Bound<'py, PyArray3<f64>> {
         let comp_0 = comp_0_py.as_array();
         let comp_90 = comp_90_py.as_array();
         let comp_ver = comp_ver_py.as_array();
-        let periods = periods_py.as_array();
-        let psa = py.detach(|| psa::psa(&comp_0, &comp_90, &comp_ver, &periods, dt, xi));
+        let coefficients = coefficients_py.as_array();
+        let psa = py.detach(|| psa::psa(&comp_0, &comp_90, &comp_ver, &coefficients));
         psa.into_pyarray(py)
     }
 

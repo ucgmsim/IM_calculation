@@ -1,157 +1,129 @@
 use ndarray::prelude::*;
-use ndarray::{Array1, Ix1};
 
 use crate::rotd::{self, Hull, N_ROTD_STATS};
 
-#[allow(clippy::too_many_arguments)]
-fn newmark_beta_solver(
-    waveform: ArrayView<f64, Ix1>,
-    dt: f64,
-    w: f64,
-    xi: f64,
-    gamma: f64,
-    beta: f64,
-    u0: f64,
-    dudt0: f64,
-) -> Array1<f64> {
-    let nt = waveform.dim();
-    let mut u = Array1::zeros(nt);
-    let one_over_beta_dt_sq = 1.0 / (beta * dt * dt);
-    let one_over_beta_dt = 1.0 / (beta * dt);
-    let k = w * w;
-    let c = 2.0 * xi * w;
-    let c_gamma_over_beta_dt = (gamma * c) / (beta * dt);
-    let one_over_two_beta = 1.0 / (2.0 * beta);
-    // Constants to solve for u_n+1:
-    let kbar = one_over_beta_dt_sq + k + c_gamma_over_beta_dt; // u_n+1
-    let a1 = c_gamma_over_beta_dt + one_over_beta_dt_sq; // u_n
-    let b1 = one_over_beta_dt + c * (gamma / beta - 1.0); // udot_n
-    let c1 = c * dt * (gamma / (2.0 * beta) - 1.0) + one_over_two_beta - 1.0; // uddot_n
+/// Number of coefficients describing one oscillator.
+///
+/// A row of coefficients is the exact discrete-time update of a unit-mass
+/// SDOF oscillator driven by a ground acceleration `ag` that varies linearly
+/// between samples (Nigam and Jennings 1969, equivalently a first-order-hold
+/// discretisation). The state is the pseudo-acceleration `A = ω² u` and the
+/// relative velocity `v`, and the row `[a11, a12, a21, a22, b1, b2, c1, c2]`
+/// steps it as
+///
+/// ```text
+/// A_{n+1} = a11 A_n + a12 v_n + b1 ag_n + c1 ag_{n+1}
+/// v_{n+1} = a21 A_n + a22 v_n + b2 ag_n + c2 ag_{n+1}
+/// ```
+///
+/// The sign of the inertial load `-ag` is folded into the `b` and `c`
+/// coefficients.
+pub const N_COEFFICIENTS: usize = 8;
 
-    // Constants to solve for uddot_n+1
-    let a2 = one_over_beta_dt_sq; // u_n+1 - u_n
-    let b2 = -one_over_beta_dt; // udot_n
-    let c2 = -c1; // uddot_n
-    // Constants to solve for udot_n+1
-    // a'3 = 1 for uddot_n
-    let a3 = 1.0 - gamma; // uddot_n
-    let b3 = gamma; // uddot_n+1
+type Coefficients = [f64; N_COEFFICIENTS];
 
-    u[0] = u0;
-    let mut udot = dudt0;
-    let mut uddot = -waveform[0] - (c * udot + k * u[0]); // negated because ground motion
-
-    // ENCI335 notes solve for u''_n+1, but for numerical stability reasons we really want to solve for displacement directly and then derive velocity and acceleration from that.
-    // Basically the formulations in the ENCI notes solve for acceleration and then integrate to get displacement, but this involves the calculation of
-    // d_pti = waveform[i + 1] - waveform[i]
-    // which is a noisy floating-point operation. We then numerically integrate that noise twice which amplifies the noise carried into the rest of the calculations.
-    // Instead: implicitly solve for displacement and differentiate. The u at each time step is the smoothed response, so it is more robust to signal noise from the waveform.
-    // See https://collab.dvb.bayern/spaces/TUMmodsim/pages/71122788/Newmark-%CE%B2+method for the derivation when beta = 1/4, gamma = 1/2.
-    for i in 0..(nt - 1) {
-        let u_n = u[i];
-        let f_next = -waveform[i + 1]; // Negated because ground motion.
-        let pbar = f_next + a1 * u_n + b1 * udot + c1 * uddot;
-        let u_next = pbar / kbar;
-        let uddot_next = a2 * (u_next - u_n) + b2 * udot + c2 * uddot;
-        let udot_next = udot + dt * (a3 * uddot + b3 * uddot_next);
-        u[i + 1] = u_next;
-        udot = udot_next;
-        uddot = uddot_next;
-    }
-    u
-}
-
-fn choose_gamma_beta(dt: f64, w: f64) -> (f64, f64) {
-    let gamma = 0.5;
-
-    let stability_constant = 0.551328895421792;
-    // Whilst the linear solver is theoretically stable for ratios
-    // dt/T up to 0.551-ish, we want to be a bit more conservative
-    // about when we choose the linear solver instead of the constant
-    // solver. During testing, we pick a conservative 80%. This means we leave
-    // some result accuracy on the table, but I can live with this
-    // because it only affects very short period pSA with large
-    // timesteps.
-    let stability_fraction = 0.8;
-    let effective_stability_constant = stability_fraction * stability_constant;
-    let pi = std::f64::consts::PI;
-    let beta = if dt < effective_stability_constant * (2.0 * pi) / w {
-        1.0 / 6.0
-    } else {
-        1.0 / 4.0
+/// Peak pseudo-acceleration of each component's oscillator, starting from
+/// rest, or `None` if any component's response is not finite.
+///
+/// The 000 and 090 responses are also written to `response_0` and
+/// `response_90`, which the RotD sweep needs in full.
+fn respond(
+    components: [ArrayView1<f64>; 3],
+    coefficients: &Coefficients,
+    response_0: &mut Array1<f64>,
+    response_90: &mut Array1<f64>,
+) -> Option<[f64; 3]> {
+    let [a11, a12, a21, a22, b1, b2, c1, c2] = *coefficients;
+    let step = |(a, v): (f64, f64), window: ArrayView1<f64>| {
+        (
+            a11 * a + a12 * v + b1 * window[0] + c1 * window[1],
+            a21 * a + a22 * v + b2 * window[0] + c2 * window[1],
+        )
     };
-
-    (gamma, beta)
-}
-
-pub fn newmark_beta_method(
-    waveform: ArrayView<f64, Ix1>,
-    dt: f64,
-    w: f64,
-    xi: f64,
-    u0: f64,
-    dudt0: f64,
-) -> Array1<f64> {
-    let (gamma, beta) = choose_gamma_beta(dt, w);
-    newmark_beta_solver(waveform, dt, w, xi, gamma, beta, u0, dudt0)
+    let [comp_0, comp_90, comp_ver] = components;
+    response_0[0] = 0.0;
+    response_90[0] = 0.0;
+    let mut states = [(0.0, 0.0); 3];
+    let mut peaks = [0.0f64; 3];
+    azip!((
+        window_0 in comp_0.windows(2),
+        window_90 in comp_90.windows(2),
+        window_ver in comp_ver.windows(2),
+        next_0 in response_0.slice_mut(s![1..]),
+        next_90 in response_90.slice_mut(s![1..]),
+    ) {
+        states = [
+            step(states[0], window_0),
+            step(states[1], window_90),
+            step(states[2], window_ver),
+        ];
+        *next_0 = states[0].0;
+        *next_90 = states[1].0;
+        for (peak, state) in peaks.iter_mut().zip(states) {
+            *peak = peak.max(state.0.abs());
+        }
+    });
+    // A non-finite sample makes the state non-finite from that step on, since
+    // no arithmetic turns inf or NaN finite again. The peak folds ignore NaN,
+    // so the final state is what reveals it.
+    states
+        .iter()
+        .all(|(a, v)| a.is_finite() && v.is_finite())
+        .then_some(peaks)
 }
 
 /// Columns of a pSA row: the 000, 090, vertical and geometric mean peaks,
 /// then the five RotD statistics of [`rotd::rotd_stats`].
 pub const N_PSA_COMPONENTS: usize = 4 + N_ROTD_STATS;
 
-/// Peak pseudo-spectral acceleration of a displacement response.
-///
-/// Multiplying by `w_squared` converts the peak relative displacement of the
-/// unit-mass oscillator to a pseudo-spectral acceleration.
-fn peak(response: &Array1<f64>, w_squared: f64) -> f64 {
-    w_squared * response.iter().fold(0.0f64, |m, &u| m.max(u.abs()))
-}
-
 /// Pseudo-spectral acceleration statistics for every station and period.
+///
+/// Row `i` of `coefficients` describes the oscillator for period `i` at the
+/// sampling interval of the components, as documented on [`N_COEFFICIENTS`].
 /// Output shape: (stations, periods, components = 000, 090, VER, GEOM, rotd0, rotd50, rotd100, theta0, theta100).
 pub fn psa(
     comp_0: &ArrayView2<f64>,
     comp_90: &ArrayView2<f64>,
     comp_ver: &ArrayView2<f64>,
-    periods: &ArrayView1<f64>,
-    dt: f64,
-    xi: f64,
+    coefficients: &ArrayView2<f64>,
 ) -> Array3<f64> {
     assert!(
         comp_0.dim() == comp_90.dim() && comp_0.dim() == comp_ver.dim(),
         "components must have matching shapes"
     );
-    let ns = comp_0.nrows();
-    let mut out = Array3::zeros((ns, periods.len(), N_PSA_COMPONENTS));
-    let mut hull = Hull::with_capacity(comp_0.ncols());
-    for (index, &period) in periods.iter().enumerate() {
-        let w = std::f64::consts::TAU / period;
-        let w_squared = w * w;
+    assert_eq!(
+        coefficients.ncols(),
+        N_COEFFICIENTS,
+        "coefficients must have {N_COEFFICIENTS} columns"
+    );
+    let (ns, nt) = comp_0.dim();
+    let mut out = Array3::zeros((ns, coefficients.nrows(), N_PSA_COMPONENTS));
+    if nt == 0 {
+        return out;
+    }
+    let mut hull = Hull::with_capacity(nt);
+    let mut response_0 = Array1::zeros(nt);
+    let mut response_90 = Array1::zeros(nt);
+    for (index, row) in coefficients.rows().into_iter().enumerate() {
+        let oscillator: Coefficients = std::array::from_fn(|k| row[k]);
         for s in 0..ns {
-            let mut row = out.slice_mut(s![s, index, ..]);
-            let row_is_finite = comp_0.row(s).iter().all(|v| v.is_finite())
-                && comp_90.row(s).iter().all(|v| v.is_finite())
-                && comp_ver.row(s).iter().all(|v| v.is_finite());
-            if !row_is_finite {
-                // A non-finite input sample poisons the Newmark recursion
-                // from that point on, but the peak fold below would silently
-                // ignore the resulting NaN tail. Short-circuit instead.
-                row.fill(f64::NAN);
+            let mut out_row = out.slice_mut(s![s, index, ..]);
+            let Some([peak_0, peak_90, peak_ver]) = respond(
+                [comp_0.row(s), comp_90.row(s), comp_ver.row(s)],
+                &oscillator,
+                &mut response_0,
+                &mut response_90,
+            ) else {
+                out_row.fill(f64::NAN);
                 continue;
-            }
-            let response_0 = newmark_beta_method(comp_0.row(s), dt, w, xi, 0.0, 0.0);
-            let response_90 = newmark_beta_method(comp_90.row(s), dt, w, xi, 0.0, 0.0);
-            let response_ver = newmark_beta_method(comp_ver.row(s), dt, w, xi, 0.0, 0.0);
-            let mut sweep = hull.peaks(response_0.view(), response_90.view());
-            sweep.iter_mut().for_each(|peak| *peak *= w_squared);
-            let peak_0 = peak(&response_0, w_squared);
-            let peak_90 = peak(&response_90, w_squared);
-            row[0] = peak_0;
-            row[1] = peak_90;
-            row[2] = peak(&response_ver, w_squared);
-            row[3] = (peak_0 * peak_90).sqrt();
-            row.slice_mut(s![4..])
+            };
+            let sweep = hull.peaks(response_0.view(), response_90.view());
+            out_row[0] = peak_0;
+            out_row[1] = peak_90;
+            out_row[2] = peak_ver;
+            out_row[3] = (peak_0 * peak_90).sqrt();
+            out_row
+                .slice_mut(s![4..])
                 .assign(&ArrayView1::from(&rotd::rotd_stats(sweep)));
         }
     }
@@ -165,141 +137,114 @@ mod tests {
     use approx::assert_abs_diff_eq;
     use std::f64::consts::PI;
     const XI: f64 = 0.05;
-    // Linear gamma and beta settings
-    const GAMMA: f64 = 0.5;
-    const BETA: f64 = 1.0 / 6.0;
-    const M: f64 = 1.0;
 
-    #[test]
-    fn test_newmark_linear_parameters() {
-        let dt = 0.01f64;
-        let w = 2.0 * PI; // T_n = 1
-        let (gamma, beta) = choose_gamma_beta(dt, w);
-        assert_eq!((gamma, beta), (0.5, 1.0 / 6.0));
+    /// Coefficients for angular frequency `w` and damping ratio `xi` at
+    /// sampling interval `dt`, from a scaled-and-squared Taylor series of the
+    /// matrix exponential the Python layer takes with `scipy.linalg.expm`.
+    fn coefficients(dt: f64, w: f64, xi: f64) -> Coefficients {
+        // State [u, v, p, p'] with p = -ag varying linearly over the step.
+        let mut m = Array2::<f64>::zeros((4, 4));
+        m[[0, 1]] = dt;
+        m[[1, 0]] = -w * w * dt;
+        m[[1, 1]] = -2.0 * xi * w * dt;
+        m[[1, 2]] = dt;
+        m[[2, 3]] = 1.0;
+        let norm = m
+            .rows()
+            .into_iter()
+            .map(|row| row.iter().map(|x| x.abs()).sum::<f64>())
+            .fold(0.0, f64::max);
+        let squarings = norm.log2().ceil().max(0.0) as i32 + 1;
+        let scaled = m * 0.5f64.powi(squarings);
+        let mut term = Array2::<f64>::eye(4);
+        let mut e = term.clone();
+        for k in 1..=20 {
+            term = term.dot(&scaled) / k as f64;
+            e += &term;
+        }
+        for _ in 0..squarings {
+            e = e.dot(&e);
+        }
+        let w2 = w * w;
+        [
+            e[[0, 0]],
+            e[[0, 1]] * w2,
+            e[[1, 0]] / w2,
+            e[[1, 1]],
+            -(e[[0, 2]] - e[[0, 3]]) * w2,
+            -(e[[1, 2]] - e[[1, 3]]),
+            -e[[0, 3]] * w2,
+            -e[[1, 3]],
+        ]
+    }
+
+    /// Pseudo-acceleration response to a single component.
+    fn response(waveform: &Array1<f64>, coefficients: &Coefficients) -> Array1<f64> {
+        let mut response = Array1::zeros(waveform.len());
+        let mut unused = Array1::zeros(waveform.len());
+        let view = waveform.view();
+        respond([view, view, view], coefficients, &mut response, &mut unused);
+        response
     }
 
     #[test]
-    fn test_newmark_const_parameters() {
-        let dt = 0.01f64;
-        let w = 100.0 * 2.0 * PI; // T_n = 0.01
-        let (gamma, beta) = choose_gamma_beta(dt, w);
-        assert_eq!((gamma, beta), (0.5, 0.25));
-    }
-
-    fn differentiate(waveform: &Array<f64, Ix1>, dt: f64) -> Array<f64, Ix1> {
-        let nt = waveform.dim();
-        Array1::from_shape_fn(nt, |i| {
-            if i == 0 {
-                (waveform[i + 1] - waveform[i]) / dt
-            } else if i == nt - 1 {
-                (waveform[i] - waveform[i - 1]) / dt
-            } else {
-                (waveform[i + 1] - waveform[i - 1]) / (2.0 * dt)
-            }
-        })
-    }
-
-    fn ddifferentiate(waveform: &Array<f64, Ix1>, dt: f64) -> Array<f64, Ix1> {
-        let nt = waveform.dim();
-        Array1::from_shape_fn(nt, |i| {
-            if i == 0 {
-                (waveform[i + 2] - 2.0 * waveform[i + 1] + waveform[i]) / (dt * dt)
-            } else if i == nt - 1 {
-                (waveform[i] - 2.0 * waveform[i - 1] + waveform[i - 2]) / (dt * dt)
-            } else {
-                (waveform[i + 1] - 2.0 * waveform[i] + waveform[i - 1]) / (dt * dt)
-            }
-        })
-    }
-
-    #[test]
-    fn test_newmark_beta_single_zeros() {
+    fn test_zeros() {
         let waveform = Array1::<f64>::zeros(100);
-        let dt = 0.01;
-        let w = 1.0;
-
-        let u = newmark_beta_solver(waveform.view(), dt, w, XI, GAMMA, BETA, 0.0, 0.0);
-        let expected = Array1::<f64>::zeros(100);
-        assert_eq!(u, expected);
+        let a = response(&waveform, &coefficients(0.01, 1.0, XI));
+        assert_eq!(a, Array1::<f64>::zeros(100));
     }
 
     #[test]
-    fn test_newmark_beta_solves_constant() {
+    fn test_solves_constant() {
         let dt = 0.001;
         let waveform = Array1::<f64>::ones(100_000);
-        let w = 2.0 * PI;
-
-        let u = newmark_beta_solver(waveform.view(), dt, w, XI, GAMMA, BETA, 0.0, 0.0);
-
-        // Of course we could use the exact solution here. This test is to determine
-        // the long-term behaviour of the solver accumulating floating point error.
-        let uss = -M / (M * w * w);
-        let uss_est = u[waveform.dim() - 1];
-        let err = (uss_est - uss).abs();
-        assert!(
-            err < 1e-4,
-            "NB method did not solve for steady-state solution (uss = {}): |{} - {}| = {} > 1e-4",
-            uss,
-            uss,
-            uss_est,
-            err
-        );
+        let a = response(&waveform, &coefficients(dt, 2.0 * PI, XI));
+        // The long-run steady state, u = -1 / w^2, also checks the recursion
+        // does not accumulate floating point error.
+        assert_abs_diff_eq!(a[waveform.len() - 1], -1.0, epsilon = 1e-12);
     }
 
     #[test]
-    fn test_newmark_beta_solves_equation() {
-        // Test a more complicated sum of frequencies
-        let t = Array1::<f64>::linspace(0.0, 10.0, 100_000);
-        let dt = t[1] - t[0];
-        // W(t) = sum_i 1/i * sin(pi * i * t)
-        let waveform = t.map(|&t| {
-            (1..100)
-                .map(|freq| {
-                    let freq_f = freq as f64;
-                    1.0 / freq_f * (freq_f * PI * t).sin()
-                })
-                .sum()
-        });
-        let w = 2.0 * PI;
+    fn test_is_exact_for_a_ramp() {
+        // A ramp is piecewise linear, so the recurrence should reproduce the
+        // analytical response to rounding error even at a coarse step.
+        let dt = 0.02;
+        let w = 2.0 * PI / 0.3;
+        let t = Array1::from_shape_fn(2000, |i| i as f64 * dt);
+        for xi in [0.0, XI, 0.7] {
+            let a = response(&t, &coefficients(dt, w, xi));
 
-        let u = newmark_beta_solver(waveform.view(), dt, w, XI, GAMMA, BETA, 0.0, 0.0);
-
-        let du = differentiate(&u, dt);
-        let du2 = ddifferentiate(&u, dt);
-        let c = 2.0 * XI * w;
-        let k = M * w * w;
-        let sdof_invariant = M * du2 + c * du + k * u + M * waveform;
-        // Skipping the first and last value of u because the differentiation is less accurate at the boundary.
-
-        let max_deviation = sdof_invariant
-            .slice(s![1..sdof_invariant.len() - 1])
-            .map(|&x| x.abs())
-            .fold(0.0, |x: f64, &y| x.max(y));
-        assert_abs_diff_eq!(max_deviation, 0.0, epsilon = 5e-4);
+            // u'' + 2 xi w u' + w^2 u = -t from rest.
+            let wd = w * (1.0 - xi * xi).sqrt();
+            let c = -2.0 * xi / w.powi(3);
+            let d = (1.0 / (w * w) + xi * w * c) / wd;
+            let u = t.map(|&x| {
+                -(x / (w * w) - 2.0 * xi / w.powi(3))
+                    + (-xi * w * x).exp() * (c * (wd * x).cos() + d * (wd * x).sin())
+            });
+            assert_abs_diff_eq!(a, u * w * w, epsilon = 1e-9);
+        }
     }
 
     #[test]
-    fn test_newmark_solves_undamped_free_vibration() {
+    fn test_solves_critically_damped_harmonic_oscillation() {
         let t = Array1::<f64>::linspace(0.0, 10.0, 10000);
         let dt = t[1] - t[0];
-        let waveform = Array1::zeros(t.dim());
-        let w = 2.0 * PI;
+        let waveform = t.sin();
 
-        let u = newmark_beta_solver(waveform.view(), dt, w, 0.0, GAMMA, BETA, 1.0, 0.0);
-        let analytical = (t * w).cos();
-        assert_abs_diff_eq!(u, analytical, epsilon = 5e-4);
+        let a = response(&waveform, &coefficients(dt, 1.0, 1.0));
+        // A sine is not piecewise linear, so expect an O(dt^2) error.
+        let analytical = t.map(|&x| -0.5 * (-x).exp() * (x - x.exp() * x.cos() + 1.0));
+        assert_abs_diff_eq!(a, analytical, epsilon = 1e-7);
     }
 
-    #[test]
-    fn test_newmark_solves_damped_free_vibration() {
-        let t = Array1::<f64>::linspace(0.0, 10.0, 10000);
-        let dt = t[1] - t[0];
-        let waveform = Array1::zeros(t.dim());
-        let w = 1.0;
-        let xi = 1.0;
-        let u = newmark_beta_solver(waveform.view(), dt, w, xi, GAMMA, BETA, 1.0, 0.0);
-        let analytical = t.map(|&x| (-x).exp() * (x + 1.0));
-        assert_abs_diff_eq!(u, analytical, epsilon = 5e-4);
+    fn coefficient_table(periods: &[f64], dt: f64) -> Array2<f64> {
+        Array2::from(
+            periods
+                .iter()
+                .map(|&period| coefficients(dt, 2.0 * PI / period, XI))
+                .collect::<Vec<_>>(),
+        )
     }
 
     #[test]
@@ -309,31 +254,23 @@ mod tests {
         // peak ground motion path run on those responses.
         let t = Array1::<f64>::linspace(0.0, 2.0, 512);
         let dt = t[1] - t[0];
-        let comp_0 = t.map(|&x| (3.0 * x).sin()).insert_axis(Axis(0));
-        let comp_90 = t.map(|&x| 0.7 * (5.0 * x).cos()).insert_axis(Axis(0));
-        let comp_ver = t.map(|&x| 0.2 * (7.0 * x).sin()).insert_axis(Axis(0));
-        let period = 1.0;
-        let w_squared = (std::f64::consts::TAU / period).powi(2);
+        let comp_0 = t.map(|&x| (3.0 * x).sin());
+        let comp_90 = t.map(|&x| 0.7 * (5.0 * x).cos());
+        let comp_ver = t.map(|&x| 0.2 * (7.0 * x).sin());
 
         let result = psa(
-            &comp_0.view(),
-            &comp_90.view(),
-            &comp_ver.view(),
-            &array![period].view(),
-            dt,
-            XI,
+            &comp_0.view().insert_axis(Axis(0)),
+            &comp_90.view().insert_axis(Axis(0)),
+            &comp_ver.view().insert_axis(Axis(0)),
+            &coefficient_table(&[1.0], dt).view(),
         );
 
-        let responses: Vec<Array2<f64>> = [&comp_0, &comp_90, &comp_ver]
+        let oscillator = coefficients(dt, 2.0 * PI, XI);
+        let responses: Vec<Array1<f64>> = [&comp_0, &comp_90, &comp_ver]
             .iter()
-            .map(|comp| {
-                newmark_beta_method(comp.row(0), dt, w_squared.sqrt(), XI, 0.0, 0.0)
-                    .insert_axis(Axis(0))
-            })
+            .map(|comp| response(comp, &oscillator))
             .collect();
-        let peak = |response: &Array2<f64>| {
-            w_squared * response.iter().fold(0.0f64, |m, &u| m.max(u.abs()))
-        };
+        let peak = |response: &Array1<f64>| response.iter().fold(0.0f64, |m, &a| m.max(a.abs()));
 
         for (column, response) in responses.iter().enumerate() {
             assert_abs_diff_eq!(result[[0, 0, column]], peak(response), epsilon = 1e-12);
@@ -343,11 +280,11 @@ mod tests {
             (peak(&responses[0]) * peak(&responses[1])).sqrt(),
             epsilon = 1e-12
         );
-        // The statistics of the scaled responses, straight off the peak
-        // ground motion entry point.
+        // The statistics of the responses, straight off the peak ground
+        // motion entry point.
         let stats = crate::rotd::rotd(
-            (&responses[0] * w_squared).view(),
-            (&responses[1] * w_squared).view(),
+            responses[0].view().insert_axis(Axis(0)),
+            responses[1].view().insert_axis(Axis(0)),
         );
         for column in 0..N_ROTD_STATS {
             assert_abs_diff_eq!(
@@ -360,9 +297,9 @@ mod tests {
 
     #[test]
     fn test_psa_is_nan_when_a_sample_is_non_finite() {
-        // A NaN sample poisons the Newmark recursion from that point on, but
-        // the peak fold used to ignore the resulting NaN tail and return the
-        // (finite, wrong) peak of the record up to that point instead.
+        // A NaN sample poisons the oscillator recursion from that point on,
+        // but the peak fold used to ignore the resulting NaN tail and return
+        // the (finite, wrong) peak of the record up to that point instead.
         let t = Array1::<f64>::linspace(0.0, 2.0, 512);
         let dt = t[1] - t[0];
         let mut comp_0 = t.map(|&x| (3.0 * x).sin());
@@ -375,9 +312,7 @@ mod tests {
             &comp_0.view(),
             &comp_90.view(),
             &comp_ver.view(),
-            &array![1.0].view(),
-            dt,
-            XI,
+            &coefficient_table(&[1.0], dt).view(),
         );
 
         for column in 0..N_PSA_COMPONENTS {
@@ -390,15 +325,24 @@ mod tests {
     }
 
     #[test]
-    fn test_newmark_solves_damped_harmonic_oscillation() {
-        let t = Array1::<f64>::linspace(0.0, 10.0, 10000);
+    fn test_psa_is_nan_when_the_last_sample_is_infinite() {
+        // The last sample only reaches the final state, which is then
+        // infinite rather than NaN.
+        let t = Array1::<f64>::linspace(0.0, 2.0, 512);
         let dt = t[1] - t[0];
-        let waveform = t.sin();
-        let w = 1.0;
-        let xi = 1.0;
-        let u = newmark_beta_solver(waveform.view(), dt, w, xi, GAMMA, BETA, 0.0, 0.0);
+        let comp_0 = t.map(|&x| (3.0 * x).sin()).insert_axis(Axis(0));
+        let comp_90 = t.map(|&x| 0.7 * (5.0 * x).cos()).insert_axis(Axis(0));
+        let mut comp_ver = t.map(|&x| 0.2 * (7.0 * x).sin());
+        comp_ver[511] = f64::INFINITY;
+        let comp_ver = comp_ver.insert_axis(Axis(0));
 
-        let analytical = t.map(|&x| -0.5 * (-x).exp() * (x - x.exp() * x.cos() + 1.0));
-        assert_abs_diff_eq!(u, analytical, epsilon = 5e-4);
+        let result = psa(
+            &comp_0.view(),
+            &comp_90.view(),
+            &comp_ver.view(),
+            &coefficient_table(&[1.0], dt).view(),
+        );
+
+        assert!(result.iter().all(|v| v.is_nan()), "{result}");
     }
 }
