@@ -11,7 +11,7 @@ import scipy as sp
 import xarray as xr
 
 from IM import (
-    _core,  # ty: ignore[unresolved-import]
+    _core,
     konno_ohmachi,
 )
 
@@ -744,7 +744,10 @@ def _psa_kernel(
             # Keep the original samples exactly rather than their
             # interpolated round trip.
             chunk = original if factor == 1 else upsampled[..., :: max_factor // factor]
-            psa[stations, factors == factor] = _core._psa(*chunk, coefficients)
+            comp_0, comp_90, comp_ver = chunk
+            psa[stations, factors == factor] = _core._psa(
+                comp_0, comp_90, comp_ver, coefficients
+            )
     return psa.reshape(lead + (len(periods), len(ROTD_COMPONENTS)))
 
 
