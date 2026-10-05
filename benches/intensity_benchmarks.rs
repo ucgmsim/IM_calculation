@@ -17,8 +17,19 @@ const SAMPLE_LENGTHS: &[usize] = &[
     20_000, // 100 seconds
     40_000, // 200 seconds
 ];
-const PSA_PERIODS: &[f64] = &[1.0]; // Should be independent of pSA period, but added here for safety in the future
-const DAMPING: f64 = 0.05;
+// Oscillator coefficients for T = 1 s, 5% damping at SAMPLING_RATE, from
+// `IM.ims._nigam_jennings_coefficients(np.array([1.0]), 0.005)`. The cost of
+// the recurrence does not depend on their values.
+const PSA_COEFFICIENTS: [f64; psa::N_COEFFICIENTS] = [
+    0.9995070766804318,
+    0.19704993255509468,
+    -0.004991333100781255,
+    0.996370929600225,
+    -0.00032856713331003905,
+    -0.0024941543916031455,
+    -0.00016435618625817934,
+    -0.00249717870917811,
+];
 
 /// Benchmark CAV (Cumulative Absolute Velocity) calculations
 fn bench_cav(c: &mut Criterion) {
@@ -131,30 +142,26 @@ fn bench_psa(c: &mut Criterion) {
     // PSA is expensive, so we might want to use a smaller sample size
     group.sample_size(10);
 
-    for &period in PSA_PERIODS {
-        for &stations in STATION_COUNTS {
-            // For PSA, use smaller sample sets to keep benchmark times reasonable
-            for &samples in SAMPLE_LENGTHS {
-                let waveforms = generate_waveforms(stations, samples);
-                let view = waveforms.view();
-                let periods = array![period];
-                let param = format!("T{:.1}s_{}stn_{}smp", period, stations, samples);
+    let coefficients = array![PSA_COEFFICIENTS];
+    for &stations in STATION_COUNTS {
+        // For PSA, use smaller sample sets to keep benchmark times reasonable
+        for &samples in SAMPLE_LENGTHS {
+            let waveforms = generate_waveforms(stations, samples);
+            let view = waveforms.view();
+            let param = format!("T1.0s_{}stn_{}smp", stations, samples);
 
-                group.throughput(Throughput::Bytes((stations * samples * 8) as u64));
+            group.throughput(Throughput::Bytes((stations * samples * 8) as u64));
 
-                group.bench_with_input(BenchmarkId::new("Sequential", &param), &view, |b, &v| {
-                    b.iter(|| {
-                        psa::psa(
-                            black_box(&v),
-                            black_box(&v),
-                            black_box(&v),
-                            black_box(&periods.view()),
-                            black_box(SAMPLING_RATE),
-                            black_box(DAMPING),
-                        )
-                    })
-                });
-            }
+            group.bench_with_input(BenchmarkId::new("Sequential", &param), &view, |b, &v| {
+                b.iter(|| {
+                    psa::psa(
+                        black_box(&v),
+                        black_box(&v),
+                        black_box(&v),
+                        black_box(&coefficients.view()),
+                    )
+                })
+            });
         }
     }
 

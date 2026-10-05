@@ -581,6 +581,116 @@ def ds595(waveform: Waveform, dt: float) -> xr.Dataset:
     return significant_duration(waveform, dt, 5, 95, IM.Ds595.value)
 
 
+OSCILLATOR_SAMPLES_PER_PERIOD = 10
+"""Minimum samples per oscillator period before a record is upsampled for pSA.
+
+This is the conventional rule (Nigam and Jennings 1969; Boore and Goulet
+2014) for resolving the peak oscillator response.
+"""
+
+_UPSAMPLE_BUDGET = 2**24
+"""Samples of upsampling FFT (across all components) to hold in memory at once."""
+
+
+def _nigam_jennings_coefficients(
+    periods: npt.NDArray[np.float64], dt: float, damping: float = DAMPING
+) -> npt.NDArray[np.float64]:
+    """Exact recurrence coefficients for unit-mass SDOF oscillators.
+
+    The oscillator equation `u'' + 2 ξ ω u' + ω² u = -a_g(t)` is integrated
+    exactly over each step assuming `a_g` varies linearly between samples
+    (Nigam and Jennings 1969). This is the first-order-hold discretisation of
+    the state `[u, u']`, computed as the matrix exponential of the state
+    matrix augmented with the load and its slope, which avoids the
+    cancellation the textbook closed-form expressions suffer when `ω dt` is
+    small.
+
+    Parameters
+    ----------
+    periods : ndarray of float64
+        Natural periods of the oscillators (s).
+    dt : float
+        Timestep of the ground acceleration (s).
+    damping : float, optional
+        Fraction of critical damping.
+
+    Returns
+    -------
+    ndarray of float64
+        Shape `(len(periods), 8)`, one oscillator per row, laid out as
+        documented on `N_COEFFICIENTS` in `src-rust/psa.rs`. The state is
+        rescaled to `[ω² u, u']` so the recurrence yields pseudo-acceleration.
+    """
+    w = 2 * np.pi / periods
+    # Augmented state [u, v, p, p'] with load p = -a_g and constant slope p'.
+    state = np.zeros((len(w), 4, 4))
+    state[:, 0, 1] = 1.0
+    state[:, 1, 0] = -(w**2)
+    state[:, 1, 1] = -2 * damping * w
+    state[:, 1, 2] = 1.0
+    state[:, 2, 3] = 1.0 / dt
+    transition = sp.linalg.expm(state * dt)
+    # x[n+1] = Φ x[n] + Γ0 p[n] + Γ1 (p[n+1] - p[n]), with p = -a_g.
+    phi = transition[:, :2, :2]
+    gamma_0 = transition[:, :2, 2]
+    gamma_1 = transition[:, :2, 3]
+    coefficients = np.concatenate(
+        [phi.reshape(-1, 4), gamma_1 - gamma_0, -gamma_1], axis=1
+    )
+    # Rescale the displacement row and column to pseudo-acceleration.
+    coefficients[:, [1, 4, 6]] *= (w**2)[:, np.newaxis]
+    coefficients[:, 2] /= w**2
+    return coefficients
+
+
+def _upsampling_factors(
+    periods: npt.NDArray[np.float64], dt: float
+) -> npt.NDArray[np.int64]:
+    """Power-of-two upsampling factor giving each period enough samples.
+
+    Parameters
+    ----------
+    periods : ndarray of float64
+        Natural periods of the oscillators (s).
+    dt : float
+        Timestep of the record (s).
+
+    Returns
+    -------
+    ndarray of int64
+        The smallest power of two `f` with `dt / f <= period / 10`.
+    """
+    ratio = OSCILLATOR_SAMPLES_PER_PERIOD * dt / periods
+    exponent = np.ceil(np.log2(np.maximum(ratio, 1.0)))
+    return (2**exponent).astype(np.int64)
+
+
+def _upsample_record(waveforms: np.ndarray, factor: int) -> np.ndarray:
+    """Band-limited (sinc) interpolation of waveforms by an integer factor.
+
+    The record is zero padded to at least twice its length so the periodic
+    interpolation does not wrap the end of the record onto its start.
+
+    Parameters
+    ----------
+    waveforms : ndarray
+        Waveforms of shape `(..., nt)`.
+    factor : int
+        Upsampling factor.
+
+    Returns
+    -------
+    ndarray
+        Shape `(..., (nt - 1) * factor + 1)`, spanning the same time interval
+        and preserving the original samples.
+    """
+    nt = waveforms.shape[-1]
+    padded = np.zeros(waveforms.shape[:-1] + (sp.fft.next_fast_len(2 * nt, real=True),))
+    padded[..., :nt] = waveforms
+    upsampled = sp.signal.resample(padded, padded.shape[-1] * factor, axis=-1)
+    return upsampled[..., : (nt - 1) * factor + 1]
+
+
 def _psa_kernel(
     block: np.ndarray,
     *,
@@ -603,8 +713,31 @@ def _psa_kernel(
     np.ndarray
         A chunk of solved pSA values.
     """
-    (comp_0, comp_90, comp_ver), lead = _components(block)
-    psa = _core._psa(comp_0, comp_90, comp_ver, periods, dt, DAMPING)
+    components, lead = _components(block)
+    n_stations, nt = components.shape[1:]
+    factors = _upsampling_factors(periods, dt)
+    groups = {
+        factor: _nigam_jennings_coefficients(periods[factors == factor], dt / factor)
+        for factor in np.unique(factors)
+    }
+    max_factor = int(factors.max(initial=1))
+    batch = (
+        n_stations
+        if max_factor == 1
+        else max(1, _UPSAMPLE_BUDGET // (len(components) * 2 * nt * max_factor))
+    )
+    psa = np.empty((n_stations, len(periods), len(ROTD_COMPONENTS)))
+    for start in range(0, n_stations, batch):
+        stations = slice(start, start + batch)
+        original = components[:, stations]
+        upsampled = (
+            _upsample_record(original, max_factor) if max_factor > 1 else original
+        )
+        for factor, coefficients in groups.items():
+            # Keep the original samples exactly rather than their
+            # interpolated round trip.
+            chunk = original if factor == 1 else upsampled[..., :: max_factor // factor]
+            psa[stations, factors == factor] = _core._psa(*chunk, coefficients)
     return psa.reshape(lead + (len(periods), len(ROTD_COMPONENTS)))
 
 
@@ -616,7 +749,7 @@ def pseudo_spectral_acceleration(
     """Compute pseudo-spectral acceleration (PSA) statistics.
 
     Calculates PSA for single-degree-of-freedom oscillators across various
-    periods using the Newmark-beta method and computes rotated (RotD) statistics.
+    periods.
 
     Parameters
     ----------
