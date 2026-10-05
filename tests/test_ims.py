@@ -1032,8 +1032,11 @@ def test_psa_matches_an_independent_oscillator_solution() -> None:
 
     for period, value in zip(periods, result["000"].values[0]):
         w = 2 * np.pi / period
-        system = sp.signal.StateSpace(
-            [[0, 1], [-(w**2), -2 * ims.DAMPING * w]], [[0], [-1]], [[1, 0]], [[0]]
+        system = (
+            np.array([[0.0, 1.0], [-(w**2), -2 * ims.DAMPING * w]]),
+            np.array([[0.0], [-1.0]]),
+            np.array([[1.0, 0.0]]),
+            np.array([[0.0]]),
         )
         _, u, _ = sp.signal.lsim(system, ag, t, interp=True)
         assert value == pytest.approx(w**2 * np.abs(u).max(), rel=1e-8)
@@ -1050,9 +1053,9 @@ def test_short_period_psa_tends_to_pga() -> None:
             np.sin(2 * np.pi * 1.1 * t) + 0.5 * np.sin(2 * np.pi * 2.3 * t)
         )
 
-    ag = acceleration(np.arange(1000) * dt)
+    ag = acceleration(np.arange(1000, dtype=np.float64) * dt)
     waveforms = np.broadcast_to(ag, (3, 1, ag.size))
-    peak = np.abs(acceleration(np.arange(1000 * 64) * dt / 64)).max()
+    peak = np.abs(acceleration(np.arange(1000 * 64, dtype=np.float64) * dt / 64)).max()
 
     psa = ims.pseudo_spectral_acceleration(waveforms, np.array([0.01]), dt)
     assert psa["000"].item() == pytest.approx(peak, rel=1e-3)
