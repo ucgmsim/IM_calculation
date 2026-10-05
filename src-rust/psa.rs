@@ -23,7 +23,7 @@ pub const N_COEFFICIENTS: usize = 8;
 type Coefficients = [f64; N_COEFFICIENTS];
 
 /// Peak pseudo-acceleration of each component's oscillator, starting from
-/// rest.
+/// rest, or `None` if any component's response is not finite.
 ///
 /// The 000 and 090 responses are also written to `response_0` and
 /// `response_90`, which the RotD sweep needs in full.
@@ -32,7 +32,7 @@ fn respond(
     coefficients: &Coefficients,
     response_0: &mut Array1<f64>,
     response_90: &mut Array1<f64>,
-) -> [f64; 3] {
+) -> Option<[f64; 3]> {
     let [a11, a12, a21, a22, b1, b2, c1, c2] = *coefficients;
     let step = |(a, v): (f64, f64), window: ArrayView1<f64>| {
         (
@@ -45,8 +45,6 @@ fn respond(
     response_90[0] = 0.0;
     let mut states = [(0.0, 0.0); 3];
     let mut peaks = [0.0f64; 3];
-    // The three components are independent recurrences, so stepping them
-    // together lets their latency-bound updates overlap.
     azip!((
         window_0 in comp_0.windows(2),
         window_90 in comp_90.windows(2),
@@ -65,7 +63,13 @@ fn respond(
             *peak = peak.max(state.0.abs());
         }
     });
-    peaks
+    // A non-finite sample makes the state non-finite from that step on, since
+    // no arithmetic turns inf or NaN finite again. The peak folds ignore NaN,
+    // so the final state is what reveals it.
+    states
+        .iter()
+        .all(|(a, v)| a.is_finite() && v.is_finite())
+        .then_some(peaks)
 }
 
 /// Columns of a pSA row: the 000, 090, vertical and geometric mean peaks,
@@ -97,33 +101,22 @@ pub fn psa(
     if nt == 0 {
         return out;
     }
-    // A non-finite input sample poisons the oscillator recursion from that
-    // point on, but the peak folds would silently ignore the resulting NaN
-    // tail. Short-circuit those stations instead.
-    let finite: Vec<bool> = (0..ns)
-        .map(|s| {
-            [comp_0, comp_90, comp_ver]
-                .iter()
-                .all(|comp| comp.row(s).iter().all(|v| v.is_finite()))
-        })
-        .collect();
     let mut hull = Hull::with_capacity(nt);
     let mut response_0 = Array1::zeros(nt);
     let mut response_90 = Array1::zeros(nt);
     for (index, row) in coefficients.rows().into_iter().enumerate() {
         let oscillator: Coefficients = std::array::from_fn(|k| row[k]);
-        for (s, &is_finite) in finite.iter().enumerate() {
+        for s in 0..ns {
             let mut out_row = out.slice_mut(s![s, index, ..]);
-            if !is_finite {
-                out_row.fill(f64::NAN);
-                continue;
-            }
-            let [peak_0, peak_90, peak_ver] = respond(
+            let Some([peak_0, peak_90, peak_ver]) = respond(
                 [comp_0.row(s), comp_90.row(s), comp_ver.row(s)],
                 &oscillator,
                 &mut response_0,
                 &mut response_90,
-            );
+            ) else {
+                out_row.fill(f64::NAN);
+                continue;
+            };
             let sweep = hull.peaks(response_0.view(), response_90.view());
             out_row[0] = peak_0;
             out_row[1] = peak_90;
@@ -329,5 +322,27 @@ mod tests {
                 result[[0, 0, column]]
             );
         }
+    }
+
+    #[test]
+    fn test_psa_is_nan_when_the_last_sample_is_infinite() {
+        // The last sample only reaches the final state, which is then
+        // infinite rather than NaN.
+        let t = Array1::<f64>::linspace(0.0, 2.0, 512);
+        let dt = t[1] - t[0];
+        let comp_0 = t.map(|&x| (3.0 * x).sin()).insert_axis(Axis(0));
+        let comp_90 = t.map(|&x| 0.7 * (5.0 * x).cos()).insert_axis(Axis(0));
+        let mut comp_ver = t.map(|&x| 0.2 * (7.0 * x).sin());
+        comp_ver[511] = f64::INFINITY;
+        let comp_ver = comp_ver.insert_axis(Axis(0));
+
+        let result = psa(
+            &comp_0.view(),
+            &comp_90.view(),
+            &comp_ver.view(),
+            &coefficient_table(&[1.0], dt).view(),
+        );
+
+        assert!(result.iter().all(|v| v.is_nan()), "{result}");
     }
 }
