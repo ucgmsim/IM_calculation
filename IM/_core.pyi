@@ -6,10 +6,10 @@ Every array argument must be a C-contiguous array of the stated dtype.
 
 import numpy as np
 
-_Array1F64 = np.ndarray[tuple[int], np.dtype[np.float64]]
-_Array2F64 = np.ndarray[tuple[int, int], np.dtype[np.float64]]
-_Array2F32 = np.ndarray[tuple[int, int], np.dtype[np.float32]]
-_Array3F64 = np.ndarray[tuple[int, int, int], np.dtype[np.float64]]
+type _Array1F64 = np.ndarray[tuple[int], np.dtype[np.float64]]
+type _Array2F64 = np.ndarray[tuple[int, int], np.dtype[np.float64]]
+type _Array2F32 = np.ndarray[tuple[int, int], np.dtype[np.float32]]
+type _Array3F64 = np.ndarray[tuple[int, int, int], np.dtype[np.float64]]
 
 def _arias_intensity(waveforms_py: np.ndarray, dt: float) -> _Array1F64: ...
 def _cav(waveforms_py: np.ndarray, dt: float) -> _Array1F64: ...
