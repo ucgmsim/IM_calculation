@@ -622,7 +622,7 @@ def _nigam_jennings_coefficients(
         rescaled to `[ω² u, u']` so the recurrence yields pseudo-acceleration.
     """
     w = 2 * np.pi / periods
-    # Augmented state [u, v, p, p'] with load p = -a_g and constant slope p'.
+    # Augmented state [u, u', p, p'] with load p = -a_g and constant slope p'.
     state = np.zeros((len(w), 4, 4))
     state[:, 0, 1] = 1.0
     state[:, 1, 0] = -(w**2)
@@ -630,7 +630,14 @@ def _nigam_jennings_coefficients(
     state[:, 1, 2] = 1.0
     state[:, 2, 3] = 1.0 / dt
     transition = sp.linalg.expm(state * dt)
-    # x[n+1] = Φ x[n] + Γ0 p[n] + Γ1 (p[n+1] - p[n]), with p = -a_g.
+    # This transition matrix predicts p(n + 1) and p'(n + 1), but we only need
+    # the part of the transition matrix that corresponds to the u, u'. The
+    # matrix E = exp(state * dt) will have shape
+    # [Φ Γ0 Γ1; 0 0 1 1; 0 0 0 1]
+    # Where Φ, Γ0, Γ1 are 2 x 2 matrices. Matrix exponentiation shows [u(n + 1),
+    # u'(n + 1), p(n + 1), p'(n + 1)] = E [u(n), u'(n), p(n), p'(n)].
+    # Noting that p'(n) = p(n + 1) - p(n),
+    # u(n+1) = Φ u(n) + Γ0 p(n) + Γ1 (p(n+1) - p(n)), with p = -a_g.
     phi = transition[:, :2, :2]
     gamma_0 = transition[:, :2, 2]
     gamma_1 = transition[:, :2, 3]
