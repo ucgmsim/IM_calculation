@@ -56,7 +56,7 @@ def calculate_snr(
         Waveform data as a NumPy array.
     dt : float
         The sampling rate of the waveform
-    tp : float
+    tp : int
         The index of the p-arrival
     frequencies : np.ndarray, optional
         The frequency vector to use for the SNR calculation,
@@ -73,25 +73,30 @@ def calculate_snr(
     Raises
     ------
     ValueError
-        If the noise duration is less than 1s and so SNR can't be computed.
+        If `tp` is not a valid index into the waveform, or if the noise
+        duration is less than 1s and so SNR can't be computed.
     """
+    (_, _, nt) = waveform.shape
+    if not (0 < tp < nt):
+        raise ValueError(f"tp ({tp}) must be between 0 and nt ({nt}), exclusive")
+
     # This extra time is to ensure that when a taper is applied, the signal part of the waveform
     # is not affected by the tapering. The tapering is applied to the signal and noise separately.
-    (_, _, nt) = waveform.shape
     tp_extra = (nt - tp) / 19
     # Round up the tp_extra to the nearest highest integer
     tp_extra = int(np.ceil(tp_extra))
 
     # Calculate signal and noise areas
-    signal_duration, noise_duration = (nt - max(tp - tp_extra, 0), tp)
+    signal_npts, noise_npts = (nt - max(tp - tp_extra, 0), tp)
+    signal_duration, noise_duration = (signal_npts * dt, noise_npts * dt)
 
     signal_acc, noise_acc = (
-        waveform[:, :, nt - signal_duration :],
-        waveform[:, :, :noise_duration],
+        waveform[:, :, nt - signal_npts :],
+        waveform[:, :, :noise_npts],
     )
 
     # Ensure the noise is not shorter than 1s, if not then skip the calculation
-    if noise_duration < 1:
+    if noise_duration < 1.0:
         raise ValueError("Noise duration is less than 1s")
 
     # Apply Taper
