@@ -12,9 +12,7 @@ from pathlib import Path
 import numpy as np
 import numpy.typing as npt
 
-from IM import (
-    _core,  # ty: ignore[unresolved-import]
-)
+from IM import _core
 
 DEFAULT_BANDWIDTH = 188.5
 """Bandwidth of the Konno-Ohmachi window. Lower values smooth more strongly.
