@@ -1,0 +1,53 @@
+name: AI
+
+# Scheduled Claude jobs from ucgmsim/meta-ci-action: file vetted issues, fix the
+# ones labelled `ai-ok`, and add tests that kill surviving mutants. The times are
+# ~02:17 in Auckland; the crons are UTC. Setup mirrors ci.yml.
+on:
+  schedule:
+    - cron: "17 13 * * 6"  # Sundays: issue generator
+    - cron: "17 13 * * *"  # Daily: issue solver and test improver
+  workflow_dispatch:
+    inputs:
+      run:
+        description: "Which job to run now"
+        type: choice
+        options: [issue-generator, issue-solver, test-improver]
+      issue:
+        description: "issue-solver: try this issue regardless of its labels (0: the oldest ai-ok issues)"
+        type: number
+        default: 0
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+  id-token: write  # for the Claude GitHub App
+
+jobs:
+  issue-generator:
+    if: github.event.schedule == '17 13 * * 6' || inputs.run == 'issue-generator'
+    uses: ucgmsim/meta-ci-action/.github/workflows/ai-issue-generator.yml@v2
+    secrets:
+      claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+    with:
+      uv-extra-args: "--all-extras"
+
+  issue-solver:
+    if: github.event.schedule == '17 13 * * *' || inputs.run == 'issue-solver'
+    uses: ucgmsim/meta-ci-action/.github/workflows/ai-issue-solver.yml@v2
+    secrets:
+      claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+    with:
+      # A dispatch passes the number as a string, which a number input rejects.
+      issue: ${{ fromJSON(inputs.issue || '0') }}
+      uv-extra-args: "--all-extras"
+
+  test-improver:
+    if: github.event.schedule == '17 13 * * *' || inputs.run == 'test-improver'
+    uses: ucgmsim/meta-ci-action/.github/workflows/ai-test-improver.yml@v2
+    secrets:
+      claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+    with:
+      cov-package: IM
+      uv-extra-args: "--all-extras"
