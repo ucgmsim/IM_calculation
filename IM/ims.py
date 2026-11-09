@@ -888,7 +888,7 @@ def _fas_kernel(
 def fourier_amplitude_spectra(
     waveforms: Waveform,
     dt: float,
-    freqs: npt.NDArray[np.float64],
+    freqs: npt.ArrayLike,
     bandwidth: float = konno_ohmachi.DEFAULT_BANDWIDTH,
 ) -> xr.Dataset:
     """Compute Fourier Amplitude Spectrum (FAS) of seismic waveforms.
@@ -899,8 +899,9 @@ def fourier_amplitude_spectra(
         Waveform array (g) with shape `(n_components, n_stations, n_timesteps)`.
     dt : float
         Timestep resolution of the waveforms (s).
-    freqs : ndarray of float64
-        Frequencies at which to compute FAS (Hz).
+    freqs : array_like
+        Frequencies at which to compute FAS (Hz). Must be non-negative and
+        finite.
     bandwidth : float, optional
         Bandwidth of the Konno-Ohmachi smoothing window. Lower values smooth
         more strongly.
@@ -910,7 +911,15 @@ def fourier_amplitude_spectra(
     xr.Dataset
         One data variable per component, each with a `frequency` dimension,
         containing FAS values for ['000', '090', 'ver', 'geom', 'eas'].
+
+    Raises
+    ------
+    ValueError
+        If any frequency is negative or not finite.
     """
+    freqs = np.asarray(freqs, dtype=np.float64)
+    if not np.all(np.isfinite(freqs) & (freqs >= 0)):
+        raise ValueError("freqs must be non-negative and finite.")
     waveform = _as_waveform(waveforms)
 
     nyquist_frequency = 1 / (2 * dt)
