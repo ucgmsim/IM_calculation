@@ -730,6 +730,34 @@ def test_invalid_waveform_shapes(invalid_shape: tuple[int, ...]) -> None:
         ims.peak_ground_acceleration(waveforms)
 
 
+@pytest.mark.parametrize("nt", [0, 1])
+@pytest.mark.parametrize(
+    "im_function",
+    [
+        ims.peak_ground_acceleration,
+        functools.partial(ims.peak_ground_velocity, dt=0.01),
+        functools.partial(ims.peak_ground_displacement, dt=0.01),
+        functools.partial(ims.cumulative_absolute_velocity, dt=0.01),
+        functools.partial(ims.arias_intensity, dt=0.01),
+        functools.partial(ims.ds575, dt=0.01),
+        functools.partial(ims.ds595, dt=0.01),
+        functools.partial(
+            ims.pseudo_spectral_acceleration, periods=np.array([1.0]), dt=0.01
+        ),
+        functools.partial(
+            ims.fourier_amplitude_spectra, dt=0.01, freqs=np.array([1.0, 10.0])
+        ),
+    ],
+)
+def test_waveform_too_few_timesteps(im_function: Callable, nt: int) -> None:
+    """Waveforms with fewer than 2 timesteps are rejected with a clear error
+    (see issue #250) instead of failing cryptically or returning garbage."""
+    waveforms = np.ones((3, 1, nt), dtype=np.float64) * 0.1
+
+    with pytest.raises(ValueError, match="at least 2 timesteps"):
+        im_function(waveforms)
+
+
 @pytest.mark.parametrize("period", [0.0, -1.0, np.inf, np.nan])
 def test_pseudo_spectral_acceleration_rejects_non_positive_periods(
     sample_waveforms: npt.NDArray[np.float64],

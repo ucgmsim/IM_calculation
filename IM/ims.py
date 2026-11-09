@@ -83,6 +83,8 @@ def _as_waveform(waveform: Waveform) -> xr.DataArray:
     TypeError
         If the waveform has the wrong number of dimensions, is missing the
         `component`/`time` dimensions, or does not have 3 components.
+    ValueError
+        If the waveform has fewer than 2 timesteps.
     """
     if not isinstance(waveform, xr.DataArray):
         array = np.asarray(waveform)
@@ -100,6 +102,10 @@ def _as_waveform(waveform: Waveform) -> xr.DataArray:
         raise TypeError(
             f"Waveform must have {len(Component)} components, "
             f"but {waveform.sizes['component']=}"
+        )
+    if waveform.sizes["time"] < 2:
+        raise ValueError(
+            f"Waveform must have at least 2 timesteps, but {waveform.sizes['time']=}"
         )
     if waveform.chunks is not None:
         waveform = waveform.chunk({"component": -1, "time": -1})
