@@ -181,7 +181,7 @@ def calculate_ims(
     periods: np.ndarray = DEFAULT_PERIODS,
     frequencies: np.ndarray = DEFAULT_FREQUENCIES,
     bandwidth: float = konno_ohmachi.DEFAULT_BANDWIDTH,
-):
+) -> pd.DataFrame:
     """
     Calculate intensity measures for a single waveform.
 
@@ -211,9 +211,8 @@ def calculate_ims(
     Raises
     ------
     ValueError
-        If the IM is not recognized, if required environment variables are
-        not set to 1, or if `waveform` is not a single station's waveform
-        with shape `(1, nt, 3)` or `(nt, 3)`.
+        If the IM is not recognized, or if `waveform` is not a single
+        station's waveform with shape `(1, nt, 3)` or `(nt, 3)`.
     """
     if ims_list is None:
         ims_list = list(IM)
