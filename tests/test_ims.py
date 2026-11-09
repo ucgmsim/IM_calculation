@@ -755,6 +755,24 @@ def test_fourier_amplitude_spectra_shape() -> None:
         assert fas[component].shape == (n_stations, len(freqs))
 
 
+def test_fourier_amplitude_spectra_accepts_list() -> None:
+    """Regression test: a plain list of frequencies raised AttributeError
+    because `fourier_amplitude_spectra` called `.max()` on it."""
+    waveforms = np.random.default_rng(0).normal(size=(3, 1, 1000))
+    from_list = ims.fourier_amplitude_spectra(waveforms, 0.01, [1.0, 2.0])
+    from_array = ims.fourier_amplitude_spectra(waveforms, 0.01, np.array([1.0, 2.0]))
+    xr.testing.assert_equal(from_list, from_array)
+
+
+@pytest.mark.parametrize("freq", [-1.0, np.nan, np.inf])
+def test_fourier_amplitude_spectra_rejects_invalid_frequency(freq: float) -> None:
+    """Negative or non-finite frequencies are rejected, as pSA rejects
+    invalid periods."""
+    waveforms = np.random.default_rng(0).normal(size=(3, 1, 1000))
+    with pytest.raises(ValueError):
+        ims.fourier_amplitude_spectra(waveforms, 0.01, [1.0, freq])
+
+
 # Asserts that the RotDx values of PGA, PGV and pSA are invariant of the order of 000 and 090.
 @given(
     waveform=nst.arrays(
