@@ -89,7 +89,7 @@ def test_scalar_im_matches_direct_computation(
     assert list(result.columns) == [im.value]
     expected = compute(_component_waveform(station_waveform))
     assert list(result.index) == list(expected.data_vars)
-    for component in expected.data_vars:
+    for component in map(str, expected.data_vars):
         assert result.loc[component, im.value] == pytest.approx(
             float(expected[component].values[0]), nan_ok=True
         )
@@ -106,7 +106,7 @@ def test_psa_columns_match_direct_computation(
     expected = ims.pseudo_spectral_acceleration(
         _component_waveform(station_waveform), PERIODS, DT
     )
-    for component in expected.data_vars:
+    for component in map(str, expected.data_vars):
         np.testing.assert_allclose(
             result.loc[component].to_numpy(dtype=float),
             expected[component].values[0],
@@ -135,7 +135,7 @@ def test_fas_uses_requested_bandwidth(
     expected = ims.fourier_amplitude_spectra(
         _component_waveform(station_waveform), DT, FREQUENCIES, bandwidth=bandwidth
     )
-    for component in expected.data_vars:
+    for component in map(str, expected.data_vars):
         np.testing.assert_allclose(
             result.loc[component].to_numpy(dtype=float),
             expected[component].values[0],
