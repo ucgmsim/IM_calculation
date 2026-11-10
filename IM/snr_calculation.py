@@ -53,9 +53,13 @@ def calculate_snr(
     Parameters
     ----------
     waveform : np.ndarray
-        Waveform data as a NumPy array.
+        Waveform data for a single station, with shape ``(3, 1, nt)``:
+        the 000, 090 and ver components, then one station, then time.
+        Note that `waveform_reading.read_ascii` returns shape ``(1, nt, 3)``,
+        so its output must be transposed (e.g. with
+        ``np.moveaxis(waveform, -1, 0)``) before being passed in.
     dt : float
-        The sampling rate of the waveform
+        The sampling interval of the waveform (s).
     tp : int
         The index of the p-arrival
     frequencies : np.ndarray, optional
@@ -73,9 +77,15 @@ def calculate_snr(
     Raises
     ------
     ValueError
-        If `tp` is not a valid index into the waveform, or if the noise
+        If `waveform` does not have shape ``(3, 1, nt)``, if `tp` is not a
+        valid index into the waveform, or if the noise
         duration is less than 1s and so SNR can't be computed.
     """
+    if waveform.ndim != 3 or waveform.shape[0] != 3 or waveform.shape[1] != 1:
+        raise ValueError(
+            "waveform must have shape (3, 1, nt) (components, a single station, "
+            f"time), but has shape {waveform.shape}"
+        )
     (_, _, nt) = waveform.shape
     if not (0 < tp < nt):
         raise ValueError(f"tp ({tp}) must be between 0 and nt ({nt}), exclusive")

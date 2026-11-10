@@ -307,6 +307,34 @@ def test_snr_tp_validated_against_record_length(tp: int) -> None:
         snr_calculation.calculate_snr(waveform, dt, tp=tp)
 
 
+@pytest.mark.parametrize(
+    "shape",
+    [
+        (3, 2, 2000),  # multiple stations would be silently truncated
+        (1, 2000, 3),  # read_ascii layout
+        (2000, 3),  # 2D layout
+        (2, 1, 2000),  # wrong number of components
+    ],
+)
+def test_snr_rejects_unsupported_waveform_shape(shape: tuple[int, ...]) -> None:
+    """calculate_snr only accepts a single-station (3, 1, nt) waveform."""
+    rng = np.random.default_rng(0)
+    waveform = rng.normal(size=shape)
+
+    with pytest.raises(ValueError, match=r"\(3, 1, nt\)"):
+        snr_calculation.calculate_snr(waveform, 0.01, tp=500)
+
+
+def test_snr_accepts_single_station_waveform() -> None:
+    """A (3, 1, nt) waveform is accepted and yields one column per component."""
+    rng = np.random.default_rng(0)
+    waveform = rng.normal(size=(3, 1, 2000))
+
+    result = snr_calculation.calculate_snr(waveform, 0.01, tp=500)
+
+    assert list(result.snr_df.columns) == ["000", "090", "ver"]
+
+
 def test_all_ims_benchmark() -> None:
     """Compare benchmark IM calculation against current implementation."""
     # Load the DataFrame
