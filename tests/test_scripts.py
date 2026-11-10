@@ -1,9 +1,12 @@
 import shutil
 from pathlib import Path
 
+import numpy as np
+import pandas as pd
 import pytest
 from typer.testing import CliRunner
 
+from IM import im_calculation, waveform_reading
 from IM.scripts.calculate_ims import (
     app,  # Replace with the actual module name containing your app
 )
@@ -63,6 +66,39 @@ def test_calculate_ims_ascii_invalid_file():
     # Assertions
     assert result.exit_code != 0
     assert "Usage:" in result.stderr
+
+
+def test_calculate_ims_ascii_matches_calculate_ims(waveform_directory: Path):
+    file_000 = waveform_directory / "2024p950420_MWFS_HN_20.000"
+    file_090 = waveform_directory / "2024p950420_MWFS_HN_20.090"
+    file_ver = waveform_directory / "2024p950420_MWFS_HN_20.ver"
+    output_file = waveform_directory / "output.csv"
+
+    result = runner.invoke(
+        app,
+        [
+            str(file_000),
+            str(file_090),
+            str(file_ver),
+            str(output_file),
+            "pSA",
+            "--periods",
+            "0.5",
+            "--periods",
+            "1.0",
+        ],
+    )
+    assert result.exit_code == 0, result.output
+
+    dt, waveform = waveform_reading.read_ascii(file_000, file_090, file_ver)
+    expected = im_calculation.calculate_ims(
+        waveform, dt, [im_calculation.IM.pSA], np.array([0.5, 1.0])
+    )
+    actual = pd.read_csv(output_file, index_col=0)
+
+    assert list(actual.columns) == list(expected.columns)
+    assert list(actual.index) == list(expected.index)
+    np.testing.assert_allclose(actual.to_numpy(), expected.to_numpy(), rtol=1e-12)
 
 
 def test_calculate_ims_ascii_empty_ims_list(tmp_path: Path):
