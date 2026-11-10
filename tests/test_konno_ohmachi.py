@@ -387,3 +387,12 @@ def test_bins_for_samples_matches_the_fas_padding() -> None:
     """The bin count `warm` takes is the one FAS will actually ask for."""
     for n_samples, expected in ((7144, 4097), (9271, 8193), (21953, 16385)):
         assert konno_ohmachi.bins_for_samples(n_samples) == expected
+
+
+@pytest.mark.parametrize("bandwidth", [0.0, -40.0, np.nan, np.inf])
+def test_invalid_bandwidth_rejected(bandwidth: float) -> None:
+    """A bandwidth that is not positive and finite is rejected up front."""
+    with pytest.raises(ValueError, match="bandwidth must be positive and finite"):
+        konno_ohmachi.smoothing_matrix(5, bandwidth)
+    with pytest.raises(ValueError, match="bandwidth must be positive and finite"):
+        konno_ohmachi.smooth(np.ones((2, 5)), bandwidth, konno_ohmachi.MatrixStore())
