@@ -64,6 +64,23 @@ def _row_blocks(n_bins: int) -> list[tuple[int, int]]:
     return [(start, min(start + rows, n_bins)) for start in range(0, n_bins, rows)]
 
 
+def _check_bandwidth(bandwidth: float) -> None:
+    """Reject a Konno-Ohmachi bandwidth that is not positive and finite.
+
+    Parameters
+    ----------
+    bandwidth : float
+        Bandwidth of the Konno-Ohmachi window.
+
+    Raises
+    ------
+    ValueError
+        If `bandwidth` is zero, negative, infinite or NaN.
+    """
+    if not (np.isfinite(bandwidth) and bandwidth > 0):
+        raise ValueError(f"bandwidth must be positive and finite, got {bandwidth}")
+
+
 def smoothing_matrix(
     n_bins: int, bandwidth: float = DEFAULT_BANDWIDTH
 ) -> npt.NDArray[np.float32]:
@@ -84,7 +101,13 @@ def smoothing_matrix(
     -------
     ndarray of float32
         An `(n_bins, n_bins)` row-major matrix.
+
+    Raises
+    ------
+    ValueError
+        If `bandwidth` is not positive and finite.
     """
+    _check_bandwidth(bandwidth)
     return _core._konno_ohmachi_matrix_rows(n_bins, bandwidth, 0, n_bins)
 
 
@@ -351,7 +374,13 @@ def smooth(
     -------
     ndarray of float64
         The smoothed spectra, with the same shape as `spectra`.
+
+    Raises
+    ------
+    ValueError
+        If `bandwidth` is not positive and finite.
     """
+    _check_bandwidth(bandwidth)
     store = store if store is not None else MATRICES
     n_bins = spectra.shape[-1]
     flat = np.asarray(spectra).reshape(-1, n_bins)

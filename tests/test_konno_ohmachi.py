@@ -389,6 +389,15 @@ def test_bins_for_samples_matches_the_fas_padding() -> None:
         assert konno_ohmachi.bins_for_samples(n_samples) == expected
 
 
+@pytest.mark.parametrize("bandwidth", [0.0, -40.0, np.nan, np.inf])
+def test_invalid_bandwidth_rejected(bandwidth: float) -> None:
+    """A bandwidth that is not positive and finite is rejected up front."""
+    with pytest.raises(ValueError, match="bandwidth must be positive and finite"):
+        konno_ohmachi.smoothing_matrix(5, bandwidth)
+    with pytest.raises(ValueError, match="bandwidth must be positive and finite"):
+        konno_ohmachi.smooth(np.ones((2, 5)), bandwidth, konno_ohmachi.MatrixStore())
+
+
 def test_bins_for_samples_is_an_exact_integer() -> None:
     """The bin count is an `int`, usable as an array size and a store key.
 

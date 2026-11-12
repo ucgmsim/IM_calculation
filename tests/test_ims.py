@@ -1166,3 +1166,13 @@ def test_upsampled_psa_is_nan_only_for_the_non_finite_station(
     for component in ims.ROTD_COMPONENTS:
         assert np.isnan(psa[component].values[0]).all()
         assert np.isfinite(psa[component].values[1]).all()
+
+
+@pytest.mark.parametrize("bandwidth", [0.0, -40.0, np.nan])
+def test_fourier_amplitude_spectra_invalid_bandwidth(bandwidth: float) -> None:
+    """An invalid Konno-Ohmachi bandwidth raises a clear error, not a NaN failure."""
+    waveform = np.random.default_rng(0).normal(size=(3, 1, 1000))
+    with pytest.raises(ValueError, match="bandwidth must be positive and finite"):
+        ims.fourier_amplitude_spectra(
+            waveform, 0.01, np.array([1.0, 5.0, 10.0]), bandwidth=bandwidth
+        )
