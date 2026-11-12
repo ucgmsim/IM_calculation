@@ -1,6 +1,7 @@
 """Test cases for intensity measure implementations."""
 
 import functools
+import warnings
 from collections.abc import Callable
 from pathlib import Path
 
@@ -333,6 +334,145 @@ def test_snr_accepts_single_station_waveform() -> None:
     result = snr_calculation.calculate_snr(waveform, 0.01, tp=500)
 
     assert list(result.snr_df.columns) == ["000", "090", "ver"]
+
+
+@pytest.mark.parametrize("tp", [0, 1000])
+def test_snr_tp_out_of_range_error_message(tp: int) -> None:
+    """tp outside (0, nt) is rejected by the tp check, with a message naming tp."""
+    rng = np.random.default_rng(0)
+    waveform = rng.normal(size=(3, 1, 1000))
+
+    with pytest.raises(
+        ValueError, match=rf"tp \({tp}\) must be between 0 and nt \(1000\)"
+    ):
+        snr_calculation.calculate_snr(waveform, 0.01, tp=tp)
+
+
+@pytest.mark.parametrize(
+    ("tp", "dt"),
+    [
+        (1, 0.01),  # smallest valid index, but only 0.01s of noise
+        (99, 0.01),  # 0.99s of noise
+    ],
+)
+def test_snr_short_noise_error_message(tp: int, dt: float) -> None:
+    """A valid tp with under 1s of noise fails the noise-duration check."""
+    rng = np.random.default_rng(0)
+    waveform = rng.normal(size=(3, 1, 1000))
+
+    with pytest.raises(ValueError, match=r"^Noise duration is less than 1s$"):
+        snr_calculation.calculate_snr(waveform, dt, tp=tp)
+
+
+@pytest.mark.parametrize("tp", [100, 150])
+def test_snr_accepts_noise_of_at_least_one_second(tp: int) -> None:
+    """Exactly 1s (and 1.5s) of noise is enough to compute the SNR."""
+    rng = np.random.default_rng(0)
+    waveform = rng.normal(size=(3, 1, 2000))
+
+    result = snr_calculation.calculate_snr(waveform, 0.01, tp=tp)
+
+    assert result.noise_duration == pytest.approx(tp * 0.01)
+    assert np.all(np.isfinite(result.snr_df.values))
+
+
+@pytest.mark.parametrize(
+    ("tp", "expected_signal_npts"),
+    [
+        # tp_extra = ceil((2000 - 500) / 19) = 79, signal starts at 500 - 79.
+        (500, 2000 - (500 - 79)),
+        # tp_extra = ceil((2000 - 100) / 19) = 100, signal starts at index 0.
+        (100, 2000),
+        # tp_extra = ceil((2000 - 50) / 19) = 103 > tp, signal clamped to index 0.
+        (50, 2000),
+    ],
+)
+def test_snr_signal_and_noise_durations(tp: int, expected_signal_npts: int) -> None:
+    """Signal window starts tp_extra samples before tp (clamped at 0)."""
+    rng = np.random.default_rng(0)
+    waveform = rng.normal(size=(3, 1, 2000))
+    dt = 0.02
+
+    result = snr_calculation.calculate_snr(waveform, dt, tp=tp)
+
+    assert result.signal_duration == pytest.approx(expected_signal_npts * dt)
+    assert result.noise_duration == pytest.approx(tp * dt)
+
+
+def test_snr_outputs_match_fas_of_tapered_windows() -> None:
+    """The FAS and SNR outputs are built from the tapered signal and noise
+    windows, using the requested Konno-Ohmachi bandwidth."""
+    rng = np.random.default_rng(1)
+    nt, tp, dt = 2000, 500, 0.01
+    waveform = rng.normal(size=(3, 1, nt))
+    # Make the signal stronger than the noise so the SNR is meaningful.
+    waveform[:, :, tp:] *= 10
+    freqs = np.logspace(-0.5, 1.3, 25)
+    bandwidth = 20.0
+
+    result = snr_calculation.calculate_snr(
+        waveform, dt, tp, frequencies=freqs, bandwidth=bandwidth
+    )
+
+    signal_start = tp - int(np.ceil((nt - tp) / 19))
+    signal = waveform[:, :, signal_start:]
+    noise = waveform[:, :, :tp]
+    signal = signal * sp.signal.windows.tukey(signal.shape[-1], alpha=0.05)
+    noise = noise * sp.signal.windows.tukey(noise.shape[-1], alpha=0.05)
+    components = ["000", "090", "ver"]
+    expected_signal = (
+        ims.fourier_amplitude_spectra(signal, dt, freqs, bandwidth)[components]
+        .isel(station=0, drop=True)
+        .to_dataframe()
+    )
+    expected_noise = (
+        ims.fourier_amplitude_spectra(noise, dt, freqs, bandwidth)[components]
+        .isel(station=0, drop=True)
+        .to_dataframe()
+    )
+    signal_duration = (nt - signal_start) * dt
+    noise_duration = tp * dt
+
+    assert isinstance(result.fas_signal_df, pd.DataFrame)
+    assert isinstance(result.fas_noise_df, pd.DataFrame)
+    pd.testing.assert_frame_equal(result.fas_signal_df, expected_signal)
+    pd.testing.assert_frame_equal(result.fas_noise_df, expected_noise)
+    assert result.signal_duration == pytest.approx(signal_duration)
+    assert result.noise_duration == pytest.approx(noise_duration)
+    pd.testing.assert_frame_equal(
+        result.snr_df,
+        (expected_signal * noise_duration) / (expected_noise * signal_duration),
+    )
+
+    # The bandwidth argument actually changes the smoothing.
+    default_bandwidth = snr_calculation.calculate_snr(
+        waveform, dt, tp, frequencies=freqs
+    )
+    assert not np.allclose(
+        default_bandwidth.fas_signal_df.values, result.fas_signal_df.values
+    )
+    assert not np.allclose(
+        default_bandwidth.fas_noise_df.values, result.fas_noise_df.values
+    )
+
+
+def test_snr_silent_noise_gives_inf_and_nan_without_warnings() -> None:
+    """Zero noise yields inf SNR (and NaN where the signal is also zero)
+    without emitting divide-by-zero or invalid-value warnings."""
+    rng = np.random.default_rng(0)
+    nt, tp, dt = 2000, 500, 0.01
+    waveform = np.zeros((3, 1, nt))
+    # Only the 000 component has signal (well after the signal window start).
+    waveform[0, 0, 600:] = rng.normal(size=nt - 600)
+    freqs = np.logspace(-1, 1, 20)
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        result = snr_calculation.calculate_snr(waveform, dt, tp, frequencies=freqs)
+
+    assert np.all(np.isposinf(result.snr_df["000"].to_numpy(dtype=np.float64)))
+    assert np.all(np.isnan(result.snr_df["090"].values))
+    assert np.all(np.isnan(result.snr_df["ver"].values))
 
 
 def test_all_ims_benchmark() -> None:
