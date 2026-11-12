@@ -396,3 +396,157 @@ def test_invalid_bandwidth_rejected(bandwidth: float) -> None:
         konno_ohmachi.smoothing_matrix(5, bandwidth)
     with pytest.raises(ValueError, match="bandwidth must be positive and finite"):
         konno_ohmachi.smooth(np.ones((2, 5)), bandwidth, konno_ohmachi.MatrixStore())
+
+
+def test_bins_for_samples_is_an_exact_integer() -> None:
+    """The bin count is an `int`, usable as an array size and a store key.
+
+    A float `4097.0` compares equal to `4097` but cannot size an array.
+    """
+    for n_samples, expected in ((1, 1), (2, 2), (3, 3), (4, 3), (5, 5), (1024, 513)):
+        n_bins = konno_ohmachi.bins_for_samples(n_samples)
+        assert type(n_bins) is int
+        assert n_bins == expected
+
+
+@pytest.fixture
+def stores() -> Iterator[list[konno_ohmachi.MatrixStore]]:
+    """Collect stores a test builds, and clear them so no scratch file leaks."""
+    built: list[konno_ohmachi.MatrixStore] = []
+    yield built
+    for store in built:
+        store.clear()
+
+
+@pytest.mark.parametrize("as_string", [False, True], ids=["path", "str"])
+@pytest.mark.parametrize("exists", [False, True], ids=["missing", "existing"])
+def test_store_spills_into_its_own_scratch_directory(
+    stores: list[konno_ohmachi.MatrixStore],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    as_string: bool,
+    exists: bool,
+) -> None:
+    """A store spills into the directory it was given, whether or not it exists.
+
+    A missing directory is created along with its missing parents; an existing
+    one is reused. The platform temporary directory and the environment
+    variable point elsewhere, and the former is made unusable, so a matrix
+    spilled anywhere but the given directory fails to spill at all.
+    """
+    monkeypatch.setattr(konno_ohmachi.tempfile, "tempdir", str(tmp_path / "gone"))
+    monkeypatch.setenv(
+        konno_ohmachi.SCRATCH_DIRECTORY_VARIABLE, str(tmp_path / "from-env")
+    )
+    chosen = tmp_path / "deep" / "nested" / "scratch"
+    if exists:
+        chosen.mkdir(parents=True)
+
+    store = konno_ohmachi.MatrixStore(
+        memory_budget=0,
+        # The constructor converts with `Path(...)`, so a str is accepted too.
+        scratch_directory=str(chosen) if as_string else chosen,  # ty: ignore[invalid-argument-type]
+    )
+    stores.append(store)
+    assert store.scratch_directory == chosen
+
+    matrix = store.get(65, 40.0)
+
+    assert isinstance(matrix, np.memmap)
+    assert matrix.dtype == np.float32
+    assert matrix.shape == (65, 65)
+    np.testing.assert_allclose(
+        matrix, konno_ohmachi.smoothing_matrix(65, 40.0), rtol=1e-6
+    )
+    assert chosen.is_dir()
+    assert not (tmp_path / "from-env").exists()
+    assert len(store) == 1
+    # A hit serves the same spilled matrix rather than spilling again.
+    assert store.get(65, 40.0) is matrix
+
+    store.clear()
+    assert len(store) == 0
+    assert list(chosen.iterdir()) == []
+
+
+def test_store_defaults_come_from_the_environment(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Without arguments a store reads both knobs from the environment."""
+    monkeypatch.setenv(konno_ohmachi.SCRATCH_DIRECTORY_VARIABLE, str(tmp_path / "env"))
+    monkeypatch.setenv(konno_ohmachi.MEMORY_BUDGET_VARIABLE, "12345")
+
+    store = konno_ohmachi.MatrixStore()
+
+    assert store.scratch_directory == tmp_path / "env"
+    assert store.memory_budget == 12345
+
+
+def test_store_defaults_without_environment(monkeypatch: pytest.MonkeyPatch) -> None:
+    """With neither variable set, the documented fallbacks apply."""
+    monkeypatch.delenv(konno_ohmachi.SCRATCH_DIRECTORY_VARIABLE, raising=False)
+    monkeypatch.delenv(konno_ohmachi.MEMORY_BUDGET_VARIABLE, raising=False)
+
+    store = konno_ohmachi.MatrixStore()
+
+    assert store.scratch_directory == Path(konno_ohmachi.tempfile.gettempdir())
+    assert store.memory_budget == konno_ohmachi.DEFAULT_MEMORY_BUDGET
+
+
+@pytest.mark.parametrize(
+    ("free_delta", "spills"),
+    [(-1, False), (0, True)],
+    ids=["one-byte-short", "exactly-enough"],
+)
+def test_spill_needs_room_for_the_whole_float32_matrix(
+    stores: list[konno_ohmachi.MatrixStore],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    free_delta: int,
+    spills: bool,
+) -> None:
+    """A matrix spills only if the scratch filesystem has all its bytes free.
+
+    `n_bins**2 * 4` bytes is the requirement: one byte short refuses, an exact
+    fit is accepted.
+    """
+    n_bins = 65
+    needed = n_bins * n_bins * np.float32().itemsize
+    monkeypatch.setattr(
+        konno_ohmachi.shutil,
+        "disk_usage",
+        lambda _: SimpleNamespace(free=needed + free_delta),
+    )
+    store = konno_ohmachi.MatrixStore(
+        memory_budget=0, scratch_directory=tmp_path / "scratch"
+    )
+    stores.append(store)
+
+    matrix = store.get(n_bins, 40.0)
+
+    if spills:
+        assert isinstance(matrix, np.memmap)
+        assert matrix.nbytes == needed
+        assert len(store) == 1
+    else:
+        assert matrix is None
+        assert len(store) == 0
+
+
+def test_warm_honours_the_bandwidth(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Warming at a bandwidth builds that bandwidth's matrix, not the default's."""
+    store = konno_ohmachi.MatrixStore()
+    store.warm([65, 129], bandwidth=40.0)
+    assert len(store) == 2
+
+    def explode(*_args: object, **_kwargs: object) -> None:
+        raise AssertionError("a warmed matrix was rebuilt instead of reused")
+
+    monkeypatch.setattr(konno_ohmachi, "smoothing_matrix", explode)
+    warmed = store.get(65, 40.0)
+    assert warmed is not None
+    np.testing.assert_allclose(
+        warmed, obspy_smoothing_matrix(65, 40.0), rtol=1e-4, atol=1e-12
+    )
+    assert store.get(129, 40.0) is not None
+    assert len(store) == 2
