@@ -1,6 +1,7 @@
 """Test cases for intensity measure implementations."""
 
 import functools
+import re
 import warnings
 from collections.abc import Callable
 from pathlib import Path
@@ -318,11 +319,16 @@ def test_snr_tp_validated_against_record_length(tp: int) -> None:
     ],
 )
 def test_snr_rejects_unsupported_waveform_shape(shape: tuple[int, ...]) -> None:
-    """calculate_snr only accepts a single-station (3, 1, nt) waveform."""
+    """calculate_snr only accepts a single-station (3, 1, nt) waveform, and
+    the error message states the expected layout and the shape it was given."""
     rng = np.random.default_rng(0)
     waveform = rng.normal(size=shape)
 
-    with pytest.raises(ValueError, match=r"\(3, 1, nt\)"):
+    expected_message = (
+        "waveform must have shape (3, 1, nt) (components, a single station, "
+        f"time), but has shape {shape}"
+    )
+    with pytest.raises(ValueError, match=rf"^{re.escape(expected_message)}$"):
         snr_calculation.calculate_snr(waveform, 0.01, tp=500)
 
 
