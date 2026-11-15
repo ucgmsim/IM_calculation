@@ -48,6 +48,16 @@ def test_strip_trailing_nans_keeps_rows_valid_in_any_column():
     np.testing.assert_array_equal(waveform_reading.strip_trailing_nans(arr), arr[:2])
 
 
+def test_strip_trailing_nans_keeps_only_first_row():
+    # Only row 0 is valid, so everything after it must be stripped. NaN
+    # entries must map to an index below every real row (i.e. 0), otherwise
+    # the trailing NaN rows would be counted as valid.
+    arr = np.array([[1.0, 2.0, 3.0], [np.nan] * 3, [np.nan] * 3])
+    result = waveform_reading.strip_trailing_nans(arr)
+    assert result.shape == (1, 3)
+    np.testing.assert_array_equal(result, arr[:1])
+
+
 @pytest.mark.parametrize("nt", [12, 14])
 def test_read_ascii_dt_shape_and_values(tmp_path: Path, nt: int):
     # nt = 14 leaves a short last line, which the parser pads with NaN.
@@ -67,7 +77,7 @@ def test_read_ascii_dt_shape_and_values(tmp_path: Path, nt: int):
 def test_read_ascii_mid_record_nan_raises(tmp_path: Path):
     components = [[float(i) for i in range(12)] for _ in range(3)]
     components[1][5] = np.nan
-    with pytest.raises(ValueError, match="NaN"):
+    with pytest.raises(ValueError, match=r"^Components contain NaN values\.$"):
         waveform_reading.read_ascii(*write_components(tmp_path, components))
 
 
