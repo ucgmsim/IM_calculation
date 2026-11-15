@@ -535,7 +535,17 @@ def significant_duration(
     xr.Dataset
         One data variable per component containing the significant duration
         (s) for ['000', '090', 'ver', 'geom'].
+
+    Raises
+    ------
+    ValueError
+        If the bounds do not satisfy 0 <= percent_low < percent_high <= 100.
     """
+    if not 0 <= percent_low < percent_high <= 100:
+        raise ValueError(
+            "Need 0 <= percent_low < percent_high <= 100, "
+            f"got {percent_low=}, {percent_high=}."
+        )
     return _im_dataset(
         _duration_kernel,
         waveforms,

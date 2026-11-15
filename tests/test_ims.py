@@ -740,6 +740,20 @@ def test_significant_duration(
         assert np.all(result[component].values <= len(sample_time) * dt)
 
 
+@pytest.mark.parametrize(
+    "percent_low,percent_high", [(95, 5), (5, 5), (-1, 95), (5, 101)]
+)
+def test_significant_duration_rejects_invalid_percent_bounds(
+    sample_waveforms: npt.NDArray[np.float64],
+    percent_low: float,
+    percent_high: float,
+) -> None:
+    with pytest.raises(
+        ValueError, match=r"^Need 0 <= percent_low < percent_high <= 100"
+    ):
+        ims.significant_duration(sample_waveforms, 0.01, percent_low, percent_high)
+
+
 def test_ds5xx() -> None:
     comp_0 = np.ones((100,), dtype=np.float64)
     waveforms = np.zeros((3, 1, len(comp_0)), dtype=np.float64)
