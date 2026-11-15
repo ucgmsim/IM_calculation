@@ -791,7 +791,7 @@ def pseudo_spectral_acceleration(
     ValueError
         If any period is not strictly positive and finite.
     """
-    periods = np.asarray(periods, dtype=np.float64)
+    periods = np.atleast_1d(np.asarray(periods, dtype=np.float64))
     if not np.all(np.isfinite(periods) & (periods > 0)):
         raise ValueError("periods must be strictly positive and finite.")
     return _im_dataset(
@@ -923,14 +923,13 @@ def fourier_amplitude_spectra(
     ValueError
         If any frequency is negative or not finite.
     """
-    freqs = np.asarray(freqs, dtype=np.float64)
+    freqs = np.atleast_1d(np.asarray(freqs, dtype=np.float64))
     if not np.all(np.isfinite(freqs) & (freqs >= 0)):
         raise ValueError("freqs must be non-negative and finite.")
     waveform = _as_waveform(waveforms)
 
     nyquist_frequency = 1 / (2 * dt)
-    max_frequency = freqs.max()
-    if max_frequency > nyquist_frequency:
+    if freqs.size and freqs.max() > nyquist_frequency:
         warnings.warn(
             RuntimeWarning(
                 f"Attempting to compute FAS for frequencies above Nyquist frequency {nyquist_frequency:.2e} Hz. Results only include frequencies at or below Nyquist frequency {nyquist_frequency:.2e} Hz."

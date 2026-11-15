@@ -1322,3 +1322,35 @@ def test_fourier_amplitude_spectra_invalid_bandwidth(bandwidth: float) -> None:
         ims.fourier_amplitude_spectra(
             waveform, 0.01, np.array([1.0, 5.0, 10.0]), bandwidth=bandwidth
         )
+
+
+def test_psa_scalar_period_matches_length_one_list(
+    sample_waveforms: npt.NDArray[np.float64],
+) -> None:
+    """A scalar period gives the same result as a one-element list."""
+    scalar = ims.pseudo_spectral_acceleration(sample_waveforms, 0.5, 0.01)
+    listed = ims.pseudo_spectral_acceleration(sample_waveforms, [0.5], 0.01)
+    xr.testing.assert_identical(scalar, listed)
+    assert scalar.sizes["period"] == 1
+
+
+def test_fas_scalar_frequency_matches_length_one_list(
+    sample_waveforms: npt.NDArray[np.float64],
+) -> None:
+    """A scalar frequency gives the same result as a one-element list."""
+    scalar = ims.fourier_amplitude_spectra(sample_waveforms, 0.01, 1.0)
+    listed = ims.fourier_amplitude_spectra(sample_waveforms, 0.01, [1.0])
+    xr.testing.assert_identical(scalar, listed)
+    assert scalar.sizes["frequency"] == 1
+
+
+def test_fas_empty_frequencies_returns_empty_frequency_dimension(
+    sample_waveforms: npt.NDArray[np.float64],
+) -> None:
+    """Empty freqs returns an empty frequency dimension, like pSA with no periods."""
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        fas = ims.fourier_amplitude_spectra(sample_waveforms, 0.01, [])
+    assert fas.sizes["frequency"] == 0
+    for component in ims.FAS_COMPONENTS:
+        assert fas[component].shape == (sample_waveforms.shape[1], 0)
