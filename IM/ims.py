@@ -62,6 +62,7 @@ class IM(StrEnum):
     AI = "AI"
     pSA = "pSA"  # noqa: N815
     FAS = "FAS"
+    MMI = "MMI"
 
 
 def _as_waveform(waveform: Waveform) -> xr.DataArray:
@@ -1046,3 +1047,29 @@ def worden_mmi(pgv: xr.DataArray) -> xr.DataArray:
         output_dtypes=[np.float64],
     )
     return mmi.rename("MMI")
+
+
+def worden_mmi_from_pgv(pgv: xr.Dataset) -> xr.Dataset:
+    """Convert a `peak_ground_velocity` dataset to MMI, component by component.
+
+    Applies `worden_mmi` to every PGV component of the dataset. The RotD
+    orientation variables are angles, not PGV, so they are dropped.
+
+    Parameters
+    ----------
+    pgv : xr.Dataset
+        PGV (cm/s), one data variable per component, as returned by
+        `peak_ground_velocity`. May be dask-backed.
+
+    Returns
+    -------
+    xr.Dataset
+        MMI with the same components (minus the orientations), dims, coords
+        and chunks as `pgv`, with `attrs["name"]` set to `MMI`.
+    """
+    orientations = [
+        name for name in pgv.data_vars if str(name).endswith("_orientation")
+    ]
+    mmi = pgv.drop_vars(orientations).map(worden_mmi)
+    mmi.attrs = {"name": IM.MMI.value}
+    return mmi

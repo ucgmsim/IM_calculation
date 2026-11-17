@@ -504,9 +504,10 @@ def test_all_ims_benchmark() -> None:
 
     # The benchmark predates the RotD orientation components and has no
     # reference angles to compare against; those are covered by
-    # test_rotd_orientations_match_a_direct_angle_sweep instead.
+    # test_rotd_orientations_match_a_direct_angle_sweep instead. MMI is a
+    # closed-form function of PGV with no independent reference values.
     components = [component for component in result.index if component in data.index]
-    for im in result.columns:
+    for im in result.columns.drop(ims.IM.MMI.value):
         assert result.loc[components, im].values == pytest.approx(
             data.loc[components, im].values, abs=5e-4, rel=0.01, nan_ok=True
         ), (
@@ -1425,3 +1426,43 @@ def test_worden_mmi_lazy_matches_eager(
     assert_array_equal(lazy.station.values, eager_pgv.station.values)
     assert_array_equal(lazy.latitude.values, eager_pgv.latitude.values)
     assert_array_equal(lazy.compute().values, ims.worden_mmi(eager_pgv).values)
+
+
+def test_worden_mmi_from_pgv_dataset(
+    sample_waveforms: npt.NDArray[np.float64],
+) -> None:
+    """Each PGV component maps to its own MMI; orientations are dropped."""
+    pgv = ims.peak_ground_velocity(sample_waveforms, 0.01)
+    mmi = ims.worden_mmi_from_pgv(pgv)
+    assert mmi.attrs["name"] == ims.IM.MMI
+    assert set(mmi.data_vars) == set(ims.ROTD_COMPONENTS) - {
+        "rotd0_orientation",
+        "rotd100_orientation",
+    }
+    for component in mmi.data_vars:
+        assert_array_equal(mmi[component].values, ims.worden_mmi(pgv[component]).values)
+
+
+def test_worden_mmi_from_pgv_dataset_is_lazy(
+    sample_waveforms: npt.NDArray[np.float64],
+) -> None:
+    lazy_pgv = ims.peak_ground_velocity(
+        _to_dask(sample_waveforms, station_chunk=1), 0.01
+    )
+    lazy = ims.worden_mmi_from_pgv(lazy_pgv)
+    assert all(v.chunks is not None for v in lazy.data_vars.values())
+    xr.testing.assert_identical(
+        lazy.compute(), ims.worden_mmi_from_pgv(lazy_pgv.compute())
+    )
+
+
+def test_calculate_ims_mmi_matches_pgv_conversion() -> None:
+    waveform = np.random.default_rng(0).normal(scale=0.1, size=(1000, 3))
+    result = im_calculation.calculate_ims(
+        waveform, 0.01, ims_list=[ims.IM.PGV, ims.IM.MMI]
+    )
+    # MMI has no RotD orientation rows, so those are NaN in the frame.
+    rows = [row for row in result.index if not row.endswith("_orientation")]
+    expected = ims.worden_mmi(xr.DataArray(result.loc[rows, "PGV"].to_numpy()))
+    assert_array_equal(result.loc[rows, "MMI"].to_numpy(), expected.values)
+    assert result.loc[result.index.difference(rows), "MMI"].isna().all()
