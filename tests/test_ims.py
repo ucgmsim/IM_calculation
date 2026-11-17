@@ -1387,7 +1387,7 @@ def test_worden_mmi_values(pgv: float, expected_mmi: float) -> None:
 
 
 def test_worden_mmi_is_continuous_at_break() -> None:
-    """The two segments meet (to coefficient rounding) at log10(PGV) = 0.53."""
+    """The low and high segments meet (to coefficient rounding) at log10(PGV) = 0.53."""
     t1 = 0.53
     pgv = xr.DataArray(10 ** np.array([t1 - 1e-9, t1 + 1e-9]), dims="station")
     below, above = ims.worden_mmi(pgv).values

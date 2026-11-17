@@ -1013,7 +1013,7 @@ def worden_mmi(pgv: xr.DataArray) -> xr.DataArray:
     The result is clipped to `MMI_RANGE`, so zero PGV maps to MMI 1. NaN PGV
     propagates to NaN MMI. Worden et al. regressed against the larger
     horizontal component, but the conversion is applied elementwise to
-    whatever component(s) `pgv` holds.
+    whatever components `pgv` holds.
 
     The computation is elementwise and lazy for dask-backed input: chunks are
     preserved and nothing is computed until the caller asks.
@@ -1021,7 +1021,7 @@ def worden_mmi(pgv: xr.DataArray) -> xr.DataArray:
     Parameters
     ----------
     pgv : xr.DataArray
-        Precomputed PGV (cm/s) of any shape, e.g. one data variable of the
+        Precomputed PGV (cm/s) of any shape, such as one data variable of the
         `peak_ground_velocity` dataset, or several of its components stacked
         with `Dataset.to_dataarray("component")` (drop `rotd0_orientation` and
         `rotd100_orientation` first; they are angles, not PGV).
