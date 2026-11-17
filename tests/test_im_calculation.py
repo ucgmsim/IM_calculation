@@ -52,6 +52,7 @@ def test_default_ims_produce_every_im_column(all_ims: pd.DataFrame) -> None:
         ["PGA", "PGV", "PGD", "CAV", "CAV5", "Ds575", "Ds595", "AI"]
         + [f"pSA_{p}" for p in PERIODS]
         + [f"FAS_{im_calculation.frequency_label(f)}" for f in FREQUENCIES]
+        + ["MMI"]
     )
     assert list(all_ims.columns) == expected_columns
     # Rows are the components; the scalar IMs carry every one of them.

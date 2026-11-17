@@ -1,5 +1,7 @@
 """IM calculation script for ascii waveforms"""
 
+import functools
+
 import numpy as np
 import pandas as pd
 import xarray as xr
@@ -226,14 +228,15 @@ def calculate_ims(
             f"(1, nt, 3) or (nt, 3), but waveform.shape={waveform.shape}"
         )
     waveform = np.ascontiguousarray(np.moveaxis(waveform, -1, 0))
+    # PGV is computed at most once: MMI is derived from it, not recomputed.
+    pgv = functools.cache(lambda: ims.peak_ground_velocity(waveform, dt))
     # Iterate through IMs and calculate them
     for im in ims_list:
         if im == IM.PGA:
             dataset = ims.peak_ground_acceleration(waveform)
             result = _dataset_to_frame(dataset, [im.value])
         elif im == IM.PGV:
-            dataset = ims.peak_ground_velocity(waveform, dt)
-            result = _dataset_to_frame(dataset, [im.value])
+            result = _dataset_to_frame(pgv(), [im.value])
         elif im == IM.PGD:
             dataset = ims.peak_ground_displacement(waveform, dt)
             result = _dataset_to_frame(dataset, [im.value])
@@ -257,6 +260,9 @@ def calculate_ims(
             result = _dataset_to_frame(dataset, [im.value])
         elif im == IM.AI:
             dataset = ims.arias_intensity(waveform, dt)
+            result = _dataset_to_frame(dataset, [im.value])
+        elif im == IM.MMI:
+            dataset = ims.worden_mmi_from_pgv(pgv())
             result = _dataset_to_frame(dataset, [im.value])
         elif im == IM.FAS:
             dataset = ims.fourier_amplitude_spectra(
