@@ -964,3 +964,85 @@ def fourier_amplitude_spectra(
             "bandwidth": bandwidth,
         },
     )
+
+
+# Worden et al. (2012) PGV -> MMI coefficients (Table 1, PGV in cm/s).
+_WORDEN_PGV_C1 = 3.78
+_WORDEN_PGV_C2 = 1.47
+_WORDEN_PGV_C3 = 2.89
+_WORDEN_PGV_C4 = 3.16
+_WORDEN_PGV_T1 = 0.53
+"""Break point in log10(PGV), where the two linear segments meet (MMI ≈ 4.56)."""
+MMI_RANGE = (1.0, 10.0)
+"""Bounds the Worden et al. (2012) MMI is clipped to, as ShakeMap does."""
+
+
+def _worden_mmi_kernel(pgv: np.ndarray) -> np.ndarray:
+    """Kernel for `worden_mmi`: elementwise PGV (cm/s) to MMI.
+
+    Parameters
+    ----------
+    pgv : ndarray
+        PGV values (cm/s), any shape.
+
+    Returns
+    -------
+    ndarray
+        MMI values, same shape as `pgv`, clipped to `MMI_RANGE`.
+    """
+    # PGV = 0 gives log10 = -inf, which clips to the lower MMI bound.
+    with np.errstate(divide="ignore"):
+        log_pgv = np.log10(np.asarray(pgv, dtype=np.float64))
+    mmi = np.where(
+        log_pgv <= _WORDEN_PGV_T1,
+        _WORDEN_PGV_C1 + _WORDEN_PGV_C2 * log_pgv,
+        _WORDEN_PGV_C3 + _WORDEN_PGV_C4 * log_pgv,
+    )
+    return np.clip(mmi, *MMI_RANGE)
+
+
+def worden_mmi(pgv: xr.DataArray) -> xr.DataArray:
+    """Compute Modified Mercalli Intensity from PGV (Worden et al. 2012).
+
+    Uses the bilinear PGV ground-motion-to-intensity conversion equation of
+    Worden et al. (2012), without the optional magnitude/distance terms:
+
+        MMI = 3.78 + 1.47 log10(PGV)   if log10(PGV) <= 0.53
+        MMI = 2.89 + 3.16 log10(PGV)   otherwise
+
+    The result is clipped to `MMI_RANGE`, so zero PGV maps to MMI 1. NaN PGV
+    propagates to NaN MMI. Worden et al. regressed against the larger
+    horizontal component, but the conversion is applied elementwise to
+    whatever component(s) `pgv` holds.
+
+    The computation is elementwise and lazy for dask-backed input: chunks are
+    preserved and nothing is computed until the caller asks.
+
+    Parameters
+    ----------
+    pgv : xr.DataArray
+        Precomputed PGV (cm/s) of any shape, e.g. one data variable of the
+        `peak_ground_velocity` dataset, or several of its components stacked
+        with `Dataset.to_dataarray("component")` (drop `rotd0_orientation` and
+        `rotd100_orientation` first; they are angles, not PGV).
+
+    Returns
+    -------
+    xr.DataArray
+        MMI with the same dims, coords and chunks as `pgv`, named `MMI`.
+
+    References
+    ----------
+    Worden, C. B., Gerstenberger, M. C., Rhoades, D. A. and Wald, D. J.
+    (2012). Probabilistic relationships between ground-motion parameters and
+    Modified Mercalli intensity in California. Bulletin of the Seismological
+    Society of America, 102(1), 204-221. https://doi.org/10.1785/0120110156
+    """
+    mmi = xr.apply_ufunc(
+        _worden_mmi_kernel,
+        pgv,
+        keep_attrs=False,
+        dask="parallelized",
+        output_dtypes=[np.float64],
+    )
+    return mmi.rename("MMI")

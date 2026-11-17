@@ -1368,3 +1368,60 @@ def test_fas_empty_frequencies_returns_empty_frequency_dimension(
     assert fas.sizes["frequency"] == 0
     for component in ims.FAS_COMPONENTS:
         assert fas[component].shape == (sample_waveforms.shape[1], 0)
+
+
+@pytest.mark.parametrize(
+    "pgv,expected_mmi",
+    [
+        (1.0, 3.78),  # log10 = 0: low segment intercept
+        (10.0, 2.89 + 3.16),  # log10 = 1: high segment
+        (100.0, 2.89 + 3.16 * 2),
+        (0.1, 3.78 - 1.47),
+        (0.0, 1.0),  # log10 = -inf clips to MMI 1
+        (1e6, 10.0),  # clips to MMI 10
+    ],
+)
+def test_worden_mmi_values(pgv: float, expected_mmi: float) -> None:
+    mmi = ims.worden_mmi(xr.DataArray([pgv], dims="station"))
+    assert mmi.values[0] == pytest.approx(expected_mmi)
+
+
+def test_worden_mmi_is_continuous_at_break() -> None:
+    """The two segments meet (to coefficient rounding) at log10(PGV) = 0.53."""
+    t1 = 0.53
+    pgv = xr.DataArray(10 ** np.array([t1 - 1e-9, t1 + 1e-9]), dims="station")
+    below, above = ims.worden_mmi(pgv).values
+    assert below == pytest.approx(above, abs=0.01)
+
+
+def test_worden_mmi_is_monotonic_and_propagates_nan() -> None:
+    pgv = xr.DataArray(np.logspace(-3, 4, 200), dims="station")
+    assert np.all(np.diff(ims.worden_mmi(pgv).values) >= 0)
+    assert np.isnan(ims.worden_mmi(xr.DataArray([np.nan], dims="station")).values[0])
+
+
+def test_worden_mmi_lazy_matches_eager(
+    sample_waveforms: npt.NDArray[np.float64],
+) -> None:
+    """Dask-backed PGV gives a lazy MMI with the input's chunks, dims and
+    coords, and the same values as the eager computation."""
+    n_stations = sample_waveforms.shape[1]
+    coords = {
+        "station": [f"stat_{i}" for i in range(n_stations)],
+        "latitude": ("station", np.arange(n_stations, dtype=np.float64)),
+    }
+    eager_pgv = (
+        ims.peak_ground_velocity(sample_waveforms, 0.01)
+        .drop_vars(["rotd0_orientation", "rotd100_orientation"])
+        .to_dataarray("component")
+        .assign_coords(coords)
+    )
+    lazy_pgv = eager_pgv.chunk({"station": 1})
+
+    lazy = ims.worden_mmi(lazy_pgv)
+    assert lazy.chunks == lazy_pgv.chunks
+    assert lazy.dims == eager_pgv.dims
+    assert lazy.name == "MMI"
+    assert_array_equal(lazy.station.values, eager_pgv.station.values)
+    assert_array_equal(lazy.latitude.values, eager_pgv.latitude.values)
+    assert_array_equal(lazy.compute().values, ims.worden_mmi(eager_pgv).values)
